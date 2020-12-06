@@ -1,0 +1,341 @@
+/*
+ * Copyright 2020 eAlva.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.ealva.toque.service.vlc
+
+import android.net.Uri
+import com.ealva.ealvabrainz.brainz.data.ArtistMbid
+import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
+import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
+import com.ealva.ealvabrainz.brainz.data.TrackMbid
+import com.ealva.ealvabrainz.brainz.data.toArtistMbid
+import com.ealva.ealvabrainz.brainz.data.toReleaseGroupMbid
+import com.ealva.ealvabrainz.brainz.data.toReleaseMbid
+import com.ealva.ealvabrainz.brainz.data.toTrackMbid
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.file.fileExtension
+import com.ealva.toque.file.isFileScheme
+import com.ealva.toque.file.isNetworkScheme
+import com.ealva.toque.log._e
+import com.ealva.toque.media.MediaMetadata
+import com.ealva.toque.media.MediaMetadataParser
+import com.ealva.toque.media.MediaMetadataParserFactory
+import com.ealva.toque.media.STAR_NO_RATING
+import com.ealva.toque.media.StarRating
+import com.ealva.toque.tag.ArtistParser
+import com.ealva.toque.tag.ArtistParserFactory
+import com.ealva.toque.tag.SongTag
+import com.ealva.toque.tag.toAlbumSort
+import com.ealva.toque.tag.toArtistSort
+import com.ealva.toque.tag.toTitleSort
+import ealvatag.audio.SupportedFileFormat
+import org.videolan.libvlc.interfaces.IMedia
+import org.videolan.libvlc.interfaces.IMedia.Parse.ParseLocal
+import org.videolan.libvlc.interfaces.IMedia.Parse.ParseNetwork
+import java.io.File
+
+private val LOG by lazyLogger(MediaMetadataParser::class)
+
+fun Uri.tagCanParseExtension(): Boolean {
+  return SupportedFileFormat.fromExtension(fileExtension) !== SupportedFileFormat.UNKNOWN
+}
+
+class VlcMediaMetadataParserFactory(
+  private val libVlcSingleton: LibVlcSingleton,
+  private val artistParserFactory: ArtistParserFactory
+) : MediaMetadataParserFactory {
+  override suspend fun make(): MediaMetadataParser {
+    return MediaMetadataParserImpl(
+      libVlcSingleton.instance(),
+      artistParserFactory
+    )
+  }
+}
+
+private class MediaMetadataParserImpl(
+  private val libVlc: LibVlc,
+  private val artistParserFactory: ArtistParserFactory
+) : MediaMetadataParser {
+  override suspend fun parseMetadata(uri: Uri): MediaMetadata {
+    val artistParser = artistParserFactory.make()
+    return if (uri.isFileScheme() && uri.tagCanParseExtension()) {
+      try {
+        TagMediaMetadata(File(uri.path.orEmpty()), artistParser)
+      } catch (e: Exception) {
+        LOG.e(e) { it("Could not open file '%s' uri=%s", uri.path.orEmpty(), uri) }
+        VlcMediaMetadata(uri, libVlc, artistParser)
+      }
+    } else {
+      VlcMediaMetadata(uri, libVlc, artistParser)
+    }
+  }
+}
+
+private class TagMediaMetadata private constructor(
+  private val tag: SongTag,
+  private val artistParser: ArtistParser
+) : MediaMetadata {
+  override val duration: Long
+    get() = tag.duration
+  override val title: String
+    get() = tag.title
+  override val titleSort: String
+    get() = tag.titleSort
+  override val artists: List<String>
+    get() = artistParser.parseAll(tag.mediaArtists)
+  override val artistsSort: List<String>
+    get() = artistParser.parseAll(tag.mediaArtistsSort)
+  override val album: String
+    get() = tag.album
+  override val albumSort: String
+    get() = tag.albumSort
+  override val albumArtist: String
+    get() = tag.referenceAlbumArtist
+  override val albumArtistSort: String
+    get() = tag.referenceAlbumArtistSort
+  override val composer: String
+    get() = tag.composer
+  override val composerSort: String
+    get() = tag.composerSort
+  override val genres: List<String>
+    get() = tag.genre
+      .splitToSequence("/")
+      .filter { it.isNotBlank() }
+      .mapTo(ArrayList()) { it.trim() }
+  override val trackNumber: Int
+    get() = tag.trackNumber
+  override val totalTracks: Int
+    get() = tag.totalTracks
+  override val discNumber: Int
+    get() = tag.discNumber
+  override val totalDiscs: Int
+    get() = tag.totalDiscs
+  override val year: Int
+    get() = tag.year
+  override val rating: StarRating
+    get() = tag.starRating
+  override val comment: String
+    get() = tag.comment
+  override val lyrics: String
+    get() = tag.getLyrics("")
+  override val artistMbid: ArtistMbid?
+    get() = tag.artistMbid?.toArtistMbid()
+  override val releaseArtistMbid: ArtistMbid?
+    get() = tag.releaseArtistMbid?.toArtistMbid()
+  override val releaseMbid: ReleaseMbid?
+    get() = tag.releaseMbid?.toReleaseMbid()
+  override val trackMbid: TrackMbid?
+    get() = tag.releaseTrackMbid?.toTrackMbid()
+  override val releaseGroupMbid: ReleaseGroupMbid?
+    get() = tag.releaseGroupMbid?.toReleaseGroupMbid()
+  override val language: String
+    get() = tag.getLanguage("")
+
+  override val copyright: String = ""
+  override val description: String = ""
+  override val setting: String = ""
+  override val nowPlaying: String = ""
+  override val publisher: String = ""
+  override val encodedBy: String = ""
+  override val director: String = ""
+  override val season: String = ""
+  override val episode: String = ""
+  override val showName: String = ""
+  override val actors: String = ""
+
+  override fun toString(): String = asString()
+  override fun close() {
+    tag.close()
+  }
+
+  companion object {
+    operator fun invoke(
+      file: File,
+      artistParser: ArtistParser
+    ): MediaMetadata = TagMediaMetadata(
+      SongTag(
+        file,
+        ignoreArtwork = true,
+        createMissingTag = false
+      ),
+      artistParser
+    )
+  }
+}
+
+private const val END_OF_DATE_INDEX = 3
+
+private class VlcMediaMetadata private constructor(
+  private val media: IMedia,
+  artistParser: ArtistParser
+) : MediaMetadata {
+  private fun meta(id: Int): String = media.getMeta(id).orEmpty()
+  private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist)))
+  private val _artistsSort = _artists.map { it.toArtistSort() }
+  override val duration: Long
+    get() = media.duration
+  override val title: String
+    get() = meta(IMedia.Meta.Title)
+  override val titleSort: String
+    get() = title.toTitleSort()
+  override val artists: List<String>
+    get() = _artists
+  override val artistsSort: List<String>
+    get() = _artistsSort
+  override val album: String
+    get() = meta(IMedia.Meta.Album)
+  override val albumSort: String
+    get() = album.toAlbumSort()
+  override val albumArtist: String
+    get() = meta(IMedia.Meta.AlbumArtist)
+  override val albumArtistSort: String
+    get() = albumArtist.toArtistSort()
+  override val composer: String = ""
+  override val composerSort: String = ""
+  override val genres: List<String>
+    get() = meta(IMedia.Meta.Genre)
+      .splitToSequence("/")
+      .filter { it.isNotBlank() }
+      .mapTo(ArrayList()) { it.trim() }
+  override val trackNumber: Int
+    get() = meta(IMedia.Meta.TrackNumber).toIntOrNull() ?: 0
+  override val totalTracks: Int
+    get() = meta(IMedia.Meta.TrackTotal).toIntOrNull() ?: 0
+  override val discNumber: Int
+    get() = meta(IMedia.Meta.DiscNumber).toIntOrNull() ?: 0
+  override val totalDiscs: Int = 0
+
+  override val year: Int
+    get() {
+      val date = meta(IMedia.Meta.Date)
+      LOG._e { it("date=%s", date) }
+      return date.substring(0..END_OF_DATE_INDEX).toIntOrNull() ?: 0
+    }
+  override val rating: StarRating
+    get() {
+      LOG._e { it("rating=%s", meta(IMedia.Meta.Rating)) }
+      return STAR_NO_RATING
+    }
+  override val comment: String = ""
+  override val lyrics: String = ""
+  override val artistMbid: ArtistMbid? = null
+  override val releaseArtistMbid: ArtistMbid? = null
+  override val releaseMbid: ReleaseMbid? = null
+  override val trackMbid: TrackMbid? = null
+  override val releaseGroupMbid: ReleaseGroupMbid? = null
+  override val language: String
+    get() = meta(IMedia.Meta.Language)
+  override val copyright: String
+    get() = meta(IMedia.Meta.Copyright)
+  override val description: String
+    get() = meta(IMedia.Meta.Description)
+  override val setting: String
+    get() = meta(IMedia.Meta.Setting)
+  override val nowPlaying: String
+    get() = meta(IMedia.Meta.NowPlaying)
+  override val publisher: String
+    get() = meta(IMedia.Meta.Publisher)
+  override val encodedBy: String
+    get() = meta(IMedia.Meta.EncodedBy)
+  override val director: String
+    get() = meta(IMedia.Meta.Director)
+  override val season: String
+    get() = meta(IMedia.Meta.Season)
+  override val episode: String
+    get() = meta(IMedia.Meta.Episode)
+  override val showName: String
+    get() = meta(IMedia.Meta.ShowName)
+  override val actors: String
+    get() = meta(IMedia.Meta.Actors)
+
+  override fun close() {
+    media.release()
+  }
+
+  override fun toString(): String = asString()
+
+  companion object {
+    operator fun invoke(
+      uri: Uri,
+      libVlc: LibVlc,
+      artistParser: ArtistParser
+    ): MediaMetadata {
+      return VlcMediaMetadata(
+        libVlc.makeNativeMedia(uri).apply {
+          if (!isParsed) parse(if (uri.isNetworkScheme()) ParseNetwork else ParseLocal)
+        },
+        artistParser
+      )
+    }
+  }
+}
+
+fun StringBuilder.appendIndentedLine(title: String, obj: Any?, isLast: Boolean = false) {
+  append("   ")
+  append(title)
+  append(':')
+  if (isLast) {
+    appendLine(obj)
+  } else {
+    append(obj)
+    appendLine(',')
+  }
+}
+
+fun MediaMetadata.asString(): String {
+  return buildString {
+    appendLine("MediaMetadata[")
+    appendIndentedLine("title", title)
+    appendIndentedLine("titleSort", titleSort)
+    appendIndentedLine("artists", artists)
+    appendIndentedLine("artistsSort", artistsSort)
+    appendIndentedLine("album", album)
+    appendIndentedLine("albumSort", albumSort)
+    appendIndentedLine("albumArtist", albumArtist)
+    appendIndentedLine("albumArtistSort", albumArtistSort)
+    appendIndentedLine("composer", composer)
+    appendIndentedLine("composerSort", composerSort)
+    appendIndentedLine("genres", genres)
+    appendIndentedLine("trackNumber", trackNumber)
+    appendIndentedLine("totalTracks", totalTracks)
+    appendIndentedLine("discNumber", discNumber)
+    appendIndentedLine("totalDiscs", totalDiscs)
+    appendIndentedLine("year", year)
+    appendIndentedLine("rating", rating)
+    appendIndentedLine("comment", comment)
+    appendIndentedLine("lyrics", lyrics)
+    appendIndentedLine("artistMbid", artistMbid)
+    appendIndentedLine("releaseArtistMbid", releaseArtistMbid)
+    appendIndentedLine("releaseMbid", releaseMbid)
+    appendIndentedLine("trackMbid", trackMbid)
+    appendIndentedLine("releaseGroupMbid", releaseGroupMbid)
+    appendIndentedLine("language", language)
+    appendIndentedLine("copyright", copyright)
+    appendIndentedLine("description", description)
+    appendIndentedLine("setting", setting)
+    appendIndentedLine("nowPlaying", nowPlaying)
+    appendIndentedLine("publisher", publisher)
+    appendIndentedLine("encodedBy", encodedBy)
+    appendIndentedLine("director", director)
+    appendIndentedLine("season", season)
+    appendIndentedLine("episode", episode)
+    appendIndentedLine("showName", showName)
+    appendIndentedLine("actors", actors, true)
+    appendLine("]")
+  }
+}

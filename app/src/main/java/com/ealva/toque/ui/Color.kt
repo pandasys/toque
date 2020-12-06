@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("MagicNumber")
+
 package com.ealva.toque.ui
 
 import androidx.compose.ui.graphics.Color

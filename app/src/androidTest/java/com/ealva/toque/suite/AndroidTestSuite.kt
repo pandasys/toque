@@ -16,7 +16,11 @@
 
 package com.ealva.toque.suite
 
+import com.ealva.toque.android.file.MediaFormatTest
+import com.ealva.toque.android.file.UrisTest
 import com.ealva.toque.android.prefs.AppPreferencesTest
+import com.ealva.toque.android.prefs.LibVlcOptionsTest
+import com.ealva.toque.android.service.vlc.LibVlcFactoryTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.runner.RunWith
 import org.junit.runners.Suite
@@ -24,5 +28,10 @@ import org.junit.runners.Suite
 @ExperimentalCoroutinesApi
 @RunWith(Suite::class)
 @Suite.SuiteClasses(
+  UrisTest::class,
+  MediaFormatTest::class,
   AppPreferencesTest::class,
-) class AndroidTestSuite
+  LibVlcOptionsTest::class,
+  LibVlcFactoryTest::class
+)
+class AndroidTestSuite

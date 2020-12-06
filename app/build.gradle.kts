@@ -33,6 +33,8 @@ android {
     versionName = AppCoordinates.APP_VERSION_NAME
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     multiDexEnabled = true
+
+    buildConfigField("boolean", "VLC_LOGGING", "false")
   }
 
   compileOptions {
@@ -48,7 +50,7 @@ android {
 
     getByName("release") {
       isMinifyEnabled = true
-      proguardFiles(getDefaultProguardFile ("proguard-android-optimize.txt"), "proguard-rules.pro")
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }
 
@@ -58,22 +60,23 @@ android {
     getByName("androidTest").java.srcDir(sharedTestDir)
   }
 
-  packagingOptions {
-    exclude("META-INF/DEPENDENCIES")
-    exclude("META-INF/LICENSE")
-    exclude("META-INF/LICENSE.txt")
-    exclude("META-INF/license.txt")
-    exclude("META-INF/NOTICE")
-    exclude("META-INF/NOTICE.txt")
-    exclude("META-INF/notice.txt")
-    exclude("META-INF/ASL2.0")
-    exclude("META-INF/AL2.0")
-    exclude("META-INF/LGPL2.1")
-    exclude("META-INF/*.kotlin_module")
-  }          
-  
+//  packagingOptions {
+//    exclude("META-INF/DEPENDENCIES")
+//    exclude("META-INF/LICENSE")
+//    exclude("META-INF/LICENSE.txt")
+//    exclude("META-INF/license.txt")
+//    exclude("META-INF/NOTICE")
+//    exclude("META-INF/NOTICE.txt")
+//    exclude("META-INF/notice.txt")
+//    exclude("META-INF/ASL2.0")
+//    exclude("META-INF/AL2.0")
+//    exclude("META-INF/LGPL2.1")
+//    exclude("META-INF/*.kotlin_module")
+//  }
+
   kotlinOptions {
     jvmTarget = "1.8"
+    useIR = true
     suppressWarnings = false
     verbose = true
     freeCompilerArgs = freeCompilerArgs + "-XXLanguage:+InlineClasses"
@@ -88,10 +91,6 @@ android {
   composeOptions {
     kotlinCompilerExtensionVersion = Versions.COMPOSE
     kotlinCompilerVersion = Versions.KOTLIN
-  }
-
-  testOptions {
-    unitTests.isIncludeAndroidResources = true
   }
 }
 
@@ -114,6 +113,10 @@ dependencies {
   implementation(ThirdParty.EALVALOG)
   implementation(ThirdParty.EALVALOG_CORE)
   implementation(ThirdParty.EALVALOG_ANDROID)
+  implementation(ThirdParty.EALVATAG)
+  implementation(ThirdParty.WELITE_CORE)
+  implementation(ThirdParty.EALVABRAINZ)
+  implementation(ThirdParty.EALVABRAINZ_SERVICE)
 
   implementation(ThirdParty.FASTUTIL)
   implementation(ThirdParty.COROUTINE_CORE)
@@ -121,6 +124,8 @@ dependencies {
 
   implementation(ThirdParty.KOIN)
   implementation(ThirdParty.KOIN_ANDROID)
+
+  implementation(ThirdParty.PHOENIX)
 
   testImplementation(TestingLib.JUNIT)
   testImplementation(AndroidTestingLib.ANDROIDX_TEST_CORE) {

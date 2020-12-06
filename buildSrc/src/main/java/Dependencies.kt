@@ -22,7 +22,7 @@ object Sdk {
 
 object Versions {
   const val KOTLIN = "1.4.10"
-  const val COMPOSE = "1.0.0-alpha04"
+  const val COMPOSE = "1.0.0-alpha06"
   const val ANDROIDX_TEST_EXT = "1.1.2"
   const val ANDROIDX_TEST = "1.3.0"
   const val MATERIAL = "1.2.1"
@@ -33,21 +33,26 @@ object Versions {
   const val ESPRESSO_CORE = "3.2.0"
   const val JUNIT = "4.13"
   const val VLC_ANDROID = "3.3.2"
-  const val EALVALOG = "0.5.4"
+  const val EALVALOG = "0.5.6-SNAPSHOT"
+  const val EALVATAG = "0.4.7-SNAPSHOT"
+  const val WELITE = "0.0.16-SNAPSHOT"
+  const val EALVABRAINZ = "0.0.3-SNAPSHOT"
   const val ROBOLECTRIC = "4.4"
   const val EXPECT = "1.0.1"
   const val FASTUTIL = "7.2.1"
-  const val COROUTINES = "1.3.9"
+  const val COROUTINES = "1.4.1"
   const val COROUTINES_TEST = "1.4.1"
-  const val KOIN = "2.1.6"
+  const val KOIN = "2.2.0"
   const val DESUGAR = "1.0.10"
+  const val PHOENIX = "2.0.0"
 }
 
 object BuildPluginsVersion {
-  const val AGP = "4.0.1"
+  const val AGP = "7.0.0-alpha02"
   const val DETEKT = "1.14.1"
-  const val KOTLIN = "1.4.20-RC"
-  const val VERSIONS_PLUGIN = "0.33.0"
+  const val KOTLIN = "1.4.10"
+  const val DOKKA = "1.4.10.2"
+  const val VERSIONS = "0.33.0"
 }
 
 object SupportLibs {
@@ -67,6 +72,10 @@ object ThirdParty {
   const val EALVALOG = "com.ealva:ealvalog:${Versions.EALVALOG}"
   const val EALVALOG_CORE = "com.ealva:ealvalog-core:${Versions.EALVALOG}"
   const val EALVALOG_ANDROID = "com.ealva:ealvalog-android:${Versions.EALVALOG}"
+  const val EALVATAG = "com.ealva:ealvatag:${Versions.EALVATAG}"
+  const val EALVABRAINZ = "com.ealva:ealvabrainz:${Versions.EALVABRAINZ}"
+  const val EALVABRAINZ_SERVICE = "com.ealva:ealvabrainz-service:${Versions.EALVABRAINZ}"
+  const val WELITE_CORE = "com.ealva:welite-core:${Versions.WELITE}"
   const val VLC_ANDROID = "org.videolan.android:libvlc-all:${Versions.VLC_ANDROID}"
   const val FASTUTIL = "it.unimi.dsi:fastutil:${Versions.FASTUTIL}"
   const val COROUTINE_CORE = "org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES}"
@@ -74,6 +83,7 @@ object ThirdParty {
     "org.jetbrains.kotlinx:kotlinx-coroutines-android:${Versions.COROUTINES}"
   const val KOIN = "org.koin:koin-core:${Versions.KOIN}"
   const val KOIN_ANDROID = "org.koin:koin-android:${Versions.KOIN}"
+  const val PHOENIX = "com.jakewharton:process-phoenix:${Versions.PHOENIX}"
 }
 
 object TestingLib {

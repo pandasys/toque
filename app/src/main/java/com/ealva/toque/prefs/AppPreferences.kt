@@ -19,50 +19,97 @@ package com.ealva.toque.prefs
 import android.content.Context
 import androidx.datastore.DataStore
 import androidx.datastore.preferences.Preferences
-import androidx.datastore.preferences.createDataStore
 import androidx.datastore.preferences.preferencesKey
-import com.ealva.toque.prefs.AppPreferences.Keys.ALLOW_DUPLICATES
-import com.ealva.toque.prefs.AppPreferences.Keys.GO_TO_NOW_PLAYING
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.ALLOW_DUPLICATES
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.GO_TO_NOW_PLAYING
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_SMALL_FILES
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_THRESHOLD
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
-/**
- * Get/set app preferences. Get methods return the default value if an IO exception occurs.
- */
-@Suppress("PropertyName")
-class AppPreferences private constructor(private val dataStore: DataStore<Preferences>) {
-  object Keys {
-    private inline fun <reified T : Any> key(name: String, defVal: T): KeyDefault<T> {
-      return Pair(preferencesKey(name), defVal)
-    }
+private const val DATA_STORE_FILE_NAME = "user"
 
-    val ALLOW_DUPLICATES = key("allow_duplicates", false)
-    val GO_TO_NOW_PLAYING = key("go_to_now_playing", true)
-  }
+interface AppPreferences {
+  fun allowDuplicates(): Boolean
+  suspend fun allowDuplicates(value: Boolean): Boolean
+  fun goToNowPlaying(): Boolean
+  suspend fun goToNowPlaying(value: Boolean): Boolean
+  fun ignoreSmallFiles(): Boolean
+  suspend fun ignoreSmallFiles(value: Boolean): Boolean
+  fun ignoreThreshold(): Long
+  suspend fun ignoreThreshold(value: Long): Boolean
+}
 
-  suspend fun allowDuplicates(): Boolean = dataStore.get(ALLOW_DUPLICATES)
-  suspend fun allowDuplicates(value: Boolean): Boolean =
-    dataStore.set(ALLOW_DUPLICATES.key, value)
-
-  suspend fun goToNowPlaying(): Boolean = dataStore.get(GO_TO_NOW_PLAYING)
-  suspend fun goToNowPlaying(value: Boolean): Boolean =
-    dataStore.set(GO_TO_NOW_PLAYING.key, value)
+interface AppPreferencesSingleton {
+  suspend fun instance(): AppPreferences
 
   companion object {
     operator fun invoke(
       context: Context,
-      coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO
-    ): AppPreferences = AppPreferences(
-      context.applicationContext.createDataStore(
-        "user",
-        scope = CoroutineScope(coroutineDispatcher + SupervisorJob())
-      )
-    )
+      dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): AppPreferencesSingleton = AppPrefsSingletonImpl(context, dispatcher)
+  }
+}
 
-    internal operator fun invoke(dataStore: DataStore<Preferences>): AppPreferences {
-      return AppPreferences(dataStore)
+private class AppPrefsSingletonImpl(
+  private val context: Context,
+  private val dispatcher: CoroutineDispatcher
+) : AppPreferencesSingleton {
+  private suspend fun make(): AppPreferences {
+    val dataStore = context.makeDataStore(DATA_STORE_FILE_NAME, dispatcher)
+    val stateFlow = dataStore.data.stateIn(CoroutineScope(dispatcher + SupervisorJob()))
+    return AppPreferencesImpl(dataStore, stateFlow)
+  }
+
+  @Volatile
+  private var instance: AppPreferences? = null
+  private val mutex = Mutex()
+  override suspend fun instance(): AppPreferences {
+    instance?.let { return it } ?: return withContext(dispatcher) {
+      mutex.withLock {
+        instance?.let { instance } ?: make().also { instance = it }
+      }
     }
   }
+}
+
+/**
+ * Get/set app preferences. Get methods return the default value if an IO exception occurs.
+ *
+ * Kotlin suspending var would be nice
+ */
+@Suppress("PropertyName")
+private class AppPreferencesImpl(
+  private val dataStore: DataStore<Preferences>,
+  private val state: StateFlow<Preferences>
+) : AppPreferences {
+  object Keys {
+    val ALLOW_DUPLICATES = preferencesKey<Boolean>("allow_duplicates")
+    val GO_TO_NOW_PLAYING = preferencesKey<Boolean>("go_to_now_playing")
+    val IGNORE_SMALL_FILES = preferencesKey<Boolean>("ignore_small_files")
+    val IGNORE_THRESHOLD = preferencesKey<Long>("ignore_threshold")
+  }
+
+  override fun allowDuplicates(): Boolean = state.value[ALLOW_DUPLICATES, false]
+  override suspend fun allowDuplicates(value: Boolean): Boolean =
+    dataStore.set(ALLOW_DUPLICATES, value)
+
+  override fun goToNowPlaying(): Boolean = state.value[GO_TO_NOW_PLAYING, true]
+  override suspend fun goToNowPlaying(value: Boolean): Boolean =
+    dataStore.set(GO_TO_NOW_PLAYING, value)
+
+  override fun ignoreSmallFiles(): Boolean = state.value[IGNORE_SMALL_FILES, false]
+  override suspend fun ignoreSmallFiles(value: Boolean): Boolean =
+    dataStore.set(IGNORE_SMALL_FILES, value)
+
+  override fun ignoreThreshold(): Long = state.value[IGNORE_THRESHOLD, 0]
+  override suspend fun ignoreThreshold(value: Long): Boolean =
+    dataStore.set(IGNORE_THRESHOLD, value)
 }

@@ -16,27 +16,43 @@
 
 package com.ealva.toque.prefs
 
+import android.content.Context
 import androidx.datastore.DataStore
 import androidx.datastore.preferences.MutablePreferences
 import androidx.datastore.preferences.Preferences
+import androidx.datastore.preferences.createDataStore
 import androidx.datastore.preferences.edit
-import androidx.datastore.preferences.emptyPreferences
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import java.io.IOException
+import com.ealva.toque.persist.HasConstId
+import com.ealva.toque.persist.toEnum
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 
 typealias KeyDefault<T> = Pair<Preferences.Key<T>, T>
+
 inline val <T> KeyDefault<T>.key: Preferences.Key<T>
   get() = first
 inline val <T> KeyDefault<T>.defaultValue: T
   get() = second
 
-
 val DataStore<Preferences>.LOG by lazyLogger("DataStorePrefs")
+
+fun Context.makeDataStore(
+  name: String,
+  dispatcher: CoroutineDispatcher
+): DataStore<Preferences> = applicationContext.createDataStore(
+  name,
+  scope = CoroutineScope(dispatcher + SupervisorJob())
+)
+
+suspend inline fun DataStore<Preferences>.put(
+  crossinline mutableFunc: MutablePreferences.() -> Unit
+): Preferences = edit {
+  mutableFunc(it)
+}
 
 suspend fun <T> DataStore<Preferences>.set(key: Preferences.Key<T>, value: T): Boolean =
   try {
@@ -47,30 +63,22 @@ suspend fun <T> DataStore<Preferences>.set(key: Preferences.Key<T>, value: T): B
     false
   }
 
-suspend inline fun DataStore<Preferences>.put(
-  crossinline mutableFunc: MutablePreferences.() -> Unit
-): Preferences = edit {
-  mutableFunc(it)
+suspend inline fun <T> DataStore<Preferences>.set(
+  key: Preferences.Key<Int>,
+  value: T
+): Boolean where T : Enum<T>, T : HasConstId = set(key, value.id)
+
+operator fun <T> Preferences.get(key: Preferences.Key<T>, defVal: T): T {
+  return get(key) ?: defVal
 }
 
-suspend inline fun <T> DataStore<Preferences>.get(pair: KeyDefault<T>): T =
-  get(pair.key, pair.defaultValue)
+inline operator fun <reified T> Preferences.get(
+  key: Preferences.Key<Int>,
+  defVal: T
+): T where T : Enum<T>, T : HasConstId {
+  return get(key).toEnum(defVal)
+}
 
-suspend fun <T> DataStore<Preferences>.get(
-  key: Preferences.Key<T>,
-  defaultVal: T
-): T = try {
-    data.catch {
-      if (it is IOException) {
-        LOG.e { it("Exception getting value for key:'$key', returning default '$defaultVal'") }
-        emit(emptyPreferences())
-      } else {
-        throw it
-      }
-    }.map {
-      it[key] ?: defaultVal
-    }.first()
-} catch (e: Exception) {
-  LOG.e { it("Exception getting DataStore.data for key:'$key', returning default '$defaultVal'") }
-  defaultVal
+operator fun <T> Preferences.get(pair: KeyDefault<T>): T {
+  return get(pair.key) ?: pair.defaultValue
 }

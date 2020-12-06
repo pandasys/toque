@@ -15,5 +15,43 @@
   -->
 
 <resources>
-    <string name="app_name">Toque</string>
+  <string name="app_name">Toque</string>
+
+  <string name="None">None</string>
+  <string name="Title">Title</string>
+  <string name="Track">Track</string>
+  <string name="Album">Album</string>
+  <string name="Auto">Auto</string>
+  <string name="NonRef">Non-ref</string>
+  <string name="Bidir">Bidir</string>
+  <string name="NonKey">Non-key</string>
+  <string name="All">All</string>
+  <string name="Mono">Mono</string>
+  <string name="Stereo">Stereo</string>
+  <string name="HDMI">HDMI</string>
+  <string name="OpenSL">OpenSL ES</string>
+  <string name="AudioTrack">AudioTrack</string>
+  <string name="TitleSort">Title Sort</string>
+  <string name="Artist">Artist </string>
+  <string name="ArtistSort">Artist Sort</string>
+  <string name="AlbumSort">Album Sort</string>
+  <string name="AlbumArtist">Album Artist</string>
+  <string name="AlbumArtistSort">Album Artist Sort</string>
+  <string name="Composer">Composer</string>
+  <string name="ComposerSort">Composer Sort</string>
+  <string name="Genre">Genre</string>
+  <string name="Duration">Duration</string>
+  <string name="TrackNumber">Track Number</string>
+  <string name="TotalTracks">Total Tracks</string>
+  <string name="DiscNumber">Disc Number</string>
+  <string name="TotalDiscs">Total Discs</string>
+  <string name="Year">Year</string>
+  <string name="Rating">Rating</string>
+  <string name="Comment">Comment</string>
+  <string name="ArtistMbid">Artist MBID</string>
+  <string name="ReleaseArtistMbid">Release Artist MBID</string>
+  <string name="ReleaseMbid">Release MBID</string>
+  <string name="TrackMbid">Track MBID</string>
+  <string name="ReleaseGroupMbid">Release Group MBID</string>
+  <string name="ScanningMedia">Scanning media…</string>
 </resources>
