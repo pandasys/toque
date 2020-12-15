@@ -185,7 +185,7 @@ class MediaFormatTest {
 
   @Test
   fun testGetFormatFromMimeType() {
-    expect(MediaFormat.getFormatFromMimeType("audio/x-realaudio, audio/x-pn-realaudio"))
+    expect(MediaFormat.mediaFormatFromMimeType("audio/x-realaudio, audio/x-pn-realaudio"))
       .toBe(MediaFormat.RealAudio)
   }
 }

@@ -18,10 +18,8 @@ package com.ealva.toque
 
 import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Text
 import androidx.compose.material.MaterialTheme
@@ -30,17 +28,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.setContent
 import androidx.lifecycle.lifecycleScope
 import androidx.ui.tooling.preview.Preview
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.db.GenreTable
 import com.ealva.toque.file.MediaStorage
-import com.ealva.toque.file.runMediaScanner
-import com.ealva.toque.log._e
-import com.ealva.toque.scanner.ForceUpdate
 import com.ealva.toque.scanner.MediaScannerJobIntentService
+import com.ealva.toque.scanner.MediaScannerJobIntentService.Companion.Rescan
 import com.ealva.toque.ui.ToqueTheme
 import com.ealva.welite.db.Database
-import com.ealva.welite.db.table.OnConflict
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -85,18 +78,11 @@ class MainActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
-    getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.absolutePath?.let { toScan ->
-      runMediaScanner(listOf(toScan)) { path, uri: Uri? ->
-        LOG._e { it("Scan complete %s %s", path, uri ?: "null") }
-      }
-    }
+//    getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.absolutePath?.let { toScan ->
+//      runMediaScanner(listOf(toScan)) { path, uri: Uri? ->
+//      }
+//    }
     lifecycleScope.launchWhenStarted {
-      db.transaction {
-        GenreTable.insert(OnConflict.Ignore) {
-          it[genre] = "Rock"
-          it[createdTime] = System.currentTimeMillis()
-        }
-      }
       runSuspendWithPermission(READ_EXTERNAL_STORAGE) {
         getAllAudio()
       }
@@ -111,7 +97,7 @@ class MainActivity : AppCompatActivity() {
   }
 
   private fun getAllAudio() {
-    MediaScannerJobIntentService.startRescan(this, "DoIt", ForceUpdate(true))
+    MediaScannerJobIntentService.startRescan(this, "DoIt", Rescan.ModifiedSinceLast)
   }
 
   override fun onRequestPermissionsResult(

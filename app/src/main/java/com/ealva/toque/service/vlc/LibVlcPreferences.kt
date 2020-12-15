@@ -20,10 +20,8 @@ import android.content.Context
 import androidx.datastore.DataStore
 import androidx.datastore.preferences.Preferences
 import androidx.datastore.preferences.preferencesKey
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
-import com.ealva.toque.log._e
 import com.ealva.toque.prefs.get
 import com.ealva.toque.prefs.makeDataStore
 import com.ealva.toque.prefs.set
@@ -62,7 +60,6 @@ class LibVlcPreferencesSingleton(
    * @throws IllegalStateException if error during LibVLC initialization
    */
   private suspend fun make(): LibVlcPreferences {
-    LOG._e { it("Factory make LibVlcPreferences") }
     val dataStore = context.makeDataStore(DATA_STORE_FILE_NAME, dispatcher)
     val sharedFlow = dataStore.data.stateIn(CoroutineScope(dispatcher + SupervisorJob()))
     return LibVlcPreferencesImpl(dataStore, sharedFlow)
@@ -163,6 +160,7 @@ private class LibVlcPreferencesImpl(
 
   override fun networkCachingMillis(): Int =
     state.value[NETWORK_CACHING_MILLISECONDS, DEFAULT_NETWORK_CACHING]
+
   override suspend fun networkCachingMillis(millis: Int): Boolean =
     dataStore.set(NETWORK_CACHING_MILLISECONDS, millis.coerceIn(NETWORK_CACHING_RANGE))
 
@@ -196,6 +194,7 @@ private class LibVlcPreferencesImpl(
 
   override fun digitalAudioOutputEnabled(): Boolean =
     state.value[ENABLE_DIGITAL_AUDIO_OUTPUT, false]
+
   override suspend fun digitalAudioOutputEnabled(enabled: Boolean): Boolean =
     dataStore.set(ENABLE_DIGITAL_AUDIO_OUTPUT, enabled)
 }

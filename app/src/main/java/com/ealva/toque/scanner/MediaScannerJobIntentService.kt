@@ -27,19 +27,23 @@ import androidx.core.app.JobIntentService
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import com.ealva.ealvalog.e
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.R
-import com.ealva.toque.db.MediaDao
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.MediaStorage
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.media.MediaMetadataParser
 import com.ealva.toque.media.MediaMetadataParserFactory
+import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.prefs.AppPreferences
 import com.ealva.toque.prefs.AppPreferencesSingleton
+import com.ealva.toque.scanner.MediaScannerJobIntentService.Companion.RESCAN_KEY
+import com.ealva.toque.scanner.MediaScannerJobIntentService.Companion.Rescan
+import com.google.common.base.Stopwatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.buffer
@@ -49,6 +53,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
+import java.util.Date
+import java.util.concurrent.TimeUnit
 
 private val LOG by lazyLogger(MediaScannerJobIntentService::class)
 private const val JOB_ID = 1000
@@ -58,11 +64,9 @@ private const val NOTIFICATION_ID = 39000
 private const val SCANNER_CHANNEL_ID = "com.ealva.toque.scanner.MediaScannerNotificationChannel"
 private const val PERSIST_WORKER_COUNT = 3
 
-inline class ForceUpdate(val force: Boolean)
-
 class MediaScannerJobIntentService : JobIntentService() {
   private val storage: MediaStorage by inject()
-  private val mediaDao: MediaDao by inject()
+  private val audioMediaDao: AudioMediaDao by inject()
   private val mediaDataParserFactory: MediaMetadataParserFactory by inject()
   private val appPrefsSingleton: AppPreferencesSingleton by inject()
 
@@ -108,7 +112,7 @@ class MediaScannerJobIntentService : JobIntentService() {
       startNotification()
       if (intent.action == ACTION_FULL_RESCAN) {
         runBlocking {
-          tryFullRescan()
+          tryFullRescan(intent.rescan)
         }
       } else {
         LOG.e { it("Unrecognized action=%s", intent.action ?: "null") }
@@ -120,35 +124,53 @@ class MediaScannerJobIntentService : JobIntentService() {
     }
   }
 
-  private suspend fun tryFullRescan() {
+  private suspend fun tryFullRescan(rescan: Rescan) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       if (checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-        doFullRescanWithPermission()
+        doFullRescanWithPermission(rescan)
       } else {
         LOG.e { it("No permission %s", READ_EXTERNAL_STORAGE) }
       }
     } else {
-      doFullRescanWithPermission()
+      doFullRescanWithPermission(rescan)
     }
   }
 
-  private suspend fun doFullRescanWithPermission() {
+  private suspend fun doFullRescanWithPermission(rescan: Rescan) {
+    val stopWatch = Stopwatch.createStarted()
     val prefs = appPrefsSingleton.instance()
     val parser = mediaDataParserFactory.make()
-    scanAllAudio(prefs, parser)
+    val lastScanTime = if (rescan.forceUpdate) Date(0) else Date(prefs.lastScanTime())
+    if (rescan.cleanDb) deleteAllMediaFromDb()
+    val createUpdateTime = System.currentTimeMillis()
+    LOG.i { it("Elapsed:%d have resources, start scan", stopWatch.elapsed(TimeUnit.MILLISECONDS)) }
+    scanAllAudioAfter(lastScanTime, prefs, parser, createUpdateTime)
+    audioMediaDao.deleteEntitiesWithNoMedia()
+    LOG.i { it("Elapsed:%d end scan", stopWatch.stop().elapsed(TimeUnit.MILLISECONDS)) }
+    prefs.lastScanTime(createUpdateTime)
   }
 
-  private suspend fun scanAllAudio(prefs: AppPreferences, parser: MediaMetadataParser) {
-    LOG._e { it("getAllAudio") }
+  private suspend fun deleteAllMediaFromDb() {
     withContext(Dispatchers.IO) {
-      storage.audioFlow()
-        .map { async { persistAudioList(it, parser, prefs) } }
+      audioMediaDao.deleteAll()
+    }
+  }
+
+  private suspend fun scanAllAudioAfter(
+    lastScanTime: Date,
+    prefs: AppPreferences,
+    parser: MediaMetadataParser,
+    createUpdateTime: Long
+  ) {
+    withContext(Dispatchers.IO) {
+      storage.audioFlow(lastScanTime)
+        .map { async { persistAudioList(it, parser, prefs, createUpdateTime) } }
         .buffer(PERSIST_WORKER_COUNT)
         .map { it.await() }
         .onCompletion { cause ->
-          LOG._e {
-            it("onCompletion %s", if (cause == null) "success" else cause.message ?: "failed")
-          }
+//          LOG._e {
+//            it("onCompletion %s", if (cause == null) "success" else cause.message ?: "failed")
+//          }
         }
         .collect()
     }
@@ -157,17 +179,29 @@ class MediaScannerJobIntentService : JobIntentService() {
   private suspend fun persistAudioList(
     audioList: List<AudioInfo>,
     parser: MediaMetadataParser,
-    prefs: AppPreferences
+    prefs: AppPreferences,
+    createUpdateTime: Long
   ): Boolean {
-    mediaDao.upsertAudioList(audioList, parser, prefs)
+    audioMediaDao.upsertAudioList(audioList, parser, prefs, createUpdateTime)
     return true
   }
 
   companion object {
+    enum class Rescan(
+      override val id: Int,
+      val forceUpdate: Boolean,
+      val cleanDb: Boolean
+    ) : HasConstId {
+      ModifiedSinceLast(1, false, false),
+      RescanAll(2, true, false),
+      DeleteAllThenRescanAll(3, true, true);
+    }
 
-    fun startRescan(context: Context, reason: String, forceUpdate: ForceUpdate) {
+    const val RESCAN_KEY = "Rescan_MediaScanner"
+
+    fun startRescan(context: Context, reason: String, rescan: Rescan) {
       LOG._i {
-        it("reason=%s forceUpdate=%s", reason, forceUpdate)
+        it("reason=%s rescan=%s", reason, rescan)
       }
       val intent = Intent(context, MediaScannerJobIntentService::class.java).apply {
         action = ACTION_FULL_RESCAN
@@ -184,4 +218,16 @@ class MediaScannerJobIntentService : JobIntentService() {
       }
     }
   }
+}
+
+val Intent.rescan: Rescan
+  get() = when (getIntExtra(RESCAN_KEY, Rescan.ModifiedSinceLast.id)) {
+    Rescan.ModifiedSinceLast.id -> Rescan.ModifiedSinceLast
+    Rescan.RescanAll.id -> Rescan.RescanAll
+    Rescan.DeleteAllThenRescanAll.id -> Rescan.DeleteAllThenRescanAll
+    else -> Rescan.ModifiedSinceLast
+  }
+
+operator fun Intent.plusAssign(rescan: Rescan) {
+  putExtra(RESCAN_KEY, rescan.id)
 }

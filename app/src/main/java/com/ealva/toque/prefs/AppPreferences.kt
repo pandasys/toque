@@ -24,6 +24,7 @@ import com.ealva.toque.prefs.AppPreferencesImpl.Keys.ALLOW_DUPLICATES
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.GO_TO_NOW_PLAYING
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_SMALL_FILES
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_THRESHOLD
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.LAST_SCAN_TIME
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,8 @@ interface AppPreferences {
   suspend fun ignoreSmallFiles(value: Boolean): Boolean
   fun ignoreThreshold(): Long
   suspend fun ignoreThreshold(value: Long): Boolean
+  fun lastScanTime(): Long
+  suspend fun lastScanTime(value: Long): Boolean
 }
 
 interface AppPreferencesSingleton {
@@ -95,6 +98,7 @@ private class AppPreferencesImpl(
     val GO_TO_NOW_PLAYING = preferencesKey<Boolean>("go_to_now_playing")
     val IGNORE_SMALL_FILES = preferencesKey<Boolean>("ignore_small_files")
     val IGNORE_THRESHOLD = preferencesKey<Long>("ignore_threshold")
+    val LAST_SCAN_TIME = preferencesKey<Long>("last_scan_time")
   }
 
   override fun allowDuplicates(): Boolean = state.value[ALLOW_DUPLICATES, false]
@@ -112,4 +116,8 @@ private class AppPreferencesImpl(
   override fun ignoreThreshold(): Long = state.value[IGNORE_THRESHOLD, 0]
   override suspend fun ignoreThreshold(value: Long): Boolean =
     dataStore.set(IGNORE_THRESHOLD, value)
+
+  override fun lastScanTime(): Long = state.value[LAST_SCAN_TIME, 0]
+  override suspend fun lastScanTime(value: Long): Boolean =
+    dataStore.set(LAST_SCAN_TIME, value)
 }

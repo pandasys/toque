@@ -18,6 +18,18 @@ package com.ealva.toque.media
 
 import com.ealva.toque.persist.HasConstId
 
+fun Int.toMediaType(): MediaType = when (this) {
+  MediaType.Unknown.id -> MediaType.Unknown
+  MediaType.Video.id -> MediaType.Video
+  MediaType.Audio.id -> MediaType.Audio
+  MediaType.Group.id -> MediaType.Group
+  MediaType.Dir.id -> MediaType.Dir
+  MediaType.Subtitle.id -> MediaType.Subtitle
+  MediaType.Playlist.id -> MediaType.Playlist
+  MediaType.Image.id -> MediaType.Image
+  else -> MediaType.Invalid
+}
+
 enum class MediaType(override val id: Int) : HasConstId {
   Unknown(-1),
   Video(0),

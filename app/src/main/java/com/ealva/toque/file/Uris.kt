@@ -38,7 +38,7 @@ val Uri.fileExtension: String
   get() = lastPathSegment?.substringAfterLast('.') ?: ""
 
 val Uri.mediaFormat: MediaFormat
-  get() = MediaFormat.getFormatFromExtension(fileExtension)
+  get() = MediaFormat.mediaFormatFromExtension(fileExtension)
 
 /**
  * Mime Type based on file extension or an empty string if no association found
@@ -47,7 +47,7 @@ val Uri.mimeType: String
   get() = mediaFormat.preferredMimeType ?: ""
 
 fun String.mimeTypeFromExt(): String = substringAfterLast('.').let { ext ->
-  MediaFormat.getFormatFromExtension(ext).preferredMimeType ?: mimeTypeFromLookup(ext)
+  MediaFormat.mediaFormatFromExtension(ext).preferredMimeType ?: mimeTypeFromLookup(ext)
 }
 
 private fun mimeTypeFromLookup(ext: String): String = when {

@@ -18,8 +18,11 @@
 
 package com.ealva.toque.db
 
+import com.ealva.ealvabrainz.brainz.data.isInvalid
+import com.ealva.ealvabrainz.brainz.data.isValid
 import com.ealva.toque.common.debugRequire
 import com.ealva.toque.db.PersistentId.Companion.ID_INVALID
+import com.ealva.toque.db.PersistentId.Companion.isValidId
 import it.unimi.dsi.fastutil.longs.LongList
 
 /**
@@ -32,11 +35,13 @@ interface PersistentId {
 
   companion object {
     const val ID_INVALID = 0L
+
+    inline fun isValidId(id: Long): Boolean = id > ID_INVALID
   }
 }
 
 inline val PersistentId.isValid: Boolean
-  get() = id > ID_INVALID
+  get() = isValidId(id)
 
 inline val PersistentId.isInvalid: Boolean
   get() = !isValid
@@ -57,7 +62,7 @@ inline fun <reified T : PersistentId> idIterator(
  * Prefer making a MediaId this way to get a little error checking
  */
 inline fun Long.toMediaId(): MediaId {
-  debugRequire(this > MediaId.INVALID.id) { "All IDs must be greater than 0 to be valid" }
+  debugRequire(isValidId(this)) { "All IDs must be greater than 0 to be valid" }
   return MediaId(this)
 }
 

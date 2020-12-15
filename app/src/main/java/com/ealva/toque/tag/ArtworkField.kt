@@ -82,7 +82,7 @@ class ArtworkField(private val artwork: Artwork?) {
         return artwork?.mimeType ?: "Unknown"
       } else if (isUrl) {
         val dotIndex = url.lastIndexOf(".")
-        val mimeTypes = MediaFormat.getFormatFromExtension(
+        val mimeTypes = MediaFormat.mediaFormatFromExtension(
           if (dotIndex == -1 || dotIndex >= url.length - 1) {
             ""
           } else {

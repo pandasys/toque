@@ -35,8 +35,8 @@ object Versions {
   const val VLC_ANDROID = "3.3.2"
   const val EALVALOG = "0.5.6-SNAPSHOT"
   const val EALVATAG = "0.4.7-SNAPSHOT"
-  const val WELITE = "0.0.16-SNAPSHOT"
-  const val EALVABRAINZ = "0.0.3-SNAPSHOT"
+  const val WELITE = "0.0.19-SNAPSHOT"
+  const val EALVABRAINZ = "0.0.5-SNAPSHOT"
   const val ROBOLECTRIC = "4.4"
   const val EXPECT = "1.0.1"
   const val FASTUTIL = "7.2.1"
@@ -48,7 +48,7 @@ object Versions {
 }
 
 object BuildPluginsVersion {
-  const val AGP = "7.0.0-alpha02"
+  const val AGP = "7.0.0-alpha03"
   const val DETEKT = "1.14.1"
   const val KOTLIN = "1.4.10"
   const val DOKKA = "1.4.10.2"

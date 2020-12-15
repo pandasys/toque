@@ -35,111 +35,122 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-inline class GenreId(override val id: Long) : PersistentId
+inline class ComposerId(override val id: Long) : PersistentId
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun Long.toGenreId(): GenreId {
+inline fun Long.toComposerId(): ComposerId {
   debugRequire(PersistentId.isValidId(this)) { "All IDs must be greater than 0 to be valid" }
-  return GenreId(this)
+  return ComposerId(this)
 }
 
 @Suppress("NOTHING_TO_INLINE")
-inline class GenreIdList(val idList: LongList) : Iterable<GenreId> {
+inline class ComposerIdList(val idList: LongList) : Iterable<ComposerId> {
   inline val size: Int
     get() = idList.size
 
-  inline operator fun plusAssign(genreId: GenreId) {
+  inline operator fun plusAssign(genreId: ComposerId) {
     idList.add(genreId.id)
   }
 
-  inline operator fun get(index: Int): GenreId = GenreId(idList.getLong(index))
+  inline operator fun get(index: Int): ComposerId = ComposerId(idList.getLong(index))
 
   companion object {
-    operator fun invoke(capacity: Int): GenreIdList = GenreIdList(LongArrayList(capacity))
+    operator fun invoke(capacity: Int): ComposerIdList = ComposerIdList(LongArrayList(capacity))
   }
 
-  override fun iterator(): Iterator<GenreId> = idIterator(idList, ::GenreId)
+  override fun iterator(): Iterator<ComposerId> = idIterator(idList, ::ComposerId)
 }
 
-private val LOG by lazyLogger(GenreDao::class)
+private val LOG by lazyLogger(ComposerDao::class)
 private val getOrInsertLock: Lock = ReentrantLock()
 
-private val INSERT_GENRE = GenreTable.insertValues {
-  it[genre].bindArg()
+interface ComposerDao {
+  /**
+   * Creates or gets the Ids for the list of genres. Throws IllegalStateException if a genre is
+   * not found and cannot be inserted.
+   */
+  fun getOrCreateComposerId(
+    txn: Transaction,
+    composer: String,
+    composerSort: String,
+    createTime: Long
+  ): ComposerId
+
+  fun deleteAll(txn: Transaction)
+  fun deleteComposersWithNoMedia(txn: Transaction): Long
+
+  companion object {
+    operator fun invoke(): ComposerDao = ComposerDaoImpl()
+  }
+}
+
+private val INSERT_COMPOSER = ComposerTable.insertValues {
+  it[composer].bindArg()
+  it[composerSort].bindArg()
   it[createdTime].bindArg()
 }
 
-private val QUERY_GENRE_ID: Query = Query(
-  GenreTable.select(GenreTable.id)
-    .where { GenreTable.genre eq bindString() }
+private val QUERY_COMPOSER_ID: Query = Query(
+  ComposerTable.select(ComposerTable.id)
+    .where { ComposerTable.composer eq bindString() }
 )
 
-interface GenreDao {
-  /**
-   * Gets or creates the Ids for the list of genres. Throws IllegalStateException if a genre is
-   * not found and cannot be inserted.
-   */
-  fun getOrCreateGenreIds(
+private class ComposerDaoImpl : ComposerDao {
+
+  override fun getOrCreateComposerId(
     txn: Transaction,
-    genreList: List<String>,
+    composer: String,
+    composerSort: String,
     createTime: Long
-  ): GenreIdList
-
-  fun deleteAll(txn: Transaction)
-  fun deleteGenresNotAssociateWithMedia(txn: Transaction): Long
-
-  companion object {
-    operator fun invoke(): GenreDao = GenreDaoImpl()
-  }
-}
-
-private class GenreDaoImpl : GenreDao {
-
-  override fun getOrCreateGenreIds(
-    txn: Transaction,
-    genreList: List<String>,
-    createTime: Long
-  ): GenreIdList = GenreIdList(genreList.size).also { list ->
-    genreList.forEach { genre -> list += txn.getOrCreateGenre(genre, createTime) }
-  }
+  ): ComposerId = txn.getOrCreateComposer(composer, composerSort, createTime)
 
   override fun deleteAll(txn: Transaction) = txn.run {
-    val count = GenreTable.deleteAll()
-    LOG.i { it("Deleted %d genres", count) }
+    val count = ComposerTable.deleteAll()
+    LOG.i { it("Deleted %d composers", count) }
   }
 
-  override fun deleteGenresNotAssociateWithMedia(txn: Transaction): Long = txn.run {
-    GenreTable.deleteWhere {
-      literal(0) eq
-        (GenreMediaTable.selectCount { GenreMediaTable.genreId eq GenreTable.id }).asExpression()
+  override fun deleteComposersWithNoMedia(txn: Transaction): Long = txn.run {
+    ComposerTable.deleteWhere {
+      literal(0) eq (
+        ComposerMediaTable.selectCount { ComposerMediaTable.composerId eq ComposerTable.id }
+        ).asExpression()
     }.delete()
   }
 
   /**
    * Could be a race condition if two threads are trying to insert the same genre at the same time,
    * so use a pattern similar to double check locking. Try the query, if result is null obtain a
-   * lock and query again. If result is null again, insert under the assumption this thread won
+   * lock and query again. If result is null again insert under the assumption this thread won
    * the race to insert. The great majority of the time the first query succeeds and the lock is
    * avoided.
    */
-  private fun Transaction.getOrCreateGenre(genre: String, createTime: Long): GenreId =
-    getGenreId(genre)?.toGenreId() ?: getOrInsert(genre, createTime).toGenreId()
+  private fun Transaction.getOrCreateComposer(
+    composer: String,
+    composerSort: String,
+    createTime: Long
+  ): ComposerId = getComposer(composer)?.toComposerId() ?: getOrInsertComposer(
+    composer,
+    composerSort,
+    createTime
+  ).toComposerId()
 
-  private fun Queryable.getGenreId(genre: String): Long? = QUERY_GENRE_ID
-    .sequence({ it[0] = genre }) { it[GenreTable.id] }
+  private fun Queryable.getComposer(genre: String): Long? = QUERY_COMPOSER_ID
+    .sequence({ it[0] = genre }) { it[ComposerTable.id] }
     .singleOrNull()
 
   /**
    * Get a lock and try to insert. If another thread won the race to insert, query on failure. If
    * query fails throw IllegalStateException.
    */
-  private fun Transaction.getOrInsert(
-    genre: String,
+  private fun Transaction.getOrInsertComposer(
+    composer: String,
+    composerSort: String,
     createTime: Long
   ): Long = getOrInsertLock.withLock {
-    getGenreId(genre) ?: INSERT_GENRE.insert {
-      it[0] = genre
-      it[1] = createTime
+    getComposer(composer) ?: INSERT_COMPOSER.insert {
+      it[0] = composer
+      it[1] = composerSort
+      it[2] = createTime
     }
   }
 }

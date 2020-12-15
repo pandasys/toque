@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.common
+package com.ealva.toque.db
 
-@Suppress("NOTHING_TO_INLINE")
-inline fun String.emptyToNull(): String? {
-  return if (isNotEmpty()) this else null
+import com.ealva.welite.db.statements.ColumnValues
+import com.ealva.welite.db.table.Column
+
+fun ColumnValues.indexOf(column: Column<out Any?>): Int {
+  return columnValueList.indexOfFirst { it.column === column }
 }

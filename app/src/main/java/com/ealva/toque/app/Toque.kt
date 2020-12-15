@@ -65,6 +65,10 @@ class ToqueImpl : Application(), Toque {
     val logger = logger()
     logger._e { it("App create") }
 
+//    Class.forName("dalvik.system.CloseGuard")
+//      .getMethod("setEnabled", Boolean::class.javaPrimitiveType)
+//      .invoke(null, true)
+
     startKoin {
       androidLogger(level = Level.INFO)
       androidContext(androidContext = this@ToqueImpl)

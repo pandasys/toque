@@ -38,7 +38,6 @@ import com.ealva.toque.media.MediaMetadataParserFactory
 import com.ealva.toque.media.STAR_NO_RATING
 import com.ealva.toque.media.StarRating
 import com.ealva.toque.tag.ArtistParser
-import com.ealva.toque.tag.ArtistParserFactory
 import com.ealva.toque.tag.SongTag
 import com.ealva.toque.tag.toAlbumSort
 import com.ealva.toque.tag.toArtistSort
@@ -48,6 +47,7 @@ import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.interfaces.IMedia.Parse.ParseLocal
 import org.videolan.libvlc.interfaces.IMedia.Parse.ParseNetwork
 import java.io.File
+import kotlin.math.min
 
 private val LOG by lazyLogger(MediaMetadataParser::class)
 
@@ -56,23 +56,19 @@ fun Uri.tagCanParseExtension(): Boolean {
 }
 
 class VlcMediaMetadataParserFactory(
-  private val libVlcSingleton: LibVlcSingleton,
-  private val artistParserFactory: ArtistParserFactory
+  private val libVlcSingleton: LibVlcSingleton
 ) : MediaMetadataParserFactory {
   override suspend fun make(): MediaMetadataParser {
     return MediaMetadataParserImpl(
-      libVlcSingleton.instance(),
-      artistParserFactory
+      libVlcSingleton.instance()
     )
   }
 }
 
 private class MediaMetadataParserImpl(
-  private val libVlc: LibVlc,
-  private val artistParserFactory: ArtistParserFactory
+  private val libVlc: LibVlc
 ) : MediaMetadataParser {
-  override suspend fun parseMetadata(uri: Uri): MediaMetadata {
-    val artistParser = artistParserFactory.make()
+  override fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaMetadata {
     return if (uri.isFileScheme() && uri.tagCanParseExtension()) {
       try {
         TagMediaMetadata(File(uri.path.orEmpty()), artistParser)
@@ -180,17 +176,20 @@ private class TagMediaMetadata private constructor(
 
 private const val END_OF_DATE_INDEX = 3
 
+@Suppress("NOTHING_TO_INLINE")
+private inline fun String?.orUnknown(): String = if (isNullOrBlank()) "Unknown" else this
+
 private class VlcMediaMetadata private constructor(
   private val media: IMedia,
   artistParser: ArtistParser
 ) : MediaMetadata {
-  private fun meta(id: Int): String = media.getMeta(id).orEmpty()
-  private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist)))
+  private fun meta(id: Int): String? = media.getMeta(id)
+  private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist).orUnknown()))
   private val _artistsSort = _artists.map { it.toArtistSort() }
   override val duration: Long
     get() = media.duration
   override val title: String
-    get() = meta(IMedia.Meta.Title)
+    get() = meta(IMedia.Meta.Title).orUnknown()
   override val titleSort: String
     get() = title.toTitleSort()
   override val artists: List<String>
@@ -198,37 +197,37 @@ private class VlcMediaMetadata private constructor(
   override val artistsSort: List<String>
     get() = _artistsSort
   override val album: String
-    get() = meta(IMedia.Meta.Album)
+    get() = meta(IMedia.Meta.Album).orUnknown()
   override val albumSort: String
     get() = album.toAlbumSort()
   override val albumArtist: String
-    get() = meta(IMedia.Meta.AlbumArtist)
+    get() = meta(IMedia.Meta.AlbumArtist).orUnknown()
   override val albumArtistSort: String
     get() = albumArtist.toArtistSort()
   override val composer: String = ""
   override val composerSort: String = ""
   override val genres: List<String>
     get() = meta(IMedia.Meta.Genre)
+      .orUnknown()
       .splitToSequence("/")
       .filter { it.isNotBlank() }
       .mapTo(ArrayList()) { it.trim() }
   override val trackNumber: Int
-    get() = meta(IMedia.Meta.TrackNumber).toIntOrNull() ?: 0
+    get() = meta(IMedia.Meta.TrackNumber)?.toIntOrNull() ?: 0
   override val totalTracks: Int
-    get() = meta(IMedia.Meta.TrackTotal).toIntOrNull() ?: 0
+    get() = meta(IMedia.Meta.TrackTotal)?.toIntOrNull() ?: 0
   override val discNumber: Int
-    get() = meta(IMedia.Meta.DiscNumber).toIntOrNull() ?: 0
+    get() = meta(IMedia.Meta.DiscNumber)?.toIntOrNull() ?: 0
   override val totalDiscs: Int = 0
 
   override val year: Int
     get() {
-      val date = meta(IMedia.Meta.Date)
-      LOG._e { it("date=%s", date) }
-      return date.substring(0..END_OF_DATE_INDEX).toIntOrNull() ?: 0
+      val date = meta(IMedia.Meta.Date).orEmpty()
+      return date.substring(0, min(END_OF_DATE_INDEX, date.length)).toIntOrNull() ?: 0
     }
   override val rating: StarRating
     get() {
-      LOG._e { it("rating=%s", meta(IMedia.Meta.Rating)) }
+      LOG._e { it("rating=%s", meta(IMedia.Meta.Rating).orEmpty()) }
       return STAR_NO_RATING
     }
   override val comment: String = ""
@@ -239,29 +238,29 @@ private class VlcMediaMetadata private constructor(
   override val trackMbid: TrackMbid? = null
   override val releaseGroupMbid: ReleaseGroupMbid? = null
   override val language: String
-    get() = meta(IMedia.Meta.Language)
+    get() = meta(IMedia.Meta.Language).orEmpty()
   override val copyright: String
-    get() = meta(IMedia.Meta.Copyright)
+    get() = meta(IMedia.Meta.Copyright).orEmpty()
   override val description: String
-    get() = meta(IMedia.Meta.Description)
+    get() = meta(IMedia.Meta.Description).orEmpty()
   override val setting: String
-    get() = meta(IMedia.Meta.Setting)
+    get() = meta(IMedia.Meta.Setting).orEmpty()
   override val nowPlaying: String
-    get() = meta(IMedia.Meta.NowPlaying)
+    get() = meta(IMedia.Meta.NowPlaying).orUnknown()
   override val publisher: String
-    get() = meta(IMedia.Meta.Publisher)
+    get() = meta(IMedia.Meta.Publisher).orEmpty()
   override val encodedBy: String
-    get() = meta(IMedia.Meta.EncodedBy)
+    get() = meta(IMedia.Meta.EncodedBy).orEmpty()
   override val director: String
-    get() = meta(IMedia.Meta.Director)
+    get() = meta(IMedia.Meta.Director).orEmpty()
   override val season: String
-    get() = meta(IMedia.Meta.Season)
+    get() = meta(IMedia.Meta.Season).orEmpty()
   override val episode: String
-    get() = meta(IMedia.Meta.Episode)
+    get() = meta(IMedia.Meta.Episode).orEmpty()
   override val showName: String
-    get() = meta(IMedia.Meta.ShowName)
+    get() = meta(IMedia.Meta.ShowName).orEmpty()
   override val actors: String
-    get() = meta(IMedia.Meta.Actors)
+    get() = meta(IMedia.Meta.Actors).orEmpty()
 
   override fun close() {
     media.release()

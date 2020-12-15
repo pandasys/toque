@@ -16,8 +16,6 @@
 
 package com.ealva.toque.tag
 
-import com.ealva.toque.common.emptyToNull
-
 /**
  * Will apply some sort of parsing of each "artist" in a list into possibly multiple artists.
  */
@@ -60,11 +58,12 @@ class ArtistParserFactoryImpl(
 
 private class IdentityArtistParser : ArtistParser {
   override fun parseAll(artistList: List<String>): List<String> {
-    return artistList
+    return if (artistList.isNotEmpty()) artistList else listOf(SongTag.UNKNOWN)
   }
 }
 
 private const val INITIAL_ARTISTS_CAPACITY = 8
+private fun String.emptyToNull(): String? = if (isNotEmpty()) this else null
 
 private class ArtistParserImpl(
   private val delimiter: String,
@@ -86,7 +85,7 @@ private class ArtistParserImpl(
           .mapNotNullTo(result) { split -> split.trim().emptyToNull() }
       }
     }
-    return result.toList()
+    return if (result.isNotEmpty()) result.toList() else listOf(SongTag.UNKNOWN)
   }
 }
 

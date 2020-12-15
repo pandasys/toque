@@ -18,9 +18,7 @@ package com.ealva.toque.service.vlc
 
 import android.content.Context
 import android.net.Uri
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
 import com.ealva.toque.media.Media
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +41,6 @@ class LibVlcSingleton(
    * @throws IllegalStateException if error during LibVLC initialization
    */
   private suspend fun make(): LibVlc {
-    LOG._e { it("Factory make LibVlc") }
     return LibVlcImpl(
       LibVLC(context, libVlcOptions(prefsSingleton.instance(), vlcUtil ?: VlcUtil(context)))
     )

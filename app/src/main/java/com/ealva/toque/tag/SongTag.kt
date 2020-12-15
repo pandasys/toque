@@ -51,7 +51,6 @@ import ealvatag.tag.FieldKey
 import ealvatag.tag.NullTag
 import ealvatag.tag.Tag
 import ealvatag.tag.TagException
-import ealvatag.tag.UnsupportedFieldException
 import java.io.File
 import java.io.IOException
 import java.nio.charset.Charset
@@ -92,8 +91,10 @@ private fun StringBuilder.appendFormattedSampleRate(header: AudioHeader) {
   append("kHz")
 }
 
-private fun Optional<String>.orUnknown() = orNull().orUnknown()
-private fun String?.orUnknown(): String = if (isNullOrBlank()) SongTag.UNKNOWN else this
+@Suppress("NOTHING_TO_INLINE")
+private inline fun Optional<String>.orUnknown() = orNull().orUnknown()
+@Suppress("NOTHING_TO_INLINE")
+private inline fun String?.orUnknown(): String = if (isNullOrBlank()) SongTag.UNKNOWN else this
 
 class SongTagField(val id: String, val contents: String) {
   override fun toString(): String {
@@ -106,6 +107,8 @@ interface SongTagFieldIterator {
 
   fun onError(message: String): Boolean
 }
+
+val UNKNOWN_SINGLETON = listOf(SongTag.UNKNOWN)
 
 /**
  * Helper class to wrap the tag reader/writer library. Make it easier to use and wrap it to reduce
@@ -156,7 +159,7 @@ class SongTag(
 ) : AutoCloseable {
 
   val path: String = file.path
-  private val type: MediaFormat = MediaFormat.getFormatFromExtension(path)
+  private val type: MediaFormat = MediaFormat.mediaFormatFromExtension(path)
 
   //  private val readSortFields: Boolean = prefs.readTagSortFields
   private val readSortFields = true
@@ -294,9 +297,6 @@ class SongTag(
   val mediaType: MediaType
     get() = MediaType.Audio
 
-  val title: String
-    get() = tag.getValue(FieldKey.TITLE, 0).orNull().orEmpty()
-
   val nowPlaying: String
     get() = referenceAlbumArtist
 
@@ -315,6 +315,9 @@ class SongTag(
       setField(FieldKey.TRACK_TOTAL, value)
     }
 
+  val title: String
+    get() = tag.getValue(FieldKey.TITLE, 0).orUnknown()
+
   val titleSort: String
     get() = if (readSortFields)
       tag.getValue(FieldKey.TITLE_SORT, 0).or(title.toTitleSort())
@@ -322,77 +325,47 @@ class SongTag(
       title.toTitleSort()
 
   val album: String
-    get() = tag.getValue(FieldKey.ALBUM, 0).orNull()?.trim().orEmpty()
+    get() = tag.getValue(FieldKey.ALBUM, 0).orUnknown()
 
   var albumSort: String
-    get() = if (readSortFields)
-      tag.getValue(FieldKey.ALBUM_SORT, 0).or(album.toAlbumSort())
-    else
+    get() = if (readSortFields) {
+      tag.getValue(FieldKey.ALBUM_SORT, 0).or(album.toAlbumSort()).orUnknown()
+    } else {
       album.toAlbumSort()
+    }
     set(value) {
       tag.setField(FieldKey.ALBUM_SORT, value)
     }
 
   val referenceAlbumArtist: String
     get() = tag.getValue(FieldKey.ALBUM_ARTIST, 0)
-      .or(tag.getValue(FieldKey.ARTIST, 0))
-      .or("")
+      .or(mediaArtists.first())
+      .orUnknown()
 
   val referenceAlbumArtistSort: String
-    get() = if (tag.getValue(FieldKey.ALBUM_ARTIST).isPresent) {
-      albumArtistSort
-    } else {
-      if (tag.getValue(FieldKey.ARTIST).isPresent) {
-        artistSort
-      } else {
-        referenceAlbumArtist.toArtistSort()
-      }
-    }
-
-  var albumArtistSort: String
-    get() = if (readSortFields)
-      tag.getValue(FieldKey.ALBUM_ARTIST_SORT, 0).or(referenceAlbumArtist.toArtistSort())
-    else
-      referenceAlbumArtist.toArtistSort()
-    set(value) {
-      tag.setField(FieldKey.ALBUM_ARTIST_SORT, value)
-    }
-
-  var artistSort: String
-    get() = if (readSortFields)
-      tag.getValue(FieldKey.ARTIST_SORT, 0).or(artist.toArtistSort())
-    else
-      referenceAlbumArtist.toArtistSort()
-    set(value) {
-      tag.setField(FieldKey.ARTIST_SORT, value)
-    }
-
-  var artist: String
-    get() = tag.getValue(FieldKey.ARTIST, 0).orNull()?.trim().orEmpty()
-    set(value) {
-      tag.setField(FieldKey.ARTIST, value)
-    }
+    get() = tag.getValue(FieldKey.ALBUM_ARTIST_SORT)
+      .or(referenceAlbumArtist.toArtistSort())
+      .orUnknown()
 
   val mediaArtists: List<String>
     get() = try {
       tag.getAll(FieldKey.ARTIST)
+        .filterNot { it.isNullOrEmpty() }
+        .ifEmpty { UNKNOWN_SINGLETON }
     } catch (e: Exception) {
       LOG.e(e) { +it }
-      listOf("")
+      UNKNOWN_SINGLETON
     }
 
   val mediaArtistsSort: List<String>
-    get() {
-      val list = mutableListOf<String>()
-      try {
-        list.addAll(tag.getAll(FieldKey.ARTIST_SORT))
-      } catch (e: Exception) {
-        if (e !is UnsupportedFieldException) LOG.e(e) { +it }
-      }
-      if (list.isEmpty()) {
-        mediaArtists.mapTo(list) { it.toArtistSort() }
-      }
-      return list
+    get() = try {
+      tag.getAll(FieldKey.ARTIST_SORT)
+        .filterNot { it.isNullOrEmpty() }
+        .ifEmpty { mediaArtists }
+        .map { it.toArtistSort() }
+    } catch (e: Exception) {
+      LOG.e(e) { +it }
+      UNKNOWN_SINGLETON
     }
 
   val genre: String
@@ -414,7 +387,7 @@ class SongTag(
     get() = tag.getValue(FieldKey.YEAR, 0).or("")
 
   val composer: String
-    get() = tag.getValue(FieldKey.COMPOSER, 0).orNull()?.trim().orEmpty()
+    get() = tag.getValue(FieldKey.COMPOSER, 0).orUnknown()
 
   val composerSort: String
     get() = if (readSortFields)
@@ -429,7 +402,7 @@ class SongTag(
     }
 
   val comment: String
-    get() = getComment("")
+    get() = tag.getValue(FieldKey.COMMENT, 0).or("")
 
   val acousticId: String
     get() = tag.getFirst(FieldKey.ACOUSTID_ID)
@@ -567,20 +540,8 @@ class SongTag(
     return setOrDeleteField(FieldKey.LYRICS, lyrics)
   }
 
-  fun getGenre(defaultValue: String): String {
-    return tag.getValue(FieldKey.GENRE, 0).or(defaultValue)
-  }
-
   fun setGenre(genre: String?): Boolean {
     return setOrDeleteField(FieldKey.GENRE, genre)
-  }
-
-  fun getComposer(defaultValue: String): String {
-    return tag.getValue(FieldKey.COMPOSER, 0).or(defaultValue)
-  }
-
-  fun setComposer(composer: String?): Boolean {
-    return setOrDeleteField(FieldKey.COMPOSER, composer)
   }
 
   fun setTrack(track: Int): Boolean {
@@ -616,40 +577,20 @@ class SongTag(
     return setOrDeleteField(FieldKey.YEAR, if (year > 0) year.toString() else "")
   }
 
-  fun getArtist(defaultValue: String): String {
-    return tag.getValue(FieldKey.ARTIST, 0).or(defaultValue)
-  }
-
   fun setArtist(artist: String?): Boolean {
     return setOrDeleteField(FieldKey.ARTIST, artist)
-  }
-
-  fun getAlbum(defaultValue: String): String {
-    return tag.getValue(FieldKey.ALBUM, 0).or(defaultValue)
   }
 
   fun setAlbum(album: String): Boolean {
     return setField(FieldKey.ALBUM, album)
   }
 
-  fun getAlbumArtist(defaultValue: String): String {
-    return tag.getValue(FieldKey.ALBUM_ARTIST, 0).or(defaultValue)
-  }
-
   fun setAlbumArtist(albumArtist: String): Boolean {
     return setField(FieldKey.ALBUM_ARTIST, albumArtist)
   }
 
-  fun getComment(defaultValue: String): String {
-    return tag.getValue(FieldKey.COMMENT, 0).or(defaultValue)
-  }
-
   fun setComment(comment: String?): Boolean {
     return setOrDeleteField(FieldKey.COMMENT, comment)
-  }
-
-  fun getEncoder(defaultValue: String): String {
-    return tag.getValue(FieldKey.ENCODER, 0).or(defaultValue)
   }
 
   fun setEncoder(encoder: String?): Boolean {

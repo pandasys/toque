@@ -25,7 +25,7 @@ object LibVlcModule {
     single { LibVlcPreferencesSingleton(androidContext()) }
     single { LibVlcSingleton(androidContext(), get()) }
     single<MediaMetadataParserFactory> {
-      VlcMediaMetadataParserFactory(get(), get())
+      VlcMediaMetadataParserFactory(get())
     }
   }
 }

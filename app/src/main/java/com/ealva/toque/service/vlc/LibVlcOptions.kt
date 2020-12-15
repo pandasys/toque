@@ -16,9 +16,9 @@
 
 package com.ealva.toque.service.vlc
 
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._i
 import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.SUB_AUTODETECT_PATHS
 
 private val LOG by lazyLogger("libVlcOptions")
@@ -72,7 +72,7 @@ private fun getResampler(vlcUtil: VlcUtil): String =
 
 private fun ArrayList<String>.dumpOptions() {
   forEach { option ->
-    LOG._i { it(option) }
+    LOG.i { it(option) }
   }
 }
 

@@ -23,13 +23,23 @@ import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import java.io.File
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
 inline class AudioContentId(val value: Long)
 inline class VideoContentId(val value: Long)
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Long.toAudioContentId() = AudioContentId(this)
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Long.toVideoContentId() = VideoContentId(this)
 
 /**
  * MediaStorage provides an interface to read and write the device MediaStore.
@@ -41,14 +51,16 @@ interface MediaStorage {
    * Get all audio grouped by artist and album. Each list of the flow contains all the tracks
    * found for a given artist.album. eg. a list might contain all the songs on the Beatles Let It Be
    * album and another list would contain all the songs on the Beatles Revolver album. This
-   * grouping is based on the MediaStore database.
+   * grouping is based on the MediaStore database sorted by artist then album
    */
-  fun audioFlow(): Flow<List<AudioInfo>>
+  fun audioFlow(modifiedAfter: Date): Flow<List<AudioInfo>>
 
   companion object {
     operator fun invoke(context: Context): MediaStorage = MediaStorageImpl(context)
   }
 }
+
+private val LOG by lazyLogger(MediaStorage::class)
 
 /**
  * Unlikely to be this many tracks on an album so use this as starting list size.
@@ -103,45 +115,50 @@ private class MediaStorageImpl(context: Context) : MediaStorage {
   fun Cursor.longColumnToDate(columnIndex: Int): Date =
     Date(TimeUnit.SECONDS.toMillis(getLong(columnIndex)))
 
-  override fun audioFlow(): Flow<List<AudioInfo>> = flow {
-    resolver.query(
-      audioCollection,
-      audioQueryFields,
-      null,
-      null,
-      MediaStore.Audio.ArtistColumns.ARTIST + ", " + MediaStore.Audio.AlbumColumns.ALBUM
-    )?.use { c: Cursor ->
-      val iId = c.indexOf(MediaStore.Audio.Media._ID)
-      val iAlbum = c.indexOf(MediaStore.Audio.AlbumColumns.ALBUM)
-      @Suppress("DEPRECATION") val iData = c.indexOf(MediaStore.MediaColumns.DATA)
-      val iTitle = c.indexOf(MediaStore.Audio.AudioColumns.TITLE)
-      val iDateAdded = c.indexOf(MediaStore.Audio.AudioColumns.DATE_ADDED)
-      val iDateModified = c.indexOf(MediaStore.Audio.AudioColumns.DATE_MODIFIED)
-      val iMimeType = c.indexOf(MediaStore.Audio.AudioColumns.MIME_TYPE)
-      val iSize = c.indexOf(MediaStore.Audio.AudioColumns.SIZE)
+  override fun audioFlow(modifiedAfter: Date): Flow<List<AudioInfo>> {
+    val lastScan = TimeUnit.MILLISECONDS.toSeconds(modifiedAfter.time)
+    return flow {
+      resolver.query(
+        audioCollection,
+        audioQueryFields,
+        MediaStore.MediaColumns.DATE_MODIFIED + " > " + lastScan,
+        null,
+        MediaStore.Audio.ArtistColumns.ARTIST + ", " + MediaStore.Audio.AlbumColumns.ALBUM
+      )?.use { cursor: Cursor ->
+        LOG._e { it("Cursor.count=%d", cursor.count) }
 
-      val list = ArrayList<AudioInfo>(DEFAULT_AUDIO_LIST_SIZE)
-      var currentAlbum = ""
-      while (c.moveToNext()) {
-        val nextAlbum = c.getString(iAlbum)
-        if (nextAlbum != currentAlbum) {
-          if (list.isNotEmpty()) emit(list.toList())
-          list.clear()
-          currentAlbum = nextAlbum
+        val iId = cursor.indexOf(MediaStore.Audio.Media._ID)
+        val iAlbum = cursor.indexOf(MediaStore.Audio.AlbumColumns.ALBUM)
+        @Suppress("DEPRECATION") val iData = cursor.indexOf(MediaStore.MediaColumns.DATA)
+        val iTitle = cursor.indexOf(MediaStore.Audio.AudioColumns.TITLE)
+        val iDateAdded = cursor.indexOf(MediaStore.Audio.AudioColumns.DATE_ADDED)
+        val iDateModified = cursor.indexOf(MediaStore.Audio.AudioColumns.DATE_MODIFIED)
+        val iMimeType = cursor.indexOf(MediaStore.Audio.AudioColumns.MIME_TYPE)
+        val iSize = cursor.indexOf(MediaStore.Audio.AudioColumns.SIZE)
+
+        val list = ArrayList<AudioInfo>(DEFAULT_AUDIO_LIST_SIZE)
+        var currentAlbum = ""
+        while (cursor.moveToNext()) {
+          val nextAlbum = cursor.getString(iAlbum)
+          if (nextAlbum != currentAlbum) {
+            if (list.isNotEmpty()) emit(list.toList())
+            list.clear()
+            currentAlbum = nextAlbum
+          }
+          val id = AudioContentId(cursor.getLong(iId))
+          list += AudioInfo(
+            id,
+            location(id),
+            File(cursor.getString(iData)),
+            cursor.getString(iTitle),
+            cursor.longColumnToDate(iDateAdded),
+            cursor.longColumnToDate(iDateModified),
+            cursor.getString(iMimeType),
+            cursor.getLong(iSize)
+          )
         }
-        val id = AudioContentId(c.getLong(iId))
-        list += AudioInfo(
-          id,
-          location(id),
-          c.getString(iData),
-          c.getString(iTitle),
-          c.longColumnToDate(iDateAdded),
-          c.longColumnToDate(iDateModified),
-          c.getString(iMimeType),
-          c.getLong(iSize)
-        )
+        if (list.isNotEmpty()) emit(list.toList())
       }
-      if (list.isNotEmpty()) emit(list.toList())
     }
   }
 }
@@ -151,7 +168,7 @@ private fun Cursor.indexOf(columnName: String): Int = getColumnIndexOrThrow(colu
 data class AudioInfo(
   val id: AudioContentId,
   val location: Uri,
-  val path: String,
+  val path: File,
   val title: String,
   val dateAdded: Date,
   val dateModified: Date,

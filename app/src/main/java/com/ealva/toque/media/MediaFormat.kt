@@ -16,6 +16,10 @@
 package com.ealva.toque.media
 
 import com.ealva.toque.persist.HasConstId
+import it.unimi.dsi.fastutil.ints.Int2ReferenceMap
+import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2ReferenceMap
+import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap
 import org.videolan.libvlc.util.Extensions
 import java.util.Locale
 
@@ -176,31 +180,32 @@ enum class MediaFormat(
   }
 
   companion object {
-    private val mimeTypeToFormatMap: Map<String, MediaFormat> = values().toMimeTypeMap()
-    private val extensionToFormatMap: Map<String, MediaFormat> = values().toExtensionMap()
+    private val extensionToFormatMap: Object2ReferenceMap<String, MediaFormat>
+    private val mimeTypeToFormatMap: Object2ReferenceMap<String, MediaFormat>
+    private val idToFormatMap: Int2ReferenceMap<MediaFormat>
 
-    private fun Array<MediaFormat>.toExtensionMap(): Map<String, MediaFormat> {
-      return HashMap<String, MediaFormat>(INITIAL_HASHMAP_SIZE).apply {
-        this@toExtensionMap.forEach { format ->
-          format.extensions.associateWithTo(this) { format }
-        }
-      }.also { check(it.size <= INITIAL_HASHMAP_SIZE) }
+    init {
+      val values = values()
+      mimeTypeToFormatMap = Object2ReferenceOpenHashMap(values.size)
+      extensionToFormatMap = Object2ReferenceOpenHashMap(values.size)
+      idToFormatMap = Int2ReferenceOpenHashMap<MediaFormat>(values.size).apply {
+        defaultReturnValue(Unknown)
+      }
+      values.forEach { format ->
+        format.extensions.associateWithTo(extensionToFormatMap) { format }
+        format.types.associateWithTo(mimeTypeToFormatMap) { format }
+        idToFormatMap[format.id] = format
+      }
     }
 
-    private fun Array<MediaFormat>.toMimeTypeMap(): Map<String, MediaFormat> {
-      return HashMap<String, MediaFormat>(INITIAL_HASHMAP_SIZE).apply {
-        this@toMimeTypeMap.forEach { format ->
-          format.types.associateWithTo(this) { format }
-        }
-      }.also { check(it.size <= INITIAL_HASHMAP_SIZE) }
-    }
+    fun mediaFormatFromId(id: Int): MediaFormat = idToFormatMap.get(id)
 
     /**
      * Get the MediaFormat for mimeType. MIME types are case insensitive; they are only lower case
      * by convention. https://tools.ietf.org/html/rfc2045 So mime types are converted to lower
      * case for searching. Returns [Unknown] if not found
      */
-    fun getFormatFromMimeType(mimeType: String): MediaFormat = mimeType
+    fun mediaFormatFromMimeType(mimeType: String): MediaFormat = mimeType
       .splitToSequence(',')
       .map { mimeTypeToFormatMap[it.trim().toLowerCase(Locale.ROOT)] }
       .filterNotNull()
@@ -209,8 +214,8 @@ enum class MediaFormat(
     /**
      * Get the MediaFormat for the file extension. Returns [Unknown] if not found.
      */
-    fun getFormatFromExtension(extension: String): MediaFormat {
-      return extensionToFormatMap[extension.toLowerCase(Locale.ROOT)] ?: Unknown
+    fun mediaFormatFromExtension(extension: String): MediaFormat {
+      return extensionToFormatMap.getOrDefault(extension.toLowerCase(Locale.ROOT), Unknown)
     }
   }
 
@@ -246,6 +251,9 @@ enum class MediaFormat(
   val preferredMimeType: String?
     get() = types.firstOrNull()
 }
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Int.toMediaFormat(): MediaFormat = MediaFormat.mediaFormatFromId(this)
 
 object FileExtensions {
   val audio by lazy { Extensions.AUDIO.trimLeadingDot() }

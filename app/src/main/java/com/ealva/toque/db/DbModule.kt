@@ -16,296 +16,52 @@
 
 package com.ealva.toque.db
 
+import android.content.Context
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.db.MediaTable.contentId
-import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.log._i
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.OpenParams
-import com.ealva.welite.db.table.ForeignKeyAction
-import com.ealva.welite.db.table.Table
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
 private val LOG by lazyLogger(DbModule::class)
 private const val DB_FILENAME = "ToqueDB"
 
-private val allTables = setOf(
-  ArtistTable,
-  AlbumTable,
-  ArtistAlbumTable,
-  MediaTable,
-  ArtistMediaTable,
-  ComposerTable,
-  ComposerMediaTable,
-  GenreTable,
-  GenreMediaTable
-)
-
 object DbModule {
 
   val module = module {
-    single { GenreDao(get()) }
-    single { MediaDao(get(), get()) }
+    single { makeDatabase(androidContext()) }
+    single { GenreDao() }
+    single { ArtistDao() }
+    single { AlbumDao() }
+    single { ArtistAlbumDao() }
+    single { ComposerDao() }
+    single { ArtistMediaDao() }
+    single { GenreMediaDao() }
+    single { ComposerMediaDao() }
+    single { AudioMediaDao(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+  }
 
-    single {
-      Database(
-        context = androidContext(),
-        fileName = DB_FILENAME,
-        tables = allTables,
-        version = 1,
-        openParams = OpenParams(
-          enableWriteAheadLogging = true,
-          enableForeignKeyConstraints = true
-        )
-      ) {
-        onConfigure {
-          LOG._i { it("Database onConfigure") }
-        }
-        onCreate {
-          LOG._i { it("Database onCreate") }
-        }
-        onOpen { db ->
-          LOG._i { it("tables=%s", db.tables) }
-          LOG._i { it("Database path:%s", db.path) }
-        }
-      }
+  private fun makeDatabase(context: Context) = Database(
+    context = context,
+    fileName = DB_FILENAME,
+    tables = setOfAllTables,
+    version = 1,
+    openParams = OpenParams(
+      enableWriteAheadLogging = true,
+      enableForeignKeyConstraints = true
+    )
+  ) {
+    onConfigure {
+      LOG._i { it("Database onConfigure") }
     }
-  }
-}
-
-object ArtistTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val artist = text("Artist") { collateNoCase() }
-  val artistSort = text("ArtistSort") { collateNoCase() }
-  val artistImage = text("ArtistImageUri") { default("") }
-  val artistMbid = text("ArtistMbid") { default("") }
-  val createdTime = long("ArtistCreated")
-  val lastArtSearchTime = long("ArtistLastArtSearchTime") { default(0L) }
-  val updatedTime = long("ArtistTimeUpdated") { default(0L) }
-
-  init {
-    uniqueIndex(artist) // artist may appear only once
-  }
-}
-
-object AlbumTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val album = text("Album") { collateNoCase() }
-  val albumSort = text("AlbumSort") { collateNoCase() }
-  val albumArtist = text("AlbumArtist") { collateNoCase() }
-  val albumArtistSort = text("AlbumArtistSort") { collateNoCase() }
-  val albumImage = text("AlbumImageUri") { default("") }
-  val albumMbid = text("AlbumMbid") { default("") }
-  val releaseGroupMbid = text("AlbumReleaseGroupMbid") { default("") }
-  val createdTime = long("AlbumCreated")
-  val lastArtSearchTime = long("AlbumLastArtSearchTime") { default(0L) }
-  val updatedTime = long("AlbumTimeUpdated") { default(0L) }
-
-  init {
-    uniqueIndex(album, albumArtist) // pair may appear only once
-    index(album) // quickly find album info
-    index(albumArtist) // quickly find all albums by a particular album artist
-  }
-}
-
-object ArtistAlbumTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val artistId = reference(
-    "ArtistAlbum_Artist_id",
-    ArtistTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val albumId = reference(
-    "ArtistAlbum_Album_id",
-    AlbumTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val createdTime = long("ArtistAlbumTimeCreated")
-
-  init {
-    uniqueIndex(artistId, albumId) // a pair should appear only once
-    index(artistId) // quickly find all albums by an artist
-    index(albumId) // find all artist for an album
-  }
-}
-
-/**
- * Table of all media, both video and audio. Don't have separate tables for audio/video because
- * some video may be played as audio. To use the [contentId] in querying the MediaStore, the
- * [mediaType] must be known to generate the correct uri. A lot of the metadata stored in this
- * table is specific to the [mediaType]. When video is played as audio some substitutions will
- * need to be made for display purposes and some metadata will be unavailable as it doesn't exist
- * for video.
- */
-object MediaTable : Table() {
-  val id = long("_id") { primaryKey() }
-
-  /**
-   * Location of the media - need not be local to the device. If [contentId] is null then
-   * this will be a network Uri
-   */
-  val uri = text("MediaUri")
-
-  /**
-   * If the media came from the MediaStore, this is it's MediaStore ID. If the value is not null
-   * it must be unique. SQLite docs say, "For the purposes of unique indices, all NULL values are
-   * considered different from all other NULL values and are thus unique." So, we don't need a
-   * trigger to ensure uniqueness.
-   * [SQLite CREATE INDEX](https://sqlite.org/lang_createindex.html)
-   */
-  val contentId = optLong("MediaContentId")
-
-  /**
-   * The type of media, [com.ealva.toque.media.MediaType] - audio or video
-   */
-  val mediaType = long("MediaType")
-
-  /** This is the id of a MediaFormat enum instance */
-  val mediaFormat = long("MediaFormat")
-  val title = text("MediaTitle") { collateNoCase() }
-  val titleSort = text("MediaTitleSort") { collateNoCase() }
-  val albumId = reference("Media_Album_id", AlbumTable.id)
-
-  /** Primary track artist. Primary = first in the list of artists */
-  val artistId = reference("Media_Artist_id", ArtistTable.id)
-
-  /** Artist associated with the album */
-  val albumArtistId = reference("Media_AlbumArtist_id", ArtistTable.id)
-  val year = long("MediaYear") { default(0) }
-  val rating = integer("MediaRating") { default(-1) }
-  val duration = long("MediaDuration") { default(0) }
-  val trackNumber = integer("MediaTrackNumber") { default(0) }
-  val totalTracks = integer("MediaTotalTracks") { default(0) }
-  val discNumber = integer("MediaDiscNumber") { default(0) }
-  val totalDiscs = integer("MediaTotalDiscs") { default(0) }
-  val lastPlayedTime = long("MediaLastPlayedTime") { default(0) }
-  val playedCount = integer("MediaPlayedCount") { default(0) }
-  val lastSkippedTime = long("MediaLastSkippedTime") { default(0) }
-  val skippedCount = integer("MediaSkippedCount") { default(0) }
-  val bookmarkPosition = long("MediaBookmarkPosition") { default(0) }
-  val createdTime = long("MediaTimeCreated")
-  val updatedTime = long("MediaTimeUpdated") { default(0) }
-  val contentStart = long("MediaContentStart") { default(-1) }
-  val contentEnd = long("MediaContentEnd") { default(-1) }
-  val comment = text("MediaContentComment") { default("") }
-  val trackMbid = text("MediaTrackMbid") { default("") }
-  val copyright = text("MediaCopyright") { default("") }
-  val description = text("MediaDescription") { default("") }
-  val setting = text("MediaSetting") { default("") }
-  val language = text("MediaLanguage") { default("") }
-  val nowPlaying = text("MediaNowPlaying") { default("") }
-  val publisher = text("MediaPublisher") { default("") }
-  val encodedBy = text("MediaEncodedBy") { default("") }
-  val director = text("MediaDirector") { default("") }
-  val season = text("MediaSeason") { default("") }
-  val episode = text("MediaEpisode") { default("") }
-  val showName = text("MediaShowName") { default("") }
-  val actors = text("MediaActors") { default("") }
-
-  init {
-    // several of these indices exist for faster smart playlist functionality
-    uniqueIndex(uri) // media may appear only once
-    uniqueIndex(contentId) // content may appear only once and need to find quickly
-    index(mediaType) // to find all audio or all video
-    index(albumId) // denormalization for quick album info
-    index(artistId) // denormalization to quickly find first track artist
-    index(albumArtistId) // find album artist media (currently no association table for this)
-    index(title) // quickly find a somewhat familiar title (eg. LIKE %Sunshine%)
-    index(year) // smart playlist query (eg. find media in the 1970s)
-    index(rating) // smart playlist query (eg. find all unrated or find all 5 star)
-    index(createdTime) // smart playlist query (eg. find all "recently" added)
-    index(playedCount) // smart playlist query (eg. find media not being played)
-    index(lastPlayedTime) // smart playlist query (eg. find media not played in the last n days)
-    index(skippedCount) // smart playlist query (eg. find music with lower interest)
-    index(lastSkippedTime) // smart playlist query (eg. find music "recently" skipped)
-    index(duration) // smart playlist query (eg. find all songs longer than 5 minutes)
-    index(comment) // smart playlist query (eg. user can use this a a freeform search area)
-  }
-}
-
-/**
- * Contains association between an artist and a particular piece of media - a "Track"
- */
-object ArtistMediaTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val artistId = reference(
-    "ArtistMedia_Artist_id",
-    ArtistTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val mediaId = reference(
-    "ArtistMedia_Media_id",
-    MediaTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val createdTime = long("ArtistMediaCreatedTime")
-
-  init {
-    uniqueIndex(artistId, mediaId) // pair should only exist once
-    index(artistId) // quickly find all media for an artist
-    index(mediaId) // find all artists for a piece of media
-  }
-}
-
-object ComposerTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val composer = text("Composer") { collateNoCase() }
-  val composerSort = text("ComposerSort") { collateNoCase() }
-  val createdTime = long("ComposerCreatedTime")
-
-  init {
-    uniqueIndex(composer)
-  }
-}
-
-object ComposerMediaTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val composerId = reference(
-    "ComposerMedia_Composer_id",
-    ComposerTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val mediaId = reference(
-    "ComposerMedia_Media_id",
-    MediaTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val createdTime = long("ComposerMediaCreated")
-
-  init {
-    // composer field may or may not be parsed into multiple composers. et Lennon/McCartney may
-    // appear as "Lennon/McCartney" or separately as "Lennon" and "McCartney". The composer tag
-    // entry is currently non-standard formatting and may appear with various delimiters between
-    // composers. We'll leave open the possibility that a piece of media may have more than one
-    // composer.
-    index(composerId)
-    index(mediaId)
-  }
-}
-
-object GenreTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val genre = text("Genre") { collateNoCase() }
-  val createdTime = long("GenreCreatedTimes")
-
-  init {
-    uniqueIndex(genre) // a genre should only appear once
-  }
-}
-
-object GenreMediaTable : Table() {
-  val id = long("_id") { primaryKey() }
-  val genreId = reference("GenreMedia_Genre_id", GenreTable.id)
-  val mediaId = reference(
-    "GenreMedia_Media_id",
-    MediaTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-
-  init {
-    index(genreId) // to query all media for a genre
-    index(mediaId) // to query all genre for a piece of media
+    onCreate {
+      LOG._i { it("Database onCreate") }
+    }
+    onOpen { db ->
+      LOG._i { it("tables=%s", db.tables) }
+      LOG._i { it("Database path:%s", db.path) }
+    }
   }
 }
