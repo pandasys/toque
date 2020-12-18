@@ -24,7 +24,7 @@ inline fun String.updateOrNull(block: () -> String): String? =
   block().let { newValue -> if (newValue.isNotEmpty() && this != newValue) newValue else null }
 
 inline fun <T : Mbid> T.updateOrNull(block: () -> T?): T? =
-  block().let { newValue -> if (newValue != null && isObsolete(newValue)) newValue else null }
+  block().let { newValue -> if (isObsolete(newValue)) newValue else null }
 
 inline fun <T : PersistentId> T.updateOrNull(block: () -> T): T? =
   block().let { newValue -> if (id != newValue.id) newValue else null }

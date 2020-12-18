@@ -57,8 +57,14 @@ interface AudioMediaDao {
     createUpdateTime: Long
   )
 
+  /**
+   * Delete all audio media and related entities, including cascading into relationships
+   */
   suspend fun deleteAll()
 
+  /**
+   * Delete all audio related entities which no longer have relationships with audio media
+   */
   suspend fun deleteEntitiesWithNoMedia()
 
   companion object {
@@ -149,16 +155,17 @@ private class AudioMediaDaoImpl(
     }
   }
 
+  /**
+   * Deleting media also cascades into various relationship tables, as does deleting albums,
+   * artists, genres, etc.
+   */
   override suspend fun deleteAll() {
     db.transaction {
 //      eqPresetAssociationTable.deleteSongAndAlbumAssociations(txn)
 //      playListSongFileTable.deleteAll(txn)
 //      queueTable.deleteAll(txn)
-      // Deleting media cascades to include ArtistMedia, ComposerMedia, and GenreMedia
-      val count = MediaTable.deleteAll()
-      LOG.i { it("Deleted %d media", count) }
+      MediaTable.deleteAll()
       albumDao.deleteAll(this)
-      // Deleting artist would also cascade to ArtistAlbum and ArtistMedia
       artistDao.deleteAll(this)
       composerDao.deleteAll(this)
       genreDao.deleteAll(this)
@@ -305,41 +312,41 @@ private class AudioMediaDaoImpl(
    */
   private fun Transaction.updateOrInsertAudioMedia(
     audioInfo: AudioInfo,
-    albumId: AlbumId,
-    albumArtistId: ArtistId,
-    artistId: ArtistId,
+    newAlbumId: AlbumId,
+    newAlbumArtistId: ArtistId,
+    newArtistId: ArtistId,
     metadata: MediaMetadata,
     createUpdateTime: Long
   ): MediaId {
-    val mediaFormat = MediaFormat.mediaFormatFromExtension(audioInfo.path.extension)
+    val formatFromExt = MediaFormat.mediaFormatFromExtension(audioInfo.path.extension)
     return maybeUpdateAudioMedia(
       audioInfo,
-      albumId,
-      albumArtistId,
-      artistId,
+      newAlbumId,
+      newAlbumArtistId,
+      newArtistId,
       metadata,
       createUpdateTime
     ) ?: INSERT_AUDIO_STATEMENT.insert {
-      it[INSERT_AUDIO_LOCATION] = audioInfo.location
-      it[INSERT_AUDIO_CONTENT_ID] = audioInfo.id.value
-      it[INSERT_AUDIO_MEDIA_TYPE] = MediaType.Audio.id
-      it[INSERT_AUDIO_MEDIA_FORMAT] = mediaFormat.id
-      it[INSERT_AUDIO_TITLE] = metadata.title
-      it[INSERT_AUDIO_TITLE_SORT] = metadata.titleSort
-      it[INSERT_AUDIO_ALBUM_ID] = albumId.id
-      it[INSERT_AUDIO_ALBUM_ARTIST_ID] = albumArtistId.id
-      it[INSERT_AUDIO_ARTIST_ID] = artistId.id
-      it[INSERT_AUDIO_YEAR] = metadata.year
-      it[INSERT_AUDIO_RATING] = metadata.rating.toRating().value
-      it[INSERT_AUDIO_DURATION] = metadata.duration
-      it[INSERT_AUDIO_TRACK_NUM] = metadata.trackNumber
-      it[INSERT_AUDIO_TOTAL_TRACKS] = metadata.totalTracks
-      it[INSERT_AUDIO_DISC_NUM] = metadata.discNumber
-      it[INSERT_AUDIO_TOTAL_DISCS] = metadata.totalDiscs
-      it[INSERT_AUDIO_COMMENT] = metadata.comment
-      it[INSERT_AUDIO_TRACK_MBID] = metadata.trackMbid?.value ?: ""
-      it[INSERT_AUDIO_CREATED] = createUpdateTime
-      it[INSERT_AUDIO_UPDATED] = createUpdateTime
+      it[location] = audioInfo.location.toString()
+      it[contentId] = audioInfo.id.value
+      it[mediaType] = MediaType.Audio.id
+      it[mediaFormat] = formatFromExt.id
+      it[title] = metadata.title
+      it[titleSort] = metadata.titleSort
+      it[albumId] = newAlbumId.id
+      it[albumArtistId] = newAlbumArtistId.id
+      it[artistId] = newArtistId.id
+      it[year] = metadata.year
+      it[rating] = metadata.rating.toRating().value
+      it[duration] = metadata.duration
+      it[trackNumber] = metadata.trackNumber
+      it[totalTracks] = metadata.totalTracks
+      it[discNumber] = metadata.discNumber
+      it[totalDiscs] = metadata.totalDiscs
+      it[comment] = metadata.comment
+      it[trackMbid] = metadata.trackMbid?.value ?: ""
+      it[createdTime] = createUpdateTime
+      it[updatedTime] = createUpdateTime
     }.toMediaId()
   }
 
@@ -446,26 +453,6 @@ private class AudioMediaDaoImpl(
   }
 }
 
-private var INSERT_AUDIO_LOCATION: Int = -1
-private var INSERT_AUDIO_CONTENT_ID: Int = -1
-private var INSERT_AUDIO_MEDIA_TYPE: Int = -1
-private var INSERT_AUDIO_MEDIA_FORMAT: Int = -1
-private var INSERT_AUDIO_TITLE: Int = -1
-private var INSERT_AUDIO_TITLE_SORT: Int = -1
-private var INSERT_AUDIO_ALBUM_ID: Int = -1
-private var INSERT_AUDIO_ALBUM_ARTIST_ID: Int = -1
-private var INSERT_AUDIO_ARTIST_ID: Int = -1
-private var INSERT_AUDIO_YEAR: Int = -1
-private var INSERT_AUDIO_RATING: Int = -1
-private var INSERT_AUDIO_DURATION: Int = -1
-private var INSERT_AUDIO_TRACK_NUM: Int = -1
-private var INSERT_AUDIO_TOTAL_TRACKS: Int = -1
-private var INSERT_AUDIO_DISC_NUM: Int = -1
-private var INSERT_AUDIO_TOTAL_DISCS: Int = -1
-private var INSERT_AUDIO_COMMENT: Int = -1
-private var INSERT_AUDIO_TRACK_MBID: Int = -1
-private var INSERT_AUDIO_CREATED: Int = -1
-private var INSERT_AUDIO_UPDATED: Int = -1
 private val INSERT_AUDIO_STATEMENT = MediaTable.insertValues {
   it[location].bindArg()
   it[contentId].bindArg()
@@ -487,27 +474,6 @@ private val INSERT_AUDIO_STATEMENT = MediaTable.insertValues {
   it[trackMbid].bindArg()
   it[createdTime].bindArg()
   it[updatedTime].bindArg()
-
-  INSERT_AUDIO_LOCATION = it.indexOf(location)
-  INSERT_AUDIO_CONTENT_ID = it.indexOf(contentId)
-  INSERT_AUDIO_MEDIA_TYPE = it.indexOf(mediaType)
-  INSERT_AUDIO_MEDIA_FORMAT = it.indexOf(mediaFormat)
-  INSERT_AUDIO_TITLE = it.indexOf(title)
-  INSERT_AUDIO_TITLE_SORT = it.indexOf(titleSort)
-  INSERT_AUDIO_ALBUM_ID = it.indexOf(albumId)
-  INSERT_AUDIO_ALBUM_ARTIST_ID = it.indexOf(albumArtistId)
-  INSERT_AUDIO_ARTIST_ID = it.indexOf(artistId)
-  INSERT_AUDIO_YEAR = it.indexOf(year)
-  INSERT_AUDIO_RATING = it.indexOf(rating)
-  INSERT_AUDIO_DURATION = it.indexOf(duration)
-  INSERT_AUDIO_TRACK_NUM = it.indexOf(trackNumber)
-  INSERT_AUDIO_TOTAL_TRACKS = it.indexOf(totalTracks)
-  INSERT_AUDIO_DISC_NUM = it.indexOf(discNumber)
-  INSERT_AUDIO_TOTAL_DISCS = it.indexOf(totalDiscs)
-  INSERT_AUDIO_COMMENT = it.indexOf(comment)
-  INSERT_AUDIO_TRACK_MBID = it.indexOf(trackMbid)
-  INSERT_AUDIO_CREATED = it.indexOf(createdTime)
-  INSERT_AUDIO_UPDATED = it.indexOf(updatedTime)
 }
 
 private class AudioForUpdate(

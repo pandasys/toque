@@ -134,12 +134,12 @@ private class GenreDaoImpl : GenreDao {
    * query fails throw IllegalStateException.
    */
   private fun Transaction.getOrInsert(
-    genre: String,
+    newGenre: String,
     createTime: Long
   ): Long = getOrInsertLock.withLock {
-    getGenreId(genre) ?: INSERT_GENRE.insert {
-      it[0] = genre
-      it[1] = createTime
+    getGenreId(newGenre) ?: INSERT_GENRE.insert {
+      it[genre] = newGenre
+      it[createdTime] = createTime
     }
   }
 }

@@ -31,12 +31,12 @@ private val LOG by lazyLogger(ComposerMediaDao::class)
 
 interface ComposerMediaDao {
   /**
-   * Insert or replace all artists for [mediaId]
+   * Insert or replace all artists for [replaceMediaId]
    */
   fun replaceMediaComposer(
     txn: Transaction,
-    composerId: ComposerId,
-    mediaId: MediaId,
+    replaceComposerId: ComposerId,
+    replaceMediaId: MediaId,
     createTime: Long
   )
 
@@ -47,16 +47,10 @@ interface ComposerMediaDao {
   }
 }
 
-private var INSERT_COMPOSER = -1
-private var INSERT_MEDIA = -1
-private var INSERT_CREATE_TIME = -1
 private val INSERT_COMPOSER_MEDIA = Table.insertValues(OnConflict.Replace) {
   it[composerId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
-  INSERT_COMPOSER = it.indexOf(composerId)
-  INSERT_MEDIA = it.indexOf(mediaId)
-  INSERT_CREATE_TIME = it.indexOf(createdTime)
 }
 
 private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
@@ -64,14 +58,14 @@ private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
 private class ComposerMediaDaoImpl : ComposerMediaDao {
   override fun replaceMediaComposer(
     txn: Transaction,
-    composerId: ComposerId,
-    mediaId: MediaId,
+    replaceComposerId: ComposerId,
+    replaceMediaId: MediaId,
     createTime: Long
   ) = txn.run {
     INSERT_COMPOSER_MEDIA.insert {
-      it[INSERT_COMPOSER] = composerId.id
-      it[INSERT_MEDIA] = mediaId.id
-      it[INSERT_CREATE_TIME] = createTime
+      it[composerId] = replaceComposerId.id
+      it[mediaId] = replaceMediaId.id
+      it[createdTime] = createTime
     }
     Unit
   }

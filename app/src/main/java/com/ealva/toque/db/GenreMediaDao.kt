@@ -31,12 +31,12 @@ private val LOG by lazyLogger(GenreMediaDao::class)
 
 interface GenreMediaDao {
   /**
-   * Insert or replace all artists for [mediaId]
+   * Insert or replace all artists for [replaceMediaId]
    */
   fun replaceMediaGenres(
     txn: Transaction,
     genreIdList: GenreIdList,
-    mediaId: MediaId,
+    replaceMediaId: MediaId,
     createTime: Long
   )
 
@@ -47,33 +47,28 @@ interface GenreMediaDao {
   }
 }
 
-private var INSERT_GENRE = -1
-private var INSERT_MEDIA = -1
-private var INSERT_CREATE_TIME = -1
 private val INSERT_GENRE_MEDIA = Table.insertValues(OnConflict.Replace) {
   it[genreId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
-  INSERT_GENRE = it.indexOf(genreId)
-  INSERT_MEDIA = it.indexOf(mediaId)
-  INSERT_CREATE_TIME = it.indexOf(createdTime)
 }
 
-private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
+private val bindMediaId = bindLong()
+private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindMediaId }
 
 private class GenreMediaDaoImpl : GenreMediaDao {
   override fun replaceMediaGenres(
     txn: Transaction,
     genreIdList: GenreIdList,
-    mediaId: MediaId,
+    replaceMediaId: MediaId,
     createTime: Long
   ) = txn.run {
-    DELETE_MEDIA.delete { it[0] = mediaId.id }
-    genreIdList.forEach { genreId ->
+    DELETE_MEDIA.delete { it[bindMediaId] = replaceMediaId.id }
+    genreIdList.forEach { replaceGenreId ->
       INSERT_GENRE_MEDIA.insert {
-        it[INSERT_GENRE] = genreId.id
-        it[INSERT_MEDIA] = mediaId.id
-        it[INSERT_CREATE_TIME] = createTime
+        it[genreId] = replaceGenreId.id
+        it[mediaId] = replaceMediaId.id
+        it[createdTime] = createTime
       }
     }
   }

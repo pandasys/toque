@@ -143,14 +143,14 @@ private class ComposerDaoImpl : ComposerDao {
    * query fails throw IllegalStateException.
    */
   private fun Transaction.getOrInsertComposer(
-    composer: String,
-    composerSort: String,
+    newComposer: String,
+    newComposerSort: String,
     createTime: Long
   ): Long = getOrInsertLock.withLock {
-    getComposer(composer) ?: INSERT_COMPOSER.insert {
-      it[0] = composer
-      it[1] = composerSort
-      it[2] = createTime
+    getComposer(newComposer) ?: INSERT_COMPOSER.insert {
+      it[composer] = newComposer
+      it[composerSort] = newComposerSort
+      it[createdTime] = createTime
     }
   }
 }

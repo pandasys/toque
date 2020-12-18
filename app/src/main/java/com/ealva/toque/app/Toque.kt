@@ -19,6 +19,8 @@ package com.ealva.toque.app
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.StrictMode
 import android.util.Log
 import com.ealva.ealvalog.LogLevel
 import com.ealva.ealvalog.Loggers
@@ -28,6 +30,7 @@ import com.ealva.ealvalog.android.AndroidLogger
 import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
 import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.logger
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
@@ -42,6 +45,9 @@ import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import org.koin.dsl.module
+import java.util.concurrent.Executors
+
+private val LOG by lazyLogger(Toque::class)
 
 interface Toque {
   fun restartApp(intent: Intent, context: Context)
@@ -65,9 +71,18 @@ class ToqueImpl : Application(), Toque {
     val logger = logger()
     logger._e { it("App create") }
 
-//    Class.forName("dalvik.system.CloseGuard")
-//      .getMethod("setEnabled", Boolean::class.javaPrimitiveType)
-//      .invoke(null, true)
+    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      StrictMode.VmPolicy.Builder()
+        .detectNonSdkApiUsage()
+        .penaltyListener(
+          Executors.newSingleThreadExecutor(),
+          { v -> v?.let { violation -> LOG._e(violation) { it("strict violation") } } }
+        )
+        .build()
+    } else {
+      StrictMode.VmPolicy.Builder().build()
+    }
+    StrictMode.setVmPolicy(policy)
 
     startKoin {
       androidLogger(level = Level.INFO)

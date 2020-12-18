@@ -32,8 +32,8 @@ interface ArtistAlbumDao {
    */
   fun insertArtistAlbum(
     txn: Transaction,
-    artistId: ArtistId,
-    albumId: AlbumId,
+    newArtistId: ArtistId,
+    newAlbumId: AlbumId,
     createTime: Long
   )
 
@@ -44,29 +44,23 @@ interface ArtistAlbumDao {
   }
 }
 
-private var INSERT_ARTIST = -1
-private var INSERT_ALBUM = -1
-private var INSERT_CREATE_TIME = -1
 private val INSERT_ARTIST_ALBUM = Table.insertValues(OnConflict.Replace) {
   it[artistId].bindArg()
   it[albumId].bindArg()
   it[createdTime].bindArg()
-  INSERT_ARTIST = it.indexOf(artistId)
-  INSERT_ALBUM = it.indexOf(albumId)
-  INSERT_CREATE_TIME = it.indexOf(createdTime)
 }
 
 private class ArtistAlbumDaoImpl : ArtistAlbumDao {
   override fun insertArtistAlbum(
     txn: Transaction,
-    artistId: ArtistId,
-    albumId: AlbumId,
+    newArtistId: ArtistId,
+    newAlbumId: AlbumId,
     createTime: Long
   ) = txn.run {
     INSERT_ARTIST_ALBUM.insert {
-      it[INSERT_ARTIST] = artistId.id
-      it[INSERT_ALBUM] = albumId.id
-      it[INSERT_CREATE_TIME] = createTime
+      it[artistId] = newArtistId.id
+      it[albumId] = newAlbumId.id
+      it[createdTime] = createTime
     }
     Unit
   }

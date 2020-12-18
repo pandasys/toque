@@ -91,12 +91,6 @@ interface AlbumDao {
   }
 }
 
-private var INSERT_ALBUM: Int = -1
-private var INSERT_ALBUM_SORT: Int = -1
-private var INSERT_RELEASE_MBID: Int = -1
-private var INSERT_RELEASE_GROUP_MBID: Int = -1
-private var INSERT_CREATED: Int = -1
-private var INSERT_UPDATED: Int = -1
 private val INSERT_STATEMENT = Table.insertValues {
   it[album].bindArg()
   it[albumSort].bindArg()
@@ -104,12 +98,6 @@ private val INSERT_STATEMENT = Table.insertValues {
   it[releaseGroupMbid].bindArg()
   it[createdTime].bindArg()
   it[updatedTime].bindArg()
-  INSERT_ALBUM = it.indexOf(album)
-  INSERT_ALBUM_SORT = it.indexOf(albumSort)
-  INSERT_RELEASE_MBID = it.indexOf(releaseMbid)
-  INSERT_RELEASE_GROUP_MBID = it.indexOf(releaseGroupMbid)
-  INSERT_CREATED = it.indexOf(createdTime)
-  INSERT_UPDATED = it.indexOf(updatedTime)
 }
 
 private val QUERY_ALBUM_INFO: Query = Query(
@@ -165,28 +153,28 @@ private class AlbumDaoImpl : AlbumDao {
   }
 
   private fun Transaction.doUpsertAlbum(
-    album: String,
-    albumSort: String,
-    releaseMbid: ReleaseMbid?,
-    releaseGroupMbid: ReleaseGroupMbid?,
+    newAlbum: String,
+    newAlbumSort: String,
+    newReleaseMbid: ReleaseMbid?,
+    newReleaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Long
   ): AlbumId = try {
     maybeUpdateAlbum(
-      album,
-      albumSort,
-      releaseMbid,
-      releaseGroupMbid,
+      newAlbum,
+      newAlbumSort,
+      newReleaseMbid,
+      newReleaseGroupMbid,
       createUpdateTime
     ) ?: INSERT_STATEMENT.insert {
-      it[INSERT_ALBUM] = album
-      it[INSERT_ALBUM_SORT] = albumSort
-      it[INSERT_RELEASE_MBID] = releaseMbid?.value ?: ""
-      it[INSERT_RELEASE_GROUP_MBID] = releaseGroupMbid?.value ?: ""
-      it[INSERT_CREATED] = createUpdateTime
-      it[INSERT_UPDATED] = createUpdateTime
+      it[album] = newAlbum
+      it[albumSort] = newAlbumSort
+      it[releaseMbid] = newReleaseMbid?.value ?: ""
+      it[releaseGroupMbid] = newReleaseGroupMbid?.value ?: ""
+      it[createdTime] = createUpdateTime
+      it[updatedTime] = createUpdateTime
     }.toAlbumId()
   } catch (e: Exception) {
-    LOG.e(e) { it("Exception with album='%s'", album) }
+    LOG.e(e) { it("Exception with album='%s'", newAlbum) }
     throw e
   }
 

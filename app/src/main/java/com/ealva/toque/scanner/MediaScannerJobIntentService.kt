@@ -143,7 +143,6 @@ class MediaScannerJobIntentService : JobIntentService() {
     val lastScanTime = if (rescan.forceUpdate) Date(0) else Date(prefs.lastScanTime())
     if (rescan.cleanDb) deleteAllMediaFromDb()
     val createUpdateTime = System.currentTimeMillis()
-    LOG.i { it("Elapsed:%d have resources, start scan", stopWatch.elapsed(TimeUnit.MILLISECONDS)) }
     scanAllAudioAfter(lastScanTime, prefs, parser, createUpdateTime)
     audioMediaDao.deleteEntitiesWithNoMedia()
     LOG.i { it("Elapsed:%d end scan", stopWatch.stop().elapsed(TimeUnit.MILLISECONDS)) }
@@ -157,20 +156,22 @@ class MediaScannerJobIntentService : JobIntentService() {
   }
 
   private suspend fun scanAllAudioAfter(
-    lastScanTime: Date,
+    lastModified: Date,
     prefs: AppPreferences,
     parser: MediaMetadataParser,
     createUpdateTime: Long
   ) {
     withContext(Dispatchers.IO) {
-      storage.audioFlow(lastScanTime)
+      storage.audioFlow(lastModified)
         .map { async { persistAudioList(it, parser, prefs, createUpdateTime) } }
         .buffer(PERSIST_WORKER_COUNT)
         .map { it.await() }
         .onCompletion { cause ->
-//          LOG._e {
-//            it("onCompletion %s", if (cause == null) "success" else cause.message ?: "failed")
-//          }
+          cause?.let { ex ->
+            LOG.e(ex) {
+              it("Scan audio error: %s", cause.message ?: "failed")
+            }
+          } ?: LOG._i { it("Scan audio complete") }
         }
         .collect()
     }

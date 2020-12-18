@@ -22,7 +22,6 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.debugRequire
-import com.ealva.toque.log._e
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.expr.bindString
@@ -93,23 +92,15 @@ interface ArtistDao {
   }
 }
 
-private var INSERT_ARTIST: Int = -1
-private var INSERT_ARTIST_SORT: Int = -1
-private var INSERT_ARTIST_MBID: Int = -1
-private var INSERT_CREATED: Int = -1
-private var INSERT_UPDATED: Int = -1
 private val INSERT_STATEMENT = ArtistTable.insertValues {
   it[artist].bindArg()
   it[artistSort].bindArg()
   it[artistMbid].bindArg()
   it[createdTime].bindArg()
   it[updatedTime].bindArg()
-  INSERT_ARTIST = it.indexOf(artist)
-  INSERT_ARTIST_SORT = it.indexOf(artistSort)
-  INSERT_ARTIST_MBID = it.indexOf(artistMbid)
-  INSERT_CREATED = it.indexOf(createdTime)
-  INSERT_UPDATED = it.indexOf(updatedTime)
 }
+
+private val queryArtistBind = bindString()
 
 private val QUERY_ARTIST_INFO: Query = Query(
   ArtistTable.select(
@@ -117,7 +108,7 @@ private val QUERY_ARTIST_INFO: Query = Query(
     ArtistTable.artist,
     ArtistTable.artistSort,
     ArtistTable.artistMbid
-  ).where { ArtistTable.artist eq bindString() }
+  ).where { ArtistTable.artist eq queryArtistBind }
 )
 
 private data class ArtistInfo(
@@ -142,38 +133,34 @@ private class ArtistDaoImpl : ArtistDao {
     txn.doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime)
   }
 
-  override fun deleteAll(txn: Transaction): Long = txn.run { ArtistTable.deleteAll() }
+  override fun deleteAll(txn: Transaction): Long = txn.run {
+    ArtistTable.deleteAll()
+  }
 
   override fun deleteArtistsWithNoMedia(txn: Transaction): Long = txn.run {
-    LOG._e { it("%s", DELETE_ARTISTS_WITH_NO_MEDIA) }
-    try {
-      DELETE_ARTISTS_WITH_NO_MEDIA.delete()
-    } catch (e: Exception) {
-      LOG.e(e) { it("Exception deleting artists with no media") }
-      0
-    }
+    DELETE_ARTISTS_WITH_NO_MEDIA.delete()
   }
 
   private fun Transaction.doUpsertArtist(
-    artist: String,
-    artistSort: String,
-    artistMbid: ArtistMbid?,
+    newArtist: String,
+    newArtistSort: String,
+    newArtistMbid: ArtistMbid?,
     createUpdateTime: Long
   ): ArtistId = try {
     maybeUpdateArtist(
-      artist,
-      artistSort,
-      artistMbid,
+      newArtist,
+      newArtistSort,
+      newArtistMbid,
       createUpdateTime
     ) ?: INSERT_STATEMENT.insert {
-      it[INSERT_ARTIST] = artist
-      it[INSERT_ARTIST_SORT] = artistSort
-      it[INSERT_ARTIST_MBID] = artistMbid?.value ?: ""
-      it[INSERT_CREATED] = createUpdateTime
-      it[INSERT_UPDATED] = createUpdateTime
+      it[artist] = newArtist
+      it[artistSort] = newArtistSort
+      it[artistMbid] = newArtistMbid?.value ?: ""
+      it[createdTime] = createUpdateTime
+      it[updatedTime] = createUpdateTime
     }.toArtistId()
   } catch (e: Exception) {
-    LOG.e(e) { it("Exception with artist='%s'", artist) }
+    LOG.e(e) { it("Exception with artist='%s'", newArtist) }
     throw e
   }
 
@@ -210,7 +197,7 @@ private class ArtistDaoImpl : ArtistDao {
   }
 
   private fun Queryable.queryArtistInfo(artist: String): ArtistInfo? = QUERY_ARTIST_INFO
-    .sequence({ it[0] = artist }) {
+    .sequence({ it[queryArtistBind] = artist }) {
       ArtistInfo(
         it[ArtistTable.id].toArtistId(),
         it[ArtistTable.artist],
@@ -220,7 +207,7 @@ private class ArtistDaoImpl : ArtistDao {
     }.singleOrNull()
 }
 
-val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement = ArtistTable.deleteWhere {
+val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
   (
     ArtistMediaTable.select(ArtistMediaTable.mediaId).where {
       ArtistMediaTable.artistId eq ArtistTable.id

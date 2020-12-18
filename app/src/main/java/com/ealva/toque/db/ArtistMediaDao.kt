@@ -25,18 +25,17 @@ import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
-import com.ealva.toque.db.ArtistMediaTable as Table
 
 private val LOG by lazyLogger(ArtistMediaDao::class)
 
 interface ArtistMediaDao {
   /**
-   * Insert or replace all artists for [mediaId]
+   * Insert or replace all artists for [replaceMediaId]
    */
   fun replaceMediaArtists(
     txn: Transaction,
     artistIdList: ArtistIdList,
-    mediaId: MediaId,
+    replaceMediaId: MediaId,
     createTime: Long
   )
 
@@ -47,39 +46,36 @@ interface ArtistMediaDao {
   }
 }
 
-private var INSERT_ARTIST = -1
-private var INSERT_MEDIA = -1
-private var INSERT_CREATE_TIME = -1
-private val INSERT_ARTIST_MEDIA = Table.insertValues(OnConflict.Replace) {
+private val INSERT_ARTIST_MEDIA = ArtistMediaTable.insertValues(OnConflict.Replace) {
   it[artistId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
-  INSERT_ARTIST = it.indexOf(artistId)
-  INSERT_MEDIA = it.indexOf(mediaId)
-  INSERT_CREATE_TIME = it.indexOf(createdTime)
 }
 
-private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
+private val deleteMediaBindId = bindLong()
+private val DELETE_MEDIA = ArtistMediaTable.deleteWhere {
+  ArtistMediaTable.mediaId eq deleteMediaBindId
+}
 
 private class ArtistMediaDaoImpl : ArtistMediaDao {
   override fun replaceMediaArtists(
     txn: Transaction,
     artistIdList: ArtistIdList,
-    mediaId: MediaId,
+    replaceMediaId: MediaId,
     createTime: Long
   ) = txn.run {
-    DELETE_MEDIA.delete { it[0] = mediaId.id }
-    artistIdList.forEach { artistId ->
+    DELETE_MEDIA.delete { it[deleteMediaBindId] = replaceMediaId.id }
+    artistIdList.forEach { newArtistId ->
       INSERT_ARTIST_MEDIA.insert {
-        it[INSERT_ARTIST] = artistId.id
-        it[INSERT_MEDIA] = mediaId.id
-        it[INSERT_CREATE_TIME] = createTime
+        it[artistId] = newArtistId.id
+        it[mediaId] = replaceMediaId.id
+        it[createdTime] = createTime
       }
     }
   }
 
   override fun deleteAll(txn: Transaction) = txn.run {
-    val count = Table.deleteAll()
+    val count = ArtistMediaTable.deleteAll()
     LOG.i { it("Deleted %d artist/media associations", count) }
   }
 }
