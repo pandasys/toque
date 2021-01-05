@@ -16,11 +16,7 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.media.Media
-
 interface Player {
-  val media: Media
-
   fun pause(immediate: Boolean = false)
   fun play(immediate: Boolean = false)
 }

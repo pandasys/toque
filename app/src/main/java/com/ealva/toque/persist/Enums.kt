@@ -77,9 +77,8 @@ private fun <T> Class<T>.getEnumValues(): ConstIdValues<T> where T : Enum<T>, T 
   return (ENUM_VALUES_MAP[this] ?: makeConstIdValues()) as ConstIdValues<T>
 }
 
-private fun <T> Class<T>.makeConstIdValues() where T : Enum<T>, T : HasConstId {
+private fun <T> Class<T>.makeConstIdValues() where T : Enum<T>, T : HasConstId =
   ConstIdValues(enumConstants).also { enumValues -> ENUM_VALUES_MAP[this] = enumValues }
-}
 
 @OptIn(ExperimentalContracts::class)
 private inline fun <T : HasConstId> Array<T>?.requireNotEmptyAndDistinct(msg: () -> Any): Array<T> {

@@ -17,11 +17,14 @@
 package com.ealva.toque.app
 
 import android.app.Application
+import android.app.KeyguardManager
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.os.StrictMode
-import android.util.Log
+import android.media.AudioManager
+import android.os.PowerManager
+import android.telephony.TelephonyManager
+import android.view.WindowManager
 import com.ealva.ealvalog.LogLevel
 import com.ealva.ealvalog.Loggers
 import com.ealva.ealvalog.Marker
@@ -30,8 +33,9 @@ import com.ealva.ealvalog.android.AndroidLogger
 import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
 import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.logger
+import com.ealva.toque.android.content.requireSystemService
+import com.ealva.toque.audio.AudioModule
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
 import com.ealva.toque.log._e
@@ -45,9 +49,6 @@ import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import org.koin.dsl.module
-import java.util.concurrent.Executors
-
-private val LOG by lazyLogger(Toque::class)
 
 interface Toque {
   fun restartApp(intent: Intent, context: Context)
@@ -61,6 +62,12 @@ interface Toque {
 class ToqueImpl : Application(), Toque {
   private val appModule = module {
     single<Toque> { this@ToqueImpl }
+    single<AudioManager> { requireSystemService() }
+    single<NotificationManager> { requireSystemService() }
+    single<PowerManager> { requireSystemService() }
+    single<TelephonyManager> { requireSystemService() }
+    single<KeyguardManager> { requireSystemService() }
+    single<WindowManager> { requireSystemService() }
   }
 
   override fun onCreate() {
@@ -71,18 +78,18 @@ class ToqueImpl : Application(), Toque {
     val logger = logger()
     logger._e { it("App create") }
 
-    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-      StrictMode.VmPolicy.Builder()
-        .detectNonSdkApiUsage()
-        .penaltyListener(
-          Executors.newSingleThreadExecutor(),
-          { v -> v?.let { violation -> LOG._e(violation) { it("strict violation") } } }
-        )
-        .build()
-    } else {
-      StrictMode.VmPolicy.Builder().build()
-    }
-    StrictMode.setVmPolicy(policy)
+//    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+//      StrictMode.VmPolicy.Builder()
+//        .detectNonSdkApiUsage()
+//        .penaltyListener(
+//          Executors.newSingleThreadExecutor(),
+//          { v -> v?.let { violation -> logger._e(violation) { it("strict violation") } } }
+//        )
+//        .build()
+//    } else {
+//      StrictMode.VmPolicy.Builder().build()
+//    }
+//    StrictMode.setVmPolicy(policy)
 
     startKoin {
       androidLogger(level = Level.INFO)
@@ -91,6 +98,7 @@ class ToqueImpl : Application(), Toque {
       modules(
         appModule,
         PrefsModule.module,
+        AudioModule.module,
         FilesModule.module,
         TagModule.module,
         LibVlcModule.module,
@@ -134,5 +142,5 @@ private class ToqueLogHandler : com.ealva.ealvalog.android.BaseLogHandler() {
     androidLevel: Int,
     marker: Marker?,
     throwable: Throwable?
-  ): Boolean = androidLevel > Log.INFO
+  ): Boolean = false // include location per logger and not via handler
 }

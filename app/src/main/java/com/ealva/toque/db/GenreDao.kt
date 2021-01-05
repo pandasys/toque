@@ -19,9 +19,10 @@ package com.ealva.toque.db
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.debugRequire
 import com.ealva.welite.db.Queryable
-import com.ealva.welite.db.Transaction
+import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.literal
@@ -29,6 +30,9 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.select
+import com.ealva.welite.db.table.selectCount
+import com.ealva.welite.db.table.where
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
@@ -69,9 +73,11 @@ private val INSERT_GENRE = GenreTable.insertValues {
   it[createdTime].bindArg()
 }
 
-private val QUERY_GENRE_ID: Query = Query(
+private val queryGenreNameBind = bindString()
+
+private val QUERY_GENRE_ID = Query(
   GenreTable.select(GenreTable.id)
-    .where { GenreTable.genre eq bindString() }
+    .where { genre eq queryGenreNameBind }
 )
 
 interface GenreDao {
@@ -80,13 +86,13 @@ interface GenreDao {
    * not found and cannot be inserted.
    */
   fun getOrCreateGenreIds(
-    txn: Transaction,
+    txn: TransactionInProgress,
     genreList: List<String>,
-    createTime: Long
+    createTime: Millis
   ): GenreIdList
 
-  fun deleteAll(txn: Transaction)
-  fun deleteGenresNotAssociateWithMedia(txn: Transaction): Long
+  fun deleteAll(txn: TransactionInProgress)
+  fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long
 
   companion object {
     operator fun invoke(): GenreDao = GenreDaoImpl()
@@ -96,22 +102,21 @@ interface GenreDao {
 private class GenreDaoImpl : GenreDao {
 
   override fun getOrCreateGenreIds(
-    txn: Transaction,
+    txn: TransactionInProgress,
     genreList: List<String>,
-    createTime: Long
+    createTime: Millis
   ): GenreIdList = GenreIdList(genreList.size).also { list ->
     genreList.forEach { genre -> list += txn.getOrCreateGenre(genre, createTime) }
   }
 
-  override fun deleteAll(txn: Transaction) = txn.run {
+  override fun deleteAll(txn: TransactionInProgress) = txn.run {
     val count = GenreTable.deleteAll()
     LOG.i { it("Deleted %d genres", count) }
   }
 
-  override fun deleteGenresNotAssociateWithMedia(txn: Transaction): Long = txn.run {
+  override fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long = txn.run {
     GenreTable.deleteWhere {
-      literal(0) eq
-        (GenreMediaTable.selectCount { GenreMediaTable.genreId eq GenreTable.id }).asExpression()
+      literal(0) eq (GenreMediaTable.selectCount { genreId eq id }).asExpression()
     }.delete()
   }
 
@@ -122,24 +127,24 @@ private class GenreDaoImpl : GenreDao {
    * the race to insert. The great majority of the time the first query succeeds and the lock is
    * avoided.
    */
-  private fun Transaction.getOrCreateGenre(genre: String, createTime: Long): GenreId =
+  private fun TransactionInProgress.getOrCreateGenre(genre: String, createTime: Millis): GenreId =
     getGenreId(genre)?.toGenreId() ?: getOrInsert(genre, createTime).toGenreId()
 
   private fun Queryable.getGenreId(genre: String): Long? = QUERY_GENRE_ID
-    .sequence({ it[0] = genre }) { it[GenreTable.id] }
+    .sequence({ it[queryGenreNameBind] = genre }) { it[id] }
     .singleOrNull()
 
   /**
    * Get a lock and try to insert. If another thread won the race to insert, query on failure. If
    * query fails throw IllegalStateException.
    */
-  private fun Transaction.getOrInsert(
+  private fun TransactionInProgress.getOrInsert(
     newGenre: String,
-    createTime: Long
+    createTime: Millis
   ): Long = getOrInsertLock.withLock {
     getGenreId(newGenre) ?: INSERT_GENRE.insert {
       it[genre] = newGenre
-      it[createdTime] = createTime
+      it[createdTime] = createTime.value
     }
   }
 }

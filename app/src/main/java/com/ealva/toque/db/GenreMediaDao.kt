@@ -19,62 +19,62 @@ package com.ealva.toque.db
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.welite.db.Transaction
+import com.ealva.toque.common.Millis
+import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
-import com.ealva.toque.db.GenreMediaTable as Table
 
 private val LOG by lazyLogger(GenreMediaDao::class)
 
 interface GenreMediaDao {
   /**
-   * Insert or replace all artists for [replaceMediaId]
+   * Insert or replace all genres for [newMediaId]
    */
   fun replaceMediaGenres(
-    txn: Transaction,
+    txn: TransactionInProgress,
     genreIdList: GenreIdList,
-    replaceMediaId: MediaId,
-    createTime: Long
+    newMediaId: MediaId,
+    createTime: Millis
   )
 
-  fun deleteAll(txn: Transaction)
+  fun deleteAll(txn: TransactionInProgress)
 
   companion object {
     operator fun invoke(): GenreMediaDao = GenreMediaDaoImpl()
   }
 }
 
-private val INSERT_GENRE_MEDIA = Table.insertValues(OnConflict.Replace) {
+private val INSERT_GENRE_MEDIA = GenreMediaTable.insertValues(OnConflict.Replace) {
   it[genreId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
 }
 
-private val bindMediaId = bindLong()
-private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindMediaId }
+private val BIND_MEDIA_ID = bindLong()
+private val DELETE_MEDIA = GenreMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
 
 private class GenreMediaDaoImpl : GenreMediaDao {
   override fun replaceMediaGenres(
-    txn: Transaction,
+    txn: TransactionInProgress,
     genreIdList: GenreIdList,
-    replaceMediaId: MediaId,
-    createTime: Long
+    newMediaId: MediaId,
+    createTime: Millis
   ) = txn.run {
-    DELETE_MEDIA.delete { it[bindMediaId] = replaceMediaId.id }
-    genreIdList.forEach { replaceGenreId ->
+    DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = newMediaId.id }
+    genreIdList.forEach { newGenreId ->
       INSERT_GENRE_MEDIA.insert {
-        it[genreId] = replaceGenreId.id
-        it[mediaId] = replaceMediaId.id
-        it[createdTime] = createTime
+        it[genreId] = newGenreId.id
+        it[mediaId] = newMediaId.id
+        it[createdTime] = createTime.value
       }
     }
   }
 
-  override fun deleteAll(txn: Transaction) = txn.run {
-    val count = Table.deleteAll()
+  override fun deleteAll(txn: TransactionInProgress) = txn.run {
+    val count = GenreMediaTable.deleteAll()
     LOG.i { it("Deleted %d genre/media associations", count) }
   }
 }

@@ -54,4 +54,12 @@
   <string name="TrackMbid">Track MBID</string>
   <string name="ReleaseGroupMbid">Release Group MBID</string>
   <string name="ScanningMedia">Scanning media…</string>
+  <string name="Disabled">Disabled</string>
+  <string name="Automatic">Automatic</string>
+  <string name="DecodingAcceleration">Decoding acceleration</string>
+  <string name="FullAcceleration">Full acceleration</string>
+  <string name="NotFoundItem">%s not found</string>
+  <string name="FailedToInsertItem">Failed to insert %s</string>
+  <string name="FailedToUpdateItem">Failed to update %s</string>
+  <string name="FailedToDeleteItem">Failed to delete %s</string>
 </resources>

@@ -18,29 +18,46 @@ package com.ealva.toque.service.vlc
 
 import android.net.Uri
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.db.AlbumId
+import com.ealva.toque.db.MediaId
 import com.ealva.toque.media.Media
 import com.ealva.toque.media.MediaEvent
-import com.ealva.toque.tag.ArtistParserFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
 
 private val LOG by lazyLogger(VlcMedia::class)
 
 class VlcMedia(
-  private val media: IMedia,
-  private val uri: Uri,
-  private val artistParserFactory: ArtistParserFactory
+  private val libVlc: LibVlc,
+  val media: IMedia,
+  val uri: Uri,
+  val mediaId: MediaId,
+  val albumId: AlbumId,
+  private val presetSelector: EqPresetSelector
 ) : Media {
   private val mutableEventFlow = MutableSharedFlow<MediaEvent>()
-  private val mediaPlayer: MediaPlayer? = null
+  private var player: VlcPlayer? = null
 
   override val eventFlow: Flow<MediaEvent>
     get() = mutableEventFlow
 
   override fun close() {
-    mediaPlayer?.release()
+    player?.release()
     media.release()
   }
+
+/*
+  suspend fun prepareSeekMaybePlay(
+    startOnPrepared: Boolean,
+    position: Long,
+    presetSelector: EqPresetSelector,
+//    onPreparedTransition: PlayerTransition
+  ) {
+    player = makePlayer()
+  }
+*/
+
+  private suspend fun makePlayer(): VlcPlayer =
+    VlcPlayer.make(libVlc, this, presetSelector.getPreferredEqPreset(mediaId, albumId))
 }

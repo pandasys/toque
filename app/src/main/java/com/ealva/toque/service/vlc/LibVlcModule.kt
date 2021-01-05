@@ -16,8 +16,11 @@
 
 package com.ealva.toque.service.vlc
 
+import com.ealva.toque.media.EqPresetFactory
+import com.ealva.toque.media.MediaFactory
 import com.ealva.toque.media.MediaMetadataParserFactory
 import org.koin.android.ext.koin.androidContext
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 object LibVlcModule {
@@ -27,5 +30,7 @@ object LibVlcModule {
     single<MediaMetadataParserFactory> {
       VlcMediaMetadataParserFactory(get())
     }
+    single { VlcPresetFactory(androidContext(), get(), get(), get()) } bind EqPresetFactory::class
+    single<MediaFactory> { VlcMediaFactory(get(), get(), get()) }
   }
 }

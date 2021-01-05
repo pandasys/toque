@@ -20,9 +20,10 @@ import com.ealva.ealvabrainz.brainz.data.ArtistMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
 import com.ealva.ealvabrainz.brainz.data.TrackMbid
+import com.ealva.toque.common.Millis
 
 interface MediaMetadata : AutoCloseable {
-  val duration: Long
+  val duration: Millis
   val title: String
   val titleSort: String
   val artists: List<String>

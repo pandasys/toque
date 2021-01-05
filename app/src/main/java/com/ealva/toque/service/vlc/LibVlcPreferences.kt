@@ -22,6 +22,11 @@ import androidx.datastore.preferences.Preferences
 import androidx.datastore.preferences.preferencesKey
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
+import com.ealva.toque.common.Amp
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.coerceIn
+import com.ealva.toque.common.toAmp
+import com.ealva.toque.common.toMillis
 import com.ealva.toque.prefs.get
 import com.ealva.toque.prefs.makeDataStore
 import com.ealva.toque.prefs.set
@@ -31,6 +36,7 @@ import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.ALLOW_TIME_STRETCH
 import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.ENABLE_DIGITAL_AUDIO_OUTPUT
 import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.ENABLE_FRAME_SKIP
 import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.ENABLE_VERBOSE_MODE
+import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.HARDWARE_ACCELERATION
 import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.NETWORK_CACHING_MILLISECONDS
 import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.REPLAY_GAIN_DEFAULT_PREAMP
 import com.ealva.toque.service.vlc.LibVlcPreferencesImpl.Keys.REPLAY_GAIN_MODE
@@ -92,8 +98,8 @@ interface LibVlcPreferences {
   fun chroma(): Chroma
   suspend fun chroma(chroma: Chroma): Boolean
 
-  fun networkCachingMillis(): Int
-  suspend fun networkCachingMillis(millis: Int): Boolean
+  fun networkCachingAmount(): Millis
+  suspend fun networkCachingAmount(millis: Millis): Boolean
 
   fun subtitleEncoding(): SubtitleEncoding
   suspend fun subtitleEncoding(encoding: SubtitleEncoding): Boolean
@@ -101,11 +107,11 @@ interface LibVlcPreferences {
   fun replayGainMode(): ReplayGainMode
   suspend fun replayGainMode(mode: ReplayGainMode): Boolean
 
-  fun replayGainPreamp(): Float
-  suspend fun replayGainPreamp(preamp: Float): Boolean
+  fun replayGainPreamp(): Amp
+  suspend fun replayGainPreamp(preamp: Amp): Boolean
 
-  fun replayGainDefaultPreamp(): Float
-  suspend fun replayGainDefaultPreamp(preamp: Float): Boolean
+  fun replayGainDefaultPreamp(): Amp
+  suspend fun replayGainDefaultPreamp(preamp: Amp): Boolean
 
   fun enableFrameSkip(): Boolean
   suspend fun enableFrameSkip(enable: Boolean): Boolean
@@ -119,9 +125,12 @@ interface LibVlcPreferences {
   fun digitalAudioOutputEnabled(): Boolean
   suspend fun digitalAudioOutputEnabled(enabled: Boolean): Boolean
 
+  fun hardwareAcceleration(): HardwareAcceleration
+  suspend fun hardwareAcceleration(acceleration: HardwareAcceleration): Boolean
+
   companion object {
-    const val DEFAULT_NETWORK_CACHING = 1000
-    val NETWORK_CACHING_RANGE = 0..60000
+    const val DEFAULT_NETWORK_CACHING = 1000L
+    val NETWORK_CACHING_RANGE: LongRange = 0L..60000L
     const val SUB_AUTODETECT_PATHS = "./Subtitles, ./subtitles, ./Subs, ./subs"
   }
 }
@@ -137,7 +146,7 @@ private class LibVlcPreferencesImpl(
   object Keys {
     val ENABLE_VERBOSE_MODE = preferencesKey<Boolean>("enable_verbose_mode")
     val VIDEO_CHROMA = preferencesKey<Int>("video_chroma")
-    val NETWORK_CACHING_MILLISECONDS = preferencesKey<Int>("network_caching")
+    val NETWORK_CACHING_MILLISECONDS = preferencesKey<Long>("network_caching")
     val SUBTITLE_ENCODING = preferencesKey<Int>("subtitle_encoding")
     val REPLAY_GAIN_MODE = preferencesKey<Int>("replay_gain_mode")
     val REPLAY_GAIN_PREAMP = preferencesKey<Float>("replay_gain_preamp")
@@ -146,6 +155,7 @@ private class LibVlcPreferencesImpl(
     val SKIP_LOOP_FILTER = preferencesKey<Int>("skip_loop_filter")
     val ALLOW_TIME_STRETCH_AUDIO = preferencesKey<Boolean>("allow_time_stretch_audio")
     val ENABLE_DIGITAL_AUDIO_OUTPUT = preferencesKey<Boolean>("enable_digital_audio_output")
+    val HARDWARE_ACCELERATION = preferencesKey<Int>("hardware_acceleration")
   }
 
   override val debugAndLogging: Boolean
@@ -158,11 +168,11 @@ private class LibVlcPreferencesImpl(
   override fun chroma(): Chroma = state.value[VIDEO_CHROMA, Chroma.DEFAULT]
   override suspend fun chroma(chroma: Chroma): Boolean = dataStore.set(VIDEO_CHROMA, chroma)
 
-  override fun networkCachingMillis(): Int =
-    state.value[NETWORK_CACHING_MILLISECONDS, DEFAULT_NETWORK_CACHING]
+  override fun networkCachingAmount(): Millis =
+    state.value[NETWORK_CACHING_MILLISECONDS, DEFAULT_NETWORK_CACHING].toMillis()
 
-  override suspend fun networkCachingMillis(millis: Int): Boolean =
-    dataStore.set(NETWORK_CACHING_MILLISECONDS, millis.coerceIn(NETWORK_CACHING_RANGE))
+  override suspend fun networkCachingAmount(millis: Millis): Boolean =
+    dataStore.set(NETWORK_CACHING_MILLISECONDS, millis.coerceIn(NETWORK_CACHING_RANGE).value)
 
   override fun subtitleEncoding() = state.value[SUBTITLE_ENCODING, SubtitleEncoding.DEFAULT]
   override suspend fun subtitleEncoding(encoding: SubtitleEncoding): Boolean =
@@ -172,13 +182,13 @@ private class LibVlcPreferencesImpl(
   override suspend fun replayGainMode(mode: ReplayGainMode) =
     dataStore.set(REPLAY_GAIN_MODE, mode)
 
-  override fun replayGainPreamp(): Float = state.value[REPLAY_GAIN_PREAMP, 0.0F]
-  override suspend fun replayGainPreamp(preamp: Float): Boolean =
-    dataStore.set(REPLAY_GAIN_PREAMP, preamp)
+  override fun replayGainPreamp(): Amp = state.value[REPLAY_GAIN_PREAMP, 0.0F].toAmp()
+  override suspend fun replayGainPreamp(preamp: Amp): Boolean =
+    dataStore.set(REPLAY_GAIN_PREAMP, preamp.value)
 
-  override fun replayGainDefaultPreamp(): Float = state.value[REPLAY_GAIN_DEFAULT_PREAMP, 0F]
-  override suspend fun replayGainDefaultPreamp(preamp: Float): Boolean =
-    dataStore.set(REPLAY_GAIN_DEFAULT_PREAMP, preamp)
+  override fun replayGainDefaultPreamp(): Amp = state.value[REPLAY_GAIN_DEFAULT_PREAMP, 0F].toAmp()
+  override suspend fun replayGainDefaultPreamp(preamp: Amp): Boolean =
+    dataStore.set(REPLAY_GAIN_DEFAULT_PREAMP, preamp.value)
 
   override fun enableFrameSkip(): Boolean = state.value[ENABLE_FRAME_SKIP, false]
   override suspend fun enableFrameSkip(enable: Boolean): Boolean =
@@ -197,4 +207,10 @@ private class LibVlcPreferencesImpl(
 
   override suspend fun digitalAudioOutputEnabled(enabled: Boolean): Boolean =
     dataStore.set(ENABLE_DIGITAL_AUDIO_OUTPUT, enabled)
+
+  override fun hardwareAcceleration(): HardwareAcceleration =
+    state.value[HARDWARE_ACCELERATION, HardwareAcceleration.AUTOMATIC]
+
+  override suspend fun hardwareAcceleration(acceleration: HardwareAcceleration): Boolean =
+    dataStore.set(HARDWARE_ACCELERATION, acceleration)
 }

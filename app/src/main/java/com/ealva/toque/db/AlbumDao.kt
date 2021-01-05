@@ -23,9 +23,10 @@ import com.ealva.ealvabrainz.brainz.data.toReleaseMbid
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.debugRequire
 import com.ealva.welite.db.Queryable
-import com.ealva.welite.db.Transaction
+import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.literal
@@ -34,14 +35,20 @@ import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.selectCount
+import com.ealva.welite.db.table.selects
+import com.ealva.welite.db.table.where
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import com.ealva.toque.db.AlbumTable as Table
 
-inline class AlbumId(override val id: Long) : PersistentId
+inline class AlbumId(override val id: Long) : PersistentId {
+  companion object {
+    val INVALID = AlbumId(PersistentId.ID_INVALID)
+  }
+}
 
 @Suppress("NOTHING_TO_INLINE")
 inline fun Long.toAlbumId(): AlbumId {
@@ -74,49 +81,22 @@ interface AlbumDao {
    * Update the Album if it exists otherwise insert it
    */
   fun upsertAlbum(
-    txn: Transaction,
+    txn: TransactionInProgress,
     album: String,
     albumSort: String,
     releaseMbid: ReleaseMbid?,
     releaseGroupMbid: ReleaseGroupMbid?,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): AlbumId
 
-  fun deleteAll(txn: Transaction): Long
+  fun deleteAll(txn: TransactionInProgress): Long
 
-  fun deleteAlbumsWithNoMedia(txn: Transaction): Long
+  fun deleteAlbumsWithNoMedia(txn: TransactionInProgress): Long
 
   companion object {
     operator fun invoke(): AlbumDao = AlbumDaoImpl()
   }
 }
-
-private val INSERT_STATEMENT = Table.insertValues {
-  it[album].bindArg()
-  it[albumSort].bindArg()
-  it[releaseMbid].bindArg()
-  it[releaseGroupMbid].bindArg()
-  it[createdTime].bindArg()
-  it[updatedTime].bindArg()
-}
-
-private val QUERY_ALBUM_INFO: Query = Query(
-  Table.select(
-    Table.id,
-    Table.album,
-    Table.albumSort,
-    Table.releaseMbid,
-    Table.releaseGroupMbid,
-  ).where { Table.album eq bindString() }
-)
-
-private data class AlbumInfo(
-  val id: AlbumId,
-  val album: String,
-  val albumSort: String,
-  val releaseMbid: ReleaseMbid,
-  val releaseGroupMbid: ReleaseGroupMbid,
-)
 
 private val upsertLock: Lock = ReentrantLock()
 
@@ -127,12 +107,12 @@ private class AlbumDaoImpl : AlbumDao {
    * just in case
    */
   override fun upsertAlbum(
-    txn: Transaction,
+    txn: TransactionInProgress,
     album: String,
     albumSort: String,
     releaseMbid: ReleaseMbid?,
     releaseGroupMbid: ReleaseGroupMbid?,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): AlbumId = upsertLock.withLock {
     require(album.isNotBlank()) { "Album may not be blank" }
     txn.doUpsertAlbum(
@@ -144,20 +124,20 @@ private class AlbumDaoImpl : AlbumDao {
     )
   }
 
-  override fun deleteAll(txn: Transaction): Long = txn.run { Table.deleteAll() }
+  override fun deleteAll(txn: TransactionInProgress): Long = txn.run { AlbumTable.deleteAll() }
 
-  override fun deleteAlbumsWithNoMedia(txn: Transaction): Long = txn.run {
-    Table.deleteWhere {
-      literal(0) eq (MediaTable.selectCount { Table.id eq MediaTable.albumId }).asExpression()
+  override fun deleteAlbumsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
+    AlbumTable.deleteWhere {
+      literal(0) eq (MediaTable.selectCount { AlbumTable.id eq albumId }).asExpression()
     }.delete()
   }
 
-  private fun Transaction.doUpsertAlbum(
+  private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,
     newAlbumSort: String,
     newReleaseMbid: ReleaseMbid?,
     newReleaseGroupMbid: ReleaseGroupMbid?,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): AlbumId = try {
     maybeUpdateAlbum(
       newAlbum,
@@ -170,8 +150,8 @@ private class AlbumDaoImpl : AlbumDao {
       it[albumSort] = newAlbumSort
       it[releaseMbid] = newReleaseMbid?.value ?: ""
       it[releaseGroupMbid] = newReleaseGroupMbid?.value ?: ""
-      it[createdTime] = createUpdateTime
-      it[updatedTime] = createUpdateTime
+      it[createdTime] = createUpdateTime.value
+      it[updatedTime] = createUpdateTime.value
     }.toAlbumId()
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with album='%s'", newAlbum) }
@@ -182,12 +162,12 @@ private class AlbumDaoImpl : AlbumDao {
    * Update the album if necessary and return the AlbumId. Null is returned if the album does not
    * exist
    */
-  private fun Transaction.maybeUpdateAlbum(
+  private fun TransactionInProgress.maybeUpdateAlbum(
     newAlbum: String,
     newAlbumSort: String,
     newReleaseMbid: ReleaseMbid?,
     newReleaseGroupMbid: ReleaseGroupMbid?,
-    newUpdateTime: Long
+    newUpdateTime: Millis
   ): AlbumId? = queryAlbumInfo(newAlbum)?.let { info ->
     // album could match on query yet differ in case, so update if case changes
     val updateAlbum = info.album.updateOrNull { newAlbum }
@@ -204,12 +184,12 @@ private class AlbumDaoImpl : AlbumDao {
       )
     }
     if (updateNeeded) {
-      val updated = Table.updateColumns {
+      val updated = AlbumTable.updateColumns {
         updateAlbum?.let { update -> it[album] = update }
         updateAlbumSort?.let { update -> it[albumSort] = update }
         updateReleaseMbid?.let { update -> it[releaseMbid] = update.value }
         updateReleaseGroupMbid?.let { update -> it[releaseGroupMbid] = update.value }
-        it[updatedTime] = newUpdateTime
+        it[updatedTime] = newUpdateTime.value
       }.where { id eq info.id.id }.update()
 
       if (updated < 1) LOG.e { it("Could not update $info") }
@@ -217,14 +197,37 @@ private class AlbumDaoImpl : AlbumDao {
     info.id
   }
 
-  private fun Queryable.queryAlbumInfo(album: String): AlbumInfo? = QUERY_ALBUM_INFO
-    .sequence({ it[0] = album }) {
+  private fun Queryable.queryAlbumInfo(albumName: String): AlbumInfo? = QUERY_ALBUM_INFO
+    .sequence({ it[0] = albumName }) {
       AlbumInfo(
-        it[Table.id].toAlbumId(),
-        it[Table.album],
-        it[Table.albumSort],
-        it[Table.releaseMbid].toReleaseMbid(),
-        it[Table.releaseGroupMbid].toReleaseGroupMbid()
+        it[id].toAlbumId(),
+        it[album],
+        it[albumSort],
+        it[releaseMbid].toReleaseMbid(),
+        it[releaseGroupMbid].toReleaseGroupMbid()
       )
     }.singleOrNull()
 }
+
+private val INSERT_STATEMENT = AlbumTable.insertValues {
+  it[album].bindArg()
+  it[albumSort].bindArg()
+  it[releaseMbid].bindArg()
+  it[releaseGroupMbid].bindArg()
+  it[createdTime].bindArg()
+  it[updatedTime].bindArg()
+}
+
+private val QUERY_ALBUM_INFO = Query(
+  AlbumTable
+    .selects { listOf(id, album, albumSort, releaseMbid, releaseGroupMbid) }
+    .where { album eq bindString() }
+)
+
+private data class AlbumInfo(
+  val id: AlbumId,
+  val album: String,
+  val albumSort: String,
+  val releaseMbid: ReleaseMbid,
+  val releaseGroupMbid: ReleaseGroupMbid,
+)

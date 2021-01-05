@@ -28,6 +28,8 @@ import com.ealva.ealvabrainz.brainz.data.toTrackMbid
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.toMillis
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
 import com.ealva.toque.file.isNetworkScheme
@@ -86,8 +88,8 @@ private class TagMediaMetadata private constructor(
   private val tag: SongTag,
   private val artistParser: ArtistParser
 ) : MediaMetadata {
-  override val duration: Long
-    get() = tag.duration
+  override val duration: Millis
+    get() = tag.duration.toMillis()
   override val title: String
     get() = tag.title
   override val titleSort: String
@@ -186,8 +188,8 @@ private class VlcMediaMetadata private constructor(
   private fun meta(id: Int): String? = media.getMeta(id)
   private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist).orUnknown()))
   private val _artistsSort = _artists.map { it.toArtistSort() }
-  override val duration: Long
-    get() = media.duration
+  override val duration: Millis
+    get() = media.duration.toMillis()
   override val title: String
     get() = meta(IMedia.Meta.Title).orUnknown()
   override val titleSort: String

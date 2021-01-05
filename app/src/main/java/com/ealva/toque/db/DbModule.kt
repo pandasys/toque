@@ -17,6 +17,7 @@
 package com.ealva.toque.db
 
 import android.content.Context
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.log._i
@@ -40,7 +41,23 @@ object DbModule {
     single { ArtistMediaDao() }
     single { GenreMediaDao() }
     single { ComposerMediaDao() }
-    single { AudioMediaDao(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { EqPresetDao(get()) }
+    single { EqPresetAssociationDao(get()) }
+    single {
+      AudioMediaDao(
+        get(),
+        get(),
+        get(),
+        get(),
+        get(),
+        get(),
+        get(),
+        get(),
+        get(),
+        get(),
+        get()
+      )
+    }
   }
 
   private fun makeDatabase(context: Context) = Database(
@@ -56,11 +73,12 @@ object DbModule {
     onConfigure {
       LOG._i { it("Database onConfigure") }
     }
-    onCreate {
-      LOG._i { it("Database onCreate") }
+    onCreate { db ->
+      LOG._i { it("tables=%s", db.tables) }
+      LOG.i { it("SQLite version=%s", sqliteVersion) }
     }
     onOpen { db ->
-      LOG._i { it("tables=%s", db.tables) }
+      EqPresetDao.establishMinimumRowId(this)
       LOG._i { it("Database path:%s", db.path) }
     }
   }

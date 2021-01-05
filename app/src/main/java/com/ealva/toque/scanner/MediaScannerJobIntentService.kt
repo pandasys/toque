@@ -32,6 +32,9 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.R
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.toDate
+import com.ealva.toque.common.toMillis
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.MediaStorage
@@ -108,14 +111,15 @@ class MediaScannerJobIntentService : JobIntentService() {
   }
 
   override fun onHandleWork(intent: Intent) {
+    startNotification()
     try {
-      startNotification()
-      if (intent.action == ACTION_FULL_RESCAN) {
-        runBlocking {
+      when (intent.action) {
+        ACTION_FULL_RESCAN -> runBlocking {
           tryFullRescan(intent.rescan)
         }
-      } else {
-        LOG.e { it("Unrecognized action=%s", intent.action ?: "null") }
+        else -> {
+          LOG.e { it("Unrecognized action=%s", intent.action ?: "null") }
+        }
       }
     } catch (e: Exception) {
       LOG.e(e) { it("Media Scanner failed") }
@@ -140,9 +144,9 @@ class MediaScannerJobIntentService : JobIntentService() {
     val stopWatch = Stopwatch.createStarted()
     val prefs = appPrefsSingleton.instance()
     val parser = mediaDataParserFactory.make()
-    val lastScanTime = if (rescan.forceUpdate) Date(0) else Date(prefs.lastScanTime())
+    val lastScanTime = if (rescan.forceUpdate) Date(0) else prefs.lastScanTime().toDate()
     if (rescan.cleanDb) deleteAllMediaFromDb()
-    val createUpdateTime = System.currentTimeMillis()
+    val createUpdateTime = System.currentTimeMillis().toMillis()
     scanAllAudioAfter(lastScanTime, prefs, parser, createUpdateTime)
     audioMediaDao.deleteEntitiesWithNoMedia()
     LOG.i { it("Elapsed:%d end scan", stopWatch.stop().elapsed(TimeUnit.MILLISECONDS)) }
@@ -159,7 +163,7 @@ class MediaScannerJobIntentService : JobIntentService() {
     lastModified: Date,
     prefs: AppPreferences,
     parser: MediaMetadataParser,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ) {
     withContext(Dispatchers.IO) {
       storage.audioFlow(lastModified)
@@ -181,7 +185,7 @@ class MediaScannerJobIntentService : JobIntentService() {
     audioList: List<AudioInfo>,
     parser: MediaMetadataParser,
     prefs: AppPreferences,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): Boolean {
     audioMediaDao.upsertAudioList(audioList, parser, prefs, createUpdateTime)
     return true

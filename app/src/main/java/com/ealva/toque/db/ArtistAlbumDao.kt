@@ -19,7 +19,8 @@ package com.ealva.toque.db
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.welite.db.Transaction
+import com.ealva.toque.common.Millis
+import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
 import com.ealva.toque.db.ArtistAlbumTable as Table
@@ -28,16 +29,16 @@ private val LOG by lazyLogger(ArtistAlbumDao::class)
 
 interface ArtistAlbumDao {
   /**
-   * Insert the artist/album relationship ignoring conflict if the pair already exists
+   * Insert the artist/album relationship replacing on conflict if the pair already exists
    */
   fun insertArtistAlbum(
-    txn: Transaction,
+    txn: TransactionInProgress,
     newArtistId: ArtistId,
     newAlbumId: AlbumId,
-    createTime: Long
+    createTime: Millis
   )
 
-  fun deleteAll(txn: Transaction)
+  fun deleteAll(txn: TransactionInProgress)
 
   companion object {
     operator fun invoke(): ArtistAlbumDao = ArtistAlbumDaoImpl()
@@ -52,20 +53,20 @@ private val INSERT_ARTIST_ALBUM = Table.insertValues(OnConflict.Replace) {
 
 private class ArtistAlbumDaoImpl : ArtistAlbumDao {
   override fun insertArtistAlbum(
-    txn: Transaction,
+    txn: TransactionInProgress,
     newArtistId: ArtistId,
     newAlbumId: AlbumId,
-    createTime: Long
+    createTime: Millis
   ) = txn.run {
     INSERT_ARTIST_ALBUM.insert {
       it[artistId] = newArtistId.id
       it[albumId] = newAlbumId.id
-      it[createdTime] = createTime
+      it[createdTime] = createTime.value
     }
     Unit
   }
 
-  override fun deleteAll(txn: Transaction) = txn.run {
+  override fun deleteAll(txn: TransactionInProgress) = txn.run {
     val count = Table.deleteAll()
     LOG.i { it("Deleted %d artist/album associations", count) }
   }

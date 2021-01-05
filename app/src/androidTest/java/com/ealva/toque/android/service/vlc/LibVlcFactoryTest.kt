@@ -20,8 +20,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.service.vlc.LibVlc
-import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.service.vlc.LibVlcPreferencesSingleton
+import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -55,6 +55,8 @@ class LibVlcFactoryTest {
       LibVlcPreferencesSingleton(appCtx, coroutineRule.testDispatcher),
       dispatcher = coroutineRule.testDispatcher
     )
+
+    // Test will break when upgrading LivVlc and that's expected (obviously)
     val libVlc: LibVlc = factory.instance()
     expect(libVlc.libVlcVersion()).toBe("3.0.11.1 Vetinari")
 

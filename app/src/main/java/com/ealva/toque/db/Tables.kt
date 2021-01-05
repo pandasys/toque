@@ -30,7 +30,9 @@ val setOfAllTables = setOf(
   ComposerTable,
   ComposerMediaTable,
   GenreTable,
-  GenreMediaTable
+  GenreMediaTable,
+  EqPresetTable,
+  EqPresetAssociationTable
 )
 
 object ArtistTable : Table() {
@@ -256,5 +258,79 @@ object GenreMediaTable : Table() {
   init {
     index(genreId) // to query all media for a genre
     index(mediaId) // to query all genre for a piece of media
+  }
+}
+
+object EqPresetTable : Table() {
+  val id = long("_id") { primaryKey().autoIncrement() }
+  val presetName = text("PresetName")
+  val preAmp = float("PresetPreAmp") { default(DEFAULT_PREAMP_VALUE) }
+
+  /** 31 Hz */
+  val band0 = float("PresetBand0") { default(DEFAULT_BAND_VALUE) }
+
+  /** 63 Hz */
+  val band1 = float("PresetBand1") { default(DEFAULT_BAND_VALUE) }
+
+  /** 125 Hz */
+  val band2 = float("PresetBand2") { default(DEFAULT_BAND_VALUE) }
+
+  /** 250 Hz */
+  val band3 = float("PresetBand3") { default(DEFAULT_BAND_VALUE) }
+
+  /** 500 Hz */
+  val band4 = float("PresetBand4") { default(DEFAULT_BAND_VALUE) }
+
+  /** 1 kHz */
+  val band5 = float("PresetBand5") { default(DEFAULT_BAND_VALUE) }
+
+  /** 2 kHz */
+  val band6 = float("PresetBand6") { default(DEFAULT_BAND_VALUE) }
+
+  /** 4 kHz */
+  val band7 = float("PresetBand7") { default(DEFAULT_BAND_VALUE) }
+
+  /** 8 kHz */
+  val band8 = float("PresetBand8") { default(DEFAULT_BAND_VALUE) }
+
+  /** 16 kHz */
+  val band9 = float("PresetBand9") { default(DEFAULT_BAND_VALUE) }
+
+  val updatedTime = long("EqPresetTimeUpdated") { default(0L) }
+
+  val bandColumns = arrayOf(band0, band1, band2, band3, band4, band5, band6, band7, band8, band9)
+
+  const val DEFAULT_PREAMP_VALUE: Float = 12F
+  const val DEFAULT_BAND_VALUE: Float = 0F
+
+  init {
+    uniqueIndex(presetName)
+  }
+}
+
+object EqPresetAssociationTable : Table() {
+  /**
+   * This cannot be a reference to the id of the [EqPresetTable] because it may be a system
+   * preset
+   */
+  val presetId = long("EqPresetAssoc_PresetId")
+  val isSystemPreset = bool("EqPresetAssocIsSystem")
+  val associationType = integer("EqPresetAssocAssocType")
+
+  /**
+   * The meaning of this columns depends on the [associationType]. When [PresetAssociationType] is:
+   * * [Default][PresetAssociationType.Default] this id must be zero
+   * * [Media][PresetAssociationType.Media] this id is a Media ID
+   * * [Album][PresetAssociationType.Album] this id is an Album ID
+   * * [Output][PresetAssociationType.Output] this id is an AudioOutputRoute.id
+   */
+  val associationId = long("EqPresetAssocAssocId") { default(0) }
+
+  override val primaryKey = PrimaryKey(presetId, associationType, associationId)
+
+  init {
+    index(presetId)
+    index(associationType)
+    index(associationId)
   }
 }

@@ -18,6 +18,7 @@ package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.brainz.data.Mbid
 import com.ealva.ealvabrainz.brainz.data.isObsolete
+import com.ealva.toque.common.Millis
 import com.ealva.toque.media.StarRating
 
 inline fun String.updateOrNull(block: () -> String): String? =
@@ -36,6 +37,9 @@ inline fun Int.updateOrNull(block: () -> Int): Int? =
   block().let { newValue -> if (newValue != this) newValue else null }
 
 inline fun StarRating.updateOrNull(block: () -> StarRating): StarRating? =
+  block().let { newValue -> if (this != newValue) newValue else null }
+
+fun Millis.updateOrNull(block: () -> Millis): Millis? =
   block().let { newValue -> if (this != newValue) newValue else null }
 
 inline fun anyNotNull(block: () -> Array<Any?>): Boolean = block().any { it != null }

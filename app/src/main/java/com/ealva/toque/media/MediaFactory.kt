@@ -17,7 +17,9 @@
 package com.ealva.toque.media
 
 import android.net.Uri
+import com.ealva.toque.db.AlbumId
+import com.ealva.toque.db.MediaId
 
 interface MediaFactory {
-  fun make(location: Uri): Media
+  suspend fun makeAudio(location: Uri, mediaId: MediaId, albumId: AlbumId): Media
 }

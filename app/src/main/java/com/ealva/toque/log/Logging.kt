@@ -24,6 +24,7 @@ import com.ealva.ealvalog.Marker
 import com.ealva.ealvalog.d
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.w
 import com.ealva.ealvalog.wtf
 import com.ealva.toque.BuildConfig
@@ -66,4 +67,10 @@ inline fun Logger._wtf(
   block: (LogEntry) -> Unit
 ) {
   if (BuildConfig.DEBUG) wtf(throwable, marker, null, block)
+}
+
+inline fun Logger.runLogging(msg: () -> String, block: () -> Unit) = try {
+  block()
+} catch (e: Throwable) {
+  e(e) { it(msg()) }
 }

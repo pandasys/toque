@@ -19,13 +19,10 @@ package com.ealva.toque.db
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.welite.db.Transaction
-import com.ealva.welite.db.expr.bindLong
-import com.ealva.welite.db.expr.eq
-import com.ealva.welite.db.statements.deleteWhere
+import com.ealva.toque.common.Millis
+import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
-import com.ealva.toque.db.ComposerMediaTable as Table
 
 private val LOG by lazyLogger(ComposerMediaDao::class)
 
@@ -34,44 +31,44 @@ interface ComposerMediaDao {
    * Insert or replace all artists for [replaceMediaId]
    */
   fun replaceMediaComposer(
-    txn: Transaction,
+    txn: TransactionInProgress,
     replaceComposerId: ComposerId,
     replaceMediaId: MediaId,
-    createTime: Long
+    createTime: Millis
   )
 
-  fun deleteAll(txn: Transaction)
+  fun deleteAll(txn: TransactionInProgress)
 
   companion object {
     operator fun invoke(): ComposerMediaDao = ComposerMediaDaoImpl()
   }
 }
 
-private val INSERT_COMPOSER_MEDIA = Table.insertValues(OnConflict.Replace) {
+private val INSERT_COMPOSER_MEDIA = ComposerMediaTable.insertValues(OnConflict.Replace) {
   it[composerId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
 }
 
-private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
+// private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
 
 private class ComposerMediaDaoImpl : ComposerMediaDao {
   override fun replaceMediaComposer(
-    txn: Transaction,
+    txn: TransactionInProgress,
     replaceComposerId: ComposerId,
     replaceMediaId: MediaId,
-    createTime: Long
+    createTime: Millis
   ) = txn.run {
     INSERT_COMPOSER_MEDIA.insert {
       it[composerId] = replaceComposerId.id
       it[mediaId] = replaceMediaId.id
-      it[createdTime] = createTime
+      it[createdTime] = createTime.value
     }
     Unit
   }
 
-  override fun deleteAll(txn: Transaction) = txn.run {
-    val count = Table.deleteAll()
+  override fun deleteAll(txn: TransactionInProgress) = txn.run {
+    val count = ComposerMediaTable.deleteAll()
     LOG.i { it("Deleted %d composer/media associations", count) }
   }
 }

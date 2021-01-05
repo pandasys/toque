@@ -25,6 +25,9 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.compareTo
+import com.ealva.toque.common.toMillis
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.media.MediaFormat
 import com.ealva.toque.media.MediaMetadata
@@ -43,6 +46,8 @@ import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
+import com.ealva.welite.db.table.selects
+import com.ealva.welite.db.table.where
 
 private val LOG by lazyLogger(AudioMediaDao::class)
 
@@ -54,7 +59,7 @@ interface AudioMediaDao {
     audioInfoList: List<AudioInfo>,
     metadataParser: MediaMetadataParser,
     appPrefs: AppPreferences,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   )
 
   /**
@@ -78,7 +83,8 @@ interface AudioMediaDao {
       composerDao: ComposerDao,
       artistMediaDao: ArtistMediaDao,
       genreMediaDao: GenreMediaDao,
-      composerMediaDao: ComposerMediaDao
+      composerMediaDao: ComposerMediaDao,
+      eqPresetAssociationDao: EqPresetAssociationDao
     ): AudioMediaDao {
       return AudioMediaDaoImpl(
         db,
@@ -90,7 +96,8 @@ interface AudioMediaDao {
         composerDao,
         artistMediaDao,
         genreMediaDao,
-        composerMediaDao
+        composerMediaDao,
+        eqPresetAssociationDao
       )
     }
   }
@@ -100,27 +107,29 @@ private fun AudioInfo.uriToParse(): Uri {
   return if (path.exists()) path.toUri() else location
 }
 
-private val QUERY_AUDIO_FOR_UPDATE = MediaTable.select(
-  MediaTable.id,
-  MediaTable.title,
-  MediaTable.titleSort,
-  MediaTable.albumId,
-  MediaTable.albumArtistId,
-  MediaTable.artistId,
-  MediaTable.year,
-  MediaTable.rating,
-  MediaTable.duration,
-  MediaTable.trackNumber,
-  MediaTable.totalTracks,
-  MediaTable.discNumber,
-  MediaTable.totalDiscs,
-  MediaTable.comment,
-  MediaTable.trackMbid
-).where { MediaTable.location eq bindString() }
+private val QUERY_AUDIO_FOR_UPDATE = MediaTable.selects {
+  listOf(
+    id,
+    title,
+    titleSort,
+    albumId,
+    albumArtistId,
+    artistId,
+    year,
+    rating,
+    duration,
+    trackNumber,
+    totalTracks,
+    discNumber,
+    totalDiscs,
+    comment,
+    trackMbid
+  )
+}.where { location eq bindString() }
 
-private val QUERY_AUDIO_ID = MediaTable.select(
-  MediaTable.id
-).where { MediaTable.location eq bindString() }
+// private val QUERY_AUDIO_ID = MediaTable.select(
+//   MediaTable.id
+// ).where { location eq bindString() }
 
 private class AudioMediaDaoImpl(
   private val db: Database,
@@ -132,7 +141,8 @@ private class AudioMediaDaoImpl(
   private val composerDao: ComposerDao,
   private val artistMediaDao: ArtistMediaDao,
   private val genreMediaDao: GenreMediaDao,
-  private val composerMediaDao: ComposerMediaDao
+  private val composerMediaDao: ComposerMediaDao,
+  private val eqPresetAssocDao: EqPresetAssociationDao
 ) : AudioMediaDao {
   /**
    * Parse the file tags and create/update all media relationships. Usually the list would be of one
@@ -143,7 +153,7 @@ private class AudioMediaDaoImpl(
     audioInfoList: List<AudioInfo>,
     metadataParser: MediaMetadataParser,
     appPrefs: AppPreferences,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ) {
     val artistParser = artistParserFactory.make()
     db.transaction {
@@ -161,7 +171,7 @@ private class AudioMediaDaoImpl(
    */
   override suspend fun deleteAll() {
     db.transaction {
-//      eqPresetAssociationTable.deleteSongAndAlbumAssociations(txn)
+      eqPresetAssocDao.deleteMediaAndAlbumAssociations(this)
 //      playListSongFileTable.deleteAll(txn)
 //      queueTable.deleteAll(txn)
       MediaTable.deleteAll()
@@ -198,11 +208,11 @@ private class AudioMediaDaoImpl(
     audioInfo: AudioInfo,
     metadata: MediaMetadata,
     prefs: AppPreferences,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ) {
     val duration = metadata.duration
     if (shouldNotIgnore(duration, prefs)) {
-      val albumArtistId = upsetAlbumArtist(metadata, createUpdateTime)
+      val albumArtistId = upsertAlbumArtist(metadata, createUpdateTime)
       val albumId = upsertAlbum(metadata, createUpdateTime)
       artistAlbumDao.insertArtistAlbum(this, albumArtistId, albumId, createUpdateTime)
       val mediaArtistsIds = upsertMediaArtists(metadata, createUpdateTime)
@@ -215,8 +225,8 @@ private class AudioMediaDaoImpl(
         createUpdateTime
       )
       artistMediaDao.replaceMediaArtists(this, mediaArtistsIds, mediaId, createUpdateTime)
-      replaceGenreMedia(metadata, createUpdateTime, mediaId)
-      replaceComposerMedia(metadata, createUpdateTime, mediaId)
+      replaceGenreMedia(metadata, mediaId, createUpdateTime)
+      replaceComposerMedia(metadata, mediaId, createUpdateTime)
     } else {
       logIgnoring(audioInfo, duration, prefs)
     }
@@ -224,8 +234,8 @@ private class AudioMediaDaoImpl(
 
   private fun Transaction.replaceComposerMedia(
     metadata: MediaMetadata,
-    createUpdateTime: Long,
-    mediaId: MediaId
+    mediaId: MediaId,
+    createUpdateTime: Millis
   ) {
     composerMediaDao.replaceMediaComposer(
       this,
@@ -242,8 +252,8 @@ private class AudioMediaDaoImpl(
 
   private fun Transaction.replaceGenreMedia(
     metadata: MediaMetadata,
-    createUpdateTime: Long,
-    mediaId: MediaId
+    mediaId: MediaId,
+    createUpdateTime: Millis
   ) {
     genreMediaDao.replaceMediaGenres(
       this,
@@ -259,7 +269,7 @@ private class AudioMediaDaoImpl(
 
   private fun Transaction.upsertAlbum(
     metadata: MediaMetadata,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ) = albumDao.upsertAlbum(
     this,
     metadata.album,
@@ -269,9 +279,9 @@ private class AudioMediaDaoImpl(
     createUpdateTime
   )
 
-  private fun Transaction.upsetAlbumArtist(
+  private fun Transaction.upsertAlbumArtist(
     metadata: MediaMetadata,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ) = artistDao.upsertArtist(
     this,
     metadata.albumArtist,
@@ -282,7 +292,7 @@ private class AudioMediaDaoImpl(
 
   private fun Transaction.upsertMediaArtists(
     metadata: MediaMetadata,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): ArtistIdList {
     val mediaArtists = metadata.artists
     val mediaArtistsSort = metadata.artistsSort
@@ -300,10 +310,10 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  private fun Transaction.getAudioId(location: Uri): MediaId? = QUERY_AUDIO_ID
-    .sequence({ it[0] = location.toString() }) {
-      it[MediaTable.id].toMediaId()
-    }.singleOrNull()
+//  private fun Transaction.getAudioId(location: Uri): MediaId? = QUERY_AUDIO_ID
+//    .sequence({ it[0] = location.toString() }) {
+//      it[id].toMediaId()
+//    }.singleOrNull()
 
   /**
    * While there could be a race condition if 2 threads tried to insert the same media, it's
@@ -316,7 +326,7 @@ private class AudioMediaDaoImpl(
     newAlbumArtistId: ArtistId,
     newArtistId: ArtistId,
     metadata: MediaMetadata,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): MediaId {
     val formatFromExt = MediaFormat.mediaFormatFromExtension(audioInfo.path.extension)
     return maybeUpdateAudioMedia(
@@ -338,15 +348,15 @@ private class AudioMediaDaoImpl(
       it[artistId] = newArtistId.id
       it[year] = metadata.year
       it[rating] = metadata.rating.toRating().value
-      it[duration] = metadata.duration
+      it[duration] = metadata.duration.value
       it[trackNumber] = metadata.trackNumber
       it[totalTracks] = metadata.totalTracks
       it[discNumber] = metadata.discNumber
       it[totalDiscs] = metadata.totalDiscs
       it[comment] = metadata.comment
       it[trackMbid] = metadata.trackMbid?.value ?: ""
-      it[createdTime] = createUpdateTime
-      it[updatedTime] = createUpdateTime
+      it[createdTime] = createUpdateTime.value
+      it[updatedTime] = createUpdateTime.value
     }.toMediaId()
   }
 
@@ -356,7 +366,7 @@ private class AudioMediaDaoImpl(
     newAlbumArtistId: ArtistId,
     newArtistId: ArtistId,
     metadata: MediaMetadata,
-    newUpdateTime: Long
+    newUpdateTime: Millis
   ): MediaId? = queryAudioForUpdate(newInfo.location)?.let { info ->
     val updateTitle = info.title.updateOrNull { metadata.title }
     val updateTitleSort = info.titleSort.updateOrNull { metadata.titleSort }
@@ -401,14 +411,14 @@ private class AudioMediaDaoImpl(
         updateArtistId?.let { update -> it[artistId] = update.id }
         updateYear?.let { update -> it[year] = update }
         updateRating?.let { update -> it[rating] = update.toRating().value }
-        updateDuration?.let { update -> it[duration] = update }
+        updateDuration?.let { update -> it[duration] = update.value }
         updateTrackNumber?.let { update -> it[trackNumber] = update }
         updateTotalTracks?.let { update -> it[totalTracks] = update }
         updateDiscNumber?.let { update -> it[discNumber] = update }
         updateTotalDiscs?.let { update -> it[totalDiscs] = update }
         updateComment?.let { update -> it[comment] = update }
         updateTrackMbid?.let { update -> it[trackMbid] = update.value }
-        it[updatedTime] = newUpdateTime
+        it[updatedTime] = newUpdateTime.value
       }.where { id eq info.id.id }.update()
 
       if (updated < 1) LOG.e { it("Could not update ${info.title}") }
@@ -419,29 +429,29 @@ private class AudioMediaDaoImpl(
   private fun Queryable.queryAudioForUpdate(location: Uri): AudioForUpdate? = QUERY_AUDIO_FOR_UPDATE
     .sequence({ it[0] = location.toString() }) {
       AudioForUpdate(
-        it[MediaTable.id].toMediaId(),
-        it[MediaTable.title],
-        it[MediaTable.titleSort],
-        it[MediaTable.albumId].toAlbumId(),
-        it[MediaTable.albumArtistId].toArtistId(),
-        it[MediaTable.artistId].toArtistId(),
-        it[MediaTable.year],
-        it[MediaTable.rating].toRating().toStarRating(),
-        it[MediaTable.duration],
-        it[MediaTable.trackNumber],
-        it[MediaTable.totalTracks],
-        it[MediaTable.discNumber],
-        it[MediaTable.totalDiscs],
-        it[MediaTable.comment],
-        it[MediaTable.trackMbid].toTrackMbidOrNull()
+        it[id].toMediaId(),
+        it[title],
+        it[titleSort],
+        it[albumId].toAlbumId(),
+        it[albumArtistId].toArtistId(),
+        it[artistId].toArtistId(),
+        it[year],
+        it[rating].toRating().toStarRating(),
+        it[duration].toMillis(),
+        it[trackNumber],
+        it[totalTracks],
+        it[discNumber],
+        it[totalDiscs],
+        it[comment],
+        it[trackMbid].toTrackMbidOrNull()
       )
     }.singleOrNull() // TODO firstOrNull causes many resource not closed log statements. Why?
   // TODO It appears to be the underlying Cursor not being closed, but it's in a use{} block
 
-  private fun shouldNotIgnore(duration: Long, prefs: AppPreferences) =
+  private fun shouldNotIgnore(duration: Millis, prefs: AppPreferences) =
     !prefs.ignoreSmallFiles() || duration > prefs.ignoreThreshold()
 
-  private fun logIgnoring(audioInfo: AudioInfo, duration: Long, prefs: AppPreferences) {
+  private fun logIgnoring(audioInfo: AudioInfo, duration: Millis, prefs: AppPreferences) {
     LOG.i {
       it(
         "Ignoring %s duration:%d < threshold:%d",
@@ -485,7 +495,7 @@ private class AudioForUpdate(
   val artistId: ArtistId,
   val year: Int,
   val rating: StarRating,
-  val duration: Long,
+  val duration: Millis,
   val trackNumber: Int,
   val totalTracks: Int,
   val discNumber: Int,

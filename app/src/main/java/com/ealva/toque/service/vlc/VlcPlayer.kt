@@ -17,16 +17,45 @@
 package com.ealva.toque.service.vlc
 
 import com.ealva.toque.service.player.Player
+import org.videolan.libvlc.MediaPlayer
 
-class VlcPlayer(
-  private val libVlc: LibVlc,
-  override val media: VlcMedia
-) : Player {
+class VlcPlayer private constructor(private val player: MediaPlayer) : Player {
+  fun release() {
+    player.release()
+  }
+
   override fun pause(immediate: Boolean) {
     TODO("Not yet implemented")
   }
 
   override fun play(immediate: Boolean) {
     TODO("Not yet implemented")
+  }
+
+  private fun setPreset(vlcEqPreset: VlcEqPreset) {
+    vlcEqPreset.applyToPlayer(player)
+  }
+
+  companion object {
+    fun make(
+      libVlc: LibVlc,
+      vlcMedia: VlcMedia,
+      vlcEqPreset: VlcEqPreset = VlcEqPreset.NONE
+    ): VlcPlayer {
+      return VlcPlayer(libVlc.makeMediaPlayer(vlcMedia.media)).apply {
+        setPreset(vlcEqPreset)
+      }
+      /*
+        override var duration: Long,
+  private val updateListener: AvPlayerListener,
+  private var eqPreset: Equalizer?,
+  private val initialSeek: Long,
+  private val onPreparedTransition: PlayerTransition,
+  startPaused: Boolean,
+  private val powerManager: PowerManager,
+  private val prefs: AppPreferences
+
+       */
+    }
   }
 }

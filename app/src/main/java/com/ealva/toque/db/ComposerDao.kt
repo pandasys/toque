@@ -19,9 +19,10 @@ package com.ealva.toque.db
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.debugRequire
 import com.ealva.welite.db.Queryable
-import com.ealva.welite.db.Transaction
+import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.literal
@@ -29,6 +30,9 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.select
+import com.ealva.welite.db.table.selectCount
+import com.ealva.welite.db.table.where
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
@@ -70,14 +74,14 @@ interface ComposerDao {
    * not found and cannot be inserted.
    */
   fun getOrCreateComposerId(
-    txn: Transaction,
+    txn: TransactionInProgress,
     composer: String,
     composerSort: String,
-    createTime: Long
+    createTime: Millis
   ): ComposerId
 
-  fun deleteAll(txn: Transaction)
-  fun deleteComposersWithNoMedia(txn: Transaction): Long
+  fun deleteAll(txn: TransactionInProgress)
+  fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
 
   companion object {
     operator fun invoke(): ComposerDao = ComposerDaoImpl()
@@ -90,30 +94,28 @@ private val INSERT_COMPOSER = ComposerTable.insertValues {
   it[createdTime].bindArg()
 }
 
-private val QUERY_COMPOSER_ID: Query = Query(
+private val QUERY_COMPOSER_ID = Query(
   ComposerTable.select(ComposerTable.id)
-    .where { ComposerTable.composer eq bindString() }
+    .where { composer eq bindString() }
 )
 
 private class ComposerDaoImpl : ComposerDao {
 
   override fun getOrCreateComposerId(
-    txn: Transaction,
+    txn: TransactionInProgress,
     composer: String,
     composerSort: String,
-    createTime: Long
+    createTime: Millis
   ): ComposerId = txn.getOrCreateComposer(composer, composerSort, createTime)
 
-  override fun deleteAll(txn: Transaction) = txn.run {
+  override fun deleteAll(txn: TransactionInProgress) = txn.run {
     val count = ComposerTable.deleteAll()
     LOG.i { it("Deleted %d composers", count) }
   }
 
-  override fun deleteComposersWithNoMedia(txn: Transaction): Long = txn.run {
+  override fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long = txn.run {
     ComposerTable.deleteWhere {
-      literal(0) eq (
-        ComposerMediaTable.selectCount { ComposerMediaTable.composerId eq ComposerTable.id }
-        ).asExpression()
+      literal(0) eq (ComposerMediaTable.selectCount { composerId eq id }).asExpression()
     }.delete()
   }
 
@@ -124,10 +126,10 @@ private class ComposerDaoImpl : ComposerDao {
    * the race to insert. The great majority of the time the first query succeeds and the lock is
    * avoided.
    */
-  private fun Transaction.getOrCreateComposer(
+  private fun TransactionInProgress.getOrCreateComposer(
     composer: String,
     composerSort: String,
-    createTime: Long
+    createTime: Millis
   ): ComposerId = getComposer(composer)?.toComposerId() ?: getOrInsertComposer(
     composer,
     composerSort,
@@ -135,22 +137,22 @@ private class ComposerDaoImpl : ComposerDao {
   ).toComposerId()
 
   private fun Queryable.getComposer(genre: String): Long? = QUERY_COMPOSER_ID
-    .sequence({ it[0] = genre }) { it[ComposerTable.id] }
+    .sequence({ it[0] = genre }) { it[id] }
     .singleOrNull()
 
   /**
    * Get a lock and try to insert. If another thread won the race to insert, query on failure. If
    * query fails throw IllegalStateException.
    */
-  private fun Transaction.getOrInsertComposer(
+  private fun TransactionInProgress.getOrInsertComposer(
     newComposer: String,
     newComposerSort: String,
-    createTime: Long
+    createTime: Millis
   ): Long = getOrInsertLock.withLock {
     getComposer(newComposer) ?: INSERT_COMPOSER.insert {
       it[composer] = newComposer
       it[composerSort] = newComposerSort
-      it[createdTime] = createTime
+      it[createdTime] = createTime.value
     }
   }
 }

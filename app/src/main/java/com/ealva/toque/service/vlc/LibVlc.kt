@@ -18,14 +18,19 @@ package com.ealva.toque.service.vlc
 
 import android.content.Context
 import android.net.Uri
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.media.Media
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.compareTo
+import com.ealva.toque.common.toFloat
+import com.ealva.toque.log._e
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
 
 private val LOG by lazyLogger(LibVlc::class)
@@ -79,14 +84,14 @@ interface LibVlc {
 
   fun makeAudioMedia(
     uri: Uri,
-    initialSeek: Long,
+    initialSeek: Millis,
     startPaused: Boolean,
     prefs: LibVlcPreferences
-  ): Media
+  ): IMedia
 
-  fun makeVideoMedia(path: String, startPaused: Boolean, prefs: LibVlcPreferences): Media
+  fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPreferences): IMedia
 
-  fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPreferences): Media
+  fun makeMediaPlayer(media: IMedia): MediaPlayer
 }
 
 private class LibVlcImpl(
@@ -103,18 +108,66 @@ private class LibVlcImpl(
 
   override fun makeAudioMedia(
     uri: Uri,
-    initialSeek: Long,
+    initialSeek: Millis,
     startPaused: Boolean,
     prefs: LibVlcPreferences
-  ): Media {
+  ): IMedia {
+    return makeNativeMedia(uri).setAudioMediaOptions(startPaused, initialSeek, prefs)
+  }
+
+  private fun IMedia.setAudioMediaOptions(
+    startPaused: Boolean,
+    initialSeek: Millis,
+    prefs: LibVlcPreferences
+  ) = apply {
+    if (startPaused) {
+      addMediaOption { ":start-paused" }
+    }
+    if (initialSeek > 0) {
+      addMediaOption { """:start-time=${initialSeek.toFloat()}""" }
+    }
+    addMediaOption { ":no-video" }
+    addMediaOption { ":no-volume-save" }
+    maybeSetReplayGain { prefs }
+    setMediaHardwareAcceleration { prefs }
+//    val bufferSize = prefs.bufferSize
+//    if (bufferSize != BufferSize.Default) {
+//      addMediaOption(media, ":file-caching=" + bufferSize.size)
+//    }
+  }
+
+  private inline fun IMedia.maybeSetReplayGain(prefs: () -> LibVlcPreferences) = prefs().apply {
+    if (replayGainMode() != ReplayGainMode.None) {
+      addMediaOption { """:audio-replay-gain-mode=${replayGainMode()}""" }
+      addMediaOption { """:audio-replay-gain-preamp=${replayGainPreamp()}""" }
+      addMediaOption { """:audio-replay-gain-default=${replayGainDefaultPreamp()}""" }
+    }
+  }
+
+  private inline fun IMedia.setMediaHardwareAcceleration(prefs: () -> LibVlcPreferences) {
+    when (prefs().hardwareAcceleration()) {
+      HardwareAcceleration.DISABLED -> setHWDecoderEnabled(false, false)
+      HardwareAcceleration.FULL -> setHWDecoderEnabled(true, true)
+      HardwareAcceleration.DECODING -> {
+        setHWDecoderEnabled(true, true)
+        addMediaOption { ":no-mediacodec-dr" }
+        addMediaOption { ":no-omxil-dr" }
+      }
+      HardwareAcceleration.AUTOMATIC -> {
+      }
+    }
+  }
+
+  private inline fun IMedia.addMediaOption(option: () -> String) {
+    LOG._e { it("IMedia option=${option()}") }
+    addOption(option())
+  }
+
+  override fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPreferences): IMedia {
     TODO("Not yet implemented")
   }
 
-  override fun makeVideoMedia(path: String, startPaused: Boolean, prefs: LibVlcPreferences): Media {
-    TODO("Not yet implemented")
-  }
-
-  override fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPreferences): Media {
-    TODO("Not yet implemented")
+  override fun makeMediaPlayer(media: IMedia): MediaPlayer {
+    return MediaPlayer(media)
   }
 }

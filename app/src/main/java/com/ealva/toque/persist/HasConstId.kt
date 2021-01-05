@@ -26,7 +26,9 @@ interface HasConstId {
   /**
    * Don't reuse this ID for other purposes - it is used for lookup (reification). Prefer
    * IDs starting at 1 and incrementing by 1 as this leads to search and space
-   * efficiency in other areas
+   * efficiency in other areas. Once this ID is assigned in source code, it shouldn't ever be
+   * changed. (Of course there are ways to map IDs during reification, but better to never change
+   * an ID or just abandon an ID if absolutely necessary)
    */
   val id: Int
 }

@@ -21,9 +21,11 @@ import com.ealva.ealvabrainz.brainz.data.toArtistMbid
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.debugRequire
 import com.ealva.welite.db.Queryable
-import com.ealva.welite.db.Transaction
+import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.literal
@@ -34,7 +36,10 @@ import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.asExpression
-import com.ealva.welite.db.table.union
+import com.ealva.welite.db.table.select
+import com.ealva.welite.db.table.selectCount
+import com.ealva.welite.db.table.selects
+import com.ealva.welite.db.table.where
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
@@ -77,15 +82,15 @@ interface ArtistDao {
    * Update the artist info if it exists otherwise insert it
    */
   fun upsertArtist(
-    txn: Transaction,
+    txn: TransactionInProgress,
     artistName: String,
     artistSort: String,
     artistMbid: ArtistMbid?,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): ArtistId
 
-  fun deleteAll(txn: Transaction): Long
-  fun deleteArtistsWithNoMedia(txn: Transaction): Long
+  fun deleteAll(txn: TransactionInProgress): Long
+  fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
 
   companion object {
     operator fun invoke(): ArtistDao = ArtistDaoImpl()
@@ -102,13 +107,10 @@ private val INSERT_STATEMENT = ArtistTable.insertValues {
 
 private val queryArtistBind = bindString()
 
-private val QUERY_ARTIST_INFO: Query = Query(
-  ArtistTable.select(
-    ArtistTable.id,
-    ArtistTable.artist,
-    ArtistTable.artistSort,
-    ArtistTable.artistMbid
-  ).where { ArtistTable.artist eq queryArtistBind }
+private val QUERY_ARTIST_INFO = Query(
+  ArtistTable
+    .selects { listOf(id, artist, artistSort, artistMbid) }
+    .where { artist eq queryArtistBind }
 )
 
 private data class ArtistInfo(
@@ -123,29 +125,29 @@ private val upsertLock: Lock = ReentrantLock()
 private class ArtistDaoImpl : ArtistDao {
 
   override fun upsertArtist(
-    txn: Transaction,
+    txn: TransactionInProgress,
     artistName: String,
     artistSort: String,
     artistMbid: ArtistMbid?,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): ArtistId = upsertLock.withLock {
     require(artistName.isNotBlank()) { "Artist may not be blank" }
     txn.doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime)
   }
 
-  override fun deleteAll(txn: Transaction): Long = txn.run {
+  override fun deleteAll(txn: TransactionInProgress): Long = txn.run {
     ArtistTable.deleteAll()
   }
 
-  override fun deleteArtistsWithNoMedia(txn: Transaction): Long = txn.run {
+  override fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
     DELETE_ARTISTS_WITH_NO_MEDIA.delete()
   }
 
-  private fun Transaction.doUpsertArtist(
+  private fun TransactionInProgress.doUpsertArtist(
     newArtist: String,
     newArtistSort: String,
     newArtistMbid: ArtistMbid?,
-    createUpdateTime: Long
+    createUpdateTime: Millis
   ): ArtistId = try {
     maybeUpdateArtist(
       newArtist,
@@ -156,8 +158,8 @@ private class ArtistDaoImpl : ArtistDao {
       it[artist] = newArtist
       it[artistSort] = newArtistSort
       it[artistMbid] = newArtistMbid?.value ?: ""
-      it[createdTime] = createUpdateTime
-      it[updatedTime] = createUpdateTime
+      it[createdTime] = createUpdateTime.value
+      it[updatedTime] = createUpdateTime.value
     }.toArtistId()
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with artist='%s'", newArtist) }
@@ -168,11 +170,11 @@ private class ArtistDaoImpl : ArtistDao {
    * Update the artist if necessary and return the ArtistId. Null is returned if the artist does not
    * exist
    */
-  private fun Transaction.maybeUpdateArtist(
+  private fun TransactionInProgress.maybeUpdateArtist(
     newArtist: String,
     newArtistSort: String,
     newArtistMbid: ArtistMbid?,
-    newUpdateTime: Long
+    newUpdateTime: Millis
   ): ArtistId? = queryArtistInfo(newArtist)?.let { info ->
     // artist could match on query yet differ in case, so update if case changes
     val updateArtist = info.artist.updateOrNull { newArtist }
@@ -188,7 +190,7 @@ private class ArtistDaoImpl : ArtistDao {
         updateArtist?.let { update -> it[artist] = update }
         updateSort?.let { update -> it[artistSort] = update }
         updateMbid?.let { update -> it[artistMbid] = update.value }
-        it[updatedTime] = newUpdateTime
+        it[updatedTime] = newUpdateTime.value
       }.where { id eq info.id.id }.update()
 
       if (updated < 1) LOG.e { it("Could not update $info") }
@@ -196,23 +198,22 @@ private class ArtistDaoImpl : ArtistDao {
     info.id
   }
 
-  private fun Queryable.queryArtistInfo(artist: String): ArtistInfo? = QUERY_ARTIST_INFO
-    .sequence({ it[queryArtistBind] = artist }) {
+  private fun Queryable.queryArtistInfo(artistName: String): ArtistInfo? = QUERY_ARTIST_INFO
+    .sequence({ it[queryArtistBind] = artistName }) {
       ArtistInfo(
-        it[ArtistTable.id].toArtistId(),
-        it[ArtistTable.artist],
-        it[ArtistTable.artistSort],
-        it[ArtistTable.artistMbid].toArtistMbid()
+        it[id].toArtistId(),
+        it[artist],
+        it[artistSort],
+        it[artistMbid].toArtistMbid()
       )
     }.singleOrNull()
 }
 
 val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
-  (
-    ArtistMediaTable.select(ArtistMediaTable.mediaId).where {
-      ArtistMediaTable.artistId eq ArtistTable.id
-    } union MediaTable.select(MediaTable.id).where {
-      (MediaTable.artistId eq ArtistTable.id) or (MediaTable.albumArtistId eq ArtistTable.id)
-    }
-    ).selectCount().asExpression<Long>() eq literal(0L)
+  literal(0L) eq (
+    ArtistMediaTable.select { mediaId }.where { artistId eq id } union
+      MediaTable.select { id }.where {
+        (artistId eq ArtistTable.id) or (albumArtistId eq ArtistTable.id)
+      }
+    ).selectCount().asExpression()
 }

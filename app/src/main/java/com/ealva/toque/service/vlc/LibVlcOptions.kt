@@ -105,7 +105,7 @@ private fun ArrayList<String>.androidWindowChromaOption(prefs: LibVlcPreferences
 
 private fun ArrayList<String>.networkCachingOption(prefs: LibVlcPreferences) {
   add(PARM_NETWORK_CACHING)
-  add(prefs.networkCachingMillis().toString())
+  add(prefs.networkCachingAmount().toString())
 }
 
 private fun ArrayList<String>.subsEncodingOption(prefs: LibVlcPreferences) {

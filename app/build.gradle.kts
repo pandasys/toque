@@ -55,24 +55,32 @@ android {
   }
 
   sourceSets {
-    val sharedTestDir = "src/sharedTest/java"
-    getByName("test").java.srcDir(sharedTestDir)
-    getByName("androidTest").java.srcDir(sharedTestDir)
+    val sharedTestDir = File("src/sharedTest/java")
+    getByName("test").java.srcDirs(sharedTestDir)
+    getByName("androidTest").java.srcDirs(sharedTestDir)
+
+    val resDir = File("sampledata")
+    getByName("test").resources.srcDirs(resDir)
+    getByName("androidTest").resources.srcDirs(resDir)
   }
 
-//  packagingOptions {
-//    exclude("META-INF/DEPENDENCIES")
-//    exclude("META-INF/LICENSE")
-//    exclude("META-INF/LICENSE.txt")
-//    exclude("META-INF/license.txt")
-//    exclude("META-INF/NOTICE")
-//    exclude("META-INF/NOTICE.txt")
-//    exclude("META-INF/notice.txt")
-//    exclude("META-INF/ASL2.0")
-//    exclude("META-INF/AL2.0")
-//    exclude("META-INF/LGPL2.1")
-//    exclude("META-INF/*.kotlin_module")
-//  }
+  packagingOptions.resources {
+    excludes.addAll(
+      listOf(
+        "META-INF/DEPENDENCIES",
+        "META-INF/LICENSE",
+        "META-INF/LICENSE.txt",
+        "META-INF/license.txt",
+        "META-INF/NOTICE",
+        "META-INF/NOTICE.txt",
+        "META-INF/notice.txt",
+        "META-INF/ASL2.0",
+        "META-INF/AL2.0",
+        "META-INF/LGPL2.1",
+        "META-INF/*.kotlin_module"
+      )
+    )
+  }
 
   kotlinOptions {
     jvmTarget = "1.8"
@@ -101,6 +109,7 @@ dependencies {
   implementation(SupportLibs.ANDROIDX_APPCOMPAT)
   implementation(SupportLibs.ANDROIDX_CORE_KTX)
   implementation(SupportLibs.ANDROIDX_LIFECYCLE_RUNTIME_KTX)
+  implementation(SupportLibs.ANDROIDX_LIFECYCLE_COMMON)
   implementation(SupportLibs.ANDROIDX_DATASTORE_PREFERENCES)
 
   implementation(SupportLibs.ANDROID_MATERIAL)
@@ -125,6 +134,9 @@ dependencies {
   implementation(ThirdParty.KOIN)
   implementation(ThirdParty.KOIN_ANDROID)
 
+  implementation(ThirdParty.KOTLIN_RESULT)
+  implementation(ThirdParty.KOTLIN_RESULT_CO)
+
   implementation(ThirdParty.PHOENIX)
 
   testImplementation(TestingLib.JUNIT)
@@ -137,6 +149,7 @@ dependencies {
   testImplementation(TestingLib.EXPECT)
   testImplementation(TestingLib.ROBOLECTRIC)
   testImplementation(TestingLib.COROUTINE_TEST)
+  testImplementation(ThirdParty.KOIN_TEST)
 
   androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_RUNNER) {
     exclude("junit", "junit")
@@ -147,4 +160,5 @@ dependencies {
   androidTestImplementation(TestingLib.JUNIT)
   androidTestImplementation(TestingLib.EXPECT)
   androidTestImplementation(TestingLib.COROUTINE_TEST)
+  androidTestImplementation(ThirdParty.KOIN_TEST)
 }

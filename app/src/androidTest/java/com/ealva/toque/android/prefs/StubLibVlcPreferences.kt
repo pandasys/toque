@@ -14,9 +14,16 @@
  * limitations under the License.
  */
 
+@file:Suppress("MemberVisibilityCanBePrivate")
+
 package com.ealva.toque.android.prefs
 
+import com.ealva.toque.common.Amp
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.toAmp
+import com.ealva.toque.common.toMillis
 import com.ealva.toque.service.vlc.Chroma
+import com.ealva.toque.service.vlc.HardwareAcceleration
 import com.ealva.toque.service.vlc.LibVlcPreferences
 import com.ealva.toque.service.vlc.ReplayGainMode
 import com.ealva.toque.service.vlc.SkipLoopFilter
@@ -40,9 +47,9 @@ class StubLibVlcPreferences : LibVlcPreferences {
     return true
   }
 
-  var networkCachingMillis = 1000
-  override fun networkCachingMillis(): Int = networkCachingMillis
-  override suspend fun networkCachingMillis(millis: Int): Boolean {
+  var networkCachingMillis = 1000.toMillis()
+  override fun networkCachingAmount(): Millis = networkCachingMillis
+  override suspend fun networkCachingAmount(millis: Millis): Boolean {
     networkCachingMillis = millis
     return true
   }
@@ -61,16 +68,16 @@ class StubLibVlcPreferences : LibVlcPreferences {
     return true
   }
 
-  var replayGainPreamp = 0F
-  override fun replayGainPreamp(): Float = replayGainPreamp
-  override suspend fun replayGainPreamp(preamp: Float): Boolean {
+  var replayGainPreamp = 0F.toAmp()
+  override fun replayGainPreamp(): Amp = replayGainPreamp
+  override suspend fun replayGainPreamp(preamp: Amp): Boolean {
     replayGainPreamp = preamp
     return true
   }
 
-  var replayGainDefaultPreamp = 0F
-  override fun replayGainDefaultPreamp(): Float = replayGainDefaultPreamp
-  override suspend fun replayGainDefaultPreamp(preamp: Float): Boolean {
+  var replayGainDefaultPreamp = 0F.toAmp()
+  override fun replayGainDefaultPreamp(): Amp = replayGainDefaultPreamp
+  override suspend fun replayGainDefaultPreamp(preamp: Amp): Boolean {
     replayGainDefaultPreamp = preamp
     return true
   }
@@ -100,6 +107,13 @@ class StubLibVlcPreferences : LibVlcPreferences {
   override fun digitalAudioOutputEnabled(): Boolean = digitalAudioOutputEnabled
   override suspend fun digitalAudioOutputEnabled(enabled: Boolean): Boolean {
     digitalAudioOutputEnabled = enabled
+    return true
+  }
+
+  var hardwareAcceleration = HardwareAcceleration.AUTOMATIC
+  override fun hardwareAcceleration(): HardwareAcceleration = hardwareAcceleration
+  override suspend fun hardwareAcceleration(acceleration: HardwareAcceleration): Boolean {
+    hardwareAcceleration = acceleration
     return true
   }
 }
