@@ -66,8 +66,31 @@ inline fun Long.toMediaId(): MediaId {
   return MediaId(this)
 }
 
+/**
+ * Primary for test
+ */
+inline fun Int.toMediaId() = this.toLong().toMediaId()
+
 inline class MediaId(override val id: Long) : PersistentId {
   companion object {
     val INVALID = MediaId(ID_INVALID)
   }
+}
+
+/**
+ * Basically a marker interface indicating the instance has a unique, persistent [id].
+ * This [id] is typically (always?) a row _id column which guarantees it's uniqueness and
+ * persistence.
+ */
+interface HasId {
+  /**
+   * Unique persistent ID of instances of this interface
+   */
+  val id: PersistentId
+  /**
+   * The "instance" ID is required as some persistent items may appear in lists more than once.
+   * This is the unique ID for a particular instance represented by [id]. If duplicate instances
+   * will not be needed, this field may be equal to [id]
+   */
+  val instanceId: Long
 }

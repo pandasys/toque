@@ -31,9 +31,9 @@ import com.ealva.toque.db.EqPresetInfo
 import com.ealva.toque.db.MediaId
 import com.ealva.toque.db.NullEqPresetDao
 import com.ealva.toque.db.getErrorString
-import com.ealva.toque.media.EqPreset
-import com.ealva.toque.media.EqPresetFactory
-import com.ealva.toque.media.EqPresetFactory.Companion.DEFAULT_SYSTEM_PRESET_NAME
+import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.service.media.EqPresetFactory
+import com.ealva.toque.service.media.EqPresetFactory.Companion.DEFAULT_SYSTEM_PRESET_NAME
 import com.ealva.toque.service.vlc.VlcEqPreset.Companion.NONE
 import com.ealva.toque.service.vlc.VlcEqPreset.Companion.setNativeEqValues
 import com.github.michaelbull.result.Err

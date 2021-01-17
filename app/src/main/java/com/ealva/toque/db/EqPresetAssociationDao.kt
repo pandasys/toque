@@ -18,7 +18,7 @@ package com.ealva.toque.db
 
 import com.ealva.toque.audio.AudioOutputRoute
 import com.ealva.toque.audio.longId
-import com.ealva.toque.media.EqPreset
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reify
 import com.ealva.toque.persist.reifyRequire

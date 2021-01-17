@@ -32,7 +32,8 @@ val setOfAllTables = setOf(
   GenreTable,
   GenreMediaTable,
   EqPresetTable,
-  EqPresetAssociationTable
+  EqPresetAssociationTable,
+  QueueStateTable
 )
 
 object ArtistTable : Table() {
@@ -113,7 +114,7 @@ object MediaTable : Table() {
   val contentId = optLong("MediaContentId")
 
   /**
-   * The type of media, [com.ealva.toque.media.MediaType] - audio or video
+   * The type of media, [com.ealva.toque.service.media.MediaType] - audio or video
    */
   val mediaType = integer("MediaType")
 
@@ -333,4 +334,15 @@ object EqPresetAssociationTable : Table() {
     index(associationType)
     index(associationId)
   }
+}
+
+/**
+ * Stores the state of a queue in the media player service. The [id] is specific to a queue and
+ * IDs can't overlap or they corrupt each other's data
+ */
+object QueueStateTable : Table() {
+  val id = long("_id") { primaryKey() }
+  val mediaId = long("ServiceState_MediaId") { default(-1) }
+  val queueIndex = integer("ServiceState_QueueIndex") { default(0) }
+  val playbackPosition = long("ServiceState_PlaybackPosition") { default(0) }
 }

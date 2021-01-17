@@ -19,8 +19,8 @@ package com.ealva.toque.file
 import android.content.ContentResolver.SCHEME_CONTENT
 import android.content.ContentResolver.SCHEME_FILE
 import android.net.Uri
-import com.ealva.toque.media.FileExtensions
-import com.ealva.toque.media.MediaFormat
+import com.ealva.toque.service.media.FileExtensions
+import com.ealva.toque.service.media.MediaFormat
 import java.util.Locale
 
 private val supportedSet = setOf(SCHEME_FILE, "smb", "ssh", "nfs", "ftp", "ftps", SCHEME_CONTENT)

@@ -16,12 +16,62 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.toque.service.player.Player
-import com.ealva.toque.service.player.PlayerFactory
+import android.content.Context
+import android.os.PowerManager
+import androidx.core.content.getSystemService
+import com.ealva.toque.common.Millis
+import com.ealva.toque.service.player.PlayerTransition
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 
-class VlcPlayerFactory(private val libVlcSingleton: LibVlcSingleton) : PlayerFactory {
-  override suspend fun make(): Player {
-    TODO()
-//    return VlcPlayer(libVlcSingleton.instance())
+interface VlcPlayerFactory {
+  suspend fun make(
+    vlcMedia: VlcMedia,
+    vlcEqPreset: VlcEqPreset,
+    onPreparedTransition: PlayerTransition,
+    duration: Millis,
+    dispatcher: CoroutineDispatcher = Dispatchers.IO
+  ): VlcPlayer
+
+  companion object {
+    operator fun invoke(
+      context: Context,
+      libVlcSingleton: LibVlcSingleton
+    ): VlcPlayerFactory = VlcPlayerFactoryImpl(context, libVlcSingleton)
   }
+}
+
+class VlcPlayerFactoryImpl(
+  context: Context,
+  private val libVlcSingleton: LibVlcSingleton
+) : VlcPlayerFactory {
+  private val powerManager: PowerManager = requireNotNull(context.getSystemService())
+
+  override suspend fun make(
+    vlcMedia: VlcMedia,
+    vlcEqPreset: VlcEqPreset,
+    onPreparedTransition: PlayerTransition,
+    duration: Millis,
+    dispatcher: CoroutineDispatcher
+  ): VlcPlayer {
+    return VlcPlayer.make(
+      libVlcSingleton.instance(),
+      vlcMedia,
+      duration,
+      vlcEqPreset,
+      onPreparedTransition,
+      powerManager,
+      dispatcher
+    )
+  }
+}
+
+object NullVlcPlayerFactory : VlcPlayerFactory {
+  override suspend fun make(
+    vlcMedia: VlcMedia,
+    vlcEqPreset: VlcEqPreset,
+    onPreparedTransition: PlayerTransition,
+    duration: Millis,
+    dispatcher: CoroutineDispatcher
+  ): VlcPlayer = NullVlcPlayer
 }

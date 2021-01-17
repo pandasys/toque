@@ -20,36 +20,6 @@ package com.ealva.toque.math
 
 import com.ealva.toque.common.debug
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
-
-inline fun Double.clamp(min: Double, max: Double): Double = max(min, min(this, max))
-
-inline fun Float.clamp(min: Float, max: Float): Float = max(min, min(this, max))
-
-inline fun Int.clamp(min: Int, max: Int) = min(max(this, min), max)
-
-inline fun Int.clamp(range: IntRange) = min(max(this, range.first), range.last)
-
-@Suppress("unused")
-fun Long.clamp(min: Long, max: Long) = min(max(this, min), max)
-
-inline fun Int.hash(): Int {
-  return this
-}
-
-inline fun Long.hash(): Int {
-  return (xor(ushr(32))).toInt()
-}
-
-inline fun Double.hash(): Int {
-  val bits = java.lang.Double.doubleToLongBits(this)
-  return (bits xor bits.ushr(32)).toInt()
-}
-
-inline fun Float.hash(): Int {
-  return java.lang.Float.floatToIntBits(this)
-}
 
 /**
  * Returns true if this and [rhs] are within [epsilon] of each other. Floating point numbers should
@@ -83,7 +53,7 @@ inline fun Double.isNotZero(epsilon: Double): Boolean {
  */
 inline fun Double.percentageToInt(): Int {
   debug { require(this in 0.0..1.0) }
-  return (this * 100.0).clamp(0.0, 100.0).toInt()
+  return (this * 100.0).coerceIn(0.0, 100.0).toInt()
 }
 
 inline fun Float.isEqualTo(rhs: Float, epsilon: Float): Boolean {

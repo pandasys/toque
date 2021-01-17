@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@
 
 @file:Suppress("MagicNumber")
 
-package com.ealva.toque.media
-
-import com.ealva.toque.math.hash
+package com.ealva.toque.service.media
 
 val NO_RATING = Rating(-1)
 val RATING_0 = Rating(0)
@@ -139,11 +137,8 @@ fun Float.toStarRating(): StarRating {
 }
 
 inline class StarRating(val value: Float) {
-
   val isValid: Boolean
     get() = value != STAR_NO_RATING.value
-
-  fun hash(): Int = value.hash()
 }
 
 val MP3_NO_RATING = Mp3Rating(-1)

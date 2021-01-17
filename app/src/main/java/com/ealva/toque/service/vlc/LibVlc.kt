@@ -21,8 +21,6 @@ import android.net.Uri
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.compareTo
-import com.ealva.toque.common.toFloat
 import com.ealva.toque.log._e
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -94,6 +92,9 @@ interface LibVlc {
   fun makeMediaPlayer(media: IMedia): MediaPlayer
 }
 
+@Suppress("NOTHING_TO_INLINE")
+inline fun Millis.toFloat(): Float = value.toFloat()
+
 private class LibVlcImpl(
   private val libVLC: LibVLC
 ) : LibVlc {
@@ -123,7 +124,7 @@ private class LibVlcImpl(
     if (startPaused) {
       addMediaOption { ":start-paused" }
     }
-    if (initialSeek > 0) {
+    if (initialSeek > Millis.ZERO) {
       addMediaOption { """:start-time=${initialSeek.toFloat()}""" }
     }
     addMediaOption { ":no-video" }

@@ -18,16 +18,16 @@ package com.ealva.toque.test.db
 
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.toAmp
-import com.ealva.toque.media.EqPreset
-import com.ealva.toque.media.EqPreset.Companion.PRE_AMP_DEFAULT
-import com.ealva.toque.media.PreAmpAndBands
+import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.service.media.EqPreset.Companion.PRE_AMP_DEFAULT
+import com.ealva.toque.service.media.PreAmpAndBands
 
 private val ZERO_AMP = 0.toAmp()
 
 class EqPresetStub(override var presetId: Long = 0) : EqPreset {
   override var name: String = "EqPresetStub"
-  override val displayName: String = "*$name"
-  override var isSystemPreset: Boolean = true
+  override val displayName: String = name
+  override var isSystemPreset: Boolean = false
   override val bandCount: Int = 10
   override val bandIndices: IntRange = 0 until bandCount
 

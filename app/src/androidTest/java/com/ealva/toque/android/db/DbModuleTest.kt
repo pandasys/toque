@@ -39,6 +39,8 @@ import com.ealva.toque.db.GenreMediaDao
 import com.ealva.toque.db.GenreMediaTable
 import com.ealva.toque.db.GenreTable
 import com.ealva.toque.db.MediaTable
+import com.ealva.toque.db.QueueStateDaoFactory
+import com.ealva.toque.db.QueueStateTable
 import com.ealva.welite.db.Database
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -60,7 +62,7 @@ class DbModuleTest : KoinTest {
   fun testExpectedTables() {
     val db: Database = get()
     val tables = db.tables
-    expect(tables).toHaveSize(11)
+    expect(tables).toHaveSize(12)
     expect(tables).toBe(
       listOf(
         ArtistTable,
@@ -73,7 +75,8 @@ class DbModuleTest : KoinTest {
         GenreTable,
         GenreMediaTable,
         EqPresetTable,
-        EqPresetAssociationTable
+        EqPresetAssociationTable,
+        QueueStateTable
       )
     )
   }
@@ -91,5 +94,6 @@ class DbModuleTest : KoinTest {
     expect(get<EqPresetDao>()).toNotBeNull()
     expect(get<EqPresetAssociationDao>()).toNotBeNull()
     expect(get<AudioMediaDao>()).toNotBeNull()
+    expect(get<QueueStateDaoFactory>()).toNotBeNull()
   }
 }

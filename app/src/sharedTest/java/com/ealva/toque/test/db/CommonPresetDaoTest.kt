@@ -27,7 +27,7 @@ import com.ealva.toque.db.DaoNotFound
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.EqPresetTable
-import com.ealva.toque.media.PreAmpAndBands
+import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.toque.test.shared.withTestDatabase
 import com.ealva.welite.db.expr.eq
 import com.github.michaelbull.result.Err

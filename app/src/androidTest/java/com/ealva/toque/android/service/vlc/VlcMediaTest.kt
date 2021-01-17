@@ -28,6 +28,7 @@ import com.ealva.toque.service.vlc.LibVlc
 import com.ealva.toque.service.vlc.LibVlcPreferencesSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.service.vlc.NullEqPresetSelector
+import com.ealva.toque.service.vlc.NullVlcPlayerFactory
 import com.ealva.toque.service.vlc.VlcMedia
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
@@ -90,12 +91,13 @@ class VlcMediaTest : KoinTest {
     val media = libVlc.makeAudioMedia(uri, 0.toMillis(), true, prefsSingleton.instance())
     expect(media.type).toBe(1)
     val vlcMedia = VlcMedia(
-      libVlc,
       media,
       uri,
       MediaId.INVALID,
       AlbumId.INVALID,
-      NullEqPresetSelector
+      NullEqPresetSelector,
+      NullVlcPlayerFactory,
+      coroutineRule.testDispatcher
     )
     expect(vlcMedia.uri).toBe(uri)
   }

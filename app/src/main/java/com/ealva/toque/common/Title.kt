@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,16 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.player
+@file:Suppress("NOTHING_TO_INLINE")
 
-interface Player {
-  fun pause(immediate: Boolean = false)
-  fun play(immediate: Boolean = false)
+package com.ealva.toque.common
+
+inline fun String?.toTitle(): Title {
+  return this?.let { Title(trim()) } ?: Title.UNKNOWN
+}
+
+inline class Title(val value: String) {
+  companion object {
+    val UNKNOWN: Title = Title("Unknown")
+  }
 }

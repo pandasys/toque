@@ -58,6 +58,7 @@ object DbModule {
         get()
       )
     }
+    single { QueueStateDaoFactory(get()) }
   }
 
   private fun makeDatabase(context: Context) = Database(

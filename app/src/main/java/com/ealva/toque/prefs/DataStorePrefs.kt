@@ -22,6 +22,7 @@ import androidx.datastore.preferences.MutablePreferences
 import androidx.datastore.preferences.Preferences
 import androidx.datastore.preferences.createDataStore
 import androidx.datastore.preferences.edit
+import androidx.datastore.preferences.emptyPreferences
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -30,15 +31,15 @@ import com.ealva.toque.persist.toEnum
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import java.io.IOException
 
-typealias KeyDefault<T> = Pair<Preferences.Key<T>, T>
+private val DataStore<Preferences>.LOG by lazyLogger("DataStorePrefs")
 
-inline val <T> KeyDefault<T>.key: Preferences.Key<T>
-  get() = first
-inline val <T> KeyDefault<T>.defaultValue: T
-  get() = second
-
-val DataStore<Preferences>.LOG by lazyLogger("DataStorePrefs")
+data class KeyDefault<T>(val key: Preferences.Key<T>, val defaultValue: T)
 
 fun Context.makeDataStore(
   name: String,
@@ -81,4 +82,15 @@ inline operator fun <reified T> Preferences.get(
 
 operator fun <T> Preferences.get(pair: KeyDefault<T>): T {
   return get(pair.key) ?: pair.defaultValue
+}
+
+/**
+ * Make a flow of values for [keyDefault].key defaulting to [keyDefault].defaultValue if the
+ * key is not present. Values will be [distinctUntilChanged]
+ */
+fun <T> DataStore<Preferences>.valueFlow(keyDefault: KeyDefault<T>): Flow<T> {
+  return data
+    .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+    .map { preferences -> preferences[keyDefault.key] ?: keyDefault.defaultValue }
+    .distinctUntilChanged()
 }

@@ -18,7 +18,7 @@ package com.ealva.toque.db
 
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.toAmp
-import com.ealva.toque.media.PreAmpAndBands
+import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress

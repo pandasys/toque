@@ -24,7 +24,7 @@ object Versions {
   const val ANDROIDX_TEST = "1.3.0"
   const val ANDROIDX_TEST_EXT = "1.1.2"
   const val APPCOMPAT = "1.2.0"
-  const val COMPOSE = "1.0.0-alpha06"
+  const val COMPOSE = "1.0.0-alpha08"
   const val CORE_KTX = "1.3.2"
   const val COROUTINES = "1.4.1"
   const val COROUTINES_TEST = "1.4.1"
@@ -38,11 +38,12 @@ object Versions {
   const val FASTUTIL = "7.2.1"
   const val JUNIT = "4.13"
   const val KOIN = "2.2.2"
-  const val KOTLIN = "1.4.10"
+  const val KOTLIN = "1.4.20"
   const val KOTLIN_RESULT = "1.1.9"
   const val KOTLIN_RESULT_CO = "1.1.9"
   const val LIFECYCLE = "2.3.0-rc01"
   const val MATERIAL = "1.2.1"
+  const val MOCKK = "1.10.5"
   const val PHOENIX = "2.0.0"
   const val ROBOLECTRIC = "4.4"
   const val VLC_ANDROID = "3.3.2"
@@ -50,10 +51,10 @@ object Versions {
 }
 
 object BuildPluginsVersion {
-  const val AGP = "7.0.0-alpha03"
+  const val AGP = "7.0.0-alpha04"
   const val DETEKT = "1.14.1"
   const val DOKKA = "1.4.10.2"
-  const val KOTLIN = "1.4.10"
+  const val KOTLIN = "1.4.20"
   const val VERSIONS = "0.33.0"
 }
 
@@ -70,7 +71,7 @@ object SupportLibs {
   const val ANDROID_MATERIAL = "com.google.android.material:material:${Versions.MATERIAL}"
   const val COMPOSE_MATERIAL = "androidx.compose.material:material:${Versions.COMPOSE}"
   const val COMPOSE_UI = "androidx.compose.ui:ui:${Versions.COMPOSE}"
-  const val COMPOSE_UI_TOOLING = "androidx.ui:ui-tooling:${Versions.COMPOSE}"
+  const val COMPOSE_UI_TOOLING = "androidx.compose.ui:ui-tooling:${Versions.COMPOSE}"
 }
 
 object ThirdParty {
@@ -100,6 +101,7 @@ object TestingLib {
     "org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_TEST}"
   const val EXPECT = "com.nhaarman:expect.kt:${Versions.EXPECT}"
   const val JUNIT = "junit:junit:${Versions.JUNIT}"
+  const val MOCKK = "io.mockk:mockk:${Versions.MOCKK}"
   const val ROBOLECTRIC = "org.robolectric:robolectric:${Versions.ROBOLECTRIC}"
 }
 

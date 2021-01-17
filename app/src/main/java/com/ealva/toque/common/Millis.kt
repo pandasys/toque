@@ -20,18 +20,29 @@ package com.ealva.toque.common
 
 import java.util.Date
 
+typealias MillisRange = ClosedRange<Millis>
+
 inline fun Long.toMillis(): Millis = Millis(this)
 inline fun Int.toMillis(): Millis = Millis(toLong())
 
-inline class Millis(val value: Long) {
+inline class Millis(val value: Long) : Comparable<Millis> {
   override fun toString(): String = value.toString()
+
+  override operator fun compareTo(other: Millis): Int = value.compareTo(other.value)
+
+  inline operator fun minus(rhs: Millis): Millis = (value - rhs.value).toMillis()
+  inline operator fun div(other: Millis): Millis = (value / other.value).toMillis()
+
+  inline operator fun compareTo(rhs: Long): Int = value.compareTo(rhs)
+  inline operator fun compareTo(rhs: Int): Int = value.compareTo(rhs)
+
+  inline fun toDate(): Date = Date(value)
+
+  companion object {
+    // Some commonly used Millis
+    val ZERO = 0.toMillis()
+    val ONE_HUNDRED = 100.toMillis()
+    val TWO_HUNDRED = 200.toMillis()
+    val ONE_MINUTE = 60000.toMillis()
+  }
 }
-
-inline operator fun Millis.compareTo(rhs: Millis): Int = value.compareTo(rhs.value)
-inline operator fun Millis.compareTo(rhs: Long): Int = value.compareTo(rhs)
-inline operator fun Millis.compareTo(rhs: Int): Int = value.compareTo(rhs)
-
-inline fun Millis.coerceIn(range: LongRange): Millis = value.coerceIn(range).toMillis()
-
-inline fun Millis.toDate(): Date = Date(value)
-inline fun Millis.toFloat(): Float = value.toFloat()

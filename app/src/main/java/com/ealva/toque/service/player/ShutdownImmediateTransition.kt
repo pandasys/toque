@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,20 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.media
+package com.ealva.toque.service.player
 
-import kotlinx.coroutines.flow.Flow
+import com.ealva.toque.common.Volume
+import com.ealva.toque.service.player.PlayerTransition.Type
 
-sealed class MediaEvent {
-  data class MetadataUpdate(val metadata: MediaMetadata) : MediaEvent()
-}
+/**
+ * Immediately shutdown a player
+ */
+class ShutdownImmediateTransition : BasePlayerTransition(Type.Shutdown) {
+  override suspend fun doExecute(player: TransitionPlayer) {
+    player.volume = Volume.ZERO
+    player.shutdown()
+    setComplete()
+  }
 
-interface Media : AutoCloseable {
-  val eventFlow: Flow<MediaEvent>
+  override fun toString(): String = "ShutdownImmediate"
 }

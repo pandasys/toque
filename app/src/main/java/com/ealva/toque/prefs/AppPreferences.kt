@@ -30,11 +30,13 @@ import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_SMALL_FILES
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_THRESHOLD
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.LAST_SCAN_TIME
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.PLAY_PAUSE_FADE_LENGTH
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.SCROBBLER
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,6 +59,9 @@ interface AppPreferences {
   suspend fun fadeOnPlayPause(fade: Boolean): Boolean
   fun playPauseFadeLength(): Millis
   suspend fun playPauseFadeLength(millis: Millis): Boolean
+  fun scrobbler(): ScrobblerPackage
+  suspend fun scrobbler(scrobblerPackage: ScrobblerPackage): Boolean
+  fun scrobblerFlow(): Flow<ScrobblerPackage>
 
   companion object {
     const val DEFAULT_PLAY_PAUSE_FADE_LENGTH = 500L
@@ -80,7 +85,7 @@ private class AppPrefsSingletonImpl(
 ) : AppPreferencesSingleton {
   private suspend fun make(): AppPreferences {
     val dataStore = context.makeDataStore(DATA_STORE_FILE_NAME, dispatcher)
-    val stateFlow = dataStore.data.stateIn(CoroutineScope(dispatcher + SupervisorJob()))
+    val stateFlow = dataStore.data.stateIn(MainScope())
     return AppPreferencesImpl(dataStore, stateFlow)
   }
 
@@ -107,41 +112,67 @@ private class AppPreferencesImpl(
   private val state: StateFlow<Preferences>
 ) : AppPreferences {
   object Keys {
-    val ALLOW_DUPLICATES = preferencesKey<Boolean>("allow_duplicates")
-    val GO_TO_NOW_PLAYING = preferencesKey<Boolean>("go_to_now_playing")
-    val IGNORE_SMALL_FILES = preferencesKey<Boolean>("ignore_small_files")
-    val IGNORE_THRESHOLD = preferencesKey<Long>("ignore_threshold")
-    val LAST_SCAN_TIME = preferencesKey<Long>("last_scan_time")
-    val FADE_ON_PLAY_PAUSE = preferencesKey<Boolean>("fade_on_play_pause")
-    val PLAY_PAUSE_FADE_LENGTH = preferencesKey<Long>("play_pause_fade_length")
+    val ALLOW_DUPLICATES = KeyDefault(preferencesKey("allow_duplicates"), false)
+    val GO_TO_NOW_PLAYING = KeyDefault(preferencesKey("go_to_now_playing"), true)
+    val IGNORE_SMALL_FILES = KeyDefault(preferencesKey("ignore_small_files"), false)
+    val IGNORE_THRESHOLD = KeyDefault(preferencesKey("ignore_threshold"), Millis.ZERO.value)
+    val LAST_SCAN_TIME = KeyDefault(preferencesKey("last_scan_time"), Millis.ZERO.value)
+    val FADE_ON_PLAY_PAUSE = KeyDefault(preferencesKey("fade_on_play_pause"), false)
+    val PLAY_PAUSE_FADE_LENGTH =
+      KeyDefault(preferencesKey("play_pause_fade_length"), DEFAULT_PLAY_PAUSE_FADE_LENGTH)
+    val SCROBBLER =
+      KeyDefault(preferencesKey("selected_scrobbler"), ScrobblerPackage.None.id)
   }
 
-  override fun allowDuplicates(): Boolean = state.value[ALLOW_DUPLICATES, false]
+  override fun allowDuplicates(): Boolean =
+    state.value[ALLOW_DUPLICATES.key, ALLOW_DUPLICATES.defaultValue]
+
   override suspend fun allowDuplicates(value: Boolean): Boolean =
-    dataStore.set(ALLOW_DUPLICATES, value)
+    dataStore.set(ALLOW_DUPLICATES.key, value)
 
-  override fun goToNowPlaying(): Boolean = state.value[GO_TO_NOW_PLAYING, true]
+  override fun goToNowPlaying(): Boolean =
+    state.value[GO_TO_NOW_PLAYING.key, GO_TO_NOW_PLAYING.defaultValue]
+
   override suspend fun goToNowPlaying(value: Boolean): Boolean =
-    dataStore.set(GO_TO_NOW_PLAYING, value)
+    dataStore.set(GO_TO_NOW_PLAYING.key, value)
 
-  override fun ignoreSmallFiles(): Boolean = state.value[IGNORE_SMALL_FILES, false]
+  override fun ignoreSmallFiles(): Boolean =
+    state.value[IGNORE_SMALL_FILES.key, IGNORE_SMALL_FILES.defaultValue]
+
   override suspend fun ignoreSmallFiles(value: Boolean): Boolean =
-    dataStore.set(IGNORE_SMALL_FILES, value)
+    dataStore.set(IGNORE_SMALL_FILES.key, value)
 
-  override fun ignoreThreshold(): Millis = state.value[IGNORE_THRESHOLD, 0].toMillis()
+  override fun ignoreThreshold(): Millis =
+    state.value[IGNORE_THRESHOLD.key, IGNORE_THRESHOLD.defaultValue].toMillis()
+
   override suspend fun ignoreThreshold(time: Millis): Boolean =
-    dataStore.set(IGNORE_THRESHOLD, time.value)
+    dataStore.set(IGNORE_THRESHOLD.key, time.value)
 
-  override fun lastScanTime(): Millis = state.value[LAST_SCAN_TIME, 0].toMillis()
+  override fun lastScanTime(): Millis =
+    state.value[LAST_SCAN_TIME.key, LAST_SCAN_TIME.defaultValue].toMillis()
+
   override suspend fun lastScanTime(time: Millis): Boolean =
-    dataStore.set(LAST_SCAN_TIME, time.value)
+    dataStore.set(LAST_SCAN_TIME.key, time.value)
 
-  override fun fadeOnPlayPause(): Boolean = state.value[FADE_ON_PLAY_PAUSE, false]
+  override fun fadeOnPlayPause(): Boolean =
+    state.value[FADE_ON_PLAY_PAUSE.key, FADE_ON_PLAY_PAUSE.defaultValue]
+
   override suspend fun fadeOnPlayPause(fade: Boolean): Boolean =
-    dataStore.set(FADE_ON_PLAY_PAUSE, fade)
+    dataStore.set(FADE_ON_PLAY_PAUSE.key, fade)
 
   override fun playPauseFadeLength(): Millis =
-    state.value[PLAY_PAUSE_FADE_LENGTH, DEFAULT_PLAY_PAUSE_FADE_LENGTH].toMillis()
+    state.value[PLAY_PAUSE_FADE_LENGTH.key, PLAY_PAUSE_FADE_LENGTH.defaultValue].toMillis()
+
   override suspend fun playPauseFadeLength(millis: Millis): Boolean =
-    dataStore.set(PLAY_PAUSE_FADE_LENGTH, millis.value)
+    dataStore.set(PLAY_PAUSE_FADE_LENGTH.key, millis.value)
+
+  override fun scrobbler(): ScrobblerPackage =
+    ScrobblerPackage.reify(state.value[SCROBBLER.key, SCROBBLER.defaultValue])
+
+  override suspend fun scrobbler(scrobblerPackage: ScrobblerPackage): Boolean =
+    dataStore.set(SCROBBLER.key, scrobblerPackage.id)
+
+  override fun scrobblerFlow(): Flow<ScrobblerPackage> = dataStore
+    .valueFlow(KeyDefault(SCROBBLER.key, scrobbler().id))
+    .map { ScrobblerPackage.reify(it) }
 }

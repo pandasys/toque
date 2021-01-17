@@ -22,11 +22,11 @@ import com.ealva.toque.common.contains
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.NullEqPresetDao
-import com.ealva.toque.media.EqPreset
-import com.ealva.toque.media.EqPreset.Companion.AMP_RANGE
-import com.ealva.toque.media.EqPreset.Companion.BAND_DEFAULT
-import com.ealva.toque.media.EqPreset.Companion.PRE_AMP_DEFAULT
-import com.ealva.toque.media.PreAmpAndBands
+import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.service.media.EqPreset.Companion.AMP_RANGE
+import com.ealva.toque.service.media.EqPreset.Companion.BAND_DEFAULT
+import com.ealva.toque.service.media.EqPreset.Companion.PRE_AMP_DEFAULT
+import com.ealva.toque.service.media.PreAmpAndBands
 import com.github.michaelbull.result.onFailure
 import org.videolan.libvlc.MediaPlayer
 

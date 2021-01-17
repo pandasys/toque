@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,19 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.player
+package com.ealva.toque.android.content
 
-interface PlayerFactory {
-  suspend fun make(): Player
+import android.content.Context
+import android.content.Intent
+
+interface IntentBroadcaster {
+  fun broadcast(intent: Intent)
+
+  companion object {
+    operator fun invoke(context: Context): IntentBroadcaster = ContextIntentBroadcaster(context)
+  }
+}
+
+private class ContextIntentBroadcaster(private val context: Context) : IntentBroadcaster {
+  override fun broadcast(intent: Intent) { context.sendBroadcast(intent) }
 }

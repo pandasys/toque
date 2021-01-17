@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,21 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.media
+package com.ealva.toque.service.queue
 
-import android.net.Uri
-import com.ealva.toque.tag.ArtistParser
+import com.ealva.toque.common.Volume
+import com.ealva.toque.common.VolumeRange
 
-interface MediaMetadataParser {
-  fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaMetadata
-}
+interface StreamVolume {
+  /** Is the volume fixed (not adjustable) */
+  val volumeIsFixed: Boolean
 
-interface MediaMetadataParserFactory {
-  suspend fun make(): MediaMetadataParser
+  /** Min to max volume range for this stream */
+  val volumeRange: VolumeRange
+
+  /**
+   * The current stream volume. Setting a value outside [volumeRange] clamps to that range, so a
+   * resulting get may differ from a previous set if it was outside the range.
+   */
+  var streamVolume: Volume
 }

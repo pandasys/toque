@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.media
+package com.ealva.toque.service.media
 
 import com.ealva.toque.db.AlbumId
 import com.ealva.toque.db.DaoMessage

@@ -20,8 +20,8 @@ import android.content.Context
 import android.webkit.MimeTypeMap
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.media.FileExtensions
-import com.ealva.toque.media.MediaFormat
+import com.ealva.toque.service.media.FileExtensions
+import com.ealva.toque.service.media.MediaFormat
 import com.nhaarman.expect.expect
 import it.unimi.dsi.fastutil.ints.IntAVLTreeSet
 import it.unimi.dsi.fastutil.objects.ObjectAVLTreeSet

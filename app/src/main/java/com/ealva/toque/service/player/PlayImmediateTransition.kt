@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,21 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.media
+package com.ealva.toque.service.player
 
-import android.net.Uri
-import com.ealva.toque.db.AlbumId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.common.Volume
+import com.ealva.toque.service.player.PlayerTransition.Type
 
-interface MediaFactory {
-  suspend fun makeAudio(location: Uri, mediaId: MediaId, albumId: AlbumId): Media
+/**
+ * Do immediate play with no fade
+ */
+class PlayImmediateTransition : BasePlayerTransition(Type.Play) {
+  override suspend fun doExecute(player: TransitionPlayer) {
+    player.play()
+    player.volume = Volume.ONE_HUNDRED
+    player.notifyPlaying()
+    setComplete()
+  }
+
+  override fun toString(): String = "PlayImmediate"
 }

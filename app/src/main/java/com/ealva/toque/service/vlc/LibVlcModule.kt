@@ -16,9 +16,9 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.toque.media.EqPresetFactory
-import com.ealva.toque.media.MediaFactory
-import com.ealva.toque.media.MediaMetadataParserFactory
+import com.ealva.toque.service.media.EqPresetFactory
+import com.ealva.toque.service.media.MediaFactory
+import com.ealva.toque.service.media.MediaMetadataParserFactory
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -31,6 +31,7 @@ object LibVlcModule {
       VlcMediaMetadataParserFactory(get())
     }
     single { VlcPresetFactory(androidContext(), get(), get(), get()) } bind EqPresetFactory::class
-    single<MediaFactory> { VlcMediaFactory(get(), get(), get()) }
+    single { VlcPlayerFactory(androidContext(), get()) }
+    single<MediaFactory> { VlcMediaFactory(get(), get(), get(), get()) }
   }
 }

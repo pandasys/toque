@@ -147,6 +147,7 @@ dependencies {
     exclude("junit", "junit")
   }
   testImplementation(TestingLib.EXPECT)
+  testImplementation(TestingLib.MOCKK)
   testImplementation(TestingLib.ROBOLECTRIC)
   testImplementation(TestingLib.COROUTINE_TEST)
   testImplementation(ThirdParty.KOIN_TEST)

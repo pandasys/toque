@@ -16,7 +16,7 @@
 
 package com.ealva.toque.tag
 
-import com.ealva.toque.media.MediaFormat
+import com.ealva.toque.service.media.MediaFormat
 import ealvatag.tag.images.Artwork
 import ealvatag.tag.reference.PictureTypes
 

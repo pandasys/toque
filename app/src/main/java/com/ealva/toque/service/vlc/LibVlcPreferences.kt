@@ -24,7 +24,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.coerceIn
+import com.ealva.toque.common.MillisRange
 import com.ealva.toque.common.toAmp
 import com.ealva.toque.common.toMillis
 import com.ealva.toque.prefs.get
@@ -130,7 +130,7 @@ interface LibVlcPreferences {
 
   companion object {
     const val DEFAULT_NETWORK_CACHING = 1000L
-    val NETWORK_CACHING_RANGE: LongRange = 0L..60000L
+    val NETWORK_CACHING_RANGE: MillisRange = Millis.ZERO..Millis.ONE_MINUTE
     const val SUB_AUTODETECT_PATHS = "./Subtitles, ./subtitles, ./Subs, ./subs"
   }
 }

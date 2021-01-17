@@ -27,13 +27,13 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.ealvalog.w
 import com.ealva.toque.common.debug
-import com.ealva.toque.media.MediaFormat
-import com.ealva.toque.media.MediaType
-import com.ealva.toque.media.Mp3Rating
-import com.ealva.toque.media.STAR_NO_RATING
-import com.ealva.toque.media.StarRating
-import com.ealva.toque.media.toMp3Rating
-import com.ealva.toque.media.toRating
+import com.ealva.toque.service.media.MediaFormat
+import com.ealva.toque.service.media.MediaType
+import com.ealva.toque.service.media.Mp3Rating
+import com.ealva.toque.service.media.STAR_NO_RATING
+import com.ealva.toque.service.media.StarRating
+import com.ealva.toque.service.media.toMp3Rating
+import com.ealva.toque.service.media.toRating
 import com.google.common.base.Optional
 import com.google.common.base.Splitter
 import com.google.common.cache.CacheBuilder
@@ -147,8 +147,6 @@ val UNKNOWN_SINGLETON = listOf(SongTag.UNKNOWN)
  *  - ReleaseMbid = Album
  *  - TrackMbid
  *  - ReleaseGroupMbid
- *
- * Created by Eric on 6/15/2015.
  */
 class SongTag(
   file: File,

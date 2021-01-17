@@ -32,13 +32,12 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.toMillis
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
-import com.ealva.toque.file.isNetworkScheme
 import com.ealva.toque.log._e
-import com.ealva.toque.media.MediaMetadata
-import com.ealva.toque.media.MediaMetadataParser
-import com.ealva.toque.media.MediaMetadataParserFactory
-import com.ealva.toque.media.STAR_NO_RATING
-import com.ealva.toque.media.StarRating
+import com.ealva.toque.service.media.MediaMetadata
+import com.ealva.toque.service.media.MediaMetadataParser
+import com.ealva.toque.service.media.MediaMetadataParserFactory
+import com.ealva.toque.service.media.STAR_NO_RATING
+import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.tag.ArtistParser
 import com.ealva.toque.tag.SongTag
 import com.ealva.toque.tag.toAlbumSort
@@ -46,8 +45,6 @@ import com.ealva.toque.tag.toArtistSort
 import com.ealva.toque.tag.toTitleSort
 import ealvatag.audio.SupportedFileFormat
 import org.videolan.libvlc.interfaces.IMedia
-import org.videolan.libvlc.interfaces.IMedia.Parse.ParseLocal
-import org.videolan.libvlc.interfaces.IMedia.Parse.ParseNetwork
 import java.io.File
 import kotlin.math.min
 
@@ -277,9 +274,7 @@ private class VlcMediaMetadata private constructor(
       artistParser: ArtistParser
     ): MediaMetadata {
       return VlcMediaMetadata(
-        libVlc.makeNativeMedia(uri).apply {
-          if (!isParsed) parse(if (uri.isNetworkScheme()) ParseNetwork else ParseLocal)
-        },
+        libVlc.makeNativeMedia(uri).apply { if (!isParsed) parse(VlcMedia.parseFlagFromUri(uri)) },
         artistParser
       )
     }

@@ -18,10 +18,14 @@ package com.ealva.toque.service.vlc
 
 import android.net.Uri
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.toMillis
 import com.ealva.toque.db.AlbumId
 import com.ealva.toque.db.MediaId
-import com.ealva.toque.media.Media
-import com.ealva.toque.media.MediaEvent
+import com.ealva.toque.file.isNetworkScheme
+import com.ealva.toque.service.media.Media
+import com.ealva.toque.service.media.MediaEvent
+import com.ealva.toque.service.player.PlayerTransition
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.videolan.libvlc.interfaces.IMedia
@@ -29,35 +33,53 @@ import org.videolan.libvlc.interfaces.IMedia
 private val LOG by lazyLogger(VlcMedia::class)
 
 class VlcMedia(
-  private val libVlc: LibVlc,
   val media: IMedia,
   val uri: Uri,
-  val mediaId: MediaId,
-  val albumId: AlbumId,
-  private val presetSelector: EqPresetSelector
+  private val mediaId: MediaId,
+  private val albumId: AlbumId,
+  private val presetSelector: EqPresetSelector,
+  private val vlcPlayerFactory: VlcPlayerFactory,
+  private val dispatcher: CoroutineDispatcher
 ) : Media {
+  private val duration = media.duration.toMillis()
   private val mutableEventFlow = MutableSharedFlow<MediaEvent>()
-  private var player: VlcPlayer? = null
+  private var player: VlcPlayer = NullVlcPlayer
 
   override val eventFlow: Flow<MediaEvent>
     get() = mutableEventFlow
 
-  override fun close() {
-    player?.release()
+  fun release() {
+    player.shutdown()
     media.release()
   }
 
-/*
-  suspend fun prepareSeekMaybePlay(
-    startOnPrepared: Boolean,
-    position: Long,
-    presetSelector: EqPresetSelector,
-//    onPreparedTransition: PlayerTransition
-  ) {
-    player = makePlayer()
+  override suspend fun prepareAndPlay(onPreparedTransition: PlayerTransition) {
+    player = makePlayer(onPreparedTransition)
   }
-*/
 
-  private suspend fun makePlayer(): VlcPlayer =
-    VlcPlayer.make(libVlc, this, presetSelector.getPreferredEqPreset(mediaId, albumId))
+  private suspend fun makePlayer(onPreparedTransition: PlayerTransition): VlcPlayer =
+    vlcPlayerFactory.make(
+      this,
+      presetSelector.getPreferredEqPreset(mediaId, albumId),
+      onPreparedTransition,
+      duration,
+      dispatcher
+    )
+
+  companion object {
+    fun parseFlagFromUri(uri: Uri): Int =
+      if (uri.isNetworkScheme()) PARSE_NETWORK else PARSE_LOCAL
+
+    /** Parse metadata if the file is local. Doesn't bother with artwork */
+    const val PARSE_LOCAL = IMedia.Parse.ParseLocal
+
+    /** Parse metadata even if over a network connection. Doesn't bother with artwork */
+    const val PARSE_NETWORK = IMedia.Parse.ParseNetwork
+
+    /** Parse metadata and fetch artwork if the file is local */
+    const val PARSE_WITH_ART_LOCAL = IMedia.Parse.FetchLocal
+
+    /** Parse metadata and fetch artwork even if over a network connection */
+    const val PARSE_WITH_ART_NETWORK = IMedia.Parse.FetchNetwork
+  }
 }
