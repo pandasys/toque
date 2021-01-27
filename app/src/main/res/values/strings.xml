@@ -62,4 +62,14 @@
   <string name="FailedToInsertItem">Failed to insert %s</string>
   <string name="FailedToUpdateItem">Failed to update %s</string>
   <string name="FailedToDeleteItem">Failed to delete %s</string>
+  <string name="ShuffleNone">Shuffle none</string>
+  <string name="ShuffleMedia">Shuffle media</string>
+  <string name="ShuffleLists">Shuffle lists</string>
+  <string name="ShuffleMediaAndLists">Shuffle media and lists</string>
+    <string name="Duck">Duck</string>
+  <string name="Pause">Pause</string>
+  <string name="DoNothing">Do Nothing</string>
+  <string name="Speaker">Speaker</string>
+  <string name="HeadphoneJack">Headphone Jack</string>
+  <string name="Bluetooth">Bluetooth</string>
 </resources>

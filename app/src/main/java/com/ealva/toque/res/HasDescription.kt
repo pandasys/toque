@@ -16,12 +16,17 @@
 
 package com.ealva.toque.res
 
-import android.content.res.Resources
+import android.content.Context
 import com.ealva.toque.app.Toque
 
 interface HasDescription {
-  fun description(resources: Resources): String
+  /** The [com.ealva.toque.R.string] string resource */
+  val stringRes: Int
+
+  /** Loads [stringRes] from [context] */
+  fun description(context: Context): String = context.getString(stringRes)
 }
 
-val HasDescription.description: String
-  get() = description(Toque.appContext.resources)
+/** Use the global application context to get the description */
+inline val HasDescription.description: String
+  get() = description(Toque.appContext)

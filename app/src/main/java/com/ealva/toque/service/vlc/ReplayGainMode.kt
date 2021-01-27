@@ -16,7 +16,6 @@
 
 package com.ealva.toque.service.vlc
 
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -25,17 +24,13 @@ import com.ealva.toque.res.HasDescription
 enum class ReplayGainMode(
   override val id: Int,
   private val value: String,
-  @StringRes private val stringRes: Int
+  @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
   None(1, "none", R.string.None),
   Track(2, "track", R.string.Track),
   Album(3, "album", R.string.Album);
 
   override fun toString(): String = value
-
-  override fun description(resources: Resources): String {
-    return resources.getString(stringRes)
-  }
 
   companion object {
     val DEFAULT = None

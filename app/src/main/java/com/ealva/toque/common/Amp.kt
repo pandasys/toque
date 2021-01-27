@@ -25,11 +25,16 @@ inline operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean 
   contains(amp.value)
 
 /** Represents Amplitude */
-inline class Amp(val value: Float) {
+inline class Amp(val value: Float) : Comparable<Amp> {
+  override fun compareTo(other: Amp): Int = value.compareTo(other.value)
   override fun toString(): String = value.toString()
+
+  companion object {
+    val ZERO = 0.toAmp()
+    val TWELVE = 12.toAmp()
+  }
 }
 
-inline operator fun Amp.compareTo(rhs: Amp): Int = value.compareTo(rhs.value)
 inline operator fun Amp.compareTo(rhs: Float): Int = value.compareTo(rhs)
 
 inline operator fun Amp.plus(rhs: Amp): Amp = (value + rhs.value).toAmp()

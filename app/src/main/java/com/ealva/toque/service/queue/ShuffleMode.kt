@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,37 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.audio
+package com.ealva.toque.service.queue
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.persist.reifyRequire
 import com.ealva.toque.res.HasDescription
 
-@Suppress("NOTHING_TO_INLINE")
-inline fun Long.toAudioOutputRoute(): AudioOutputRoute =
-  AudioOutputRoute::class.reifyRequire(this.toInt())
-
-inline val AudioOutputRoute.longId: Long
-  get() = id.toLong()
-
-enum class AudioOutputRoute(
+/**
+ * Describes the state of "shuffle"
+ */
+enum class ShuffleMode(
   override val id: Int,
+  /** Should the media in a list be randomly shuffled */
+  val shuffleMedia: Boolean,
+  /** Should list selection be random */
+  val shuffleLists: Boolean,
   @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
-  /** Audio is being output via the device's built-in speakers */
-  Speaker(1, R.string.Speaker),
+  None(1, false, false, R.string.ShuffleNone),
+  Media(2, true, false, R.string.ShuffleMedia),
+  Lists(3, false, true, R.string.ShuffleLists),
+  MediaAndLists(4, true, true, R.string.ShuffleMediaAndLists);
 
-  /** Audio is being output via the device's headphone jack */
-  HeadphoneJack(2, R.string.HeadphoneJack),
-
-  /** Audio is being output via a Bluetooth connection */
-  Bluetooth(3, R.string.Bluetooth);
+  /**
+   * This function is useful when the user presses a "shuffle" button and the value needs to be
+   * rotated to the next.
+   */
+  fun getNext(): ShuffleMode = when (this) {
+    None -> Media
+    Media -> Lists
+    Lists -> MediaAndLists
+    MediaAndLists -> None
+  }
 }

@@ -20,8 +20,12 @@ import com.ealva.brainzsvc.common.AlbumName
 import com.ealva.brainzsvc.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
+import com.ealva.toque.db.HasId
+import com.ealva.toque.db.MediaId
 
-interface QueueMediaItem {
+interface QueueMediaItem : HasId {
+  override val id: MediaId
+
   val isValid: Boolean
 
   val title: Title
@@ -40,6 +44,12 @@ interface QueueMediaItem {
 }
 
 object NullQueueMediaItem : QueueMediaItem {
+  override val id: MediaId
+    get() = MediaId.INVALID
+
+  override val instanceId: Long
+    get() = id.id
+
   override val isValid: Boolean
     get() = false
 

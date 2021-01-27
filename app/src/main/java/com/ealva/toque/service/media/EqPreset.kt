@@ -131,7 +131,7 @@ interface EqPreset {
     val MAX_AMP = 20F.toAmp()
     @Suppress("MemberVisibilityCanBePrivate")
     val MIN_AMP = (-20F).toAmp()
-    val AMP_RANGE: ClosedFloatingPointRange<Float> = MIN_AMP.value..MAX_AMP.value
+    val AMP_RANGE = MIN_AMP..MAX_AMP
     val PRE_AMP_DEFAULT = 12F.toAmp()
     val BAND_DEFAULT = 0F.toAmp()
   }

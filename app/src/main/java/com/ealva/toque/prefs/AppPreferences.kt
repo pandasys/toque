@@ -19,11 +19,18 @@ package com.ealva.toque.prefs
 import android.content.Context
 import androidx.datastore.DataStore
 import androidx.datastore.preferences.Preferences
-import androidx.datastore.preferences.preferencesKey
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Volume
 import com.ealva.toque.common.toMillis
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_PLAY_PAUSE_FADE_LENGTH
+import com.ealva.toque.common.toVolume
+import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_DUCK_VOLUME
+import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_IGNORE_THRESHOLD
+import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_PLAY_PAUSE_FADE
+import com.ealva.toque.prefs.AppPreferences.Companion.DUCK_VOLUME_RANGE
+import com.ealva.toque.prefs.AppPreferences.Companion.PLAY_PAUSE_FADE_RANGE
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.ALLOW_DUPLICATES
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.DUCK_ACTION
+import com.ealva.toque.prefs.AppPreferencesImpl.Keys.DUCK_VOLUME
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.FADE_ON_PLAY_PAUSE
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.GO_TO_NOW_PLAYING
 import com.ealva.toque.prefs.AppPreferencesImpl.Keys.IGNORE_SMALL_FILES
@@ -62,9 +69,19 @@ interface AppPreferences {
   fun scrobbler(): ScrobblerPackage
   suspend fun scrobbler(scrobblerPackage: ScrobblerPackage): Boolean
   fun scrobblerFlow(): Flow<ScrobblerPackage>
+  fun duckAction(): DuckAction
+  suspend fun duckAction(action: DuckAction): Boolean
+  fun duckVolume(): Volume
+  suspend fun duckVolume(volume: Volume): Boolean
+
+  suspend fun resetAllToDefault()
 
   companion object {
-    const val DEFAULT_PLAY_PAUSE_FADE_LENGTH = 500L
+    val DEFAULT_IGNORE_THRESHOLD = Millis.ZERO
+    val DEFAULT_PLAY_PAUSE_FADE = 1000.toMillis()
+    val PLAY_PAUSE_FADE_RANGE = 500.toMillis()..2000.toMillis()
+    val DEFAULT_DUCK_VOLUME = 50.toVolume()
+    val DUCK_VOLUME_RANGE = Volume.ZERO..Volume.ONE_HUNDRED
   }
 }
 
@@ -112,67 +129,82 @@ private class AppPreferencesImpl(
   private val state: StateFlow<Preferences>
 ) : AppPreferences {
   object Keys {
-    val ALLOW_DUPLICATES = KeyDefault(preferencesKey("allow_duplicates"), false)
-    val GO_TO_NOW_PLAYING = KeyDefault(preferencesKey("go_to_now_playing"), true)
-    val IGNORE_SMALL_FILES = KeyDefault(preferencesKey("ignore_small_files"), false)
-    val IGNORE_THRESHOLD = KeyDefault(preferencesKey("ignore_threshold"), Millis.ZERO.value)
-    val LAST_SCAN_TIME = KeyDefault(preferencesKey("last_scan_time"), Millis.ZERO.value)
-    val FADE_ON_PLAY_PAUSE = KeyDefault(preferencesKey("fade_on_play_pause"), false)
+    val ALLOW_DUPLICATES = KeyDefault("allow_duplicates", false)
+    val GO_TO_NOW_PLAYING = KeyDefault("go_to_now_playing", true)
+    val IGNORE_SMALL_FILES = KeyDefault("ignore_small_files", false)
+    val IGNORE_THRESHOLD =
+      KeyDefault("ignore_threshold", DEFAULT_IGNORE_THRESHOLD, ::Millis, { it.value })
+    val LAST_SCAN_TIME =
+      KeyDefault("last_scan_time", Millis.ZERO, ::Millis, { it.value })
+    val FADE_ON_PLAY_PAUSE = KeyDefault("fade_on_play_pause", false)
     val PLAY_PAUSE_FADE_LENGTH =
-      KeyDefault(preferencesKey("play_pause_fade_length"), DEFAULT_PLAY_PAUSE_FADE_LENGTH)
-    val SCROBBLER =
-      KeyDefault(preferencesKey("selected_scrobbler"), ScrobblerPackage.None.id)
+      KeyDefault("play_pause_fade_length", DEFAULT_PLAY_PAUSE_FADE, ::Millis, { it.value })
+    val SCROBBLER = EnumKeyDefault(ScrobblerPackage.None)
+    val DUCK_ACTION = EnumKeyDefault(DuckAction.Duck)
+    val DUCK_VOLUME =
+      KeyDefault("duck_volume", DEFAULT_DUCK_VOLUME, ::Volume, { it.value })
   }
 
-  override fun allowDuplicates(): Boolean =
-    state.value[ALLOW_DUPLICATES.key, ALLOW_DUPLICATES.defaultValue]
-
+  override fun allowDuplicates(): Boolean = state.value[ALLOW_DUPLICATES]
   override suspend fun allowDuplicates(value: Boolean): Boolean =
-    dataStore.set(ALLOW_DUPLICATES.key, value)
+    dataStore.set(ALLOW_DUPLICATES, value)
 
-  override fun goToNowPlaying(): Boolean =
-    state.value[GO_TO_NOW_PLAYING.key, GO_TO_NOW_PLAYING.defaultValue]
-
+  override fun goToNowPlaying(): Boolean = state.value[GO_TO_NOW_PLAYING]
   override suspend fun goToNowPlaying(value: Boolean): Boolean =
-    dataStore.set(GO_TO_NOW_PLAYING.key, value)
+    dataStore.set(GO_TO_NOW_PLAYING, value)
 
-  override fun ignoreSmallFiles(): Boolean =
-    state.value[IGNORE_SMALL_FILES.key, IGNORE_SMALL_FILES.defaultValue]
-
+  override fun ignoreSmallFiles(): Boolean = state.value[IGNORE_SMALL_FILES]
   override suspend fun ignoreSmallFiles(value: Boolean): Boolean =
-    dataStore.set(IGNORE_SMALL_FILES.key, value)
+    dataStore.set(IGNORE_SMALL_FILES, value)
 
-  override fun ignoreThreshold(): Millis =
-    state.value[IGNORE_THRESHOLD.key, IGNORE_THRESHOLD.defaultValue].toMillis()
-
+  override fun ignoreThreshold(): Millis = state.value[IGNORE_THRESHOLD]
   override suspend fun ignoreThreshold(time: Millis): Boolean =
-    dataStore.set(IGNORE_THRESHOLD.key, time.value)
+    dataStore.set(IGNORE_THRESHOLD, time.coerceAtLeast(Millis.ZERO))
 
-  override fun lastScanTime(): Millis =
-    state.value[LAST_SCAN_TIME.key, LAST_SCAN_TIME.defaultValue].toMillis()
-
+  override fun lastScanTime(): Millis = state.value[LAST_SCAN_TIME]
   override suspend fun lastScanTime(time: Millis): Boolean =
-    dataStore.set(LAST_SCAN_TIME.key, time.value)
+    dataStore.set(LAST_SCAN_TIME, time)
 
-  override fun fadeOnPlayPause(): Boolean =
-    state.value[FADE_ON_PLAY_PAUSE.key, FADE_ON_PLAY_PAUSE.defaultValue]
-
+  override fun fadeOnPlayPause(): Boolean = state.value[FADE_ON_PLAY_PAUSE]
   override suspend fun fadeOnPlayPause(fade: Boolean): Boolean =
-    dataStore.set(FADE_ON_PLAY_PAUSE.key, fade)
+    dataStore.set(FADE_ON_PLAY_PAUSE, fade)
 
-  override fun playPauseFadeLength(): Millis =
-    state.value[PLAY_PAUSE_FADE_LENGTH.key, PLAY_PAUSE_FADE_LENGTH.defaultValue].toMillis()
-
+  override fun playPauseFadeLength(): Millis = state.value[PLAY_PAUSE_FADE_LENGTH]
   override suspend fun playPauseFadeLength(millis: Millis): Boolean =
-    dataStore.set(PLAY_PAUSE_FADE_LENGTH.key, millis.value)
+    dataStore.set(PLAY_PAUSE_FADE_LENGTH, millis.coerceIn(PLAY_PAUSE_FADE_RANGE))
 
-  override fun scrobbler(): ScrobblerPackage =
-    ScrobblerPackage.reify(state.value[SCROBBLER.key, SCROBBLER.defaultValue])
-
+  override fun scrobbler(): ScrobblerPackage = state.value[SCROBBLER]
   override suspend fun scrobbler(scrobblerPackage: ScrobblerPackage): Boolean =
-    dataStore.set(SCROBBLER.key, scrobblerPackage.id)
+    dataStore.set(SCROBBLER, scrobblerPackage)
 
   override fun scrobblerFlow(): Flow<ScrobblerPackage> = dataStore
     .valueFlow(KeyDefault(SCROBBLER.key, scrobbler().id))
-    .map { ScrobblerPackage.reify(it) }
+    .map { id -> id.toScrobblerPackage() }
+
+  override fun duckAction(): DuckAction = state.value[DUCK_ACTION]
+  override suspend fun duckAction(action: DuckAction): Boolean =
+    dataStore.set(DUCK_ACTION, action)
+
+  override fun duckVolume(): Volume = state.value[DUCK_VOLUME]
+  override suspend fun duckVolume(volume: Volume): Boolean =
+    dataStore.set(DUCK_VOLUME, volume.coerceIn(DUCK_VOLUME_RANGE))
+
+  override suspend fun resetAllToDefault() {
+    dataStore.put {
+      this[ALLOW_DUPLICATES.key] = ALLOW_DUPLICATES.realToStored(ALLOW_DUPLICATES.defaultValue)
+      this[GO_TO_NOW_PLAYING.key] = GO_TO_NOW_PLAYING.realToStored(GO_TO_NOW_PLAYING.defaultValue)
+      this[IGNORE_SMALL_FILES.key] =
+        IGNORE_SMALL_FILES.realToStored(IGNORE_SMALL_FILES.defaultValue)
+      this[IGNORE_THRESHOLD.key] = IGNORE_THRESHOLD.realToStored(IGNORE_THRESHOLD.defaultValue)
+      // Don't reset last scan time
+      // this[LAST_SCAN_TIME.key] = LAST_SCAN_TIME.realToStored(LAST_SCAN_TIME.defaultValue)
+      this[FADE_ON_PLAY_PAUSE.key] =
+        FADE_ON_PLAY_PAUSE.realToStored(FADE_ON_PLAY_PAUSE.defaultValue)
+      this[PLAY_PAUSE_FADE_LENGTH.key] =
+        PLAY_PAUSE_FADE_LENGTH.realToStored(PLAY_PAUSE_FADE_LENGTH.defaultValue)
+      this[SCROBBLER.key] = SCROBBLER.realToStored(SCROBBLER.defaultValue)
+      this[DUCK_ACTION.key] = DUCK_ACTION.realToStored(DUCK_ACTION.defaultValue)
+      this[DUCK_VOLUME.key] = DUCK_VOLUME.realToStored(DUCK_VOLUME.defaultValue)
+    }
+  }
 }

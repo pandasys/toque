@@ -117,9 +117,9 @@ private fun ArrayList<String>.audioReplayGainMode(prefs: LibVlcPreferences) {
   add(PARM_GAIN_MODE)
   add(prefs.replayGainMode().toString())
   add(PARM_GAIN_PREAMP)
-  add(prefs.replayGainPreamp().toString())
+  add(prefs.replayPreamp().toString())
   add(PARM_GAIN_DEFAULT)
-  add(prefs.replayGainDefaultPreamp().toString())
+  add(prefs.defaultReplayGain().toString())
 }
 
 private fun ArrayList<String>.skipFrameAndIdctOptions(prefs: LibVlcPreferences) {

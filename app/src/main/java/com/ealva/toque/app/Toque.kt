@@ -54,6 +54,7 @@ interface Toque {
   fun restartApp(intent: Intent, context: Context)
 
   companion object {
+    /** Not valid until the [Application.onCreate] function is called */
     val appContext: Context
       get() = checkNotNull(ToqueImpl.appContext)
   }
@@ -122,6 +123,7 @@ class ToqueImpl : Application(), Toque {
   }
 
   companion object {
+    /** Set in Toque [onCreate] */
     var appContext: Context? = null
   }
 }

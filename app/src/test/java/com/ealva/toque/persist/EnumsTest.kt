@@ -19,12 +19,7 @@ package com.ealva.toque.persist
 import com.nhaarman.expect.expect
 import com.nhaarman.expect.fail
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
 class EnumsTest {
 
   @Test
@@ -89,6 +84,7 @@ class EnumsTest {
     ).toBe(TestEnum.First)
   }
 
+  @Test
   fun `test reify require`() {
     TestEnum.values().forEach { value ->
       expect(value.javaClass.reifyRequire(value.id)).toBe(value)
@@ -107,26 +103,20 @@ class EnumsTest {
   }
 }
 
-enum class TestEnum(override val id: Int) :
-  HasConstId {
+enum class TestEnum(override val id: Int) : HasConstId {
   First(1),
   Second(2),
   Third(3),
   Fourth(4);
 
-  override fun toString(): String {
-    return "$name($id)"
-  }
+  override fun toString(): String = "$name($id)"
 }
 
-enum class GenSparse(override val id: Int) :
-  HasConstId {
+enum class GenSparse(override val id: Int) : HasConstId {
   First(Int.MIN_VALUE),
   Second(-1),
   Third(Int.MAX_VALUE),
   Fourth(0);
 
-  override fun toString(): String {
-    return "$name($id)"
-  }
+  override fun toString(): String = "$name($id)"
 }

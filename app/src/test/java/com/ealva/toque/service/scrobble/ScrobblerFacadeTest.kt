@@ -16,39 +16,29 @@
 
 package com.ealva.toque.service.scrobble
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
-import com.ealva.toque.prefs.AppPreferences
 import com.ealva.toque.prefs.ScrobblerPackage
 import com.ealva.toque.service.queue.QueueMediaItemFake
+import com.ealva.toque.test.prefs.AppPreferencesStub
 import com.ealva.toque.test.service.scrobbler.ScrobblerFactoryStub
 import com.ealva.toque.test.service.scrobbler.ScrobblerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flow
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
-@RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScrobblerFacadeTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
-  private lateinit var appCtx: Context
-  private lateinit var prefs: AppPreferences
+  private lateinit var prefs: AppPreferencesStub
 
   @Before
-  fun init() {
-    appCtx = ApplicationProvider.getApplicationContext()
-    prefs = mockk()
+  fun setup() {
+    prefs = AppPreferencesStub()
   }
 
   @Test
@@ -58,9 +48,11 @@ class ScrobblerFacadeTest {
     val factory = ScrobblerFactoryStub()
     factory._makeReturns = mutableListOf(scrobbler)
     factory._makeReturns
-    every { prefs.scrobbler() } returns ScrobblerPackage.LastFm
-    every { prefs.scrobblerFlow() } returns flow { emit(ScrobblerPackage.LastFm) }
-    val facade = ScrobblerFacade(appCtx, prefs, factory, coroutineRule.testDispatcher)
+
+    prefs._scrobblerItems = mutableListOf(ScrobblerPackage.LastFm)
+    val flow = MutableStateFlow(ScrobblerPackage.LastFm)
+    prefs._scrobblerFlow = flow
+    val facade = ScrobblerFacade(prefs, factory, coroutineRule.testDispatcher)
     facade.start(item)
     facade.pause(item)
     facade.resume(item)
@@ -88,10 +80,10 @@ class ScrobblerFacadeTest {
     val scrobbler2 = ScrobblerStub()
     val factory = ScrobblerFactoryStub()
     factory._makeReturns = mutableListOf(scrobbler1, scrobbler2)
-    every { prefs.scrobbler() } returns ScrobblerPackage.LastFm
+    prefs._scrobblerItems = mutableListOf(ScrobblerPackage.LastFm)
     val flow = MutableStateFlow(ScrobblerPackage.LastFm)
-    every { prefs.scrobblerFlow() } returns flow
-    val facade = ScrobblerFacade(appCtx, prefs, factory, coroutineRule.testDispatcher)
+    prefs._scrobblerFlow = flow
+    val facade = ScrobblerFacade(prefs, factory, coroutineRule.testDispatcher)
     facade.start(item)
 
     expect(scrobbler1._startCalled).toBe(1)
@@ -121,10 +113,10 @@ class ScrobblerFacadeTest {
     val factory = ScrobblerFactoryStub()
     // Set factory to return 2 scrobbler instances, but should not be called to produce 2nd
     factory._makeReturns = mutableListOf(scrobbler1, scrobbler2)
-    every { prefs.scrobbler() } returns ScrobblerPackage.LastFm
+    prefs._scrobblerItems = mutableListOf(ScrobblerPackage.LastFm)
     val flow = MutableStateFlow(ScrobblerPackage.LastFm)
-    every { prefs.scrobblerFlow() } returns flow
-    val facade = ScrobblerFacade(appCtx, prefs, factory, coroutineRule.testDispatcher)
+    prefs._scrobblerFlow = flow
+    val facade = ScrobblerFacade(prefs, factory, coroutineRule.testDispatcher)
     facade.start(item)
 
     expect(scrobbler1._startCalled).toBe(1)

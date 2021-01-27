@@ -16,7 +16,6 @@
 
 package com.ealva.toque.audio
 
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -25,9 +24,9 @@ import org.videolan.libvlc.util.HWDecoderUtil
 
 enum class AudioOutputModule(
   override val id: Int,
-  val module: String,
+  private val module: String,
   private val hardwareOutput: HWDecoderUtil.AudioOutput,
-  @StringRes private val stringRes: Int
+  @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
   OpenSlEs(
     1,
@@ -42,9 +41,7 @@ enum class AudioOutputModule(
     R.string.AudioTrack
   );
 
-  override fun description(resources: Resources): String {
-    return resources.getString(stringRes)
-  }
+  override fun toString(): String = module
 
   companion object {
     val DEFAULT = select(OpenSlEs)

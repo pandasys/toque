@@ -16,7 +16,6 @@
 
 package com.ealva.toque.audio
 
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -24,14 +23,12 @@ import com.ealva.toque.res.HasDescription
 
 enum class AudioOutputDevice(
   override val id: Int,
-  val deviceId: String,
-  @StringRes private val stringRes: Int
+  private val deviceId: String,
+  @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
-  MONO(1, "mono", R.string.Mono),
-  STEREO(2, "stereo", R.string.Stereo),
+  Mono(1, "mono", R.string.Mono),
+  Stereo(2, "stereo", R.string.Stereo),
   HDMI(3, "hdmi", R.string.HDMI);
 
-  override fun description(resources: Resources): String {
-    return resources.getString(stringRes)
-  }
+  override fun toString(): String = deviceId
 }

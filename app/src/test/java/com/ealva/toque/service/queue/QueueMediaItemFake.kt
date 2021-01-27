@@ -20,8 +20,12 @@ import com.ealva.brainzsvc.common.AlbumName
 import com.ealva.brainzsvc.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
+import com.ealva.toque.db.MediaId
+import com.ealva.toque.db.toMediaId
 
 class QueueMediaItemFake(
+  override val id: MediaId = 1.toMediaId(),
+  override val instanceId: Long = 1,
   override var isValid: Boolean = true,
   override var title: Title = Title.UNKNOWN,
   override var albumName: AlbumName = AlbumName.UNKNOWN,

@@ -16,14 +16,17 @@
 
 package com.ealva.toque.prefs
 
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.toPackageName
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reify
+import com.ealva.toque.prefs.ScrobblerPackage.None
 import com.ealva.toque.res.HasDescription
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Int.toScrobblerPackage(): ScrobblerPackage = ScrobblerPackage::class.reify(this, None)
 
 /**
  * Don't change any enum instance [id] as it is persisted in the app preferences.
@@ -31,19 +34,13 @@ import com.ealva.toque.res.HasDescription
 enum class ScrobblerPackage(
   override val id: Int,
   val packageName: PackageName,
-  @StringRes private val stringRes: Int
+  @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
   None(0, PackageName.NONE, R.string.None),
   LastFm(1, "com.adam.aslfms".toPackageName(), R.string.LastFm),
   SimpleLastFm(2, "com.adam.aslfms".toPackageName(), R.string.SimpleLastFm);
 
-  override fun description(resources: Resources): String {
-    return resources.getString(stringRes)
-  }
-
   companion object {
-    fun reify(id: Int): ScrobblerPackage {
-      return ScrobblerPackage::class.reify(id, None)
-    }
+    val DEFAULT = None
   }
 }

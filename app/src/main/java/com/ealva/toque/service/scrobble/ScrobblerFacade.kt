@@ -16,7 +16,6 @@
 
 package com.ealva.toque.service.scrobble
 
-import android.content.Context
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
@@ -47,9 +46,8 @@ private val LOG by lazyLogger(ScrobblerFacade::class)
 interface ScrobblerFacade : Scrobbler {
   companion object {
     operator fun invoke(
-      context: Context,
       prefs: AppPreferences,
-      scrobblerFactory: ScrobblerFactory = ScrobblerFactory(context),
+      scrobblerFactory: ScrobblerFactory,
       dispatcher: CoroutineDispatcher = Dispatchers.IO
     ): Scrobbler {
       return ScrobblerFacadeImpl(prefs, scrobblerFactory, dispatcher)

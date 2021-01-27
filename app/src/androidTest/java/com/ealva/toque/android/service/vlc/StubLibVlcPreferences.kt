@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 @file:Suppress("MemberVisibilityCanBePrivate")
 
-package com.ealva.toque.android.prefs
+package com.ealva.toque.android.service.vlc
 
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.Millis
@@ -69,15 +69,15 @@ class StubLibVlcPreferences : LibVlcPreferences {
   }
 
   var replayGainPreamp = 0F.toAmp()
-  override fun replayGainPreamp(): Amp = replayGainPreamp
-  override suspend fun replayGainPreamp(preamp: Amp): Boolean {
+  override fun replayPreamp(): Amp = replayGainPreamp
+  override suspend fun replayPreamp(preamp: Amp): Boolean {
     replayGainPreamp = preamp
     return true
   }
 
   var replayGainDefaultPreamp = 0F.toAmp()
-  override fun replayGainDefaultPreamp(): Amp = replayGainDefaultPreamp
-  override suspend fun replayGainDefaultPreamp(preamp: Amp): Boolean {
+  override fun defaultReplayGain(): Amp = replayGainDefaultPreamp
+  override suspend fun defaultReplayGain(preamp: Amp): Boolean {
     replayGainDefaultPreamp = preamp
     return true
   }
@@ -110,10 +110,12 @@ class StubLibVlcPreferences : LibVlcPreferences {
     return true
   }
 
-  var hardwareAcceleration = HardwareAcceleration.AUTOMATIC
+  var hardwareAcceleration = HardwareAcceleration.Automatic
   override fun hardwareAcceleration(): HardwareAcceleration = hardwareAcceleration
   override suspend fun hardwareAcceleration(acceleration: HardwareAcceleration): Boolean {
     hardwareAcceleration = acceleration
     return true
   }
+
+  override suspend fun resetAllToDefault() = Unit
 }

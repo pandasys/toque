@@ -16,5 +16,17 @@
 
 package com.ealva.toque.service.queue
 
-interface PlayableMediaQueue {
+interface PlayableMediaQueue<T : QueueMediaItem> {
+
+  val isActive: Boolean
+
+  val currentItem: T
+
+  val currentItemIndex: Int
+
+  suspend fun getNextMediaTitle(): String
+
+  fun play(immediate: Boolean = false)
+
+  fun pause(immediate: Boolean = false)
 }

@@ -35,15 +35,20 @@ interface ScrobblerFactory {
   fun make(selectedScrobbler: ScrobblerPackage): Scrobbler
 
   companion object {
-    operator fun invoke(context: Context): ScrobblerFactory = ScrobblerFactoryImpl(context)
+    operator fun invoke(context: Context): ScrobblerFactory =
+      ScrobblerFactoryImpl(
+        context.getString(R.string.app_name),
+        context.packageName.toPackageName(),
+        IntentBroadcaster(context)
+      )
   }
 }
 
-private class ScrobblerFactoryImpl(context: Context) : ScrobblerFactory {
-  private val appName = context.getString(R.string.app_name)
-  private val appPkg: PackageName = context.packageName.toPackageName()
-  private val intentBroadcaster: IntentBroadcaster = IntentBroadcaster(context)
-
+private class ScrobblerFactoryImpl(
+  private val appName: String,
+  private val appPkg: PackageName,
+  private val intentBroadcaster: IntentBroadcaster
+) : ScrobblerFactory {
   override fun make(selectedScrobbler: ScrobblerPackage): Scrobbler {
     return when (selectedScrobbler) {
       ScrobblerPackage.SimpleLastFm -> SimpleLastFmScrobbler(appName, appPkg, intentBroadcaster)

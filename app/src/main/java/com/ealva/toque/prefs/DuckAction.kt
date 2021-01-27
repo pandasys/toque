@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,25 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.audio
+package com.ealva.toque.prefs
 
-import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.persist.reifyRequire
+import com.ealva.toque.persist.reify
 import com.ealva.toque.res.HasDescription
 
 @Suppress("NOTHING_TO_INLINE")
-inline fun Long.toAudioOutputRoute(): AudioOutputRoute =
-  AudioOutputRoute::class.reifyRequire(this.toInt())
+inline fun Int.toDuckAction(): DuckAction = DuckAction::class.reify(this, DuckAction.DEFAULT)
 
-inline val AudioOutputRoute.longId: Long
-  get() = id.toLong()
-
-enum class AudioOutputRoute(
+enum class DuckAction(
   override val id: Int,
-  @StringRes override val stringRes: Int
+  override val stringRes: Int
 ) : HasConstId, HasDescription {
-  /** Audio is being output via the device's built-in speakers */
-  Speaker(1, R.string.Speaker),
+  Duck(1, R.string.Duck),
+  Pause(2, R.string.Pause),
+  DoNothing(3, R.string.DoNothing);
 
-  /** Audio is being output via the device's headphone jack */
-  HeadphoneJack(2, R.string.HeadphoneJack),
-
-  /** Audio is being output via a Bluetooth connection */
-  Bluetooth(3, R.string.Bluetooth);
+  companion object {
+    val DEFAULT = Duck
+  }
 }

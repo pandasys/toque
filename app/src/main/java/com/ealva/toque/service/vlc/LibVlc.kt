@@ -140,21 +140,21 @@ private class LibVlcImpl(
   private inline fun IMedia.maybeSetReplayGain(prefs: () -> LibVlcPreferences) = prefs().apply {
     if (replayGainMode() != ReplayGainMode.None) {
       addMediaOption { """:audio-replay-gain-mode=${replayGainMode()}""" }
-      addMediaOption { """:audio-replay-gain-preamp=${replayGainPreamp()}""" }
-      addMediaOption { """:audio-replay-gain-default=${replayGainDefaultPreamp()}""" }
+      addMediaOption { """:audio-replay-gain-preamp=${replayPreamp()}""" }
+      addMediaOption { """:audio-replay-gain-default=${defaultReplayGain()}""" }
     }
   }
 
   private inline fun IMedia.setMediaHardwareAcceleration(prefs: () -> LibVlcPreferences) {
     when (prefs().hardwareAcceleration()) {
-      HardwareAcceleration.DISABLED -> setHWDecoderEnabled(false, false)
-      HardwareAcceleration.FULL -> setHWDecoderEnabled(true, true)
-      HardwareAcceleration.DECODING -> {
+      HardwareAcceleration.Disabled -> setHWDecoderEnabled(false, false)
+      HardwareAcceleration.Full -> setHWDecoderEnabled(true, true)
+      HardwareAcceleration.Decoding -> {
         setHWDecoderEnabled(true, true)
         addMediaOption { ":no-mediacodec-dr" }
         addMediaOption { ":no-omxil-dr" }
       }
-      HardwareAcceleration.AUTOMATIC -> {
+      HardwareAcceleration.Automatic -> {
       }
     }
   }

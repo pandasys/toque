@@ -18,12 +18,7 @@ package com.ealva.toque.service.vlc
 
 import com.nhaarman.expect.expect
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
 class SkipLoopFilterTest {
   @Test
   fun `test members and id`() {

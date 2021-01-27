@@ -16,7 +16,6 @@
 
 package com.ealva.toque.service.vlc
 
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -24,14 +23,14 @@ import com.ealva.toque.res.HasDescription
 
 enum class HardwareAcceleration(
   override val id: Int,
-  @StringRes private val stringRes: Int
+  @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
-  DISABLED(1, R.string.Disabled),
-  AUTOMATIC(2, R.string.Automatic),
-  DECODING(3, R.string.DecodingAcceleration),
-  FULL(4, R.string.FullAcceleration);
+  Disabled(1, R.string.Disabled),
+  Automatic(2, R.string.Automatic),
+  Decoding(3, R.string.DecodingAcceleration),
+  Full(4, R.string.FullAcceleration);
 
-  override fun description(resources: Resources): String {
-    return resources.getString(stringRes)
+  companion object {
+    val DEFAULT = Automatic
   }
 }

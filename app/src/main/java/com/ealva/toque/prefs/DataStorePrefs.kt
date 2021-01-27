@@ -23,6 +23,7 @@ import androidx.datastore.preferences.Preferences
 import androidx.datastore.preferences.createDataStore
 import androidx.datastore.preferences.edit
 import androidx.datastore.preferences.emptyPreferences
+import androidx.datastore.preferences.preferencesKey
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -39,58 +40,96 @@ import java.io.IOException
 
 private val DataStore<Preferences>.LOG by lazyLogger("DataStorePrefs")
 
-data class KeyDefault<T>(val key: Preferences.Key<T>, val defaultValue: T)
+fun Context.makeDataStore(name: String, dispatcher: CoroutineDispatcher): DataStore<Preferences> =
+  applicationContext.createDataStore(name, scope = CoroutineScope(dispatcher + SupervisorJob()))
 
-fun Context.makeDataStore(
+interface PrefKeyValue<Stored : Any, Actual : Any> {
+  val key: Preferences.Key<Stored>
+  val defaultValue: Actual
+  fun storedToReal(stored: Stored?): Actual
+  fun realToStored(real: Actual): Stored
+}
+
+interface UnmappedPrefKeyValue<T : Any> : PrefKeyValue<T, T> {
+  override val key: Preferences.Key<T>
+  override val defaultValue: T
+  override fun storedToReal(stored: T?): T = stored ?: defaultValue
+  override fun realToStored(real: T): T = real
+}
+
+class KeyDefault<T : Any>(
+  override val key: Preferences.Key<T>,
+  override val defaultValue: T
+) : UnmappedPrefKeyValue<T>
+
+@Suppress("FunctionName")
+inline fun <reified T : Any> KeyDefault(name: String, theDefaultValue: T): KeyDefault<T> =
+  KeyDefault(preferencesKey(name), theDefaultValue)
+
+@Suppress("FunctionName")
+inline fun <reified T> EnumKeyDefault(
+  theDefaultValue: T
+): PrefKeyValue<Int, T> where T : Enum<T>, T : HasConstId {
+  return object : PrefKeyValue<Int, T> {
+    override val key: Preferences.Key<Int> = preferencesKey(T::class.java.simpleName)
+    override val defaultValue: T = theDefaultValue
+    override fun storedToReal(stored: Int?): T = stored.toEnum(theDefaultValue)
+    override fun realToStored(real: T): Int = real.id
+  }
+}
+
+@Suppress("FunctionName")
+inline fun <reified S : Any, reified A : Any> KeyDefault(
   name: String,
-  dispatcher: CoroutineDispatcher
-): DataStore<Preferences> = applicationContext.createDataStore(
-  name,
-  scope = CoroutineScope(dispatcher + SupervisorJob())
-)
+  theDefaultValue: A,
+  crossinline maker: (S) -> A,
+  crossinline extract: (A) -> S
+): PrefKeyValue<S, A> {
+  return object : PrefKeyValue<S, A> {
+    override val key: Preferences.Key<S> = preferencesKey(name)
+    override val defaultValue: A = theDefaultValue
+    override fun storedToReal(stored: S?): A = stored?.let { maker(it) } ?: theDefaultValue
+    override fun realToStored(real: A): S = extract(real)
+  }
+}
 
 suspend inline fun DataStore<Preferences>.put(
   crossinline mutableFunc: MutablePreferences.() -> Unit
-): Preferences = edit {
-  mutableFunc(it)
+): Preferences = edit { mutableFunc(it) }
+
+suspend fun <T : Any> DataStore<Preferences>.set(key: Preferences.Key<T>, value: T) = try {
+  put { this[key] = value }
+  true
+} catch (e: Exception) {
+  LOG.e(e) { it("Exception setting value:'$value' for key:'$key'") }
+  false
 }
 
-suspend fun <T> DataStore<Preferences>.set(key: Preferences.Key<T>, value: T): Boolean =
-  try {
-    put { this[key] = value }
-    true
-  } catch (e: Exception) {
-    LOG.e(e) { it("Exception setting value:'$value' for key:'$key'") }
-    false
-  }
+suspend inline fun <S : Any, A : Any> DataStore<Preferences>.set(
+  prefKeyValue: PrefKeyValue<S, A>,
+  value: A
+): Boolean = set(prefKeyValue.key, prefKeyValue.realToStored(value))
+
+suspend inline fun <T : Any> DataStore<Preferences>.set(
+  prefKeyValue: UnmappedPrefKeyValue<T>,
+  value: T
+): Boolean = set(prefKeyValue.key, value)
 
 suspend inline fun <T> DataStore<Preferences>.set(
-  key: Preferences.Key<Int>,
+  prefKeyValue: PrefKeyValue<Int, T>,
   value: T
-): Boolean where T : Enum<T>, T : HasConstId = set(key, value.id)
+): Boolean where T : Enum<T>, T : HasConstId = set(prefKeyValue.key, value.id)
 
-operator fun <T> Preferences.get(key: Preferences.Key<T>, defVal: T): T {
-  return get(key) ?: defVal
-}
-
-inline operator fun <reified T> Preferences.get(
-  key: Preferences.Key<Int>,
-  defVal: T
-): T where T : Enum<T>, T : HasConstId {
-  return get(key).toEnum(defVal)
-}
-
-operator fun <T> Preferences.get(pair: KeyDefault<T>): T {
-  return get(pair.key) ?: pair.defaultValue
-}
+operator fun <S : Any, A : Any> Preferences.get(pair: PrefKeyValue<S, A>): A =
+  pair.storedToReal(get(pair.key))
 
 /**
- * Make a flow of values for [keyDefault].key defaulting to [keyDefault].defaultValue if the
+ * Make a flow of values for [keyValue].key defaulting to [keyValue].defaultValue if the
  * key is not present. Values will be [distinctUntilChanged]
  */
-fun <T> DataStore<Preferences>.valueFlow(keyDefault: KeyDefault<T>): Flow<T> {
-  return data
-    .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-    .map { preferences -> preferences[keyDefault.key] ?: keyDefault.defaultValue }
-    .distinctUntilChanged()
-}
+fun <S : Any, R : Any> DataStore<Preferences>.valueFlow(
+  keyValue: PrefKeyValue<S, R>
+): Flow<R> = data
+  .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+  .map { preferences -> keyValue.storedToReal(preferences[keyValue.key]) }
+  .distinctUntilChanged()

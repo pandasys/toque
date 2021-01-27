@@ -103,7 +103,7 @@ private val WAKE_LOCK_TIMEOUT = TimeUnit.MINUTES.toMillis(25).toMillis()
 private class VlcPlayerImpl(
   private val player: MediaPlayer,
   private var duration: Millis,
-  private var vlcEqPreset: VlcEqPreset,
+  private var eqPreset: VlcEqPreset,
   private val onPreparedTransition: PlayerTransition,
   private val powerManager: PowerManager,
   private val dispatcher: CoroutineDispatcher
@@ -121,7 +121,7 @@ private class VlcPlayerImpl(
 
   init {
     addToQueue(this)
-    vlcEqPreset.applyToPlayer(player)
+    eqPreset.applyToPlayer(player)
     player.setEventListener(makeEventListener())
   }
 
@@ -151,6 +151,7 @@ private class VlcPlayerImpl(
 
   override fun shutdown() {
     if (!isShutdown) {
+
 //      transition.setCancelled()
       isShutdown = true
       secondStageShutdown()
@@ -172,6 +173,7 @@ private class VlcPlayerImpl(
   }
 
   fun setPreset(vlcEqPreset: VlcEqPreset) {
+    eqPreset = vlcEqPreset
     vlcEqPreset.applyToPlayer(player)
   }
 

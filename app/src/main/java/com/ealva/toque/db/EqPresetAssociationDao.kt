@@ -18,10 +18,10 @@ package com.ealva.toque.db
 
 import com.ealva.toque.audio.AudioOutputRoute
 import com.ealva.toque.audio.longId
-import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.audio.toAudioOutputRoute
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reify
-import com.ealva.toque.persist.reifyRequire
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.Transaction
@@ -258,10 +258,7 @@ class PresetAssociation {
   val id: Long
 
   /**
-   * If the association is of type AudioOutput, returns the associated AudioOutput enum value
-   *
-   * @return the associate AudioOutput enum instance
-   *
+   * If the association is of type AudioOutput, returns associated [AudioOutputRoute]
    * @throws IllegalArgumentException if there is not AudioOutput with [id]
    * @throws IllegalStateException if this is not an association of type
    * [PresetAssociationType.Output]
@@ -269,7 +266,7 @@ class PresetAssociation {
   val outputRoute: AudioOutputRoute
     get() {
       check(PresetAssociationType.Output == type)
-      return AudioOutputRoute::class.java.reifyRequire(id.toInt())
+      return id.toAudioOutputRoute()
     }
 
   private constructor(type: Int, id: Long) {

@@ -37,6 +37,11 @@ interface PersistentId {
     const val ID_INVALID = 0L
 
     inline fun isValidId(id: Long): Boolean = id > ID_INVALID
+
+    val INVALID = object : PersistentId {
+      override val id: Long
+        get() = ID_INVALID
+    }
   }
 }
 

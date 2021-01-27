@@ -16,7 +16,6 @@
 
 package com.ealva.toque.service.vlc
 
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -25,7 +24,7 @@ import com.ealva.toque.res.HasDescription
 enum class SkipLoopFilter(
   override val id: Int,
   private val value: Int,
-  @StringRes private val stringRes: Int
+  @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
   Auto(1, -1, R.string.Auto),
   None(2, 0, R.string.None),
@@ -35,10 +34,6 @@ enum class SkipLoopFilter(
   All(6, 4, R.string.All);
 
   override fun toString(): String = value.toString()
-
-  override fun description(resources: Resources): String {
-    return resources.getString(stringRes)
-  }
 
   companion object {
     val DEFAULT = Auto
