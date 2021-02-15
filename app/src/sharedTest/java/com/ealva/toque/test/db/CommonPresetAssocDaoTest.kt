@@ -21,8 +21,8 @@ import com.ealva.toque.audio.AudioOutputRoute
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetAssociationTable
 import com.ealva.toque.db.PresetAssociation
-import com.ealva.toque.db.toAlbumId
-import com.ealva.toque.db.toMediaId
+import com.ealva.toque.persist.toAlbumId
+import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.test.shared.withTestDatabase
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.get

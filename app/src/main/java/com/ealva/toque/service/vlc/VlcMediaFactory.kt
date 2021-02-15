@@ -18,8 +18,9 @@ package com.ealva.toque.service.vlc
 
 import android.net.Uri
 import com.ealva.toque.common.Millis
-import com.ealva.toque.db.AlbumId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.prefs.AppPreferencesSingleton
 import com.ealva.toque.service.media.Media
 import com.ealva.toque.service.media.MediaFactory
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,10 +30,11 @@ import org.videolan.libvlc.interfaces.IMedia.Parse
 
 class VlcMediaFactory(
   private val libVlcSingleton: LibVlcSingleton,
-  private val preferencesSingleton: LibVlcPreferencesSingleton,
+  private val appPrefsSingleton: AppPreferencesSingleton,
+  private val libVlcPrefsSingleton: LibVlcPreferencesSingleton,
   private val presetFactory: VlcPresetFactory,
   private val vlcPlayerFactory: VlcPlayerFactory,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+  private val dispatcher: CoroutineDispatcher? = null
 ) : MediaFactory {
   override suspend fun makeAudio(
     location: Uri,
@@ -40,21 +42,22 @@ class VlcMediaFactory(
     albumId: AlbumId,
     initialSeek: Millis,
     startPaused: Boolean
-  ): Media = withContext(dispatcher) {
+  ): Media = withContext(dispatcher ?: Dispatchers.IO) {
     val libVlc = libVlcSingleton.instance()
     VlcMedia(
       libVlc.makeAudioMedia(
         location,
         initialSeek,
         startPaused,
-        preferencesSingleton.instance()
+        libVlcPrefsSingleton.instance()
       ).apply { parse(Parse.ParseLocal) },
       location,
       mediaId,
       albumId,
       presetFactory,
       vlcPlayerFactory,
-      dispatcher
+      appPrefsSingleton.instance(),
+      dispatcher ?: Dispatchers.Main
     )
   }
 }

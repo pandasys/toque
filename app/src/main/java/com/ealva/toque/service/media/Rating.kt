@@ -18,190 +18,165 @@
 
 package com.ealva.toque.service.media
 
-val NO_RATING = Rating(-1)
-val RATING_0 = Rating(0)
-val RATING_HALF = Rating(10)
-val RATING_1 = Rating(20)
-val RATING_1_5 = Rating(30)
-val RATING_2 = Rating(40)
-val RATING_2_5 = Rating(50)
-val RATING_3 = Rating(60)
-val RATING_3_5 = Rating(70)
-val RATING_4 = Rating(80)
-val RATING_4_5 = Rating(90)
-val RATING_5 = Rating(100)
+import kotlin.math.roundToInt
 
-fun Int.toRating(): Rating {
+/*
+ All rating names are based on "stars", including half stars, as all ratings are displayed as such.
+ Currently ratings are persisted as -1 .. 100, with 0..100 being valid and -1 meaning no rating.
+ Each increment of 10 is 1/2 star. Some file tags expect 0..100 while MP3s are 0..256 or "*-"
+ characters.
+ */
+
+inline class Rating(val value: Int) : Comparable<Rating> {
+  override fun compareTo(other: Rating): Int = value.compareTo(other.value)
+
+  val isValid: Boolean
+    get() = value != RATING_NONE.value
+
+  companion object {
+    val RATING_NONE = Rating(-1)
+    val RATING_0 = Rating(0)
+    val RATING_0_5 = Rating(10)
+    val RATING_1 = Rating(20)
+    val RATING_1_5 = Rating(30)
+    val RATING_2 = Rating(40)
+    val RATING_2_5 = Rating(50)
+    val RATING_3 = Rating(60)
+    val RATING_3_5 = Rating(70)
+    val RATING_4 = Rating(80)
+    val RATING_4_5 = Rating(90)
+    val RATING_5 = Rating(100)
+
+    val VALID_RANGE = RATING_0..RATING_5
+  }
+}
+
+fun Rating.coerceToValid() = coerceIn(Rating.VALID_RANGE)
+
+fun Int.toRating(): Rating = when (this) {
+  Rating.RATING_0.value -> Rating.RATING_0
+  Rating.RATING_0_5.value -> Rating.RATING_0_5
+  Rating.RATING_1.value -> Rating.RATING_1
+  Rating.RATING_1_5.value -> Rating.RATING_1_5
+  Rating.RATING_2.value -> Rating.RATING_2
+  Rating.RATING_2_5.value -> Rating.RATING_2_5
+  Rating.RATING_3.value -> Rating.RATING_3
+  Rating.RATING_3_5.value -> Rating.RATING_3_5
+  Rating.RATING_4.value -> Rating.RATING_4
+  Rating.RATING_4_5.value -> Rating.RATING_4_5
+  Rating.RATING_5.value -> Rating.RATING_5
+  else -> when (this) { // fallback from exact values
+    in 0..4 -> Rating.RATING_0
+    in 5..14 -> Rating.RATING_0_5
+    in 15..24 -> Rating.RATING_1
+    in 25..34 -> Rating.RATING_1_5
+    in 35..44 -> Rating.RATING_2
+    in 45..54 -> Rating.RATING_2_5
+    in 55..64 -> Rating.RATING_3
+    in 65..74 -> Rating.RATING_3_5
+    in 75..84 -> Rating.RATING_4
+    in 85..94 -> Rating.RATING_4_5
+    in 95..Int.MAX_VALUE -> Rating.RATING_5
+    else -> Rating.RATING_NONE
+  }
+}
+
+fun String.toRating(): Rating = toIntOrNull()?.toRating() ?: Rating.RATING_NONE
+
+inline class StarRating(val value: Float) : Comparable<StarRating> {
+  override fun compareTo(other: StarRating): Int = value.compareTo(other.value)
+
+  val isValid: Boolean
+    get() = value != STAR_NONE.value
+
+  companion object {
+    val STAR_NONE = StarRating(-1.0F)
+    val STAR_0 = StarRating(0.0F)
+    val STAR_0_5 = StarRating(0.5F)
+    val STAR_1 = StarRating(1.0F)
+    val STAR_1_5 = StarRating(1.5F)
+    val STAR_2 = StarRating(2.0F)
+    val STAR_2_5 = StarRating(2.5F)
+    val STAR_3 = StarRating(3.0F)
+    val STAR_3_5 = StarRating(3.5F)
+    val STAR_4 = StarRating(4.0F)
+    val STAR_4_5 = StarRating(4.5F)
+    val STAR_5 = StarRating(5.0F)
+
+    val VALID_RANGE = STAR_0..STAR_5
+  }
+}
+
+fun StarRating.coerceToValid() = coerceIn(StarRating.VALID_RANGE)
+
+fun Float.toStarRating(): StarRating {
   return when (this) {
-    RATING_0.value -> RATING_0
-    RATING_HALF.value -> RATING_HALF
-    RATING_1.value -> RATING_1
-    RATING_1_5.value -> RATING_1_5
-    RATING_2.value -> RATING_2
-    RATING_2_5.value -> RATING_2_5
-    RATING_3.value -> RATING_3
-    RATING_3_5.value -> RATING_3_5
-    RATING_4.value -> RATING_4
-    RATING_4_5.value -> RATING_4_5
-    RATING_5.value -> RATING_5
-    else -> when (this) { // fallback from exact values
-      in 0..4 -> RATING_0
-      in 5..14 -> RATING_HALF
-      in 15..24 -> RATING_1
-      in 25..34 -> RATING_1_5
-      in 35..44 -> RATING_2
-      in 45..54 -> RATING_2_5
-      in 55..64 -> RATING_3
-      in 65..74 -> RATING_3_5
-      in 75..84 -> RATING_4
-      in 85..94 -> RATING_4_5
-      in 95..Int.MAX_VALUE -> RATING_5
-      else -> NO_RATING
+    StarRating.STAR_0.value -> StarRating.STAR_0
+    StarRating.STAR_0_5.value -> StarRating.STAR_0_5
+    StarRating.STAR_1.value -> StarRating.STAR_1
+    StarRating.STAR_1_5.value -> StarRating.STAR_1_5
+    StarRating.STAR_2.value -> StarRating.STAR_2
+    StarRating.STAR_2_5.value -> StarRating.STAR_2_5
+    StarRating.STAR_3.value -> StarRating.STAR_3
+    StarRating.STAR_3_5.value -> StarRating.STAR_3_5
+    StarRating.STAR_4.value -> StarRating.STAR_4
+    StarRating.STAR_4_5.value -> StarRating.STAR_4_5
+    StarRating.STAR_5.value -> StarRating.STAR_5
+    else -> when ((this * 100).roundToInt()) { // fallback from exact values
+      in 0..24 -> StarRating.STAR_0 // .5 = 50
+      in 25..74 -> StarRating.STAR_0_5
+      in 75..124 -> StarRating.STAR_1
+      in 125..174 -> StarRating.STAR_1_5
+      in 175..224 -> StarRating.STAR_2
+      in 225..274 -> StarRating.STAR_2_5
+      in 275..324 -> StarRating.STAR_3
+      in 325..374 -> StarRating.STAR_3_5
+      in 375..424 -> StarRating.STAR_4
+      in 425..474 -> StarRating.STAR_4_5
+      in 475..Int.MAX_VALUE -> StarRating.STAR_5
+      else -> StarRating.STAR_NONE
     }
   }
 }
 
-inline class Rating(val value: Int) {
-
-  val isValid: Boolean
-    get() = value != NO_RATING.value
-
-  fun toStarRating(): StarRating {
-    return when (this) {
-      RATING_0 -> STAR_RATING_0
-      RATING_HALF -> STAR_RATING_HALF
-      RATING_1 -> STAR_RATING_1
-      RATING_1_5 -> STAR_RATING_1_5
-      RATING_2 -> STAR_RATING_2
-      RATING_2_5 -> STAR_RATING_2_5
-      RATING_3 -> STAR_RATING_3
-      RATING_3_5 -> STAR_RATING_3_5
-      RATING_4 -> STAR_RATING_4
-      RATING_4_5 -> STAR_RATING_4_5
-      RATING_5 -> STAR_RATING_5
-      else -> STAR_NO_RATING
-    }
-  }
-
-  fun hash(): Int {
-    return value
+fun Rating.toStarRating(): StarRating {
+  return when (this) {
+    Rating.RATING_0 -> StarRating.STAR_0
+    Rating.RATING_0_5 -> StarRating.STAR_0_5
+    Rating.RATING_1 -> StarRating.STAR_1
+    Rating.RATING_1_5 -> StarRating.STAR_1_5
+    Rating.RATING_2 -> StarRating.STAR_2
+    Rating.RATING_2_5 -> StarRating.STAR_2_5
+    Rating.RATING_3 -> StarRating.STAR_3
+    Rating.RATING_3_5 -> StarRating.STAR_3_5
+    Rating.RATING_4 -> StarRating.STAR_4
+    Rating.RATING_4_5 -> StarRating.STAR_4_5
+    Rating.RATING_5 -> StarRating.STAR_5
+    else -> StarRating.STAR_NONE
   }
 }
 
 // Note: currently have to use value to get compiler optimization of resolving to primitives
 fun StarRating.toRating(): Rating {
   return when (value) {
-    STAR_RATING_0.value -> RATING_0
-    STAR_RATING_HALF.value -> RATING_HALF
-    STAR_RATING_1.value -> RATING_1
-    STAR_RATING_1_5.value -> RATING_1_5
-    STAR_RATING_2.value -> RATING_2
-    STAR_RATING_2_5.value -> RATING_2_5
-    STAR_RATING_3.value -> RATING_3
-    STAR_RATING_3_5.value -> RATING_3_5
-    STAR_RATING_4.value -> RATING_4
-    STAR_RATING_4_5.value -> RATING_4_5
-    STAR_RATING_5.value -> RATING_5
-    else -> NO_RATING
-  }
-}
-
-val STAR_NO_RATING = StarRating(-1.0F)
-val STAR_RATING_0 = StarRating(0.0F)
-val STAR_RATING_HALF = StarRating(0.5F)
-val STAR_RATING_1 = StarRating(1.0F)
-val STAR_RATING_1_5 = StarRating(1.5F)
-val STAR_RATING_2 = StarRating(2.0F)
-val STAR_RATING_2_5 = StarRating(2.5F)
-val STAR_RATING_3 = StarRating(3.0F)
-val STAR_RATING_3_5 = StarRating(3.5F)
-val STAR_RATING_4 = StarRating(4.0F)
-val STAR_RATING_4_5 = StarRating(4.5F)
-val STAR_RATING_5 = StarRating(5.0F)
-
-fun Float.toStarRating(): StarRating {
-  return when (this) {
-    STAR_RATING_0.value -> STAR_RATING_0
-    STAR_RATING_HALF.value -> STAR_RATING_HALF
-    STAR_RATING_1.value -> STAR_RATING_1
-    STAR_RATING_1_5.value -> STAR_RATING_1_5
-    STAR_RATING_2.value -> STAR_RATING_2
-    STAR_RATING_2_5.value -> STAR_RATING_2_5
-    STAR_RATING_3.value -> STAR_RATING_3
-    STAR_RATING_3_5.value -> STAR_RATING_3_5
-    STAR_RATING_4.value -> STAR_RATING_4
-    STAR_RATING_4_5.value -> STAR_RATING_4_5
-    STAR_RATING_5.value -> STAR_RATING_5
-    else -> STAR_NO_RATING
-  }
-}
-
-inline class StarRating(val value: Float) {
-  val isValid: Boolean
-    get() = value != STAR_NO_RATING.value
-}
-
-val MP3_NO_RATING = Mp3Rating(-1)
-val MP3_RATING_0 = Mp3Rating(0)
-val MP3_RATING_HALF = Mp3Rating(13)
-val MP3_RATING_1 = Mp3Rating(1)
-val MP3_RATING_1_5 = Mp3Rating(54)
-val MP3_RATING_2 = Mp3Rating(64)
-val MP3_RATING_2_5 = Mp3Rating(118)
-val MP3_RATING_3 = Mp3Rating(128)
-val MP3_RATING_3_5 = Mp3Rating(186)
-val MP3_RATING_4 = Mp3Rating(196)
-val MP3_RATING_4_5 = Mp3Rating(242)
-val MP3_RATING_5 = Mp3Rating(255)
-
-fun Int.toMp3Rating(): Mp3Rating {
-  return when (this) {
-    MP3_RATING_0.value -> MP3_RATING_0
-    MP3_RATING_1.value -> MP3_RATING_1
-    MP3_RATING_HALF.value -> MP3_RATING_HALF
-    MP3_RATING_2.value -> MP3_RATING_2
-    MP3_RATING_2_5.value -> MP3_RATING_2_5
-    MP3_RATING_3.value -> MP3_RATING_3
-    MP3_RATING_3_5.value -> MP3_RATING_3_5
-    MP3_RATING_4.value -> MP3_RATING_4
-    MP3_RATING_4_5.value -> MP3_RATING_4_5
-    MP3_RATING_5.value -> MP3_RATING_5
-    else -> when (this) {
-      in 124..133, in 142..167 -> MP3_RATING_3
-      in 192..218 -> MP3_RATING_4
-      in 248..255 -> MP3_RATING_5
-      in 60..69, in 91..113 -> MP3_RATING_2
-      in 19..28, in 40..49 -> MP3_RATING_1
-      in 2..8 -> MP3_RATING_0
-      in 168..191 -> MP3_RATING_3_5
-      in 219..247 -> MP3_RATING_4_5
-      in 114..123, in 134..141 -> MP3_RATING_2_5
-      in 50..59, in 70..90, 29 -> MP3_RATING_1_5
-      in 9..18, in 30..39 -> MP3_RATING_HALF
-      in 256..Int.MAX_VALUE -> MP3_RATING_5
-      else -> MP3_NO_RATING
-    }
-  }
-}
-
-fun String.toMp3Rating(): Mp3Rating {
-  return when (this) {
-    "" -> MP3_RATING_0
-    "-" -> MP3_RATING_HALF
-    "*" -> MP3_RATING_1
-    "*-" -> MP3_RATING_1_5
-    "**" -> MP3_RATING_2
-    "**-" -> MP3_RATING_2_5
-    "***" -> MP3_RATING_3
-    "***-" -> MP3_RATING_3_5
-    "****" -> MP3_RATING_4
-    "****-" -> MP3_RATING_4_5
-    "*****" -> MP3_RATING_5
-    else -> MP3_NO_RATING
+    StarRating.STAR_0.value -> Rating.RATING_0
+    StarRating.STAR_0_5.value -> Rating.RATING_0_5
+    StarRating.STAR_1.value -> Rating.RATING_1
+    StarRating.STAR_1_5.value -> Rating.RATING_1_5
+    StarRating.STAR_2.value -> Rating.RATING_2
+    StarRating.STAR_2_5.value -> Rating.RATING_2_5
+    StarRating.STAR_3.value -> Rating.RATING_3
+    StarRating.STAR_3_5.value -> Rating.RATING_3_5
+    StarRating.STAR_4.value -> Rating.RATING_4
+    StarRating.STAR_4_5.value -> Rating.RATING_4_5
+    StarRating.STAR_5.value -> Rating.RATING_5
+    else -> Rating.RATING_NONE
   }
 }
 
 /**
+ * Taken from a Media Monkey forum a long time ago in a galaxy far, far away...
+ *
  * From Media Monkey: somewhat interoperable with other players (Windows, WinAmp...). Other
  * players will convert half stars to whole stars as they don't support the concept of 1/2 of a star
  *
@@ -226,46 +201,110 @@ fun String.toMp3Rating(): Mp3Rating {
  * "*****" = 5
  * etc...
  */
-inline class Mp3Rating(val value: Int) {
+inline class Mp3Rating(val value: Int) : Comparable<Mp3Rating> {
+  override fun compareTo(other: Mp3Rating): Int = value.compareTo(other.value)
 
   val isValid: Boolean
-    get() = value != MP3_NO_RATING.value
+    get() = value != MP3_NONE.value
 
-  fun toStarRating(): StarRating {
-    return when (value) {
-      MP3_RATING_0.value -> STAR_RATING_0
-      MP3_RATING_HALF.value -> STAR_RATING_HALF
-      MP3_RATING_1.value -> STAR_RATING_1
-      MP3_RATING_1_5.value -> STAR_RATING_1_5
-      MP3_RATING_2.value -> STAR_RATING_2
-      MP3_RATING_2_5.value -> STAR_RATING_2_5
-      MP3_RATING_3.value -> STAR_RATING_3
-      MP3_RATING_3_5.value -> STAR_RATING_3_5
-      MP3_RATING_4.value -> STAR_RATING_4
-      MP3_RATING_4_5.value -> STAR_RATING_4_5
-      MP3_RATING_5.value -> STAR_RATING_5
-      else -> STAR_NO_RATING
+  companion object {
+    val MP3_NONE = Mp3Rating(-1)
+    val MP3_0 = Mp3Rating(0)
+    val MP3_0_5 = Mp3Rating(13)
+    val MP3_1 = Mp3Rating(1)
+    val MP3_1_5 = Mp3Rating(54)
+    val MP3_2 = Mp3Rating(64)
+    val MP3_2_5 = Mp3Rating(118)
+    val MP3_3 = Mp3Rating(128)
+    val MP3_3_5 = Mp3Rating(186)
+    val MP3_4 = Mp3Rating(196)
+    val MP3_4_5 = Mp3Rating(242)
+    val MP3_5 = Mp3Rating(255)
+
+    val VALID_RANGE = MP3_0..MP3_5
+  }
+}
+
+fun Mp3Rating.coerceToValid() = coerceIn(Mp3Rating.VALID_RANGE)
+
+fun Int.toMp3Rating(): Mp3Rating {
+  return when (this) {
+    Mp3Rating.MP3_0.value -> Mp3Rating.MP3_0
+    Mp3Rating.MP3_1.value -> Mp3Rating.MP3_1
+    Mp3Rating.MP3_0_5.value -> Mp3Rating.MP3_0_5
+    Mp3Rating.MP3_2.value -> Mp3Rating.MP3_2
+    Mp3Rating.MP3_2_5.value -> Mp3Rating.MP3_2_5
+    Mp3Rating.MP3_3.value -> Mp3Rating.MP3_3
+    Mp3Rating.MP3_3_5.value -> Mp3Rating.MP3_3_5
+    Mp3Rating.MP3_4.value -> Mp3Rating.MP3_4
+    Mp3Rating.MP3_4_5.value -> Mp3Rating.MP3_4_5
+    Mp3Rating.MP3_5.value -> Mp3Rating.MP3_5
+    else -> when (this) { // fallback from exact values
+      in 124..133, in 142..167 -> Mp3Rating.MP3_3
+      in 192..218 -> Mp3Rating.MP3_4
+      in 248..255 -> Mp3Rating.MP3_5
+      in 60..69, in 91..113 -> Mp3Rating.MP3_2
+      in 19..28, in 40..49 -> Mp3Rating.MP3_1
+      in 2..8, 0 -> Mp3Rating.MP3_0
+      in 168..191 -> Mp3Rating.MP3_3_5
+      in 219..247 -> Mp3Rating.MP3_4_5
+      in 114..123, in 134..141 -> Mp3Rating.MP3_2_5
+      in 50..59, in 70..90, 29 -> Mp3Rating.MP3_1_5
+      in 9..18, in 30..39 -> Mp3Rating.MP3_0_5
+      in 256..Int.MAX_VALUE -> Mp3Rating.MP3_5
+      else -> Mp3Rating.MP3_NONE
     }
   }
+}
 
-  fun hash(): Int {
-    return value
+/** Mp3 rating stored as a string in a file tag could be a number or old style "*" */
+fun String.toMp3Rating(): Mp3Rating {
+  return toIntOrNull()?.toMp3Rating() ?: when (this) {
+    "" -> Mp3Rating.MP3_0
+    "-" -> Mp3Rating.MP3_0_5
+    "*" -> Mp3Rating.MP3_1
+    "*-" -> Mp3Rating.MP3_1_5
+    "**" -> Mp3Rating.MP3_2
+    "**-" -> Mp3Rating.MP3_2_5
+    "***" -> Mp3Rating.MP3_3
+    "***-" -> Mp3Rating.MP3_3_5
+    "****" -> Mp3Rating.MP3_4
+    "****-" -> Mp3Rating.MP3_4_5
+    "*****" -> Mp3Rating.MP3_5
+    else -> Mp3Rating.MP3_NONE
+  }
+}
+
+fun Mp3Rating.toStarRating(): StarRating {
+  return when (value) {
+    Mp3Rating.MP3_0.value -> StarRating.STAR_0
+    Mp3Rating.MP3_0_5.value -> StarRating.STAR_0_5
+    Mp3Rating.MP3_1.value -> StarRating.STAR_1
+    Mp3Rating.MP3_1_5.value -> StarRating.STAR_1_5
+    Mp3Rating.MP3_2.value -> StarRating.STAR_2
+    Mp3Rating.MP3_2_5.value -> StarRating.STAR_2_5
+    Mp3Rating.MP3_3.value -> StarRating.STAR_3
+    Mp3Rating.MP3_3_5.value -> StarRating.STAR_3_5
+    Mp3Rating.MP3_4.value -> StarRating.STAR_4
+    Mp3Rating.MP3_4_5.value -> StarRating.STAR_4_5
+    Mp3Rating.MP3_5.value -> StarRating.STAR_5
+    else -> StarRating.STAR_NONE
   }
 }
 
 fun StarRating.toMp3Rating(): Mp3Rating {
   return when (value) {
-    STAR_RATING_0.value -> MP3_RATING_0
-    STAR_RATING_HALF.value -> MP3_RATING_HALF
-    STAR_RATING_1.value -> MP3_RATING_1
-    STAR_RATING_1_5.value -> MP3_RATING_1_5
-    STAR_RATING_2.value -> MP3_RATING_2
-    STAR_RATING_2_5.value -> MP3_RATING_2_5
-    STAR_RATING_3.value -> MP3_RATING_3
-    STAR_RATING_3_5.value -> MP3_RATING_3_5
-    STAR_RATING_4.value -> MP3_RATING_4
-    STAR_RATING_4_5.value -> MP3_RATING_4_5
-    STAR_RATING_5.value -> MP3_RATING_5
-    else -> MP3_NO_RATING
+    StarRating.STAR_0.value -> Mp3Rating.MP3_0
+    StarRating.STAR_0_5.value -> Mp3Rating.MP3_0_5
+    StarRating.STAR_1.value -> Mp3Rating.MP3_1
+    StarRating.STAR_1_5.value -> Mp3Rating.MP3_1_5
+    StarRating.STAR_2.value -> Mp3Rating.MP3_2
+    StarRating.STAR_2_5.value -> Mp3Rating.MP3_2_5
+    StarRating.STAR_3.value -> Mp3Rating.MP3_3
+    StarRating.STAR_3_5.value -> Mp3Rating.MP3_3_5
+    StarRating.STAR_4.value -> Mp3Rating.MP3_4
+    StarRating.STAR_4_5.value -> Mp3Rating.MP3_4_5
+    StarRating.STAR_5.value -> Mp3Rating.MP3_5
+    else -> Mp3Rating.MP3_NONE
   }
 }

@@ -16,8 +16,8 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.toque.db.AlbumId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.MediaId
 
 interface EqPresetSelector {
   suspend fun getPreferredEqPreset(mediaId: MediaId, albumId: AlbumId): VlcEqPreset

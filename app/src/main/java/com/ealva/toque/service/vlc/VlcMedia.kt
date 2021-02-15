@@ -18,16 +18,22 @@ package com.ealva.toque.service.vlc
 
 import android.net.Uri
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.toMillis
-import com.ealva.toque.db.AlbumId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.file.isNetworkScheme
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.prefs.AppPreferences
 import com.ealva.toque.service.media.Media
 import com.ealva.toque.service.media.MediaEvent
+import com.ealva.toque.service.media.MediaPlayerEvent
 import com.ealva.toque.service.player.PlayerTransition
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 import org.videolan.libvlc.interfaces.IMedia
 
 private val LOG by lazyLogger(VlcMedia::class)
@@ -39,16 +45,17 @@ class VlcMedia(
   private val albumId: AlbumId,
   private val presetSelector: EqPresetSelector,
   private val vlcPlayerFactory: VlcPlayerFactory,
+  private val prefs: AppPreferences,
   private val dispatcher: CoroutineDispatcher
-) : Media {
+) : Media, VlcPlayerListener {
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private val duration = media.duration.toMillis()
-  private val mutableEventFlow = MutableSharedFlow<MediaEvent>()
   private var player: VlcPlayer = NullVlcPlayer
-
-  override val eventFlow: Flow<MediaEvent>
-    get() = mutableEventFlow
+  override val mediaEventFlow = MutableSharedFlow<MediaEvent>()
+  override val playerEventFlow = MutableSharedFlow<MediaPlayerEvent>()
 
   fun release() {
+    scope.cancel()
     player.shutdown()
     media.release()
   }
@@ -60,8 +67,10 @@ class VlcMedia(
   private suspend fun makePlayer(onPreparedTransition: PlayerTransition): VlcPlayer =
     vlcPlayerFactory.make(
       this,
+      this,
       presetSelector.getPreferredEqPreset(mediaId, albumId),
       onPreparedTransition,
+      prefs,
       duration,
       dispatcher
     )
@@ -81,5 +90,33 @@ class VlcMedia(
 
     /** Parse metadata and fetch artwork even if over a network connection */
     const val PARSE_WITH_ART_NETWORK = IMedia.Parse.FetchNetwork
+  }
+
+  override fun onPositionUpdate(position: Millis, duration: Millis) {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.PositionUpdate(position, duration)) }
+  }
+
+  override fun onPrepared(position: Millis, duration: Millis) {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.Prepared(position, duration)) }
+  }
+
+  override fun onStart(firstStart: Boolean) {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.Start(firstStart)) }
+  }
+
+  override fun onPaused(position: Millis) {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.Paused(position)) }
+  }
+
+  override fun onStopped() {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.Stopped) }
+  }
+
+  override fun onPlaybackComplete() {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.PlaybackComplete) }
+  }
+
+  override fun onError() {
+    scope.launch { playerEventFlow.emit(MediaPlayerEvent.Error) }
   }
 }

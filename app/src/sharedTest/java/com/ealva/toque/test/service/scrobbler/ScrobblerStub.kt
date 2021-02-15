@@ -18,6 +18,7 @@
 
 package com.ealva.toque.test.service.scrobbler
 
+import com.ealva.toque.service.queue.AudioQueueItem
 import com.ealva.toque.service.queue.QueueMediaItem
 import com.ealva.toque.service.scrobble.Scrobbler
 import com.nhaarman.expect.fail
@@ -25,28 +26,28 @@ import com.nhaarman.expect.fail
 class ScrobblerStub : Scrobbler {
   var _startCalled = 0
   val _startItems = mutableListOf<QueueMediaItem>()
-  override fun start(item: QueueMediaItem) {
+  override fun start(item: AudioQueueItem) {
     _startCalled++
     _startItems.add(item)
   }
 
   var _resumeCalled = 0
   val _resumeItems = mutableListOf<QueueMediaItem>()
-  override fun resume(item: QueueMediaItem) {
+  override fun resume(item: AudioQueueItem) {
     _resumeCalled++
     _resumeItems.add(item)
   }
 
   var _pauseCalled = 0
   val _pauseItems = mutableListOf<QueueMediaItem>()
-  override fun pause(item: QueueMediaItem) {
+  override fun pause(item: AudioQueueItem) {
     _pauseCalled++
     _pauseItems.add(item)
   }
 
   var _completeCalled = 0
   val _completeItems = mutableListOf<QueueMediaItem>()
-  override fun complete(item: QueueMediaItem) {
+  override fun complete(item: AudioQueueItem) {
     _completeCalled++
     _completeItems.add(item)
   }

@@ -16,8 +16,6 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.ealvalog.i
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.SUB_AUTODETECT_PATHS
 
@@ -63,18 +61,18 @@ fun libVlcOptions(
     subsEncodingOption(prefs)
     subtitlesAutoDetectPath()
     androidWindowChromaOption(prefs)
-    dumpOptions()
+//    dumpOptions()
   }
 }
 
 private fun getResampler(vlcUtil: VlcUtil): String =
   if (vlcUtil.machineSpecs.processors > 2) SOXR_RESAMPLER else UGLY_RESAMPLER
 
-private fun ArrayList<String>.dumpOptions() {
-  forEach { option ->
-    LOG.i { it(option) }
-  }
-}
+// private fun ArrayList<String>.dumpOptions() {
+//  forEach { option ->
+//    LOG.i { it(option) }
+//  }
+// }
 
 private fun ArrayList<String>.subtitlesAutoDetectPath() {
 //  subtitlesDirectory.mkdirs()

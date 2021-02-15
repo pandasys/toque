@@ -19,8 +19,12 @@ package com.ealva.toque.db
 import com.ealva.toque.audio.AudioOutputRoute
 import com.ealva.toque.audio.longId
 import com.ealva.toque.audio.toAudioOutputRoute
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.reify
+import com.ealva.toque.persist.toAlbumId
+import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable

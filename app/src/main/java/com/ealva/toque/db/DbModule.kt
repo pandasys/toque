@@ -34,7 +34,7 @@ object DbModule {
   val module = module {
     single { makeDatabase(androidContext()) }
     single { GenreDao() }
-    single { ArtistDao() }
+    single { ArtistDao(get()) }
     single { AlbumDao() }
     single { ArtistAlbumDao() }
     single { ComposerDao() }

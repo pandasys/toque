@@ -16,10 +16,10 @@
 
 package com.ealva.toque.service.media
 
-import com.ealva.toque.db.AlbumId
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.EqPresetInfo
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.MediaId
 import com.github.michaelbull.result.Result
 
 interface EqPresetFactory {

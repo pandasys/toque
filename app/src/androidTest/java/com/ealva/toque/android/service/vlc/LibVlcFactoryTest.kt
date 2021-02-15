@@ -56,7 +56,7 @@ class LibVlcFactoryTest {
       dispatcher = coroutineRule.testDispatcher
     )
 
-    // Test will break when upgrading LivVlc and that's expected (obviously)
+    // Test will break when upgrading LibVlc and that's expected (obviously)
     val libVlc: LibVlc = factory.instance()
     expect(libVlc.libVlcVersion()).toBe("3.0.11.1 Vetinari")
 

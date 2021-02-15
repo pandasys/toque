@@ -18,6 +18,7 @@ package com.ealva.toque
 
 import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
@@ -29,13 +30,10 @@ import androidx.compose.ui.platform.setContent
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.file.MediaStorage
 import com.ealva.toque.scanner.MediaScannerJobIntentService
 import com.ealva.toque.scanner.MediaScannerJobIntentService.Companion.Rescan
 import com.ealva.toque.ui.ToqueTheme
-import com.ealva.welite.db.Database
 import kotlinx.coroutines.launch
-import org.koin.android.ext.android.inject
 
 private val LOG by lazyLogger(MainActivity::class)
 
@@ -72,21 +70,13 @@ private suspend fun <T : AppCompatActivity> T.runSuspendWithPermission(
 }
 
 class MainActivity : AppCompatActivity() {
-  private val db: Database by inject()
-  private val storage: MediaStorage by inject()
-
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
-//    getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.absolutePath?.let { toScan ->
-//      runMediaScanner(listOf(toScan)) { path, uri: Uri? ->
-//      }
-//    }
     lifecycleScope.launchWhenStarted {
-      runSuspendWithPermission(READ_EXTERNAL_STORAGE) {
-        getAllAudio()
-      }
+      runSuspendWithPermission(READ_EXTERNAL_STORAGE) { getAllAudio() }
     }
+
     setContent {
       ToqueTheme {
         Surface(color = MaterialTheme.colors.background) {
@@ -94,6 +84,22 @@ class MainActivity : AppCompatActivity() {
         }
       }
     }
+  }
+
+  public override fun onStart() {
+    super.onStart()
+//    mediaBrowser.connect()
+  }
+
+  public override fun onResume() {
+    super.onResume()
+    volumeControlStream = AudioManager.STREAM_MUSIC
+  }
+
+  public override fun onStop() {
+    super.onStop()
+    // (see "stay in sync with the MediaSession")
+//    mediaBrowser.disconnect()
   }
 
   private fun getAllAudio() {

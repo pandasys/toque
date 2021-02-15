@@ -32,6 +32,6 @@ object LibVlcModule {
     }
     single { VlcPresetFactory(androidContext(), get(), get(), get()) } bind EqPresetFactory::class
     single { VlcPlayerFactory(androidContext(), get()) }
-    single<MediaFactory> { VlcMediaFactory(get(), get(), get(), get()) }
+    single<MediaFactory> { VlcMediaFactory(get(), get(), get(), get(), get()) }
   }
 }

@@ -21,13 +21,12 @@ import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.file.isContentScheme
 import com.ealva.toque.file.isFileScheme
-import com.ealva.toque.file.mimeTypeFromExt
 import com.ealva.toque.file.isNetworkScheme
+import com.ealva.toque.file.mimeTypeFromExt
 import com.ealva.toque.file.schemeIsSupported
 import com.nhaarman.expect.Matcher
 import com.nhaarman.expect.expect
 import com.nhaarman.expect.fail
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.videolan.libvlc.util.Extensions
@@ -48,7 +47,6 @@ private val networkUris = listOf(
   smbUri, sshUri, nfsUri, ftpUri, ftpsUri
 )
 
-@ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 class UrisTest {
   @Test

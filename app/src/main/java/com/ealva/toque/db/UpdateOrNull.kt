@@ -19,6 +19,7 @@ package com.ealva.toque.db
 import com.ealva.ealvabrainz.brainz.data.Mbid
 import com.ealva.ealvabrainz.brainz.data.isObsolete
 import com.ealva.toque.common.Millis
+import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.service.media.StarRating
 
 inline fun String.updateOrNull(block: () -> String): String? =

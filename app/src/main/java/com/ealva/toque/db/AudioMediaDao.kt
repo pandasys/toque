@@ -28,6 +28,13 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.toMillis
 import com.ealva.toque.file.AudioInfo
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.ArtistIdList
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.persist.toAlbumId
+import com.ealva.toque.persist.toArtistId
+import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.service.media.MediaFormat
 import com.ealva.toque.service.media.MediaMetadata
 import com.ealva.toque.service.media.MediaMetadataParser
@@ -35,6 +42,7 @@ import com.ealva.toque.service.media.MediaType
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.media.toRating
 import com.ealva.toque.prefs.AppPreferences
+import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.tag.ArtistParserFactory
 import com.ealva.toque.tag.SongTag
 import com.ealva.toque.tag.toArtistSort

@@ -66,10 +66,34 @@
   <string name="ShuffleMedia">Shuffle media</string>
   <string name="ShuffleLists">Shuffle lists</string>
   <string name="ShuffleMediaAndLists">Shuffle media and lists</string>
-    <string name="Duck">Duck</string>
+  <string name="Duck">Duck</string>
   <string name="Pause">Pause</string>
   <string name="DoNothing">Do Nothing</string>
   <string name="Speaker">Speaker</string>
   <string name="HeadphoneJack">Headphone Jack</string>
   <string name="Bluetooth">Bluetooth</string>
+  <string name="ClearUpNext">Clear Up Next</string>
+  <string name="PlayNext">Play Next</string>
+  <string name="Prompt">Prompt</string>
+  <string name="RepeatOff">Repeat Off</string>
+  <string name="RepeatQueue">Repeat Queue</string>
+  <string name="RepeatCurrent">Repeat Current</string>
+
+
+  <string name="allowed_caller_log">
+        Caller has a valid certificate, but its package doesn\'t match any expected package for the
+        given certificate. To allow this caller, add the following to the allowed callers list:\n
+        <![CDATA[
+        <signature name=\"%1$s\" package=\"%2$s\">\n\t<key>%3$s</key>\n</signature>\n
+        ]]>
+    </string>
+    <string name="No_media_found">No media found</string>
+  <string name="No_playlist_found">No playlist found</string>
+  <string name="Library">Library</string>
+  <string name="Playlists">Playlists</string>
+    <string name="Artists">Artists</string>
+  <string name="Albums">Albums</string>
+  <string name="Genres">Genres</string>
+  <string name="Tracks">Tracks</string>
+
 </resources>

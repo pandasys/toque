@@ -17,7 +17,6 @@
 package com.ealva.toque.android.file
 
 import android.content.Context
-import android.webkit.MimeTypeMap
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.service.media.FileExtensions
@@ -61,47 +60,6 @@ class MediaFormatTest {
   }
 
   @Test
-  fun testAudioFileExtensionsAgainstMimeTypeMap() {
-    val allAudio = MediaFormat.values().filter { it.isAudio }
-    val map = MimeTypeMap.getSingleton()
-
-    allAudio.forEach { format ->
-      format.fileExtensions.forEach { ext ->
-        map.getMimeTypeFromExtension(ext)?.let { type ->
-          expect(format.mimeTypes).toContain(type) {
-            "${format.name} types=${format.mimeTypes} doesn't have $type"
-          }
-        }
-      }
-    }
-
-    allAudio.forEach { format ->
-      if (format !== MediaFormat.MpegAudio) { // disagree with MimeMap on this one
-        format.preferredExtension?.let { ext ->
-          map.getMimeTypeFromExtension(ext)?.let { type ->
-            expect(format.preferredMimeType).toBe(type) {
-              "${format.name} $type is not preferred in ${format.mimeTypes}"
-            }
-          }
-        }
-      }
-    }
-  }
-
-  @Test
-  fun testAudioMimeTypesAgainstMimeTypeMap() {
-    val allAudio = MediaFormat.values().filter { it.isAudio }
-    val map = MimeTypeMap.getSingleton()
-    allAudio.forEach { format ->
-      map.getExtensionFromMimeType(format.preferredMimeType)?.let { ext ->
-        expect(format.preferredExtension).toBe(ext) {
-          "${format.name} $ext is not preferred in ${format.fileExtensions}"
-        }
-      }
-    }
-  }
-
-  @Test
   fun testHaveAudioMediaFormatForAllExtensions() {
     val allAudio = MediaFormat.values().filter { it.isAudio }
     FileExtensions.audio.forEach { ext ->
@@ -117,32 +75,6 @@ class MediaFormatTest {
     FileExtensions.video.forEach<String> { ext ->
       expect(allVideo.find { it.fileExtensions.contains(ext) }).toNotBeNull {
         "No format for extension=$ext"
-      }
-    }
-  }
-
-  @Test
-  fun testVideoFileExtensionsAgainstMimeTypeMap() {
-    val allVideo = MediaFormat.values().filter { it.isVideo }
-    val map = MimeTypeMap.getSingleton()
-
-    allVideo.forEach { format ->
-      format.fileExtensions.forEach { ext ->
-        map.getMimeTypeFromExtension(ext)?.let { type ->
-          expect(format.mimeTypes).toContain(type) {
-            "${format.name} types=${format.mimeTypes} doesn't have $type"
-          }
-        }
-      }
-    }
-
-    allVideo.forEach { format ->
-      format.preferredExtension?.let { ext ->
-        map.getMimeTypeFromExtension(ext)?.let { type ->
-          expect(format.preferredMimeType).toBe(type) {
-            "${format.name} $type is not preferred in ${format.mimeTypes}"
-          }
-        }
       }
     }
   }

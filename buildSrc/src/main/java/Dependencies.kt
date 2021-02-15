@@ -21,7 +21,8 @@ object Sdk {
 }
 
 object Versions {
-  const val ANDROIDX_TEST = "1.3.0"
+  const val ANDROIDX_TEST = "1.3.1-alpha03"
+  const val ANDROIDX_TEST_ANNOTATIONS = "28.0.0"
   const val ANDROIDX_TEST_EXT = "1.1.2"
   const val APPCOMPAT = "1.2.0"
   const val COMPOSE = "1.0.0-alpha08"
@@ -38,12 +39,11 @@ object Versions {
   const val FASTUTIL = "7.2.1"
   const val JUNIT = "4.13"
   const val KOIN = "2.2.2"
-  const val KOTLIN = "1.4.20"
-  const val KOTLIN_RESULT = "1.1.9"
-  const val KOTLIN_RESULT_CO = "1.1.9"
+  const val KOTLIN = "1.4.21"
+  const val KOTLIN_RESULT = "1.1.10"
+  const val KOTLIN_RESULT_CO = "1.1.10"
   const val LIFECYCLE = "2.3.0-rc01"
   const val MATERIAL = "1.2.1"
-  const val MOCKK = "1.10.5"
   const val PHOENIX = "2.0.0"
   const val ROBOLECTRIC = "4.4"
   const val VLC_ANDROID = "3.3.2"
@@ -51,10 +51,10 @@ object Versions {
 }
 
 object BuildPluginsVersion {
-  const val AGP = "7.0.0-alpha04"
+  const val AGP = "7.0.0-alpha05"
   const val DETEKT = "1.14.1"
   const val DOKKA = "1.4.10.2"
-  const val KOTLIN = "1.4.20"
+  const val KOTLIN = "1.4.21"
   const val VERSIONS = "0.33.0"
 }
 
@@ -67,6 +67,10 @@ object SupportLibs {
     "androidx.lifecycle:lifecycle-runtime-ktx:${Versions.LIFECYCLE}"
   const val ANDROIDX_LIFECYCLE_COMMON =
     "androidx.lifecycle:lifecycle-common-java8:${Versions.LIFECYCLE}"
+//  const val ANDROIDX_LIFECYCLE_EXTS =
+//    "androidx.lifecycle:lifecycle-extensions:${Versions.LIFECYCLE}"
+  const val ANDROIDX_LIFECYCLE_SERVICE =
+    "androidx.lifecycle:lifecycle-service:${Versions.LIFECYCLE}"
 
   const val ANDROID_MATERIAL = "com.google.android.material:material:${Versions.MATERIAL}"
   const val COMPOSE_MATERIAL = "androidx.compose.material:material:${Versions.COMPOSE}"
@@ -101,11 +105,12 @@ object TestingLib {
     "org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_TEST}"
   const val EXPECT = "com.nhaarman:expect.kt:${Versions.EXPECT}"
   const val JUNIT = "junit:junit:${Versions.JUNIT}"
-  const val MOCKK = "io.mockk:mockk:${Versions.MOCKK}"
   const val ROBOLECTRIC = "org.robolectric:robolectric:${Versions.ROBOLECTRIC}"
 }
 
 object AndroidTestingLib {
+  const val ANDROIDX_TEST_ANNOTATIONS =
+    "com.android.support:support-annotations:${Versions.ANDROIDX_TEST_ANNOTATIONS}"
   const val ANDROIDX_TEST_CORE = "androidx.test:core:${Versions.ANDROIDX_TEST}"
   const val ANDROIDX_TEST_EXT_JUNIT = "androidx.test.ext:junit:${Versions.ANDROIDX_TEST_EXT}"
   const val ANDROIDX_TEST_RULES = "androidx.test:rules:${Versions.ANDROIDX_TEST}"

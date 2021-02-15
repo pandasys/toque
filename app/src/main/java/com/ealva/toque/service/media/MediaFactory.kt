@@ -18,8 +18,8 @@ package com.ealva.toque.service.media
 
 import android.net.Uri
 import com.ealva.toque.common.Millis
-import com.ealva.toque.db.AlbumId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.MediaId
 
 interface MediaFactory {
   suspend fun makeAudio(

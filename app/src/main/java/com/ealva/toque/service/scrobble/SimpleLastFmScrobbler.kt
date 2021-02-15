@@ -24,8 +24,8 @@ import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.debug
-import com.ealva.toque.service.queue.NullQueueMediaItem
-import com.ealva.toque.service.queue.QueueMediaItem
+import com.ealva.toque.service.queue.AudioQueueItem
+import com.ealva.toque.service.queue.NullAudioQueueItem
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Complete
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Pause
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Resume
@@ -66,42 +66,40 @@ private fun Millis.toSeconds(): Int = (value / MILLIS_PER_SECOND).toInt()
 
 /**
  * Implementation of a scrobbler for Simple Last.fm
- *
- * Created by eric on 2/27/16.
  */
 internal class SimpleLastFmScrobbler(
   private val appName: String,
   private val pkgName: PackageName,
   private val intentBroadcaster: IntentBroadcaster
 ) : Scrobbler {
-  private var lastItem: QueueMediaItem = NullQueueMediaItem
+  private var lastItem: AudioQueueItem = NullAudioQueueItem
 
-  override fun start(item: QueueMediaItem) {
+  override fun start(item: AudioQueueItem) {
     scrobble(Start, item)
   }
 
-  override fun resume(item: QueueMediaItem) {
+  override fun resume(item: AudioQueueItem) {
     scrobble(Resume, item)
   }
 
-  override fun pause(item: QueueMediaItem) {
+  override fun pause(item: AudioQueueItem) {
     scrobble(Pause, item)
   }
 
-  override fun complete(item: QueueMediaItem) {
+  override fun complete(item: AudioQueueItem) {
     if (item == lastItem) {
       scrobble(Complete, item)
     }
   }
 
   override fun shutdown() {
-    if (lastItem !== NullQueueMediaItem) {
+    if (lastItem !== NullAudioQueueItem) {
       pause(lastItem)
-      lastItem = NullQueueMediaItem
+      lastItem = NullAudioQueueItem
     }
   }
 
-  private fun scrobble(state: SimpleLastFmState, item: QueueMediaItem) {
+  private fun scrobble(state: SimpleLastFmState, item: AudioQueueItem) {
     lastItem = item
     val intent = Intent(ACTION_SIMPLE_LAST_FM)
       .putExtra(EXTRA_TRACK, item.title.value)

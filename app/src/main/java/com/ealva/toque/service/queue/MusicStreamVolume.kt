@@ -22,17 +22,6 @@ import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.common.toVolume
 
-val AudioManager.musicStreamMinVolume: Volume
-  get() {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-      getStreamMinVolume(AudioManager.STREAM_MUSIC).toVolume()
-    } else {
-      Volume.ZERO
-    }
-  }
-val AudioManager.musicStreamMaxVolume: Volume
-  get() = getStreamMaxVolume(AudioManager.STREAM_MUSIC).toVolume()
-
 class MusicStreamVolume(private val audioManager: AudioManager) : StreamVolume {
   override val volumeIsFixed: Boolean = audioManager.isVolumeFixed
 
@@ -52,3 +41,15 @@ class MusicStreamVolume(private val audioManager: AudioManager) : StreamVolume {
       }
     }
 }
+
+private val AudioManager.musicStreamMinVolume: Volume
+  get() {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      getStreamMinVolume(AudioManager.STREAM_MUSIC).toVolume()
+    } else {
+      Volume.ZERO
+    }
+  }
+
+private val AudioManager.musicStreamMaxVolume: Volume
+  get() = getStreamMaxVolume(AudioManager.STREAM_MUSIC).toVolume()

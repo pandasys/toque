@@ -22,8 +22,9 @@ import android.os.Environment.DIRECTORY_MUSIC
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.common.toMillis
-import com.ealva.toque.db.AlbumId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.prefs.AppPreferencesSingleton
 import com.ealva.toque.service.vlc.LibVlc
 import com.ealva.toque.service.vlc.LibVlcPreferencesSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
@@ -82,13 +83,13 @@ class VlcMediaTest : KoinTest {
 
   @Test
   fun testMakeAudioMedia() = coroutineRule.runBlockingTest {
-    val (prefsSingleton, libVlcSingleton) = getSingletons()
+    val (libPrefsSingleton, libVlcSingleton, appPrefsSingleton) = getSingletons()
     val libVlc: LibVlc = libVlcSingleton.instance()
     val dir = appCtx.getExternalFilesDir(DIRECTORY_MUSIC)
     val file = File(dir, fileName)
     expect(file.exists()).toBe(true)
     val uri = Uri.fromFile(file)
-    val media = libVlc.makeAudioMedia(uri, 0.toMillis(), true, prefsSingleton.instance())
+    val media = libVlc.makeAudioMedia(uri, 0.toMillis(), true, libPrefsSingleton.instance())
     expect(media.type).toBe(1)
     val vlcMedia = VlcMedia(
       media,
@@ -97,16 +98,20 @@ class VlcMediaTest : KoinTest {
       AlbumId.INVALID,
       NullEqPresetSelector,
       NullVlcPlayerFactory,
+      appPrefsSingleton.instance(),
       coroutineRule.testDispatcher
     )
     expect(vlcMedia.uri).toBe(uri)
   }
 
-  private fun getSingletons(): Pair<LibVlcPreferencesSingleton, LibVlcSingleton> {
+  private fun getSingletons(): Triple<LibVlcPreferencesSingleton,
+    LibVlcSingleton,
+    AppPreferencesSingleton> {
     val prefsSingleton = LibVlcPreferencesSingleton(appCtx, coroutineRule.testDispatcher)
-    return Pair(
+    return Triple(
       prefsSingleton,
-      LibVlcSingleton(appCtx, prefsSingleton, dispatcher = coroutineRule.testDispatcher)
+      LibVlcSingleton(appCtx, prefsSingleton, dispatcher = coroutineRule.testDispatcher),
+      AppPreferencesSingleton(appCtx, dispatcher = coroutineRule.testDispatcher)
     )
   }
 }

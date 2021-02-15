@@ -24,7 +24,8 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.debugRequire
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.toAlbumId
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
@@ -38,41 +39,9 @@ import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
-import it.unimi.dsi.fastutil.longs.LongArrayList
-import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-
-inline class AlbumId(override val id: Long) : PersistentId {
-  companion object {
-    val INVALID = AlbumId(PersistentId.ID_INVALID)
-  }
-}
-
-@Suppress("NOTHING_TO_INLINE")
-inline fun Long.toAlbumId(): AlbumId {
-  debugRequire(PersistentId.isValidId(this)) { "All IDs must be greater than 0 to be valid" }
-  return AlbumId(this)
-}
-
-@Suppress("NOTHING_TO_INLINE")
-inline class AlbumIdList(val idList: LongList) : Iterable<AlbumId> {
-  inline val size: Int
-    get() = idList.size
-
-  inline operator fun plusAssign(genreId: AlbumId) {
-    idList.add(genreId.id)
-  }
-
-  inline operator fun get(index: Int): AlbumId = AlbumId(idList.getLong(index))
-
-  companion object {
-    operator fun invoke(capacity: Int): AlbumIdList = AlbumIdList(LongArrayList(capacity))
-  }
-
-  override fun iterator(): Iterator<AlbumId> = idIterator(idList, ::AlbumId)
-}
 
 private val LOG by lazyLogger(AlbumDao::class)
 

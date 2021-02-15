@@ -31,7 +31,12 @@ inline class Millis(val value: Long) : Comparable<Millis> {
   override operator fun compareTo(other: Millis): Int = value.compareTo(other.value)
 
   inline operator fun minus(rhs: Millis): Millis = (value - rhs.value).toMillis()
+  inline operator fun minus(rhs: Long): Millis = (value - rhs).toMillis()
+
   inline operator fun div(other: Millis): Millis = (value / other.value).toMillis()
+
+  inline operator fun plus(rhs: Millis): Millis = (value + rhs.value).toMillis()
+  inline operator fun plus(rhs: Long): Millis = (value + rhs).toMillis()
 
   inline operator fun compareTo(rhs: Long): Int = value.compareTo(rhs)
   inline operator fun compareTo(rhs: Int): Int = value.compareTo(rhs)

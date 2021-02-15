@@ -23,8 +23,8 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.debug
-import com.ealva.toque.service.queue.NullQueueMediaItem
-import com.ealva.toque.service.queue.QueueMediaItem
+import com.ealva.toque.service.queue.AudioQueueItem
+import com.ealva.toque.service.queue.NullAudioQueueItem
 
 private val LOG by lazyLogger(LastFmScrobbler::class)
 private const val ACTION_META_CHANGED = "fm.last.android.metachanged"
@@ -53,34 +53,34 @@ internal class LastFmScrobbler(
   private val pkgName: PackageName,
   private val intentBroadcaster: IntentBroadcaster
 ) : Scrobbler {
-  private var lastItem: QueueMediaItem = NullQueueMediaItem
+  private var lastItem: AudioQueueItem = NullAudioQueueItem
 
-  override fun start(item: QueueMediaItem) {
+  override fun start(item: AudioQueueItem) {
     broadcastIntent(ACTION_META_CHANGED, item, item.isPlaying)
   }
 
-  override fun resume(item: QueueMediaItem) {
+  override fun resume(item: AudioQueueItem) {
     broadcastIntent(ACTION_PLAY_STATE_CHANGED, item, true)
   }
 
-  override fun pause(item: QueueMediaItem) {
+  override fun pause(item: AudioQueueItem) {
     broadcastIntent(ACTION_PLAY_STATE_CHANGED, item, false)
   }
 
-  override fun complete(item: QueueMediaItem) {
+  override fun complete(item: AudioQueueItem) {
     if (item == lastItem) {
       broadcastIntent(ACTION_PLAYBACK_COMPLETE, item, false)
     }
   }
 
   override fun shutdown() {
-    if (lastItem !== NullQueueMediaItem) {
+    if (lastItem !== NullAudioQueueItem) {
       pause(lastItem)
-      lastItem = NullQueueMediaItem
+      lastItem = NullAudioQueueItem
     }
   }
 
-  private fun broadcastIntent(action: String, item: QueueMediaItem, isPlaying: Boolean) {
+  private fun broadcastIntent(action: String, item: AudioQueueItem, isPlaying: Boolean) {
     lastItem = item
     val intent = Intent(action)
       .putExtra(EXTRA_TRACK, item.title.value)

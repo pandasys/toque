@@ -20,10 +20,10 @@ import com.ealva.brainzsvc.common.AlbumName
 import com.ealva.brainzsvc.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
-import com.ealva.toque.db.MediaId
-import com.ealva.toque.db.toMediaId
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.persist.toMediaId
 
-class QueueMediaItemFake(
+class AudioQueueItemFake(
   override val id: MediaId = 1.toMediaId(),
   override val instanceId: Long = 1,
   override var isValid: Boolean = true,
@@ -33,7 +33,7 @@ class QueueMediaItemFake(
   override var duration: Millis = Millis.ONE_HUNDRED,
   override var position: Millis = Millis.ZERO,
   override val isPlaying: Boolean = true
-) : QueueMediaItem {
+) : AudioQueueItem {
   var _getArtistName: ArtistName = ArtistName.UNKNOWN
   override fun getArtist(preferAlbumArtist: Boolean): ArtistName {
     return _getArtistName

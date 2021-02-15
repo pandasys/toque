@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.media
 
+import com.ealva.toque.common.Millis
 import com.ealva.toque.service.player.PlayerTransition
 import kotlinx.coroutines.flow.Flow
 
@@ -23,8 +24,19 @@ sealed class MediaEvent {
   data class MetadataUpdate(val metadata: MediaMetadata) : MediaEvent()
 }
 
+sealed class MediaPlayerEvent {
+  data class Prepared(val currentPosition: Millis, val duration: Millis) : MediaPlayerEvent()
+  data class PositionUpdate(val currentPosition: Millis, val duration: Millis) : MediaPlayerEvent()
+  data class Start(val firstStart: Boolean) : MediaPlayerEvent()
+  data class Paused(val position: Millis) : MediaPlayerEvent()
+  object Stopped : MediaPlayerEvent()
+  object PlaybackComplete : MediaPlayerEvent()
+  object Error : MediaPlayerEvent()
+}
+
 interface Media {
-  val eventFlow: Flow<MediaEvent>
+  val mediaEventFlow: Flow<MediaEvent>
+  val playerEventFlow: Flow<MediaPlayerEvent>
 
   /**
    * Prepare the media and play. Media should be constructed with start paused option and this

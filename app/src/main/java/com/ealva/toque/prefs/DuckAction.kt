@@ -18,11 +18,7 @@ package com.ealva.toque.prefs
 
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.persist.reify
 import com.ealva.toque.res.HasDescription
-
-@Suppress("NOTHING_TO_INLINE")
-inline fun Int.toDuckAction(): DuckAction = DuckAction::class.reify(this, DuckAction.DEFAULT)
 
 enum class DuckAction(
   override val id: Int,
@@ -31,8 +27,4 @@ enum class DuckAction(
   Duck(1, R.string.Duck),
   Pause(2, R.string.Pause),
   DoNothing(3, R.string.DoNothing);
-
-  companion object {
-    val DEFAULT = Duck
-  }
 }

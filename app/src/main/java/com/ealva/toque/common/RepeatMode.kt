@@ -14,37 +14,40 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.queue
+package com.ealva.toque.common
 
+import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasDescription
 
-/**
- * Describes the state of "shuffle"
- */
-enum class ShuffleMode(
+enum class RepeatMode(
   override val id: Int,
-  /** Should the media in a list be randomly shuffled */
-  val shuffleMedia: Boolean,
-  /** Should list selection be random */
-  val shuffleLists: Boolean,
   @StringRes override val stringRes: Int
 ) : HasConstId, HasDescription {
-  None(1, false, false, R.string.ShuffleNone),
-  Media(2, true, false, R.string.ShuffleMedia),
-  Lists(3, false, true, R.string.ShuffleLists),
-  MediaAndLists(4, true, true, R.string.ShuffleMediaAndLists);
+  None(1, R.string.RepeatOff),
+  All(2, R.string.RepeatQueue),
+  One(3, R.string.RepeatCurrent);
 
-  /**
-   * This function is useful when the user presses a "shuffle" button and the value needs to be
-   * rotated to the next.
-   */
-  fun getNext(): ShuffleMode = when (this) {
-    None -> Media
-    Media -> Lists
-    Lists -> MediaAndLists
-    MediaAndLists -> None
+  fun getNext(): RepeatMode = when (this) {
+    None -> All
+    All -> One
+    One -> None
   }
 }
+
+fun Int.compatToRepeatMode(): RepeatMode = when (this) {
+  PlaybackStateCompat.REPEAT_MODE_NONE -> RepeatMode.None
+  PlaybackStateCompat.REPEAT_MODE_ONE -> RepeatMode.One
+  PlaybackStateCompat.REPEAT_MODE_ALL -> RepeatMode.All
+  PlaybackStateCompat.REPEAT_MODE_GROUP -> RepeatMode.All
+  else -> RepeatMode.None
+}
+
+val RepeatMode.asCompat
+  get() = when (this) {
+    RepeatMode.None -> PlaybackStateCompat.REPEAT_MODE_NONE
+    RepeatMode.All -> PlaybackStateCompat.REPEAT_MODE_ALL
+    RepeatMode.One -> PlaybackStateCompat.REPEAT_MODE_ONE
+  }

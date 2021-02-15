@@ -36,7 +36,6 @@ import com.ealva.toque.log._e
 import com.ealva.toque.service.media.MediaMetadata
 import com.ealva.toque.service.media.MediaMetadataParser
 import com.ealva.toque.service.media.MediaMetadataParserFactory
-import com.ealva.toque.service.media.STAR_NO_RATING
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.tag.ArtistParser
 import com.ealva.toque.tag.SongTag
@@ -227,7 +226,7 @@ private class VlcMediaMetadata private constructor(
   override val rating: StarRating
     get() {
       LOG._e { it("rating=%s", meta(IMedia.Meta.Rating).orEmpty()) }
-      return STAR_NO_RATING
+      return StarRating.STAR_NONE
     }
   override val comment: String = ""
   override val lyrics: String = ""

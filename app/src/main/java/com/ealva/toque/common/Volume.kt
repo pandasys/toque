@@ -30,6 +30,8 @@ inline class Volume(val value: Int) : Comparable<Volume> {
   inline operator fun plus(other: Volume): Volume = (value + other.value).toVolume()
   inline operator fun div(other: Volume): Volume = (value / other.value).toVolume()
 
+  inline operator fun plus(rhs: Int): Volume = (value + rhs).toVolume()
+
   companion object {
     // Commonly used Volumes
     val ZERO = 0.toVolume()

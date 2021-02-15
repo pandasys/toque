@@ -16,12 +16,10 @@
 
 package com.ealva.toque.service.queue
 
-import com.ealva.brainzsvc.common.AlbumName
-import com.ealva.brainzsvc.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
-import com.ealva.toque.db.HasId
-import com.ealva.toque.db.MediaId
+import com.ealva.toque.persist.HasId
+import com.ealva.toque.persist.MediaId
 
 interface QueueMediaItem : HasId {
   override val id: MediaId
@@ -30,46 +28,9 @@ interface QueueMediaItem : HasId {
 
   val title: Title
 
-  fun getArtist(preferAlbumArtist: Boolean): ArtistName
-
-  val albumName: AlbumName
-
-  val trackNumber: Int
-
   val duration: Millis
 
   val position: Millis
 
   val isPlaying: Boolean
-}
-
-object NullQueueMediaItem : QueueMediaItem {
-  override val id: MediaId
-    get() = MediaId.INVALID
-
-  override val instanceId: Long
-    get() = id.id
-
-  override val isValid: Boolean
-    get() = false
-
-  override val title: Title
-    get() = Title.UNKNOWN
-
-  override fun getArtist(preferAlbumArtist: Boolean): ArtistName = ArtistName.UNKNOWN
-
-  override val albumName: AlbumName
-    get() = AlbumName.UNKNOWN
-
-  override val trackNumber: Int
-    get() = 0
-
-  override val duration: Millis
-    get() = Millis.ZERO
-
-  override val position: Millis
-    get() = Millis.ZERO
-
-  override val isPlaying: Boolean
-    get() = false
 }

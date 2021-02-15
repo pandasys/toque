@@ -33,13 +33,31 @@ import org.videolan.libvlc.interfaces.IMedia
 
 private val LOG by lazyLogger(LibVlc::class)
 
-class LibVlcSingleton(
+interface LibVlcSingleton {
+  /**
+   * Get the single instance, which may need to be constructed
+   *
+   * @throws IllegalStateException if error during LibVLC initialization
+   */
+  suspend fun instance(): LibVlc
+
+  companion object {
+    operator fun invoke(
+      context: Context,
+      prefsSingleton: LibVlcPreferencesSingleton,
+      vlcUtil: VlcUtil? = null,
+      dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): LibVlcSingleton = LibVlcSingletonImpl(context, prefsSingleton, vlcUtil, dispatcher)
+  }
+}
+
+private class LibVlcSingletonImpl(
   private val context: Context,
   private val prefsSingleton: LibVlcPreferencesSingleton,
   /** Default to null because don't want this during injection but want to stub for test */
-  private val vlcUtil: VlcUtil? = null,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.IO
-) {
+  private val vlcUtil: VlcUtil?,
+  private val dispatcher: CoroutineDispatcher
+) : LibVlcSingleton {
   /**
    * @throws IllegalStateException if error during LibVLC initialization
    */
@@ -53,17 +71,8 @@ class LibVlcSingleton(
   private var instance: LibVlc? = null
   private val mutex = Mutex()
 
-  /**
-   * Get the single instance, which may need to be constructed
-   *
-   * @throws IllegalStateException if error during LibVLC initialization
-   */
-  suspend fun instance(): LibVlc {
-    instance?.let { return it } ?: return withContext(dispatcher) {
-      mutex.withLock {
-        instance?.let { instance } ?: make().also { instance = it }
-      }
-    }
+  override suspend fun instance(): LibVlc = instance ?: withContext(dispatcher) {
+    mutex.withLock { instance ?: make().also { instance = it } }
   }
 }
 

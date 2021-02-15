@@ -25,8 +25,18 @@ import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.vlc.Chroma
 import com.ealva.toque.service.vlc.HardwareAcceleration
 import com.ealva.toque.service.vlc.LibVlcPreferences
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_DEFAULT_REPLAY_GAIN
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ALLOW_TIME_STRETCH
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_CHROMA
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ENABLE_DIGITAL_AUDIO
 import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ENABLE_FRAME_SKIP
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ENABLE_VERBOSE_MODE
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_HARDWARE_ACCELERATION
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_NETWORK_CACHING
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_REPLAY_GAIN_DEFAULT
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_REPLAY_GAIN_MODE
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_REPLAY_PREAMP
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_SKIP_LOOP_FILTER
+import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_SUBTITLE_ENCODING
 import com.ealva.toque.service.vlc.LibVlcPreferencesSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
 import com.ealva.toque.service.vlc.SubtitleEncoding
@@ -85,7 +95,7 @@ class LibVlcPreferencesTest {
   @Test
   fun testNetworkCachingAmount() = coroutineRule.runBlockingTest {
     with(prefsSingleton.instance()) {
-      expect(networkCachingAmount()).toBe(LibVlcPreferences.DEFAULT_NETWORK_CACHING)
+      expect(networkCachingAmount()).toBe(DEFAULT_NETWORK_CACHING)
       expect(networkCachingAmount(5000.toMillis())).toBe(true)
       expect(networkCachingAmount()).toBe(5000.toMillis())
       resetAllToDefault()
@@ -121,7 +131,7 @@ class LibVlcPreferencesTest {
   @Test
   fun testReplayPreamp() = coroutineRule.runBlockingTest {
     with(prefsSingleton.instance()) {
-      expect(replayPreamp()).toBe(LibVlcPreferences.DEFAULT_REPLAY_PREAMP)
+      expect(replayPreamp()).toBe(DEFAULT_REPLAY_PREAMP)
       expect(replayPreamp((-50).toAmp())).toBe(true)
       expect(replayPreamp()).toBe(EqPreset.AMP_RANGE.start)
       expect(replayPreamp(100.toAmp())).toBe(true)
@@ -136,7 +146,7 @@ class LibVlcPreferencesTest {
   @Test
   fun testDefaultReplayGain() = coroutineRule.runBlockingTest {
     with(prefsSingleton.instance()) {
-      expect(defaultReplayGain()).toBe(DEFAULT_DEFAULT_REPLAY_GAIN)
+      expect(defaultReplayGain()).toBe(DEFAULT_REPLAY_GAIN_DEFAULT)
       expect(defaultReplayGain(5.toAmp())).toBe(true)
       expect(defaultReplayGain()).toBe(5.toAmp())
       resetAllToDefault()
@@ -172,6 +182,9 @@ class LibVlcPreferencesTest {
   @Test
   fun testDigitalAudioOutputEnabled() = coroutineRule.runBlockingTest {
     with(prefsSingleton.instance()) {
+      expect(digitalAudioOutputEnabled()).toBe(DEFAULT_ENABLE_DIGITAL_AUDIO)
+      expect(digitalAudioOutputEnabled(!DEFAULT_ENABLE_DIGITAL_AUDIO)).toBe(true)
+      expect(digitalAudioOutputEnabled()).toBe(!DEFAULT_ENABLE_DIGITAL_AUDIO)
 
       resetAllToDefault()
     }
@@ -181,7 +194,35 @@ class LibVlcPreferencesTest {
   fun testHardwareAcceleration() = coroutineRule.runBlockingTest {
     with(prefsSingleton.instance()) {
       expect(hardwareAcceleration()).toBe(HardwareAcceleration.DEFAULT)
+      HardwareAcceleration.values().forEach { accel ->
+        expect(hardwareAcceleration(accel)).toBe(true)
+        expect(hardwareAcceleration()).toBe(accel)
+      }
+
       resetAllToDefault()
     }
+  }
+
+  @Test
+  fun testResetAllToDefault() = coroutineRule.runBlockingTest {
+    with(prefsSingleton.instance()) {
+      resetAllToDefault()
+      expectAllAreDefault()
+    }
+  }
+
+  private fun LibVlcPreferences.expectAllAreDefault() {
+    expect(enableVerboseMode()).toBe(DEFAULT_ENABLE_VERBOSE_MODE)
+    expect(chroma()).toBe(DEFAULT_CHROMA)
+    expect(networkCachingAmount()).toBe(DEFAULT_NETWORK_CACHING)
+    expect(subtitleEncoding()).toBe(DEFAULT_SUBTITLE_ENCODING)
+    expect(replayGainMode()).toBe(DEFAULT_REPLAY_GAIN_MODE)
+    expect(replayPreamp()).toBe(DEFAULT_REPLAY_PREAMP)
+    expect(defaultReplayGain()).toBe(DEFAULT_REPLAY_GAIN_DEFAULT)
+    expect(enableFrameSkip()).toBe(DEFAULT_ENABLE_FRAME_SKIP)
+    expect(skipLoopFilter()).toBe(DEFAULT_SKIP_LOOP_FILTER)
+    expect(allowTimeStretchAudio()).toBe(DEFAULT_ALLOW_TIME_STRETCH)
+    expect(digitalAudioOutputEnabled()).toBe(DEFAULT_ENABLE_DIGITAL_AUDIO)
+    expect(hardwareAcceleration()).toBe(DEFAULT_HARDWARE_ACCELERATION)
   }
 }

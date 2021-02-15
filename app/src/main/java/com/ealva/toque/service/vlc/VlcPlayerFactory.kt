@@ -20,6 +20,7 @@ import android.content.Context
 import android.os.PowerManager
 import androidx.core.content.getSystemService
 import com.ealva.toque.common.Millis
+import com.ealva.toque.prefs.AppPreferences
 import com.ealva.toque.service.player.PlayerTransition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -27,8 +28,10 @@ import kotlinx.coroutines.Dispatchers
 interface VlcPlayerFactory {
   suspend fun make(
     vlcMedia: VlcMedia,
+    listener: VlcPlayerListener,
     vlcEqPreset: VlcEqPreset,
     onPreparedTransition: PlayerTransition,
+    prefs: AppPreferences,
     duration: Millis,
     dispatcher: CoroutineDispatcher = Dispatchers.IO
   ): VlcPlayer
@@ -49,8 +52,10 @@ class VlcPlayerFactoryImpl(
 
   override suspend fun make(
     vlcMedia: VlcMedia,
+    listener: VlcPlayerListener,
     vlcEqPreset: VlcEqPreset,
     onPreparedTransition: PlayerTransition,
+    prefs: AppPreferences,
     duration: Millis,
     dispatcher: CoroutineDispatcher
   ): VlcPlayer {
@@ -58,8 +63,10 @@ class VlcPlayerFactoryImpl(
       libVlcSingleton.instance(),
       vlcMedia,
       duration,
+      listener,
       vlcEqPreset,
       onPreparedTransition,
+      prefs,
       powerManager,
       dispatcher
     )
@@ -69,8 +76,10 @@ class VlcPlayerFactoryImpl(
 object NullVlcPlayerFactory : VlcPlayerFactory {
   override suspend fun make(
     vlcMedia: VlcMedia,
+    listener: VlcPlayerListener,
     vlcEqPreset: VlcEqPreset,
     onPreparedTransition: PlayerTransition,
+    prefs: AppPreferences,
     duration: Millis,
     dispatcher: CoroutineDispatcher
   ): VlcPlayer = NullVlcPlayer

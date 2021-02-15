@@ -27,6 +27,7 @@ import androidx.datastore.preferences.preferencesKey
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.toEnum
 import kotlinx.coroutines.CoroutineDispatcher
@@ -46,15 +47,16 @@ fun Context.makeDataStore(name: String, dispatcher: CoroutineDispatcher): DataSt
 interface PrefKeyValue<Stored : Any, Actual : Any> {
   val key: Preferences.Key<Stored>
   val defaultValue: Actual
-  fun storedToReal(stored: Stored?): Actual
-  fun realToStored(real: Actual): Stored
+  fun storedToActual(stored: Stored?): Actual
+  fun actualToStored(actual: Actual): Stored
+  fun defaultAsStored(): Stored = actualToStored(defaultValue)
 }
 
 interface UnmappedPrefKeyValue<T : Any> : PrefKeyValue<T, T> {
   override val key: Preferences.Key<T>
   override val defaultValue: T
-  override fun storedToReal(stored: T?): T = stored ?: defaultValue
-  override fun realToStored(real: T): T = real
+  override fun storedToActual(stored: T?): T = stored ?: defaultValue
+  override fun actualToStored(actual: T): T = actual
 }
 
 class KeyDefault<T : Any>(
@@ -73,8 +75,8 @@ inline fun <reified T> EnumKeyDefault(
   return object : PrefKeyValue<Int, T> {
     override val key: Preferences.Key<Int> = preferencesKey(T::class.java.simpleName)
     override val defaultValue: T = theDefaultValue
-    override fun storedToReal(stored: Int?): T = stored.toEnum(theDefaultValue)
-    override fun realToStored(real: T): Int = real.id
+    override fun storedToActual(stored: Int?): T = stored.toEnum(theDefaultValue)
+    override fun actualToStored(actual: T): Int = actual.id
   }
 }
 
@@ -88,10 +90,14 @@ inline fun <reified S : Any, reified A : Any> KeyDefault(
   return object : PrefKeyValue<S, A> {
     override val key: Preferences.Key<S> = preferencesKey(name)
     override val defaultValue: A = theDefaultValue
-    override fun storedToReal(stored: S?): A = stored?.let { maker(it) } ?: theDefaultValue
-    override fun realToStored(real: A): S = extract(real)
+    override fun storedToActual(stored: S?): A = stored?.let { maker(it) } ?: theDefaultValue
+    override fun actualToStored(actual: A): S = extract(actual)
   }
 }
+
+@Suppress("FunctionName")
+fun KeyDefaultMillis(name: String, defaultValue: Millis) =
+  KeyDefault(name, defaultValue, ::Millis, { it.value })
 
 suspend inline fun DataStore<Preferences>.put(
   crossinline mutableFunc: MutablePreferences.() -> Unit
@@ -108,7 +114,7 @@ suspend fun <T : Any> DataStore<Preferences>.set(key: Preferences.Key<T>, value:
 suspend inline fun <S : Any, A : Any> DataStore<Preferences>.set(
   prefKeyValue: PrefKeyValue<S, A>,
   value: A
-): Boolean = set(prefKeyValue.key, prefKeyValue.realToStored(value))
+): Boolean = set(prefKeyValue.key, prefKeyValue.actualToStored(value))
 
 suspend inline fun <T : Any> DataStore<Preferences>.set(
   prefKeyValue: UnmappedPrefKeyValue<T>,
@@ -121,7 +127,7 @@ suspend inline fun <T> DataStore<Preferences>.set(
 ): Boolean where T : Enum<T>, T : HasConstId = set(prefKeyValue.key, value.id)
 
 operator fun <S : Any, A : Any> Preferences.get(pair: PrefKeyValue<S, A>): A =
-  pair.storedToReal(get(pair.key))
+  pair.storedToActual(get(pair.key))
 
 /**
  * Make a flow of values for [keyValue].key defaulting to [keyValue].defaultValue if the
@@ -131,5 +137,5 @@ fun <S : Any, R : Any> DataStore<Preferences>.valueFlow(
   keyValue: PrefKeyValue<S, R>
 ): Flow<R> = data
   .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-  .map { preferences -> keyValue.storedToReal(preferences[keyValue.key]) }
+  .map { preferences -> keyValue.storedToActual(preferences[keyValue.key]) }
   .distinctUntilChanged()

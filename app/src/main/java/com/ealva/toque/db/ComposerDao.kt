@@ -20,7 +20,8 @@ import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.debugRequire
+import com.ealva.toque.persist.ComposerId
+import com.ealva.toque.persist.toComposerId
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
@@ -33,37 +34,9 @@ import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.where
-import it.unimi.dsi.fastutil.longs.LongArrayList
-import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-
-inline class ComposerId(override val id: Long) : PersistentId
-
-@Suppress("NOTHING_TO_INLINE")
-inline fun Long.toComposerId(): ComposerId {
-  debugRequire(PersistentId.isValidId(this)) { "All IDs must be greater than 0 to be valid" }
-  return ComposerId(this)
-}
-
-@Suppress("NOTHING_TO_INLINE")
-inline class ComposerIdList(val idList: LongList) : Iterable<ComposerId> {
-  inline val size: Int
-    get() = idList.size
-
-  inline operator fun plusAssign(genreId: ComposerId) {
-    idList.add(genreId.id)
-  }
-
-  inline operator fun get(index: Int): ComposerId = ComposerId(idList.getLong(index))
-
-  companion object {
-    operator fun invoke(capacity: Int): ComposerIdList = ComposerIdList(LongArrayList(capacity))
-  }
-
-  override fun iterator(): Iterator<ComposerId> = idIterator(idList, ::ComposerId)
-}
 
 private val LOG by lazyLogger(ComposerDao::class)
 private val getOrInsertLock: Lock = ReentrantLock()
@@ -94,9 +67,10 @@ private val INSERT_COMPOSER = ComposerTable.insertValues {
   it[createdTime].bindArg()
 }
 
+private val composerNameBind = bindString()
 private val QUERY_COMPOSER_ID = Query(
   ComposerTable.select(ComposerTable.id)
-    .where { composer eq bindString() }
+    .where { composer eq composerNameBind }
 )
 
 private class ComposerDaoImpl : ComposerDao {
@@ -136,8 +110,8 @@ private class ComposerDaoImpl : ComposerDao {
     createTime
   ).toComposerId()
 
-  private fun Queryable.getComposer(genre: String): Long? = QUERY_COMPOSER_ID
-    .sequence({ it[0] = genre }) { it[id] }
+  private fun Queryable.getComposer(composer: String): Long? = QUERY_COMPOSER_ID
+    .sequence({ it[composerNameBind] = composer }) { it[id] }
     .singleOrNull()
 
   /**

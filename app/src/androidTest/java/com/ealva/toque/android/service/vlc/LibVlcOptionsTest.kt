@@ -25,9 +25,7 @@ import com.ealva.toque.service.vlc.ReplayGainMode
 import com.ealva.toque.service.vlc.SkipLoopFilter
 import com.ealva.toque.service.vlc.VlcUtil
 import com.ealva.toque.service.vlc.libVlcOptions
-import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -56,12 +54,8 @@ private const val VV_VERBOSE = "-vv"
 private const val SOXR_RESAMPLER = "soxr"
 private const val UGLY_RESAMPLER = "ugly"
 
-@ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 class LibVlcOptionsTest {
-  @get:Rule
-  var coroutineRule = CoroutineRule()
-
   @Suppress("DEPRECATION")
   @get:Rule
   var thrown: ExpectedException = ExpectedException.none()
@@ -74,10 +68,11 @@ class LibVlcOptionsTest {
   }
 
   @Test
-  fun testLibVlcOptions() = coroutineRule.runBlockingTest {
+  fun testLibVlcOptions() {
+    val vlcUtil = VlcUtil(appCtx)
     val prefs = StubLibVlcPreferences()
     prefs.skipLoopFilter = SkipLoopFilter.All
-    libVlcOptions(prefs, VlcUtil(appCtx)).let { options ->
+    libVlcOptions(prefs, vlcUtil).let { options ->
       expect(options.size).toBe(26)
       expect(options[0]).toBe(AUDIO_TIME_STRETCH)
       expect(options[1]).toBe(GAIN_MODE)
@@ -90,7 +85,8 @@ class LibVlcOptionsTest {
       expect(options[8]).toBe(prefs.networkCachingMillis.toString())
       expect(options[9]).toBe(STATS)
       expect(options[10]).toBe(RESAMPLER)
-      expect(options[11]).toBe(SOXR_RESAMPLER)
+      expect(options[11])
+        .toBe(if (vlcUtil.machineSpecs.processors > 2) SOXR_RESAMPLER else UGLY_RESAMPLER)
       expect(options[12]).toBe(LOG_VERBOSE)
       expect(options[13]).toBe("-1")
       expect(options[14]).toBe(SKIP_LOOP_FILTER)
@@ -109,7 +105,7 @@ class LibVlcOptionsTest {
   }
 
   @Test
-  fun testLibVlcOptionsWith2ProcessorsAndNoTimeStretch() = coroutineRule.runBlockingTest {
+  fun testLibVlcOptionsWith2ProcessorsAndNoTimeStretch() {
     val prefs = StubLibVlcPreferences()
     prefs.allowTimeStretchAudio = false
     libVlcOptions(
@@ -128,7 +124,7 @@ class LibVlcOptionsTest {
   }
 
   @Test
-  fun testLibVlcOptionsVerboseMode() = coroutineRule.runBlockingTest {
+  fun testLibVlcOptionsVerboseMode() {
     val prefs = StubLibVlcPreferences()
     prefs.debugAndLogging = true
     prefs.enableVerboseMode = true
@@ -145,7 +141,7 @@ class LibVlcOptionsTest {
   }
 
   @Test
-  fun testLibVlcOptionsSpecificSkipLoopFilters() = coroutineRule.runBlockingTest {
+  fun testLibVlcOptionsSpecificSkipLoopFilters() {
     val prefs = StubLibVlcPreferences()
     prefs.skipLoopFilter = SkipLoopFilter.NonKey
     libVlcOptions(prefs, VlcUtil(appCtx)).let { options ->
@@ -156,54 +152,58 @@ class LibVlcOptionsTest {
   }
 
   @Test
-  fun testLibVlcOptionsAutoSkipLoopWithVaryingChipsAndFrequency() = coroutineRule.runBlockingTest {
-    val prefs = StubLibVlcPreferences()
-    prefs.skipLoopFilter = SkipLoopFilter.Auto
-    expectFilterGivenMachineSpecs(
-      prefs,
-      SkipLoopFilter.All,
-      VLCUtil.MachineSpecs().apply {
-        hasArmV6 = true
-      }
-    )
+  fun testLibVlcOptionsAutoSkipLoopWithVaryingChipsAndFrequency() {
+    try {
+      val prefs = StubLibVlcPreferences()
+      prefs.skipLoopFilter = SkipLoopFilter.Auto
+      expectFilterGivenMachineSpecs(
+        prefs,
+        SkipLoopFilter.All,
+        VLCUtil.MachineSpecs().apply {
+          hasArmV6 = true
+        }
+      )
 
-    expectFilterGivenMachineSpecs(
-      prefs,
-      SkipLoopFilter.All,
-      VLCUtil.MachineSpecs().apply {
-        hasMips = true
-      }
-    )
+      expectFilterGivenMachineSpecs(
+        prefs,
+        SkipLoopFilter.All,
+        VLCUtil.MachineSpecs().apply {
+          hasMips = true
+        }
+      )
 
-    expectFilterGivenMachineSpecs(
-      prefs,
-      SkipLoopFilter.NonRef,
-      VLCUtil.MachineSpecs().apply {
-        hasArmV7 = true
-        frequency = NON_REF_FREQUENCY_TRIGGER_VALUE
-        processors = 4
-      }
-    )
+      expectFilterGivenMachineSpecs(
+        prefs,
+        SkipLoopFilter.NonRef,
+        VLCUtil.MachineSpecs().apply {
+          hasArmV7 = true
+          frequency = NON_REF_FREQUENCY_TRIGGER_VALUE
+          processors = 4
+        }
+      )
 
-    expectFilterGivenMachineSpecs(
-      prefs,
-      SkipLoopFilter.NonRef,
-      VLCUtil.MachineSpecs().apply {
-        hasArmV7 = true
-        bogoMIPS = NON_REF_FREQUENCY_TRIGGER_VALUE
-        processors = 4
-      }
-    )
+      expectFilterGivenMachineSpecs(
+        prefs,
+        SkipLoopFilter.NonRef,
+        VLCUtil.MachineSpecs().apply {
+          hasArmV7 = true
+          bogoMIPS = NON_REF_FREQUENCY_TRIGGER_VALUE
+          processors = 4
+        }
+      )
 
-    expectFilterGivenMachineSpecs(
-      prefs,
-      SkipLoopFilter.NonKey,
-      VLCUtil.MachineSpecs().apply {
-        hasArmV7 = true
-        bogoMIPS = NON_REF_FREQUENCY_TRIGGER_VALUE
-        processors = 2
-      }
-    )
+      expectFilterGivenMachineSpecs(
+        prefs,
+        SkipLoopFilter.NonKey,
+        VLCUtil.MachineSpecs().apply {
+          hasArmV7 = true
+          bogoMIPS = NON_REF_FREQUENCY_TRIGGER_VALUE
+          processors = 2
+        }
+      )
+    } catch (e: Exception) {
+      println(e)
+    }
   }
 
   private fun expectFilterGivenMachineSpecs(

@@ -20,19 +20,29 @@ import android.os.PowerManager
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.common.toMillis
+import com.ealva.toque.common.toPlaybackRate
 import com.ealva.toque.common.toVolume
 import com.ealva.toque.log._w
+import com.ealva.toque.prefs.AppPreferences
+import com.ealva.toque.service.player.FadeInTransition
+import com.ealva.toque.service.player.NoOpPlayerTransition
+import com.ealva.toque.service.player.PauseFadeOutTransition
+import com.ealva.toque.service.player.PauseImmediateTransition
+import com.ealva.toque.service.player.PlayImmediateTransition
 import com.ealva.toque.service.player.PlayerTransition
 import com.ealva.toque.service.player.TransitionPlayer
+import com.ealva.toque.service.player.TransitionSelector
 import com.ealva.toque.service.vlc.VlcPlayer.Companion.VOLUME_RANGE
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.MediaPlayer.Event
 import java.util.ArrayDeque
@@ -43,19 +53,86 @@ import kotlin.concurrent.withLock
 private val LOG by lazyLogger(VlcPlayer::class)
 
 interface VlcPlayer {
+  /** True if the player is prepared and not shutdown. */
   val isValid: Boolean
 
+  /** Has the media been buffered enough to begin playback */
+  val isPrepared: Boolean
+
+  /**
+   * True if the player [isValid] and in a playable state (typically meaning initial buffering is
+   * sufficient to play)
+   */
   val isPlayable: Boolean
 
+  val isPlaying: Boolean
+  val isPaused: Boolean
+  val isShutdown: Boolean
+
+  /**
+   * Begin/resume playback if currently paused using the transition selected via [selector]. If
+   * selector is [TransitionSelector.Immediate], no fade in is applied regardless of user
+   * setting.
+   */
+  fun play(selector: TransitionSelector)
+
+  /**
+   * Pause playback if currently playing using the transition selected via [selector]. If
+   * selector is [TransitionSelector.Immediate], no fade out is applied regardless of user
+   * setting.
+   */
+  fun pause(selector: TransitionSelector)
+
+  /** Is the media prepared and seekable */
+  val isSeekable: Boolean
+
+  /** Go to playback [position] in the media */
+  fun seek(position: Millis)
+
+  /**
+   * Apply a transition to the player if it is valid from the current state and the player is not
+   * [shutdown]
+   */
+  fun transitionTo(transition: PlayerTransition)
+
+  /** Stops playing and releases some audio output resources that must be reset if played again */
+  fun stop()
+
+  /**
+   * Cancel any current playback or transition, remove event listeners, and release native
+   * resources.
+   */
+  fun shutdown()
+
+  /** Media length */
+  val duration: Millis
+
+  /** The playback position in the media. Vlc uses the term "time", so we'll use it here too */
+  val time: Millis
+
+  /** Current preset applied to the player. Can be [VlcEqPreset.NONE] */
+  var preset: VlcEqPreset
+
+  /** Playback volume in the range [VOLUME_RANGE] */
   var volume: Volume
 
+  /** Range of valid volumes, same as [VOLUME_RANGE] */
   val volumeRange: VolumeRange
 
-  fun pause(immediate: Boolean = false)
+  /**
+   * The playback rate, which defaults to [PlaybackRate.NORMAL]. Setting the rate clamps the value
+   * to [PlaybackRate.PLAYBACK_RATE_RANGE].
+   */
+  var rate: PlaybackRate
 
-  fun play(immediate: Boolean = false)
-
-  fun shutdown()
+//  fun reset()
+//  val vlcVout: IVLCVout
+//  val audioTracks: List<TrackInfo>
+//  fun setAudioTrack(id: Int)
+//  val spuTracks: List<TrackInfo>
+//  fun setSpuTrack(id: Int)
+//  var audioSync: Long
+//  var subtitleSync: Long
 
   companion object {
     val VOLUME_RANGE = Volume.ZERO..Volume.ONE_HUNDRED
@@ -64,33 +141,24 @@ interface VlcPlayer {
       libVlc: LibVlc,
       vlcMedia: VlcMedia,
       duration: Millis,
+      listener: VlcPlayerListener,
       vlcEqPreset: VlcEqPreset,
       onPreparedTransition: PlayerTransition,
+      prefs: AppPreferences,
       powerManager: PowerManager,
       dispatcher: CoroutineDispatcher = Dispatchers.IO
     ): VlcPlayer {
       return VlcPlayerImpl(
         libVlc.makeMediaPlayer(vlcMedia.media),
         duration,
+        listener,
         vlcEqPreset,
         onPreparedTransition,
+        prefs,
         powerManager,
         dispatcher
-      ).apply {
-        setPreset(vlcEqPreset)
-      }
+      )
     }
-    /*
-      override var duration: Long,
-private val updateListener: AvPlayerListener,
-private var eqPreset: Equalizer?,
-private val initialSeek: Long,
-private val onPreparedTransition: PlayerTransition,
-startPaused: Boolean,
-private val powerManager: PowerManager,
-private val prefs: AppPreferences
-
-     */
   }
 }
 
@@ -102,26 +170,29 @@ private val WAKE_LOCK_TIMEOUT = TimeUnit.MINUTES.toMillis(25).toMillis()
 
 private class VlcPlayerImpl(
   private val player: MediaPlayer,
-  private var duration: Millis,
-  private var eqPreset: VlcEqPreset,
+  override var duration: Millis,
+  private val updateListener: VlcPlayerListener,
+  private var vlcEqPreset: VlcEqPreset,
   private val onPreparedTransition: PlayerTransition,
+  private val prefs: AppPreferences,
   private val powerManager: PowerManager,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : VlcPlayer {
-  private val scope: CoroutineScope = MainScope()
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private val wakeLock: PowerManager.WakeLock = makeWakeLock()
+  private var firstStart = false
   private var realVolume: Volume = 0.toVolume()
   private var prepared = false
-  private var isShutdown = false
-  private var muted = false
-  private var unmutedVolume: Volume = 0.toVolume()
-  private var shutdownOnPrepared = false
+  override var isShutdown = false
   private var pausable = false
   private var seekable = false
+  private var transition: PlayerTransition = NoOpPlayerTransition
+  private val transitionPlayer = makeTransitionPlayer()
 
   init {
     addToQueue(this)
-    eqPreset.applyToPlayer(player)
+    onPreparedTransition.setPlayer(transitionPlayer)
+    vlcEqPreset.applyToPlayer(player)
     player.setEventListener(makeEventListener())
   }
 
@@ -135,91 +206,127 @@ private class VlcPlayerImpl(
     get() = realVolume
     set(value) {
       realVolume = value.coerceIn(VOLUME_RANGE)
-      muted = false
-      unmutedVolume = realVolume // MediaPlayer get volume not working
       if (isValid) {
         player.volume = realVolume.value
       }
     }
   override val volumeRange: VolumeRange = VOLUME_RANGE
 
-  fun release() {
-    player.setEventListener(null)
-    scope.cancel()
-    player.release()
-  }
-
   override fun shutdown() {
     if (!isShutdown) {
-
-//      transition.setCancelled()
+      transition.setCancelled()
       isShutdown = true
       secondStageShutdown()
     }
   }
 
+  override var rate: PlaybackRate
+    get() = player.rate.toPlaybackRate()
+    set(value) {
+      player.rate = value.coerceIn(PlaybackRate.PLAYBACK_RATE_RANGE).rate
+    }
+  override var preset: VlcEqPreset
+    get() = vlcEqPreset
+    set(value) {
+      value.applyToPlayer(player)
+      vlcEqPreset = value
+    }
+  override val isSeekable: Boolean
+    get() = seekable
+
+  override fun seek(position: Millis) {
+    if (isValid && player.isSeekable) {
+      player.time = position.value
+      if (!player.isPlaying) {
+        scope.launch { notifyTimeChangedImmediately(position, duration) }
+      }
+    }
+  }
+
+  override val time: Millis
+    get() = player.time.toMillis()
+
+  override val isPlaying: Boolean
+    get() = if (isPrepared) {
+      transition.isPlaying
+    } else {
+      onPreparedTransition.isPlaying
+    }
+  override val isPaused: Boolean
+    get() = if (isPrepared) {
+      transition.isPaused
+    } else {
+      onPreparedTransition.isPaused
+    }
+
   private fun secondStageShutdown() {
     removeFromQueue(this)
+    release()
+  }
+
+  fun release() {
+    player.setEventListener(null)
+    scope.cancel()
     if (!player.isReleased) player.release()
     if (wakeLock.isHeld) wakeLock.release()
   }
 
-  override fun pause(immediate: Boolean) {
-    TODO("Not yet implemented")
+  override fun pause(selector: TransitionSelector) {
+    if (isValid) startTransition(selector.selectPause(::getPauseTransition))
   }
 
-  override fun play(immediate: Boolean) {
-    TODO("Not yet implemented")
+  override fun play(selector: TransitionSelector) {
+    if (isValid) startTransition(selector.selectPlay(::getPlayTransition))
   }
 
-  fun setPreset(vlcEqPreset: VlcEqPreset) {
-    eqPreset = vlcEqPreset
-    vlcEqPreset.applyToPlayer(player)
+  override fun transitionTo(transition: PlayerTransition) {
+    startTransition(transition)
   }
+
+  override fun stop() {
+    if (isValid) player.stop()
+  }
+
+  override val isPrepared: Boolean
+    get() = prepared
 
   private fun makeWakeLock(): PowerManager.WakeLock = powerManager.newWakeLock(
     PowerManager.PARTIAL_WAKE_LOCK,
     javaClass.name
-  ).apply {
-    setReferenceCounted(false) // we don't need ref counting, just off or on
-  }
+  ).apply { setReferenceCounted(false) }
 
   private fun makeEventListener() = MediaPlayer.EventListener { event ->
     when (event.type) {
       Event.Opening -> {
-        // part of VLC HACK to quiet volume at start of fade in
-        // when setting the volume, use "realVolume", don't assume starts at zero
         player.volume = realVolume.value
-        // ----------------------------------------------------------------------
       }
       Event.Buffering -> if (!prepared && event.buffering > BUFFERING_PERCENT_TRIGGER_PREPARED) {
         prepared = true
-//        startTransition(lock, onPreparedTransition, true)
+        startTransition(onPreparedTransition, notifyPrepared = true)
       }
       Event.Playing -> if (prepared) {
         if (!wakeLock.isHeld) {
           wakeLock.acquire(WAKE_LOCK_TIMEOUT.value)
         }
-        //                            notifyPlaying();
       }
       Event.Paused -> if (prepared) {
         wakeLock.release()
       }
       Event.Stopped -> {
         wakeLock.release()
-//        updateListener.onStopped()
+        updateListener.onStopped()
       }
       Event.EndReached -> {
         shutdown()
-//        updateListener.onPlaybackComplete()
+        updateListener.onPlaybackComplete()
       }
       Event.EncounteredError -> {
         prepared = false
         shutdown()
-//        updateListener.onError()
+        updateListener.onError()
       }
       Event.TimeChanged -> {
-//        notifyTimeChangedImmediately(event.timeChanged, duration)
+        notifyTimeChangedImmediately(event.timeChanged.toMillis(), duration)
       }
       Event.PausableChanged -> {
         pausable = event.pausable
@@ -232,9 +339,37 @@ private class VlcPlayerImpl(
     }
   }
 
-  private val transitionPlayer = object : TransitionPlayer {
+  private fun notifyTimeChangedImmediately(time: Millis, duration: Millis) {
+    updateListener.onPositionUpdate(time, duration)
+  }
+
+  private fun startTransition(newTransition: PlayerTransition, notifyPrepared: Boolean = false) {
+    if (!isShutdown && transition.accept(newTransition)) {
+      transition.setCancelled()
+      newTransition.setPlayer(transitionPlayer)
+      transition = newTransition
+      val pos = player.time.toMillis()
+      val dur = duration
+      scope.launch {
+        if (notifyPrepared) {
+          updateListener.onPrepared(pos, dur)
+        }
+        newTransition.execute()
+      }
+    }
+  }
+
+  private fun getPauseTransition(): PlayerTransition =
+    if (prefs.fadeOnPlayPause()) PauseFadeOutTransition(prefs.playPauseFadeLength())
+    else PauseImmediateTransition()
+
+  private fun getPlayTransition(): PlayerTransition =
+    if (prefs.fadeOnPlayPause()) FadeInTransition(prefs.playPauseFadeLength())
+    else PlayImmediateTransition()
+
+  private fun makeTransitionPlayer() = object : TransitionPlayer {
     override val isPaused: Boolean
-      get() = isValid && player.isPlaying
+      get() = isValid && !player.isPlaying
 
     override val isPlaying: Boolean
       get() = isValid && player.isPlaying
@@ -247,10 +382,9 @@ private class VlcPlayerImpl(
     }
 
     override fun notifyPlaying() {
-      TODO("Emit playing event")
-//      coroutineScope {
-//        launch(Dispatchers.Main) { this@VlcPlayer.notifyPlaying() }
-//      }
+      val first = firstStart
+      firstStart = false
+      scope.launch { updateListener.onStart(first) }
     }
 
     override fun pause() {
@@ -258,10 +392,8 @@ private class VlcPlayerImpl(
     }
 
     override fun notifyPaused() {
-      TODO("Emit paused event")
-//      coroutineScope {
-//        launch(Dispatchers.Main) { this@VlcPlayer.notifyPaused() }
-//      }
+      val pos = player.time
+      scope.launch { updateListener.onPaused(pos.toMillis()) }
     }
 
     override var volume: Volume
@@ -317,7 +449,23 @@ object NullVlcPlayer : VlcPlayer {
     get() = 0.toVolume()
     set(@Suppress("UNUSED_PARAMETER") value) {}
   override val volumeRange: VolumeRange = VOLUME_RANGE
-  override fun pause(immediate: Boolean) = Unit
-  override fun play(immediate: Boolean) = Unit
+  override fun pause(selector: TransitionSelector) = Unit
+  override fun play(selector: TransitionSelector) = Unit
+  override fun transitionTo(transition: PlayerTransition) = Unit
   override fun shutdown() = Unit
+  override var rate: PlaybackRate
+    get() = PlaybackRate.NORMAL
+    set(@Suppress("UNUSED_PARAMETER") value) {}
+  override var preset: VlcEqPreset
+    get() = VlcEqPreset.NONE
+    set(@Suppress("UNUSED_PARAMETER") value) {}
+  override val duration: Millis = Millis.ZERO
+  override val isSeekable: Boolean = false
+  override fun seek(position: Millis) = Unit
+  override val time: Millis = Millis.ZERO
+  override val isPlaying: Boolean = false
+  override val isPaused: Boolean = false
+  override val isShutdown: Boolean = false
+  override fun stop() = Unit
+  override val isPrepared: Boolean = false
 }

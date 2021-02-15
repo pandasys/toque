@@ -23,7 +23,7 @@ import com.ealva.toque.db.QueueState
 import com.ealva.toque.db.QueueStateDao
 import com.ealva.toque.db.QueueStateDaoFactory
 import com.ealva.toque.db.QueueStateTable
-import com.ealva.toque.db.toMediaId
+import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.test.shared.withTestDatabase
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.get

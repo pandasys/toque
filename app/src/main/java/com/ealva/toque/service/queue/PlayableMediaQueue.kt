@@ -17,8 +17,26 @@
 package com.ealva.toque.service.queue
 
 interface PlayableMediaQueue<T : QueueMediaItem> {
+  /**
+   * What type of item is in the queue
+   */
+  val queueType: QueueType
+
+  /**
+   * Activate the queue, reestablishing index and position if [resume] is true, start playing if
+   * [startPlayer] is true
+   */
+  fun activate(
+    resume: Boolean,
+    startPlayer: Boolean,
+    haveWritePermission: Boolean
+  )
+
+  fun deactivate()
 
   val isActive: Boolean
+
+  val upNextQueue: List<T>
 
   val currentItem: T
 
@@ -29,4 +47,14 @@ interface PlayableMediaQueue<T : QueueMediaItem> {
   fun play(immediate: Boolean = false)
 
   fun pause(immediate: Boolean = false)
+
+  fun togglePlayPause()
+
+  fun next()
+
+  fun previous()
+
+  fun goToIndexMaybePlay(index: Int)
+
+  val streamVolume: StreamVolume
 }

@@ -20,6 +20,8 @@ import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.ArtistId
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict

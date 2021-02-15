@@ -22,6 +22,8 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.QueueStateDao.Companion.UNINITIALIZED_STATE
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.persist.isValid
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindInt

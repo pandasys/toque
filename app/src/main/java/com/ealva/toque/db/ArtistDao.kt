@@ -22,7 +22,9 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.debugRequire
+import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.toArtistId
+import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.compound.union
@@ -35,47 +37,20 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Query
+import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
-import it.unimi.dsi.fastutil.longs.LongArrayList
-import it.unimi.dsi.fastutil.longs.LongList
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-inline class ArtistId(override val id: Long) : PersistentId
-
-@Suppress("NOTHING_TO_INLINE")
-inline fun Long.toArtistId(): ArtistId {
-  debugRequire(PersistentId.isValidId(this)) { "All IDs must be greater than 0 to be valid" }
-  return ArtistId(this)
-}
-
-@Suppress("NOTHING_TO_INLINE")
-inline class ArtistIdList(val idList: LongList) : Iterable<ArtistId> {
-  inline val size: Int
-    get() = idList.size
-
-  inline operator fun plusAssign(artistId: ArtistId) {
-    idList.add(artistId.id)
-  }
-
-  inline operator fun get(index: Int): ArtistId = ArtistId(idList.getLong(index))
-
-  companion object {
-    @Suppress("MemberVisibilityCanBePrivate")
-    const val DEFAULT_INITIAL_CAPACITY = 16
-    operator fun invoke(capacity: Int = DEFAULT_INITIAL_CAPACITY): ArtistIdList =
-      ArtistIdList(LongArrayList(capacity))
-  }
-
-  override fun iterator(): Iterator<ArtistId> = idIterator(idList, ::ArtistId)
-}
-
 private val LOG by lazyLogger(ArtistDao::class)
+
+data class ArtistIdName(val artistId: ArtistId, val artistName: String)
 
 interface ArtistDao {
   /**
@@ -92,8 +67,10 @@ interface ArtistDao {
   fun deleteAll(txn: TransactionInProgress): Long
   fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
 
+  suspend fun getAllArtistNames(): List<ArtistIdName>
+
   companion object {
-    operator fun invoke(): ArtistDao = ArtistDaoImpl()
+    operator fun invoke(db: Database): ArtistDao = ArtistDaoImpl(db)
   }
 }
 
@@ -107,13 +84,13 @@ private val INSERT_STATEMENT = ArtistTable.insertValues {
 
 private val queryArtistBind = bindString()
 
-private val QUERY_ARTIST_INFO = Query(
+private val QUERY_ARTIST_UPDATE_INFO = Query(
   ArtistTable
     .selects { listOf(id, artist, artistSort, artistMbid) }
     .where { artist eq queryArtistBind }
 )
 
-private data class ArtistInfo(
+private data class ArtistUpdateInfo(
   val id: ArtistId,
   val artist: String,
   val artistSort: String,
@@ -122,7 +99,7 @@ private data class ArtistInfo(
 
 private val upsertLock: Lock = ReentrantLock()
 
-private class ArtistDaoImpl : ArtistDao {
+private class ArtistDaoImpl(private val db: Database) : ArtistDao {
 
   override fun upsertArtist(
     txn: TransactionInProgress,
@@ -141,6 +118,15 @@ private class ArtistDaoImpl : ArtistDao {
 
   override fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
     DELETE_ARTISTS_WITH_NO_MEDIA.delete()
+  }
+
+  override suspend fun getAllArtistNames(): List<ArtistIdName> = db.query {
+    ArtistTable
+      .selects { listOf(id, artist) }
+      .all()
+      .orderByAsc { artist }
+      .sequence { ArtistIdName(it[id].toArtistId(), it[artist]) }
+      .toList()
   }
 
   private fun TransactionInProgress.doUpsertArtist(
@@ -175,7 +161,7 @@ private class ArtistDaoImpl : ArtistDao {
     newArtistSort: String,
     newArtistMbid: ArtistMbid?,
     newUpdateTime: Millis
-  ): ArtistId? = queryArtistInfo(newArtist)?.let { info ->
+  ): ArtistId? = queryArtistUpdateInfo(newArtist)?.let { info ->
     // artist could match on query yet differ in case, so update if case changes
     val updateArtist = info.artist.updateOrNull { newArtist }
     val updateSort = info.artistSort.updateOrNull { newArtistSort }
@@ -198,9 +184,11 @@ private class ArtistDaoImpl : ArtistDao {
     info.id
   }
 
-  private fun Queryable.queryArtistInfo(artistName: String): ArtistInfo? = QUERY_ARTIST_INFO
+  private fun Queryable.queryArtistUpdateInfo(
+    artistName: String
+  ): ArtistUpdateInfo? = QUERY_ARTIST_UPDATE_INFO
     .sequence({ it[queryArtistBind] = artistName }) {
-      ArtistInfo(
+      ArtistUpdateInfo(
         it[id].toArtistId(),
         it[artist],
         it[artistSort],
@@ -209,7 +197,7 @@ private class ArtistDaoImpl : ArtistDao {
     }.singleOrNull()
 }
 
-val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
+private val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
   literal(0L) eq (
     ArtistMediaTable.select { mediaId }.where { artistId eq id } union
       MediaTable.select { id }.where {

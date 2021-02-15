@@ -30,10 +30,10 @@ import com.ealva.toque.common.debug
 import com.ealva.toque.service.media.MediaFormat
 import com.ealva.toque.service.media.MediaType
 import com.ealva.toque.service.media.Mp3Rating
-import com.ealva.toque.service.media.STAR_NO_RATING
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.media.toMp3Rating
 import com.ealva.toque.service.media.toRating
+import com.ealva.toque.service.media.toStarRating
 import com.google.common.base.Optional
 import com.google.common.base.Splitter
 import com.google.common.cache.CacheBuilder
@@ -200,7 +200,7 @@ class SongTag(
 
   var starRating: StarRating
     get() {
-      val ratingString = ratingAsString ?: return STAR_NO_RATING
+      val ratingString = ratingAsString ?: return StarRating.STAR_NONE
       return try {
         val value = ratingString.toInt()
         when (type) {
@@ -212,7 +212,7 @@ class SongTag(
       }
     }
     set(value) {
-      if (value.value == STAR_NO_RATING.value) {
+      if (value.value == StarRating.STAR_NONE.value) {
         deleteField(FieldKey.RATING)
       } else {
         when (type) {

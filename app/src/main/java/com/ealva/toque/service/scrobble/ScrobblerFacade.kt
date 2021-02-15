@@ -22,8 +22,8 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.prefs.AppPreferences
 import com.ealva.toque.prefs.ScrobblerPackage
-import com.ealva.toque.service.queue.NullQueueMediaItem
-import com.ealva.toque.service.queue.QueueMediaItem
+import com.ealva.toque.service.queue.AudioQueueItem
+import com.ealva.toque.service.queue.NullAudioQueueItem
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +65,7 @@ private class ScrobblerFacadeImpl(
 ) : Scrobbler {
   private var lastSelectedScrobbler = prefs.scrobbler()
   private var realScrobbler = scrobblerFactory.make(lastSelectedScrobbler)
-  private var lastActiveItem: QueueMediaItem = NullQueueMediaItem
+  private var lastActiveItem: AudioQueueItem = NullAudioQueueItem
   private var lastAction = ScrobblerAction.Shutdown
   private val scope: CoroutineScope = MainScope().apply {
     prefs.scrobblerFlow()
@@ -87,27 +87,27 @@ private class ScrobblerFacadeImpl(
     selectedScrobbler: ScrobblerPackage,
     oldScrobbler: Scrobbler,
     action: ScrobblerAction,
-    item: QueueMediaItem
+    item: AudioQueueItem
   ) = scrobblerFactory.make(selectedScrobbler).also { newScrobbler ->
     doScrobble {
-      ScrobblerAction.Shutdown.scrobble(oldScrobbler, NullQueueMediaItem)
+      ScrobblerAction.Shutdown.scrobble(oldScrobbler, NullAudioQueueItem)
       if (action.isStartOrResume && item.isValid) action.scrobble(newScrobbler, item)
     }
   }
 
-  override fun start(item: QueueMediaItem) {
+  override fun start(item: AudioQueueItem) {
     scrobble(ScrobblerAction.Start, item)
   }
 
-  override fun resume(item: QueueMediaItem) {
+  override fun resume(item: AudioQueueItem) {
     scrobble(ScrobblerAction.Resume, item)
   }
 
-  override fun pause(item: QueueMediaItem) {
+  override fun pause(item: AudioQueueItem) {
     scrobble(ScrobblerAction.Pause, item)
   }
 
-  override fun complete(item: QueueMediaItem) {
+  override fun complete(item: AudioQueueItem) {
     if (lastActiveItem == item) {
       scrobble(ScrobblerAction.Complete, item)
     }
@@ -117,7 +117,7 @@ private class ScrobblerFacadeImpl(
     scope.cancel()
     realScrobbler.shutdown()
     realScrobbler = NullScrobbler
-    lastActiveItem = NullQueueMediaItem
+    lastActiveItem = NullAudioQueueItem
     lastAction = ScrobblerAction.Shutdown
   }
 
@@ -126,7 +126,7 @@ private class ScrobblerFacadeImpl(
    * processing away from any UI or media player interactions. I've seen the resultant intent
    * broadcast take 100s of milliseconds to fire.
    */
-  private fun scrobble(action: ScrobblerAction, item: QueueMediaItem) {
+  private fun scrobble(action: ScrobblerAction, item: AudioQueueItem) {
     lastAction = action
     lastActiveItem = item
     if (realScrobbler !== NullScrobbler) { // if this won't result in a scrobble, don't bother
@@ -149,22 +149,22 @@ private class ScrobblerFacadeImpl(
 
   private enum class ScrobblerAction {
     Start {
-      override fun scrobble(scrobbler: Scrobbler, item: QueueMediaItem) = scrobbler.start(item)
+      override fun scrobble(scrobbler: Scrobbler, item: AudioQueueItem) = scrobbler.start(item)
     },
     Pause {
-      override fun scrobble(scrobbler: Scrobbler, item: QueueMediaItem) = scrobbler.pause(item)
+      override fun scrobble(scrobbler: Scrobbler, item: AudioQueueItem) = scrobbler.pause(item)
     },
     Resume {
-      override fun scrobble(scrobbler: Scrobbler, item: QueueMediaItem) = scrobbler.resume(item)
+      override fun scrobble(scrobbler: Scrobbler, item: AudioQueueItem) = scrobbler.resume(item)
     },
     Complete {
-      override fun scrobble(scrobbler: Scrobbler, item: QueueMediaItem) = scrobbler.complete(item)
+      override fun scrobble(scrobbler: Scrobbler, item: AudioQueueItem) = scrobbler.complete(item)
     },
     Shutdown {
-      override fun scrobble(scrobbler: Scrobbler, item: QueueMediaItem) = scrobbler.shutdown()
+      override fun scrobble(scrobbler: Scrobbler, item: AudioQueueItem) = scrobbler.shutdown()
     };
 
-    abstract fun scrobble(scrobbler: Scrobbler, item: QueueMediaItem)
+    abstract fun scrobble(scrobbler: Scrobbler, item: AudioQueueItem)
 
     val isStartOrResume: Boolean
       get() = when (this) {

@@ -18,11 +18,15 @@
 
 package com.ealva.toque.test.prefs
 
+import androidx.datastore.preferences.Preferences
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPreferences
 import com.ealva.toque.prefs.DuckAction
+import com.ealva.toque.prefs.EndOfQueueAction
+import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.prefs.ScrobblerPackage
+import com.ealva.toque.prefs.SelectMediaAction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -109,7 +113,43 @@ class AppPreferencesStub : AppPreferences {
     TODO("Not yet implemented")
   }
 
+  var _playUpNextAction: PlayUpNextAction = PlayUpNextAction.Prompt
+  var _getPlayUpNextActionCalled = 0
+  override fun playUpNextAction(): PlayUpNextAction =
+    _playUpNextAction.also { _getPlayUpNextActionCalled++ }
+
+  var _setPlayUpNextActionCalled = 0
+  override suspend fun playUpNextAction(action: PlayUpNextAction): Boolean {
+    _playUpNextAction = action
+    _setPlayUpNextActionCalled++
+    return true
+  }
+
+  var _endOfQueueAction: EndOfQueueAction = EndOfQueueAction.Stop
+  var _getEndOfQueueActionCalled = 1
+  override fun endOfQueueAction(): EndOfQueueAction =
+    _endOfQueueAction.also { _getEndOfQueueActionCalled++ }
+
+  var _setEndOfQueueActionCalled = false
+  override suspend fun endOfQueueAction(action: EndOfQueueAction): Boolean {
+    _endOfQueueAction = action
+    _setEndOfQueueActionCalled = true
+    return true
+  }
+
+  override fun selectMediaAction(): SelectMediaAction {
+    TODO("Not yet implemented")
+  }
+
+  override suspend fun selectMediaAction(action: SelectMediaAction): Boolean {
+    TODO("Not yet implemented")
+  }
+
   override suspend fun resetAllToDefault() {
     TODO("Not yet implemented")
   }
+
+  var _asMap: Map<Preferences.Key<*>, Any> = emptyMap()
+  var _asMapCalled = 0
+  override fun asMap(): Map<Preferences.Key<*>, Any> = _asMap.also { _asMapCalled++ }
 }

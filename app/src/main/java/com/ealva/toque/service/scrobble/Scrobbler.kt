@@ -16,7 +16,7 @@
 
 package com.ealva.toque.service.scrobble
 
-import com.ealva.toque.service.queue.QueueMediaItem
+import com.ealva.toque.service.queue.AudioQueueItem
 
 /**
  * Interface to all scrobblers. To add a Scrobbler, add the package/title to
@@ -24,21 +24,21 @@ import com.ealva.toque.service.queue.QueueMediaItem
  * in the [ScrobblerFactory.make] implementation.
  */
 interface Scrobbler {
-  fun start(item: QueueMediaItem)
+  fun start(item: AudioQueueItem)
 
-  fun resume(item: QueueMediaItem)
+  fun resume(item: AudioQueueItem)
 
-  fun pause(item: QueueMediaItem)
+  fun pause(item: AudioQueueItem)
 
-  fun complete(item: QueueMediaItem)
+  fun complete(item: AudioQueueItem)
 
   fun shutdown()
 }
 
 object NullScrobbler : Scrobbler {
-  override fun start(item: QueueMediaItem) {}
-  override fun resume(item: QueueMediaItem) {}
-  override fun pause(item: QueueMediaItem) {}
-  override fun complete(item: QueueMediaItem) {}
+  override fun start(item: AudioQueueItem) {}
+  override fun resume(item: AudioQueueItem) {}
+  override fun pause(item: AudioQueueItem) {}
+  override fun complete(item: AudioQueueItem) {}
   override fun shutdown() {}
 }

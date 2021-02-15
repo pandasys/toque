@@ -35,6 +35,7 @@ android {
     multiDexEnabled = true
 
     buildConfigField("boolean", "VLC_LOGGING", "false")
+    buildConfigField("String", "APP_ID", "\"${AppCoordinates.APP_ID}\"")
   }
 
   compileOptions {
@@ -109,6 +110,7 @@ dependencies {
   implementation(SupportLibs.ANDROIDX_APPCOMPAT)
   implementation(SupportLibs.ANDROIDX_CORE_KTX)
   implementation(SupportLibs.ANDROIDX_LIFECYCLE_RUNTIME_KTX)
+  implementation(SupportLibs.ANDROIDX_LIFECYCLE_SERVICE)
   implementation(SupportLibs.ANDROIDX_LIFECYCLE_COMMON)
   implementation(SupportLibs.ANDROIDX_DATASTORE_PREFERENCES)
 
@@ -147,15 +149,15 @@ dependencies {
     exclude("junit", "junit")
   }
   testImplementation(TestingLib.EXPECT)
-  testImplementation(TestingLib.MOCKK)
   testImplementation(TestingLib.ROBOLECTRIC)
   testImplementation(TestingLib.COROUTINE_TEST)
   testImplementation(ThirdParty.KOIN_TEST)
 
-  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_RUNNER) {
+  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_ANNOTATIONS)
+  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_EXT_JUNIT) {
     exclude("junit", "junit")
   }
-  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_EXT_JUNIT) {
+  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_RUNNER) {
     exclude("junit", "junit")
   }
   androidTestImplementation(TestingLib.JUNIT)

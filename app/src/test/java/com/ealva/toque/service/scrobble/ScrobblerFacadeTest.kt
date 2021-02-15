@@ -17,7 +17,7 @@
 package com.ealva.toque.service.scrobble
 
 import com.ealva.toque.prefs.ScrobblerPackage
-import com.ealva.toque.service.queue.QueueMediaItemFake
+import com.ealva.toque.service.queue.AudioQueueItemFake
 import com.ealva.toque.test.prefs.AppPreferencesStub
 import com.ealva.toque.test.service.scrobbler.ScrobblerFactoryStub
 import com.ealva.toque.test.service.scrobbler.ScrobblerStub
@@ -43,7 +43,7 @@ class ScrobblerFacadeTest {
 
   @Test
   fun `test scrobble`() = coroutineRule.runBlockingTest {
-    val item = QueueMediaItemFake()
+    val item = AudioQueueItemFake()
     val scrobbler = ScrobblerStub()
     val factory = ScrobblerFactoryStub()
     factory._makeReturns = mutableListOf(scrobbler)
@@ -75,7 +75,7 @@ class ScrobblerFacadeTest {
 
   @Test
   fun `test scrobbler pref change`() = coroutineRule.runBlockingTest {
-    val item = QueueMediaItemFake()
+    val item = AudioQueueItemFake()
     val scrobbler1 = ScrobblerStub()
     val scrobbler2 = ScrobblerStub()
     val factory = ScrobblerFactoryStub()
@@ -107,7 +107,7 @@ class ScrobblerFacadeTest {
 
   @Test
   fun `test set same scrobbler package does not flow duplicate`() = coroutineRule.runBlockingTest {
-    val item = QueueMediaItemFake()
+    val item = AudioQueueItemFake()
     val scrobbler1 = ScrobblerStub()
     val scrobbler2 = ScrobblerStub()
     val factory = ScrobblerFactoryStub()

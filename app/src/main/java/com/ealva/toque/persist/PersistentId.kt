@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 eAlva.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,32 +16,26 @@
 
 @file:Suppress("NOTHING_TO_INLINE")
 
-package com.ealva.toque.db
+package com.ealva.toque.persist
 
 import com.ealva.ealvabrainz.brainz.data.isInvalid
 import com.ealva.ealvabrainz.brainz.data.isValid
-import com.ealva.toque.common.debugRequire
-import com.ealva.toque.db.PersistentId.Companion.ID_INVALID
-import com.ealva.toque.db.PersistentId.Companion.isValidId
+import com.ealva.toque.persist.PersistentId.Companion.ID_INVALID
+import com.ealva.toque.persist.PersistentId.Companion.isValidId
+import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 
 /**
  * Interface for persistent IDs, used to define [id] property, the constant [ID_INVALID], and
  * extension functions [isValid] and [isInvalid] so expected inline subclasses do not need to define
- * this common functions.
+ * these common functions.
  */
 interface PersistentId {
   val id: Long
 
   companion object {
-    const val ID_INVALID = 0L
-
-    inline fun isValidId(id: Long): Boolean = id > ID_INVALID
-
-    val INVALID = object : PersistentId {
-      override val id: Long
-        get() = ID_INVALID
-    }
+    const val ID_INVALID = -1L
+    inline fun isValidId(id: Long): Boolean = id > 0
   }
 }
 
@@ -63,23 +57,30 @@ inline fun <reified T : PersistentId> idIterator(
   }
 }
 
-/**
- * Prefer making a MediaId this way to get a little error checking
- */
-inline fun Long.toMediaId(): MediaId {
-  debugRequire(isValidId(this)) { "All IDs must be greater than 0 to be valid" }
-  return MediaId(this)
-}
-
-/**
- * Primary for test
- */
-inline fun Int.toMediaId() = this.toLong().toMediaId()
+inline fun Long.toMediaId(): MediaId = MediaId(this)
+inline fun Int.toMediaId() = toLong().toMediaId()
 
 inline class MediaId(override val id: Long) : PersistentId {
   companion object {
     val INVALID = MediaId(ID_INVALID)
   }
+}
+
+inline class MediaIdList(val idList: LongList) : Iterable<MediaId> {
+  inline val size: Int
+    get() = idList.size
+
+  inline operator fun plusAssign(mediaId: MediaId) {
+    idList.add(mediaId.id)
+  }
+
+  inline operator fun get(index: Int): MediaId = idList.getLong(index).toMediaId()
+
+  companion object {
+    inline operator fun invoke(capacity: Int): MediaIdList = MediaIdList(LongArrayList(capacity))
+  }
+
+  override fun iterator(): Iterator<MediaId> = idIterator(idList, ::MediaId)
 }
 
 /**
@@ -92,6 +93,7 @@ interface HasId {
    * Unique persistent ID of instances of this interface
    */
   val id: PersistentId
+
   /**
    * The "instance" ID is required as some persistent items may appear in lists more than once.
    * This is the unique ID for a particular instance represented by [id]. If duplicate instances
