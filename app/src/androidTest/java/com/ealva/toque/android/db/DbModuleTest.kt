@@ -26,6 +26,7 @@ import com.ealva.toque.db.ArtistMediaDao
 import com.ealva.toque.db.ArtistMediaTable
 import com.ealva.toque.db.ArtistTable
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.AudioQueueTable
 import com.ealva.toque.db.ComposerDao
 import com.ealva.toque.db.ComposerMediaDao
 import com.ealva.toque.db.ComposerMediaTable
@@ -62,7 +63,7 @@ class DbModuleTest : KoinTest {
   fun testExpectedTables() {
     val db: Database = get()
     val tables = db.tables
-    expect(tables).toHaveSize(12)
+    expect(tables).toHaveSize(13)
     expect(tables).toBe(
       listOf(
         ArtistTable,
@@ -76,6 +77,7 @@ class DbModuleTest : KoinTest {
         GenreMediaTable,
         EqPresetTable,
         EqPresetAssociationTable,
+        AudioQueueTable,
         QueueStateTable
       )
     )

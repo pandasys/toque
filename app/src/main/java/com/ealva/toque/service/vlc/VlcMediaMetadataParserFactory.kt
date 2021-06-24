@@ -21,10 +21,6 @@ import com.ealva.ealvabrainz.brainz.data.ArtistMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
 import com.ealva.ealvabrainz.brainz.data.TrackMbid
-import com.ealva.ealvabrainz.brainz.data.toArtistMbid
-import com.ealva.ealvabrainz.brainz.data.toReleaseGroupMbid
-import com.ealva.ealvabrainz.brainz.data.toReleaseMbid
-import com.ealva.ealvabrainz.brainz.data.toTrackMbid
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -33,7 +29,7 @@ import com.ealva.toque.common.toMillis
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
 import com.ealva.toque.log._e
-import com.ealva.toque.service.media.MediaMetadata
+import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParser
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import com.ealva.toque.service.media.StarRating
@@ -49,9 +45,8 @@ import kotlin.math.min
 
 private val LOG by lazyLogger(MediaMetadataParser::class)
 
-fun Uri.tagCanParseExtension(): Boolean {
-  return SupportedFileFormat.fromExtension(fileExtension) !== SupportedFileFormat.UNKNOWN
-}
+fun Uri.tagCanParseExtension(): Boolean =
+  SupportedFileFormat.fromExtension(fileExtension) !== SupportedFileFormat.UNKNOWN
 
 class VlcMediaMetadataParserFactory(
   private val libVlcSingleton: LibVlcSingleton
@@ -66,24 +61,25 @@ class VlcMediaMetadataParserFactory(
 private class MediaMetadataParserImpl(
   private val libVlc: LibVlc
 ) : MediaMetadataParser {
-  override fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaMetadata {
+  override fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaFileTagInfo {
     return if (uri.isFileScheme() && uri.tagCanParseExtension()) {
       try {
-        TagMediaMetadata(File(uri.path.orEmpty()), artistParser)
+        FileTagInfo(File(uri.path.orEmpty()), artistParser)
       } catch (e: Exception) {
         LOG.e(e) { it("Could not open file '%s' uri=%s", uri.path.orEmpty(), uri) }
-        VlcMediaMetadata(uri, libVlc, artistParser)
+        VlcTagInfo(uri, libVlc, artistParser)
       }
     } else {
-      VlcMediaMetadata(uri, libVlc, artistParser)
+      LOG._e { it("Fallback to LibVLC as no parser found for %s", uri) }
+      VlcTagInfo(uri, libVlc, artistParser)
     }
   }
 }
 
-private class TagMediaMetadata private constructor(
+private class FileTagInfo private constructor(
   private val tag: SongTag,
   private val artistParser: ArtistParser
-) : MediaMetadata {
+) : MediaFileTagInfo {
   override val duration: Millis
     get() = tag.duration.toMillis()
   override val title: String
@@ -161,7 +157,7 @@ private class TagMediaMetadata private constructor(
     operator fun invoke(
       file: File,
       artistParser: ArtistParser
-    ): MediaMetadata = TagMediaMetadata(
+    ): MediaFileTagInfo = FileTagInfo(
       SongTag(
         file,
         ignoreArtwork = true,
@@ -177,10 +173,10 @@ private const val END_OF_DATE_INDEX = 3
 @Suppress("NOTHING_TO_INLINE")
 private inline fun String?.orUnknown(): String = if (isNullOrBlank()) "Unknown" else this
 
-private class VlcMediaMetadata private constructor(
+private class VlcTagInfo private constructor(
   private val media: IMedia,
   artistParser: ArtistParser
-) : MediaMetadata {
+) : MediaFileTagInfo {
   private fun meta(id: Int): String? = media.getMeta(id)
   private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist).orUnknown()))
   private val _artistsSort = _artists.map { it.toArtistSort() }
@@ -224,10 +220,7 @@ private class VlcMediaMetadata private constructor(
       return date.substring(0, min(END_OF_DATE_INDEX, date.length)).toIntOrNull() ?: 0
     }
   override val rating: StarRating
-    get() {
-      LOG._e { it("rating=%s", meta(IMedia.Meta.Rating).orEmpty()) }
-      return StarRating.STAR_NONE
-    }
+    get() = StarRating.STAR_NONE
   override val comment: String = ""
   override val lyrics: String = ""
   override val artistMbid: ArtistMbid? = null
@@ -271,8 +264,8 @@ private class VlcMediaMetadata private constructor(
       uri: Uri,
       libVlc: LibVlc,
       artistParser: ArtistParser
-    ): MediaMetadata {
-      return VlcMediaMetadata(
+    ): MediaFileTagInfo {
+      return VlcTagInfo(
         libVlc.makeNativeMedia(uri).apply { if (!isParsed) parse(VlcMedia.parseFlagFromUri(uri)) },
         artistParser
       )
@@ -292,7 +285,7 @@ fun StringBuilder.appendIndentedLine(title: String, obj: Any?, isLast: Boolean =
   }
 }
 
-fun MediaMetadata.asString(): String {
+fun MediaFileTagInfo.asString(): String {
   return buildString {
     appendLine("MediaMetadata[")
     appendIndentedLine("title", title)
@@ -334,3 +327,8 @@ fun MediaMetadata.asString(): String {
     appendLine("]")
   }
 }
+
+fun String.toArtistMbid() = ArtistMbid(this)
+fun String.toReleaseMbid() = ReleaseMbid(this)
+fun String.toReleaseGroupMbid() = ReleaseGroupMbid(this)
+fun String.toTrackMbid() = TrackMbid(this)

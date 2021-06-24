@@ -22,20 +22,23 @@ typealias VolumeRange = ClosedRange<Volume>
 
 inline fun Int.toVolume(): Volume = Volume(this)
 
-inline class Volume(val value: Int) : Comparable<Volume> {
+@JvmInline
+value class Volume(val value: Int) : Comparable<Volume> {
   override fun toString(): String = value.toString()
 
   override fun compareTo(other: Volume): Int = value.compareTo(other.value)
   inline operator fun minus(other: Volume): Volume = (value - other.value).toVolume()
   inline operator fun plus(other: Volume): Volume = (value + other.value).toVolume()
   inline operator fun div(other: Volume): Volume = (value / other.value).toVolume()
+  inline operator fun div(other: Int): Volume = (value / other).toVolume()
 
   inline operator fun plus(rhs: Int): Volume = (value + rhs).toVolume()
 
   companion object {
     // Commonly used Volumes
-    val ZERO = 0.toVolume()
-    val ONE = 1.toVolume()
-    val ONE_HUNDRED = 100.toVolume()
+    val ZERO = Volume(0)
+    val ONE = Volume(1)
+    val FIFTY = Volume(50)
+    val ONE_HUNDRED = Volume(100)
   }
 }

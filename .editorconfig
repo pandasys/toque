@@ -8,11 +8,13 @@ indent_style = space
 insert_final_newline = true
 max_line_length = 100
 tab_width = 2
+trim_trailing_whitespace = true
 
 
-[{*.kt,*.kts}]
+[{*.kt, *.kts}]
 # Comma-separated list of rules to disable (Since 0.34.0)
 # Note that rules in any ruleset other than the standard ruleset will need to be prefixed
 # by the ruleset identifier.
 # noinspection EditorConfigKeyCorrectness
-disabled_rules=import-ordering,no-multi-spaces
+disabled_rules = import-ordering, no-multi-spaces
+ij_kotlin_name_count_to_use_star_import_for_members = 99

@@ -20,7 +20,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 /**
  * Describes the state of "shuffle"
@@ -31,8 +31,8 @@ enum class ShuffleMode(
   val shuffleMedia: Boolean,
   /** Should list selection be random */
   val shuffleLists: Boolean,
-  @StringRes override val stringRes: Int
-) : HasConstId, HasDescription {
+  @StringRes override val titleRes: Int
+) : HasConstId, HasTitle {
   None(1, false, false, R.string.ShuffleNone),
   Media(2, true, false, R.string.ShuffleMedia),
   Lists(3, false, true, R.string.ShuffleLists),

@@ -17,70 +17,55 @@
 package com.ealva.toque.service.vlc
 
 import android.content.Context
+import android.net.Uri
 import android.os.PowerManager
 import androidx.core.content.getSystemService
 import com.ealva.toque.common.Millis
-import com.ealva.toque.prefs.AppPreferences
+import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.service.player.AvPlayer
+import com.ealva.toque.service.player.AvPlayerFactory
 import com.ealva.toque.service.player.PlayerTransition
+import com.ealva.toque.service.player.WakeLock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import java.util.concurrent.TimeUnit
 
-interface VlcPlayerFactory {
-  suspend fun make(
-    vlcMedia: VlcMedia,
-    listener: VlcPlayerListener,
-    vlcEqPreset: VlcEqPreset,
-    onPreparedTransition: PlayerTransition,
-    prefs: AppPreferences,
-    duration: Millis,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
-  ): VlcPlayer
+private const val WAKE_LOCK_TIMEOUT_MINUTES = 25L
 
-  companion object {
-    operator fun invoke(
-      context: Context,
-      libVlcSingleton: LibVlcSingleton
-    ): VlcPlayerFactory = VlcPlayerFactoryImpl(context, libVlcSingleton)
-  }
-}
+private val WAKE_LOCK_TIMEOUT = Millis(TimeUnit.MINUTES.toMillis(WAKE_LOCK_TIMEOUT_MINUTES))
 
-class VlcPlayerFactoryImpl(
+class VlcPlayerFactory(
   context: Context,
-  private val libVlcSingleton: LibVlcSingleton
-) : VlcPlayerFactory {
+  private val libVlcSingleton: LibVlcSingleton,
+  private val libVlcPrefsSingleton: LibVlcPrefsSingleton,
+  private val appPrefs: AppPrefs,
+  private val presetSelector: EqPresetSelector,
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Main
+) : AvPlayerFactory {
   private val powerManager: PowerManager = requireNotNull(context.getSystemService())
 
-  override suspend fun make(
-    vlcMedia: VlcMedia,
-    listener: VlcPlayerListener,
-    vlcEqPreset: VlcEqPreset,
-    onPreparedTransition: PlayerTransition,
-    prefs: AppPreferences,
+  override suspend fun makeAudioPlayer(
+    media: Uri,
+    mediaId: MediaId,
+    albumId: AlbumId,
     duration: Millis,
-    dispatcher: CoroutineDispatcher
-  ): VlcPlayer {
-    return VlcPlayer.make(
-      libVlcSingleton.instance(),
-      vlcMedia,
-      duration,
-      listener,
-      vlcEqPreset,
-      onPreparedTransition,
-      prefs,
-      powerManager,
-      dispatcher
-    )
-  }
+    preparedTransition: PlayerTransition,
+    startPaused: Boolean
+  ): AvPlayer = VlcPlayer(
+    libVlcSingleton.instance()
+      .makeAudioMedia(media, Millis.ZERO, startPaused, libVlcPrefsSingleton.instance()),
+    duration,
+    presetSelector.getPreferredEqPreset(mediaId, albumId),
+    preparedTransition,
+    appPrefs,
+    WakeLock(powerManager.makeWakeLock(), WAKE_LOCK_TIMEOUT),
+    dispatcher
+  )
 }
 
-object NullVlcPlayerFactory : VlcPlayerFactory {
-  override suspend fun make(
-    vlcMedia: VlcMedia,
-    listener: VlcPlayerListener,
-    vlcEqPreset: VlcEqPreset,
-    onPreparedTransition: PlayerTransition,
-    prefs: AppPreferences,
-    duration: Millis,
-    dispatcher: CoroutineDispatcher
-  ): VlcPlayer = NullVlcPlayer
-}
+private fun PowerManager.makeWakeLock() =
+  newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, javaClass.name).apply {
+    setReferenceCounted(false)
+  }

@@ -21,7 +21,6 @@ import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap
 import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap
 import org.videolan.libvlc.util.Extensions
-import java.util.Locale
 
 enum class MediaFormat(
   override val id: Int,
@@ -205,7 +204,7 @@ enum class MediaFormat(
      */
     fun mediaFormatFromMimeType(mimeType: String): MediaFormat = mimeType
       .splitToSequence(',')
-      .map { mimeTypeToFormatMap[it.trim().toLowerCase(Locale.ROOT)] }
+      .map { mimeTypeToFormatMap[it.trim().lowercase()] }
       .filterNotNull()
       .firstOrNull() ?: Unknown
 
@@ -213,7 +212,7 @@ enum class MediaFormat(
      * Get the MediaFormat for the file extension. Returns [Unknown] if not found.
      */
     fun mediaFormatFromExtension(extension: String): MediaFormat {
-      return extensionToFormatMap.getOrDefault(extension.toLowerCase(Locale.ROOT), Unknown)
+      return extensionToFormatMap.getOrDefault(extension.lowercase(), Unknown)
     }
   }
 
@@ -233,7 +232,7 @@ enum class MediaFormat(
     get() = types.asList()
 
   fun hasMimeType(mimeType: String): Boolean {
-    return mimeType.splitToSequence(',').any { it.trim().toLowerCase(Locale.ROOT) in types }
+    return mimeType.splitToSequence(',').any { it.trim().lowercase() in types }
   }
 
   val fileExtensions: List<String>
@@ -243,7 +242,7 @@ enum class MediaFormat(
     get() = extensions.firstOrNull()
 
   fun hasFileExtension(fileExtension: String): Boolean {
-    return extensions.contains(fileExtension.toLowerCase(Locale.ROOT))
+    return extensions.contains(fileExtension.lowercase())
   }
 
   val preferredMimeType: String?

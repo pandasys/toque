@@ -16,22 +16,22 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.toque.service.media.EqPresetFactory
 import com.ealva.toque.service.media.MediaFactory
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.make as makeLibVlcPrefs
+
+private const val LIBVLC_PREFS_FILE_NAME = "LibVlcPrefs"
 
 object LibVlcModule {
-  val module = module {
-    single { LibVlcPreferencesSingleton(androidContext()) }
+  val koinModule = module {
+    single { LibVlcPrefsSingleton(::makeLibVlcPrefs, androidContext(), LIBVLC_PREFS_FILE_NAME) }
     single { LibVlcSingleton(androidContext(), get()) }
-    single<MediaMetadataParserFactory> {
-      VlcMediaMetadataParserFactory(get())
-    }
-    single { VlcPresetFactory(androidContext(), get(), get(), get()) } bind EqPresetFactory::class
-    single { VlcPlayerFactory(androidContext(), get()) }
+    single<MediaMetadataParserFactory> { VlcMediaMetadataParserFactory(get()) }
+    single { VlcPresetFactory(androidContext(), get(), get(), get()) } bind EqPresetSelector::class
+    single { VlcPlayerFactory(androidContext(), get(), get(), get(), get()) }
     single<MediaFactory> { VlcMediaFactory(get(), get(), get(), get(), get()) }
   }
 }

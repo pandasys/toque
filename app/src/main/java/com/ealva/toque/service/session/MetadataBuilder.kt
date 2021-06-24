@@ -57,9 +57,11 @@ inline fun buildMetadata(
   builderAction: MediaMetadataCompat.Builder.() -> Unit
 ): MediaMetadataCompat = MediaMetadataCompat.Builder().apply(builderAction).build()
 
-val NOTHING_PLAYING: MediaMetadataCompat = buildMetadata {
-  mediaItemIdString { "" }
-  duration { Millis.ZERO }
+val NOTHING_PLAYING: MediaMetadata = MediaMetadata().apply {
+  edit {
+    id = ""
+    duration = Millis.ZERO
+  }
 }
 
 inline fun MediaMetadataCompat.Builder.mediaItemId(mediaId: () -> PersistentId) {
@@ -137,6 +139,7 @@ inline fun MediaMetadataCompat.Builder.displayIconUri(iconUri: () -> Uri) {
   val uri = iconUri()
   if (uri != Uri.EMPTY) putString(METADATA_KEY_DISPLAY_ICON_URI, uri.toString())
 }
+
 /*
 METADATA_KEY_BT_FOLDER_TYPE
 METADATA_KEY_ADVERTISEMENT

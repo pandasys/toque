@@ -19,15 +19,15 @@ package com.ealva.toque.audio
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 import org.videolan.libvlc.util.HWDecoderUtil
 
 enum class AudioOutputModule(
   override val id: Int,
   private val module: String,
   private val hardwareOutput: HWDecoderUtil.AudioOutput,
-  @StringRes override val stringRes: Int
-) : HasConstId, HasDescription {
+  @StringRes override val titleRes: Int
+) : HasConstId, HasTitle {
   OpenSlEs(
     1,
     "opensles_android",

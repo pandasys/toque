@@ -23,6 +23,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.toGenreId
+import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
@@ -31,30 +32,45 @@ import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Query
+import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
+import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.runCatching
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(GenreDao::class)
-private val getOrInsertLock: Lock = ReentrantLock()
 
-private val INSERT_GENRE = GenreTable.insertValues {
-  it[genre].bindArg()
-  it[createdTime].bindArg()
+sealed class GenreDaoEvent {
+  data class GenresCreatedOrUpdated(val genreIdList: GenreIdList) : GenreDaoEvent()
 }
 
-private val queryGenreNameBind = bindString()
+data class GenreIdName(val genreId: GenreId, val genreName: String)
 
-private val QUERY_GENRE_ID = Query(
-  GenreTable.select(GenreTable.id)
-    .where { genre eq queryGenreNameBind }
-)
-
+/**
+ * If a function receives a transaction parameter it is not suspending, whereas suspend functions
+ * are expected to start transaction or query which will dispatch on another thread, should return a
+ * [Result] if not returningUnit and not throw exceptions. Functions receiving a transaction are
+ * typically called by the media scanner, directly or indirectly, and are already dispatched on a
+ * background thread.
+ */
 interface GenreDao {
+  val genreDaoEvents: SharedFlow<GenreDaoEvent>
+
   /**
    * Gets or creates the Ids for the list of genres. Throws IllegalStateException if a genre is
    * not found and cannot be inserted.
@@ -68,19 +84,32 @@ interface GenreDao {
   fun deleteAll(txn: TransactionInProgress)
   fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long
 
+  suspend fun getAllGenreNames(limit: Long): Result<List<GenreIdName>, DaoMessage>
+
   companion object {
-    operator fun invoke(): GenreDao = GenreDaoImpl()
+    operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
+      GenreDaoImpl(db, dispatcher ?: Dispatchers.Main)
   }
 }
 
-private class GenreDaoImpl : GenreDao {
+private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispatcher) : GenreDao {
+  private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val getOrInsertLock: Lock = ReentrantLock()
+  override val genreDaoEvents = MutableSharedFlow<GenreDaoEvent>()
+
+  private fun emit(event: GenreDaoEvent) {
+    scope.launch { genreDaoEvents.emit(event) }
+  }
 
   override fun getOrCreateGenreIds(
     txn: TransactionInProgress,
     genreList: List<String>,
     createTime: Millis
-  ): GenreIdList = GenreIdList(genreList.size).also { list ->
-    genreList.forEach { genre -> list += txn.getOrCreateGenre(genre, createTime) }
+  ): GenreIdList {
+    val genreIdList = GenreIdList()
+    return GenreIdList(genreList.size).also { list ->
+      genreList.forEach { genre -> list += txn.getOrCreateGenre(genre, createTime, genreIdList) }
+    }.also { if (genreIdList.isNotEmpty) emit(GenreDaoEvent.GenresCreatedOrUpdated(genreIdList)) }
   }
 
   override fun deleteAll(txn: TransactionInProgress) = txn.run {
@@ -94,6 +123,21 @@ private class GenreDaoImpl : GenreDao {
     }.delete()
   }
 
+  override suspend fun getAllGenreNames(
+    limit: Long
+  ): Result<List<GenreIdName>, DaoMessage> = db.query {
+    runCatching { doGetGenreNames(limit) }
+      .mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetGenreNames(limit: Long): List<GenreIdName> = GenreTable
+    .selects { listOf(id, genre) }
+    .all()
+    .orderByAsc { genre }
+    .limit(limit)
+    .sequence { GenreIdName(it[id].toGenreId(), it[genre]) }
+    .toList()
+
   /**
    * Could be a race condition if two threads are trying to insert the same genre at the same time,
    * so use a pattern similar to double check locking. Try the query, if result is null obtain a
@@ -101,24 +145,38 @@ private class GenreDaoImpl : GenreDao {
    * the race to insert. The great majority of the time the first query succeeds and the lock is
    * avoided.
    */
-  private fun TransactionInProgress.getOrCreateGenre(genre: String, createTime: Millis): GenreId =
-    getGenreId(genre)?.toGenreId() ?: getOrInsert(genre, createTime).toGenreId()
+  private fun TransactionInProgress.getOrCreateGenre(
+    genre: String,
+    createTime: Millis,
+    genreIdList: GenreIdList
+  ): GenreId =
+    getGenreId(genre) ?: getOrInsert(genre, createTime, genreIdList)
 
-  private fun Queryable.getGenreId(genre: String): Long? = QUERY_GENRE_ID
+  private fun Queryable.getGenreId(genre: String): GenreId? = QUERY_GENRE_ID
     .sequence({ it[queryGenreNameBind] = genre }) { it[id] }
     .singleOrNull()
+    ?.toGenreId()
 
-  /**
-   * Get a lock and try to insert. If another thread won the race to insert, query on failure. If
-   * query fails throw IllegalStateException.
-   */
   private fun TransactionInProgress.getOrInsert(
     newGenre: String,
-    createTime: Millis
-  ): Long = getOrInsertLock.withLock {
+    createTime: Millis,
+    genreIdList: GenreIdList
+  ): GenreId = getOrInsertLock.withLock {
     getGenreId(newGenre) ?: INSERT_GENRE.insert {
       it[genre] = newGenre
       it[createdTime] = createTime.value
-    }
+    }.toGenreId().also { id -> genreIdList += id }
   }
 }
+
+private val INSERT_GENRE = GenreTable.insertValues {
+  it[genre].bindArg()
+  it[createdTime].bindArg()
+}
+
+private val queryGenreNameBind = bindString()
+
+private val QUERY_GENRE_ID = Query(
+  GenreTable.select(GenreTable.id)
+    .where { genre eq queryGenreNameBind }
+)

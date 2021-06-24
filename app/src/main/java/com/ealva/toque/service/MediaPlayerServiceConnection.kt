@@ -20,24 +20,22 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
-import androidx.lifecycle.Transformations
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._i
+import com.ealva.toque.log._w
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 private val LOG by lazyLogger(MediaPlayerServiceConnectionImpl::class)
 
 interface MediaPlayerServiceConnection {
   /**
-   * Observe for ToqueMediaController instance. Starts as [NullMediaController],
-   * set to the controller instance on successful bind, and then set to [NullMediaController]
-   * if the service becomes unavailable
+   * Starts as [NullMediaController], set to the controller instance on successful bind, and then
+   * set to [NullMediaController] if the service becomes unavailable
    */
-  val mediaController: LiveData<ToqueMediaController>
+  val mediaController: StateFlow<ToqueMediaController>
 
   fun bind(): Boolean
   fun unbind()
@@ -58,10 +56,8 @@ private class MediaPlayerServiceConnectionImpl(
 ) : MediaPlayerServiceConnection {
   private var serviceConnection: ServiceConnection? = null
   private var isBound: Boolean = false
-  private var toqueMediaController: ToqueMediaController = NullMediaController
 
-  override val mediaController: MediatorLiveData<ToqueMediaController> =
-    MediatorLiveData<ToqueMediaController>().apply { value = NullMediaController }
+  override val mediaController = MutableStateFlow<ToqueMediaController>(NullMediaController)
 
   override fun bind(): Boolean {
     serviceConnection = bindToService(context, context.javaClass.name)
@@ -72,7 +68,6 @@ private class MediaPlayerServiceConnectionImpl(
   override fun unbind() {
     if (isBound) {
       isBound = false
-      toqueMediaController = NullMediaController
       mediaController.value = NullMediaController
       serviceConnection?.let {
         context.unbindService(it)
@@ -101,32 +96,20 @@ private class MediaPlayerServiceConnectionImpl(
 
   private fun makeServiceConnection(binderName: String): ServiceConnection {
     return object : ServiceConnection {
-      private lateinit var controllerSource: LiveData<ToqueMediaController>
-
       override fun onServiceConnected(
         name: ComponentName,
         service: IBinder
       ) {
-        LOG._i { it("-->onServiceConnected %s", binderName) }
+        LOG._w { it("-->onServiceConnected %s", binderName) }
         val binder = service as MediaPlayerService.MediaServiceBinder
-        toqueMediaController = binder.controller
-
-        controllerSource = Transformations.map(toqueMediaController.isActive) { active ->
-          if (active == true) toqueMediaController else NullMediaController
-        }
-
-        mediaController.addSource(controllerSource) { controller ->
-          mediaController.value = controller
-        }
-        LOG._i { it("<--onServiceConnected %s", binderName) }
+        mediaController.value = binder.controller
+        LOG._w { it("<--onServiceConnected %s", binderName) }
       }
 
       override fun onServiceDisconnected(name: ComponentName) {
-        LOG._i { it("-->onServiceDisconnected %s", binderName) }
-        mediaController.removeSource(controllerSource)
-        toqueMediaController = NullMediaController
+        LOG._w { it("-->onServiceDisconnected %s", binderName) }
         mediaController.value = NullMediaController
-        LOG._i { it("<--onServiceDisconnected %s", binderName) }
+        LOG._w { it("<--onServiceDisconnected %s", binderName) }
       }
     }
   }

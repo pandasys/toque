@@ -19,12 +19,12 @@ package com.ealva.toque.service.vlc
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 enum class HardwareAcceleration(
   override val id: Int,
-  @StringRes override val stringRes: Int
-) : HasConstId, HasDescription {
+  @StringRes override val titleRes: Int
+) : HasConstId, HasTitle {
   Disabled(1, R.string.Disabled),
   Automatic(2, R.string.Automatic),
   Decoding(3, R.string.DecodingAcceleration),

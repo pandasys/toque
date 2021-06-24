@@ -21,27 +21,27 @@ package com.ealva.toque.persist
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 
-inline class ArtistId(override val id: Long) : PersistentId
+@JvmInline
+value class ArtistId(override val value: Long) : PersistentId
 
 inline fun Long.toArtistId(): ArtistId = ArtistId(this)
 inline fun Int.toArtistId(): ArtistId = toLong().toArtistId()
 
-inline class ArtistIdList(val idList: LongList) : Iterable<ArtistId> {
+@JvmInline
+value class ArtistIdList(val prop: LongList) : Iterable<ArtistId> {
   inline val size: Int
-    get() = idList.size
+    get() = prop.size
 
   inline operator fun plusAssign(artistId: ArtistId) {
-    idList.add(artistId.id)
+    prop.add(artistId.value)
   }
 
-  inline operator fun get(index: Int): ArtistId = ArtistId(idList.getLong(index))
+  inline operator fun get(index: Int): ArtistId = ArtistId(prop.getLong(index))
 
   companion object {
-    @Suppress("MemberVisibilityCanBePrivate")
-    const val DEFAULT_INITIAL_CAPACITY = 16
-    operator fun invoke(capacity: Int = DEFAULT_INITIAL_CAPACITY): ArtistIdList =
+    inline operator fun invoke(capacity: Int = 16): ArtistIdList =
       ArtistIdList(LongArrayList(capacity))
   }
 
-  override fun iterator(): Iterator<ArtistId> = idIterator(idList, ::ArtistId)
+  override fun iterator(): Iterator<ArtistId> = idIterator(prop, ::ArtistId)
 }

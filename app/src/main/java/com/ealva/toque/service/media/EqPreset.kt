@@ -50,6 +50,9 @@ interface EqPreset {
    */
   val presetId: Long
 
+  val isNullPreset: Boolean
+    get() = presetId < 0
+
   /**
    * Get the name of this equalizer preset, which is either a system preset or user assigned name.
    */
@@ -129,10 +132,32 @@ interface EqPreset {
   companion object {
     @Suppress("MemberVisibilityCanBePrivate")
     val MAX_AMP = 20F.toAmp()
+
     @Suppress("MemberVisibilityCanBePrivate")
     val MIN_AMP = (-20F).toAmp()
     val AMP_RANGE = MIN_AMP..MAX_AMP
     val PRE_AMP_DEFAULT = 12F.toAmp()
     val BAND_DEFAULT = 0F.toAmp()
+    private const val DEFAULT_BAND_COUNT = 10
+
+    val NULL = object : EqPreset {
+      override val presetId = -1L
+      override val name = "Null"
+      override val displayName = "Null"
+      override val isSystemPreset = true
+      override val bandCount = DEFAULT_BAND_COUNT
+      override val bandIndices = 0 until bandCount
+      override fun getBandFrequency(index: Int): Float = 0F
+      override val preAmp: Amp = Amp.ZERO
+      override suspend fun setPreAmp(amplitude: Amp) {}
+      override fun getAmp(index: Int): Amp = Amp.ZERO
+      override suspend fun setAmp(index: Int, amplitude: Amp) {}
+      override suspend fun resetAllToDefault() {}
+      override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {}
+      override fun getAllValues(): PreAmpAndBands = PreAmpAndBands(
+        Amp.ZERO,
+        Array(bandCount) { Amp.ZERO }
+      )
+    }
   }
 }

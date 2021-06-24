@@ -16,9 +16,12 @@
 
 package com.ealva.toque.service.queue
 
-enum class QueueType {
-  Audio,
-  Video,
-  Radio,
-  AudioCast;
+import com.ealva.toque.persist.HasConstId
+
+enum class QueueType(override val id: Int) : HasConstId {
+  NullQueue(0),
+  Audio(1),
+  Video(2),
+  Radio(3),
+  AudioCast(4);
 }

@@ -21,7 +21,6 @@ import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.common.toMillis
 import com.ealva.toque.common.toVolume
-import com.ealva.toque.service.vlc.VlcPlayer
 
 interface TransitionPlayer {
   val isPlaying: Boolean
@@ -64,7 +63,7 @@ object NullTransitionPlayer : TransitionPlayer {
     set(@Suppress("UNUSED_PARAMETER") volume) {
     }
   override val volumeRange: VolumeRange
-    get() = VlcPlayer.VOLUME_RANGE
+    get() = AvPlayer.DEFAULT_VOLUME_RANGE
 
   override fun notifyPaused() = Unit
   override fun notifyPlaying() = Unit

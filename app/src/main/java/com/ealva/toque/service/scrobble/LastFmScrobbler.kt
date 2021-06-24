@@ -23,8 +23,8 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.debug
-import com.ealva.toque.service.queue.AudioQueueItem
-import com.ealva.toque.service.queue.NullAudioQueueItem
+import com.ealva.toque.service.audio.AudioQueueItem
+import com.ealva.toque.service.audio.NullAudioQueueItem
 
 private val LOG by lazyLogger(LastFmScrobbler::class)
 private const val ACTION_META_CHANGED = "fm.last.android.metachanged"
@@ -89,7 +89,7 @@ internal class LastFmScrobbler(
       .putExtra(EXTRA_DURATION, item.duration.value)
       .putExtra(EXTRA_POSITION, item.position.value)
       .putExtra(EXTRA_PLAYING, isPlaying)
-      .putExtra(EXTRA_PLAYER, pkgName.name)
+      .putExtra(EXTRA_PLAYER, pkgName.prop)
     debug { logIntent(intent) }
     intentBroadcaster.broadcast(intent)
   }

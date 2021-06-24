@@ -25,7 +25,6 @@ import com.ealva.toque.persist.ArtistId
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
-import com.ealva.toque.db.ArtistAlbumTable as Table
 
 private val LOG by lazyLogger(ArtistAlbumDao::class)
 
@@ -47,7 +46,7 @@ interface ArtistAlbumDao {
   }
 }
 
-private val INSERT_ARTIST_ALBUM = Table.insertValues(OnConflict.Replace) {
+private val INSERT_ARTIST_ALBUM = ArtistAlbumTable.insertValues(OnConflict.Replace) {
   it[artistId].bindArg()
   it[albumId].bindArg()
   it[createdTime].bindArg()
@@ -61,15 +60,15 @@ private class ArtistAlbumDaoImpl : ArtistAlbumDao {
     createTime: Millis
   ) = txn.run {
     INSERT_ARTIST_ALBUM.insert {
-      it[artistId] = newArtistId.id
-      it[albumId] = newAlbumId.id
+      it[artistId] = newArtistId.value
+      it[albumId] = newAlbumId.value
       it[createdTime] = createTime.value
     }
     Unit
   }
 
   override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = Table.deleteAll()
+    val count = ArtistAlbumTable.deleteAll()
     LOG.i { it("Deleted %d artist/album associations", count) }
   }
 }

@@ -16,17 +16,12 @@
 
 package com.ealva.toque.db
 
-import android.content.Context
-import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.ealva.toque.R
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.ealva.toque.common.Content
 import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.getError
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.lang.RuntimeException
 
 private fun Throwable.stackTraceToString(): String {
   return StringWriter().apply {
@@ -34,11 +29,6 @@ private fun Throwable.stackTraceToString(): String {
       printStackTrace(pw)
     }
   }.toString()
-}
-
-fun <V> Result<V, DaoMessage>.getErrorString(context: Context): String = when (this) {
-  is Ok -> "Not an Err"
-  is Err -> getError()?.asString(context.resources) ?: "No DaoMessage string"
 }
 
 typealias DaoResult<T> = Result<T, DaoMessage>
@@ -50,22 +40,17 @@ typealias LongResult = DaoResult<Long>
  */
 class DaoException(msg: String) : RuntimeException(msg)
 
-sealed class DaoMessage {
-  abstract fun asString(resources: Resources): String
-}
+sealed class DaoMessage
 
-@Suppress("MemberVisibilityCanBePrivate")
 class DaoExceptionMessage(val ex: Throwable) : DaoMessage() {
-  override fun asString(resources: Resources): String {
-    return """$ex\n${ex.stackTraceToString()}"""
-  }
+  override fun toString(): String = """$ex\n${ex.stackTraceToString()}"""
 }
 
 abstract class DaoStringMessage(
   @StringRes private val res: Int,
   private vararg val args: Any
 ) : DaoMessage() {
-  override fun asString(resources: Resources): String = resources.getString(res, *args)
+  override fun toString(): String = Content.fetch(res, args)
 }
 
 class DaoNotFound(itemNotFound: Any) : DaoStringMessage(R.string.NotFoundItem, itemNotFound)
@@ -74,5 +59,5 @@ class DaoFailedToUpdate(item: Any) : DaoStringMessage(R.string.FailedToUpdateIte
 class DaoFailedToDelete(item: Any) : DaoStringMessage(R.string.FailedToDeleteItem, item)
 
 object DaoNotImplemented : DaoMessage() {
-  override fun asString(resources: Resources): String = "Not Implemented"
+  override fun toString(): String = Content.fetch(R.string.NotImplemented)
 }

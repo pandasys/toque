@@ -32,3 +32,11 @@ interface StreamVolume {
    */
   var streamVolume: Volume
 }
+
+object NullStreamVolume : StreamVolume {
+  override val volumeIsFixed: Boolean = true
+  override val volumeRange: VolumeRange = Volume.ZERO..Volume.ZERO
+  override var streamVolume: Volume
+    get() = Volume.ZERO
+    set(@Suppress("UNUSED_PARAMETER") value) {}
+}

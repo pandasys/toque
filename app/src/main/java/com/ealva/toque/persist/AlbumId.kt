@@ -21,7 +21,8 @@ package com.ealva.toque.persist
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 
-inline class AlbumId(override val id: Long) : PersistentId {
+@JvmInline
+value class AlbumId(override val value: Long) : PersistentId {
   companion object {
     val INVALID = AlbumId(PersistentId.ID_INVALID)
   }
@@ -30,19 +31,21 @@ inline class AlbumId(override val id: Long) : PersistentId {
 inline fun Long.toAlbumId(): AlbumId = AlbumId(this)
 inline fun Int.toAlbumId(): AlbumId = toLong().toAlbumId()
 
-inline class AlbumIdList(val idList: LongList) : Iterable<AlbumId> {
+@JvmInline
+value class AlbumIdList(val prop: LongList) : Iterable<AlbumId> {
   inline val size: Int
-    get() = idList.size
+    get() = prop.size
 
   inline operator fun plusAssign(genreId: AlbumId) {
-    idList.add(genreId.id)
+    prop.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): AlbumId = AlbumId(idList.getLong(index))
+  inline operator fun get(index: Int): AlbumId = AlbumId(prop.getLong(index))
 
   companion object {
-    operator fun invoke(capacity: Int): AlbumIdList = AlbumIdList(LongArrayList(capacity))
+    inline operator fun invoke(capacity: Int = 16): AlbumIdList =
+      AlbumIdList(LongArrayList(capacity))
   }
 
-  override fun iterator(): Iterator<AlbumId> = idIterator(idList, ::AlbumId)
+  override fun iterator(): Iterator<AlbumId> = idIterator(prop, ::AlbumId)
 }

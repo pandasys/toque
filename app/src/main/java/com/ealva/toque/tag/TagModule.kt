@@ -19,7 +19,7 @@ package com.ealva.toque.tag
 import org.koin.dsl.module
 
 object TagModule {
-  val module = module {
+  val koinModule = module {
     // TODO ArtistParserInfoDao needs to be injected
     single { ArtistParserFactory(ArtistParserInfoDao.NONE) }
   }

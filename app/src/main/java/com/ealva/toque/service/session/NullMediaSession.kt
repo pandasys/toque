@@ -17,11 +17,11 @@
 package com.ealva.toque.service.session
 
 import android.app.PendingIntent
-import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.service.controller.MediaSessionEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -30,7 +30,7 @@ object NullMediaSession : MediaSession {
 
   override var isActive: Boolean
     get() = false
-    set(value) {}
+    set(@Suppress("UNUSED_PARAMETER") value) {}
 
   override fun release() = Unit
 
@@ -43,7 +43,7 @@ object NullMediaSession : MediaSession {
     get() = TODO("Not yet implemented")
 
   override fun setState(state: PlaybackStateCompat) = Unit
-  override fun setMetadata(metadata: MediaMetadataCompat) = Unit
+  override fun setMetadata(metadata: MediaMetadata) = Unit
   override fun setQueue(queue: List<MediaSessionCompat.QueueItem>) = Unit
   override fun setQueueTitle(title: String) = Unit
 

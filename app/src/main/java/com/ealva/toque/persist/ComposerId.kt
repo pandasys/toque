@@ -21,24 +21,27 @@ package com.ealva.toque.persist
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 
-inline class ComposerId(override val id: Long) : PersistentId
+@JvmInline
+value class ComposerId(override val value: Long) : PersistentId
 
 inline fun Long.toComposerId(): ComposerId = ComposerId(this)
 inline fun Int.toComposerId(): ComposerId = toLong().toComposerId()
 
-inline class ComposerIdList(val idList: LongList) : Iterable<ComposerId> {
+@JvmInline
+value class ComposerIdList(val prop: LongList) : Iterable<ComposerId> {
   inline val size: Int
-    get() = idList.size
+    get() = prop.size
 
   inline operator fun plusAssign(genreId: ComposerId) {
-    idList.add(genreId.id)
+    prop.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): ComposerId = ComposerId(idList.getLong(index))
+  inline operator fun get(index: Int): ComposerId = ComposerId(prop.getLong(index))
 
   companion object {
-    operator fun invoke(capacity: Int): ComposerIdList = ComposerIdList(LongArrayList(capacity))
+    operator fun invoke(capacity: Int = 16): ComposerIdList =
+      ComposerIdList(LongArrayList(capacity))
   }
 
-  override fun iterator(): Iterator<ComposerId> = idIterator(idList, ::ComposerId)
+  override fun iterator(): Iterator<ComposerId> = idIterator(prop, ::ComposerId)
 }

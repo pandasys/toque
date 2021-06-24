@@ -17,39 +17,30 @@
 plugins {
   id("com.android.application")
   kotlin("android")
-  id("org.jetbrains.dokka")
-  id("com.vanniktech.maven.publish")
+  kotlin("plugin.serialization")
+  id("kotlin-parcelize")
 }
 
 android {
-  compileSdkVersion(Sdk.COMPILE_SDK_VERSION)
+  compileSdk = SdkVersion.COMPILE
 
   defaultConfig {
-    minSdkVersion(Sdk.MIN_SDK_VERSION)
-    targetSdkVersion(Sdk.TARGET_SDK_VERSION)
+    minSdk = SdkVersion.MIN
+    targetSdk = SdkVersion.TARGET
 
-    applicationId = AppCoordinates.APP_ID
-    versionCode = AppCoordinates.APP_VERSION_CODE
-    versionName = AppCoordinates.APP_VERSION_NAME
+    applicationId = AppVersion.ID
+    versionCode = AppVersion.VERSION_CODE
+    versionName = AppVersion.VERSION_NAME
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    multiDexEnabled = true
-
-    buildConfigField("boolean", "VLC_LOGGING", "false")
-    buildConfigField("String", "APP_ID", "\"${AppCoordinates.APP_ID}\"")
-  }
-
-  compileOptions {
-    isCoreLibraryDesugaringEnabled = true
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    signingConfig = signingConfigs.getByName("debug")
   }
 
   buildTypes {
-    getByName("debug") {
+    debug {
       isTestCoverageEnabled = false
     }
 
-    getByName("release") {
+    release {
       isMinifyEnabled = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
@@ -65,103 +56,128 @@ android {
     getByName("androidTest").resources.srcDirs(resDir)
   }
 
-  packagingOptions.resources {
-    excludes.addAll(
-      listOf(
-        "META-INF/DEPENDENCIES",
-        "META-INF/LICENSE",
-        "META-INF/LICENSE.txt",
-        "META-INF/license.txt",
-        "META-INF/NOTICE",
-        "META-INF/NOTICE.txt",
-        "META-INF/notice.txt",
-        "META-INF/ASL2.0",
-        "META-INF/AL2.0",
-        "META-INF/LGPL2.1",
-        "META-INF/*.kotlin_module"
-      )
-    )
-  }
-
-  kotlinOptions {
-    jvmTarget = "1.8"
-    useIR = true
-    suppressWarnings = false
-    verbose = true
-    freeCompilerArgs = freeCompilerArgs + "-XXLanguage:+InlineClasses"
-    freeCompilerArgs = freeCompilerArgs + "-Xinline-classes"
-    freeCompilerArgs = freeCompilerArgs + "-Xopt-in=kotlin.RequiresOptIn"
-  }
-
   buildFeatures {
+    // Enables Jetpack Compose for this module
     compose = true
   }
 
   composeOptions {
-    kotlinCompilerExtensionVersion = Versions.COMPOSE
-    kotlinCompilerVersion = Versions.KOTLIN
+    kotlinCompilerExtensionVersion = Libs.AndroidX.Compose.VERSION
+  }
+
+  compileOptions {
+    isCoreLibraryDesugaringEnabled = true
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+  }
+
+  lint {
+    isWarningsAsErrors = false
+    isAbortOnError = false
+  }
+
+  testOptions {
+    unitTests.isIncludeAndroidResources = true
+  }
+
+  packagingOptions {
+    resources {
+      excludes += listOf(
+        "META-INF/AL2.0",
+        "META-INF/LGPL2.1"
+      )
+    }
+  }
+
+  kotlinOptions {
+    jvmTarget = "1.8"
+    languageVersion = "1.5"
+    apiVersion = "1.5"
+    suppressWarnings = false
+    verbose = true
+    freeCompilerArgs = listOf(
+      "-Xopt-in=kotlin.RequiresOptIn",
+      "-Xskip-prerelease-check"
+    )
   }
 }
 
 dependencies {
-  coreLibraryDesugaring(ToolsLib.DESUGARING)
+  coreLibraryDesugaring(Libs.DESUGAR)
   implementation(kotlin("stdlib-jdk8"))
 
-  implementation(SupportLibs.ANDROIDX_APPCOMPAT)
-  implementation(SupportLibs.ANDROIDX_CORE_KTX)
-  implementation(SupportLibs.ANDROIDX_LIFECYCLE_RUNTIME_KTX)
-  implementation(SupportLibs.ANDROIDX_LIFECYCLE_SERVICE)
-  implementation(SupportLibs.ANDROIDX_LIFECYCLE_COMMON)
-  implementation(SupportLibs.ANDROIDX_DATASTORE_PREFERENCES)
+  implementation(Libs.AndroidX.APPCOMPAT)
+  implementation(Libs.AndroidX.Ktx.CORE)
+  implementation(Libs.AndroidX.Lifecycle.RUNTIME_KTX)
+  implementation(Libs.AndroidX.Lifecycle.SERVICE)
+  implementation(Libs.AndroidX.Lifecycle.COMMON_JAVA8)
+  implementation(Libs.Datastore.PREFERENCES)
 
-  implementation(SupportLibs.ANDROID_MATERIAL)
-  implementation(SupportLibs.COMPOSE_UI)
-  implementation(SupportLibs.COMPOSE_MATERIAL)
-  implementation(SupportLibs.COMPOSE_UI_TOOLING)
+  implementation(Libs.Kotlin.Serialization.CORE)
+  implementation(Libs.Kotlin.Serialization.JSON)
 
-  implementation(ThirdParty.VLC_ANDROID)
+  implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
+  implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.3.1")
 
-  implementation(ThirdParty.EALVALOG)
-  implementation(ThirdParty.EALVALOG_CORE)
-  implementation(ThirdParty.EALVALOG_ANDROID)
-  implementation(ThirdParty.EALVATAG)
-  implementation(ThirdParty.WELITE_CORE)
-  implementation(ThirdParty.EALVABRAINZ)
-  implementation(ThirdParty.EALVABRAINZ_SERVICE)
+  implementation(Libs.Android.MATERIAL)
+  implementation(Libs.AndroidX.Compose.UI)
+  implementation(Libs.AndroidX.Compose.MATERIAL)
+  implementation(Libs.AndroidX.Compose.TOOLING)
+  implementation(Libs.AndroidX.Activity.COMPOSE)
 
-  implementation(ThirdParty.FASTUTIL)
-  implementation(ThirdParty.COROUTINE_CORE)
-  implementation(ThirdParty.COROUTINE_ANDROID)
+  implementation(Libs.LibVLC.ALL)
+  implementation(Libs.PreferenceStore.STORE)
+  implementation(Libs.PreferenceStore.COMPOSE)
+  implementation(Libs.EAlvaLog.EALVALOG)
+  implementation(Libs.EAlvaLog.CORE)
+  implementation(Libs.EAlvaLog.ANDROID)
+  implementation(Libs.EAlvaTag.EALVATAG)
+  implementation(Libs.WeLite.CORE)
+  implementation(Libs.EAlvaBrainz.BRAINZ)
+  implementation(Libs.EAlvaBrainz.BRAINZ_SERVICE)
 
-  implementation(ThirdParty.KOIN)
-  implementation(ThirdParty.KOIN_ANDROID)
+  implementation(Libs.Accompanist.GLIDE)
+  implementation(Libs.Accompanist.INSETS)
+  implementation(Libs.Accompanist.UI_CONTROLLER)
 
-  implementation(ThirdParty.KOTLIN_RESULT)
-  implementation(ThirdParty.KOTLIN_RESULT_CO)
+  implementation(Libs.FastUtil.FASTUTIL)
+  implementation(Libs.Kotlin.Coroutines.CORE)
+  implementation(Libs.Kotlin.Coroutines.ANDROID)
 
-  implementation(ThirdParty.PHOENIX)
+  implementation(Libs.Koin.CORE)
+  implementation(Libs.Koin.EXT)
+  implementation(Libs.Koin.ANDROID)
+  implementation(Libs.Koin.ANDROID_EXT)
+  implementation(Libs.Koin.COMPOSE)
 
-  testImplementation(TestingLib.JUNIT)
-  testImplementation(AndroidTestingLib.ANDROIDX_TEST_CORE) {
+  implementation(Libs.SimpleStack.EXT)
+  implementation(Libs.SimpleStack.COMPOSE)
+
+  implementation(Libs.Result.RESULT)
+  implementation(Libs.Result.COROUTINES)
+
+  implementation(Libs.Phoenix.PHOENIX)
+
+  testImplementation(Libs.JUnit.JUNIT)
+  testImplementation(Libs.AndroidX.Test.CORE) {
     exclude("junit", "junit")
   }
-  testImplementation(AndroidTestingLib.ANDROIDX_TEST_RULES) {
+  testImplementation(Libs.AndroidX.Test.RULES) {
     exclude("junit", "junit")
   }
-  testImplementation(TestingLib.EXPECT)
-  testImplementation(TestingLib.ROBOLECTRIC)
-  testImplementation(TestingLib.COROUTINE_TEST)
-  testImplementation(ThirdParty.KOIN_TEST)
+  testImplementation(Libs.Expect.EXPECT)
+  testImplementation(Libs.Robolectric.ROBOLECTRIC)
+  testImplementation(Libs.Kotlin.Coroutines.TEST)
+//  testImplementation(ThirdParty.KOIN_TEST)
 
-  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_ANNOTATIONS)
-  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_EXT_JUNIT) {
+  androidTestImplementation(Libs.AndroidX.Test.Ext.JUNIT) {
     exclude("junit", "junit")
   }
-  androidTestImplementation(AndroidTestingLib.ANDROIDX_TEST_RUNNER) {
+  androidTestImplementation(Libs.AndroidX.Test.RUNNER) {
     exclude("junit", "junit")
   }
-  androidTestImplementation(TestingLib.JUNIT)
-  androidTestImplementation(TestingLib.EXPECT)
-  androidTestImplementation(TestingLib.COROUTINE_TEST)
-  androidTestImplementation(ThirdParty.KOIN_TEST)
+  androidTestImplementation(Libs.JUnit.JUNIT)
+  androidTestImplementation(Libs.Expect.EXPECT)
+  androidTestImplementation(Libs.Kotlin.Coroutines.TEST)
+  androidTestImplementation(Libs.Koin.TEST)
 }

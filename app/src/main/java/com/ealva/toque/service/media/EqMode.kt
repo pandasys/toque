@@ -16,7 +16,9 @@
 
 package com.ealva.toque.service.media
 
-enum class EqMode {
-  Off,
-  On;
+import com.ealva.toque.persist.HasConstId
+
+enum class EqMode(override val id: Int) : HasConstId {
+  Off(0),
+  On(1);
 }

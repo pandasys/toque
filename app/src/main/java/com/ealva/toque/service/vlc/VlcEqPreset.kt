@@ -18,7 +18,6 @@ package com.ealva.toque.service.vlc
 
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.toAmp
-import com.ealva.toque.common.contains
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.NullEqPresetDao
@@ -47,6 +46,8 @@ class VlcEqPreset private constructor(
 
   override val bandIndices: IntRange
     get() = BAND_INDICES
+
+  fun setPreset(mediaPlayer: MediaPlayer): Boolean = mediaPlayer.setEqualizer(nativeEq)
 
   override fun getBandFrequency(index: Int): Float = MediaPlayer.Equalizer.getBandFrequency(index)
 

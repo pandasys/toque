@@ -17,7 +17,6 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.brainz.data.ArtistMbid
-import com.ealva.ealvabrainz.brainz.data.toArtistMbid
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -44,6 +43,16 @@ import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.runCatching
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -52,7 +61,21 @@ private val LOG by lazyLogger(ArtistDao::class)
 
 data class ArtistIdName(val artistId: ArtistId, val artistName: String)
 
+sealed class ArtistDaoEvent {
+  data class ArtistCreated(val artistId: ArtistId) : ArtistDaoEvent()
+  data class ArtistUpdated(val artistId: ArtistId) : ArtistDaoEvent()
+}
+
+/**
+ * If a function receives a transaction parameter it is not suspending, whereas suspend functions
+ * are expected to start transaction or query which will dispatch on another thread, should return a
+ * [Result] if not returningUnit and not throw exceptions. Functions receiving a transaction are
+ * typically called by the media scanner, directly or indirectly, and are already dispatched on a
+ * background thread.
+ */
 interface ArtistDao {
+  val artistDaoEvents: SharedFlow<ArtistDaoEvent>
+
   /**
    * Update the artist info if it exists otherwise insert it
    */
@@ -67,39 +90,25 @@ interface ArtistDao {
   fun deleteAll(txn: TransactionInProgress): Long
   fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
 
-  suspend fun getAllArtistNames(): List<ArtistIdName>
+  suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage>
 
   companion object {
-    operator fun invoke(db: Database): ArtistDao = ArtistDaoImpl(db)
+    operator fun invoke(
+      db: Database,
+      dispatcher: CoroutineDispatcher? = null
+    ): ArtistDao = ArtistDaoImpl(db, dispatcher ?: Dispatchers.Main)
   }
 }
 
-private val INSERT_STATEMENT = ArtistTable.insertValues {
-  it[artist].bindArg()
-  it[artistSort].bindArg()
-  it[artistMbid].bindArg()
-  it[createdTime].bindArg()
-  it[updatedTime].bindArg()
-}
+private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispatcher) : ArtistDao {
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val upsertLock: Lock = ReentrantLock()
 
-private val queryArtistBind = bindString()
+  override val artistDaoEvents = MutableSharedFlow<ArtistDaoEvent>()
 
-private val QUERY_ARTIST_UPDATE_INFO = Query(
-  ArtistTable
-    .selects { listOf(id, artist, artistSort, artistMbid) }
-    .where { artist eq queryArtistBind }
-)
-
-private data class ArtistUpdateInfo(
-  val id: ArtistId,
-  val artist: String,
-  val artistSort: String,
-  val artistMbid: ArtistMbid
-)
-
-private val upsertLock: Lock = ReentrantLock()
-
-private class ArtistDaoImpl(private val db: Database) : ArtistDao {
+  private fun emit(event: ArtistDaoEvent) {
+    scope.launch { artistDaoEvents.emit(event) }
+  }
 
   override fun upsertArtist(
     txn: TransactionInProgress,
@@ -110,23 +119,6 @@ private class ArtistDaoImpl(private val db: Database) : ArtistDao {
   ): ArtistId = upsertLock.withLock {
     require(artistName.isNotBlank()) { "Artist may not be blank" }
     txn.doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime)
-  }
-
-  override fun deleteAll(txn: TransactionInProgress): Long = txn.run {
-    ArtistTable.deleteAll()
-  }
-
-  override fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
-    DELETE_ARTISTS_WITH_NO_MEDIA.delete()
-  }
-
-  override suspend fun getAllArtistNames(): List<ArtistIdName> = db.query {
-    ArtistTable
-      .selects { listOf(id, artist) }
-      .all()
-      .orderByAsc { artist }
-      .sequence { ArtistIdName(it[id].toArtistId(), it[artist]) }
-      .toList()
   }
 
   private fun TransactionInProgress.doUpsertArtist(
@@ -141,12 +133,12 @@ private class ArtistDaoImpl(private val db: Database) : ArtistDao {
       newArtistMbid,
       createUpdateTime
     ) ?: INSERT_STATEMENT.insert {
-      it[artist] = newArtist
+      it[artistName] = newArtist
       it[artistSort] = newArtistSort
       it[artistMbid] = newArtistMbid?.value ?: ""
       it[createdTime] = createUpdateTime.value
       it[updatedTime] = createUpdateTime.value
-    }.toArtistId()
+    }.toArtistId().also { id -> onCommit { emit(ArtistDaoEvent.ArtistCreated(id)) } }
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with artist='%s'", newArtist) }
     throw e
@@ -173,13 +165,14 @@ private class ArtistDaoImpl(private val db: Database) : ArtistDao {
 
     if (updateNeeded) {
       val updated = ArtistTable.updateColumns {
-        updateArtist?.let { update -> it[artist] = update }
+        updateArtist?.let { update -> it[artistName] = update }
         updateSort?.let { update -> it[artistSort] = update }
         updateMbid?.let { update -> it[artistMbid] = update.value }
         it[updatedTime] = newUpdateTime.value
-      }.where { id eq info.id.id }.update()
+      }.where { id eq info.id.value }.update()
 
-      if (updated < 1) LOG.e { it("Could not update $info") }
+      if (updated >= 1) onCommit { emit(ArtistDaoEvent.ArtistUpdated(info.id)) }
+      else LOG.e { it("Could not update $info") }
     }
     info.id
   }
@@ -190,12 +183,58 @@ private class ArtistDaoImpl(private val db: Database) : ArtistDao {
     .sequence({ it[queryArtistBind] = artistName }) {
       ArtistUpdateInfo(
         it[id].toArtistId(),
-        it[artist],
+        it[this.artistName],
         it[artistSort],
-        it[artistMbid].toArtistMbid()
+        ArtistMbid(it[artistMbid])
       )
     }.singleOrNull()
+
+  override fun deleteAll(txn: TransactionInProgress): Long = txn.run {
+    ArtistTable.deleteAll()
+  }
+
+  override fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
+    DELETE_ARTISTS_WITH_NO_MEDIA.delete()
+  }
+
+  override suspend fun getAllArtists(
+    limit: Long
+  ): Result<List<ArtistIdName>, DaoMessage> = db.query {
+    runCatching { doGetArtistNames(limit) }
+      .mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetArtistNames(limit: Long): List<ArtistIdName> = ArtistTable
+    .selects { listOf(id, artistName) }
+    .all()
+    .orderByAsc { artistName }
+    .limit(limit)
+    .sequence { ArtistIdName(it[id].toArtistId(), it[artistName]) }
+    .toList()
 }
+
+private val INSERT_STATEMENT = ArtistTable.insertValues {
+  it[artistName].bindArg()
+  it[artistSort].bindArg()
+  it[artistMbid].bindArg()
+  it[createdTime].bindArg()
+  it[updatedTime].bindArg()
+}
+
+private val queryArtistBind = bindString()
+
+private val QUERY_ARTIST_UPDATE_INFO = Query(
+  ArtistTable
+    .selects { listOf(id, artistName, artistSort, artistMbid) }
+    .where { artistName eq queryArtistBind }
+)
+
+private data class ArtistUpdateInfo(
+  val id: ArtistId,
+  val artist: String,
+  val artistSort: String,
+  val artistMbid: ArtistMbid
+)
 
 private val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
   literal(0L) eq (

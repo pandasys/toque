@@ -20,12 +20,12 @@ import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 enum class RepeatMode(
   override val id: Int,
-  @StringRes override val stringRes: Int
-) : HasConstId, HasDescription {
+  @StringRes override val titleRes: Int
+) : HasConstId, HasTitle {
   None(1, R.string.RepeatOff),
   All(2, R.string.RepeatQueue),
   One(3, R.string.RepeatCurrent);

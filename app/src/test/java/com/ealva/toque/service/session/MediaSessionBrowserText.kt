@@ -41,11 +41,11 @@ class MediaSessionBrowserText {
       val mediaId = MediaSessionBrowser.makeMediaId(id)
       mediaId.split('_').let { components ->
         if (components.size == 1) {
-          expect(components[0].toLong()).toBe(id.id)
+          expect(components[0].toLong()).toBe(id.value)
         } else {
           expect(components.size).toBe(2)
           expect(components[0]).toBe(prefix)
-          expect(components[1].toLong()).toBe(id.id)
+          expect(components[1].toLong()).toBe(id.value)
         }
       }
     }

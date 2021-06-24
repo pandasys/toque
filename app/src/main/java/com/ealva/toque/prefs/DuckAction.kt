@@ -18,12 +18,12 @@ package com.ealva.toque.prefs
 
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 enum class DuckAction(
   override val id: Int,
-  override val stringRes: Int
-) : HasConstId, HasDescription {
+  override val titleRes: Int
+) : HasConstId, HasTitle {
   Duck(1, R.string.Duck),
   Pause(2, R.string.Pause),
   DoNothing(3, R.string.DoNothing);

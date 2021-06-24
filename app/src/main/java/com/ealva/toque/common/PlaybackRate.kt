@@ -18,14 +18,22 @@
 
 package com.ealva.toque.common
 
-inline fun Float.toPlaybackRate() = PlaybackRate(this)
-inline fun Double.toPlaybackRate() = PlaybackRate(this.toFloat())
+private const val START = .25f
+private const val END = 4.0f
+private val VALID_RANGE = START..END
 
-inline class PlaybackRate(val rate: Float) : Comparable<PlaybackRate> {
-  override fun compareTo(other: PlaybackRate): Int = rate.compareTo(other.rate)
+@JvmInline
+value class PlaybackRate(val value: Float) : Comparable<PlaybackRate> {
+  init {
+    require(value in VALID_RANGE)
+  }
+
+  override fun compareTo(other: PlaybackRate): Int = value.compareTo(other.value)
 
   companion object {
-    val PLAYBACK_RATE_RANGE = .25.toPlaybackRate()..4.0.toPlaybackRate()
-    val NORMAL = 1.0.toPlaybackRate()
+    operator fun invoke(rate: Double) = PlaybackRate(rate.toFloat())
+
+    val RANGE = PlaybackRate(VALID_RANGE.start)..PlaybackRate(VALID_RANGE.endInclusive)
+    val NORMAL = PlaybackRate(1.0)
   }
 }

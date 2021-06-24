@@ -49,7 +49,7 @@ interface ArtistMediaDao {
   }
 }
 
-private val INSERT_ARTIST_MEDIA = ArtistMediaTable.insertValues(OnConflict.Replace) {
+private val INSERT_ARTIST_MEDIA = ArtistMediaTable.insertValues(OnConflict.Ignore) {
   it[artistId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
@@ -65,11 +65,11 @@ private class ArtistMediaDaoImpl : ArtistMediaDao {
     replaceMediaId: MediaId,
     createTime: Millis
   ) = txn.run {
-    DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = replaceMediaId.id }
+    DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = replaceMediaId.value }
     artistIdList.forEach { newArtistId ->
       INSERT_ARTIST_MEDIA.insert {
-        it[artistId] = newArtistId.id
-        it[mediaId] = replaceMediaId.id
+        it[artistId] = newArtistId.value
+        it[mediaId] = replaceMediaId.value
         it[createdTime] = createTime.value
       }
     }

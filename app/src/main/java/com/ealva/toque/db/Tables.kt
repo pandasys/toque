@@ -14,12 +14,33 @@
  * limitations under the License.
  */
 
+@file:Suppress("MemberVisibilityCanBePrivate")
+
 package com.ealva.toque.db
 
+import com.ealva.toque.db.MediaTable.albumArtistId
+import com.ealva.toque.db.MediaTable.albumId
+import com.ealva.toque.db.MediaTable.artistId
 import com.ealva.toque.db.MediaTable.contentId
 import com.ealva.toque.db.MediaTable.mediaType
+import com.ealva.toque.db.QueueStateTable.id
+import com.ealva.toque.service.media.MediaType
+import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.table.ForeignKeyAction
+import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Table
+import com.ealva.welite.db.table.alias
+import com.ealva.welite.db.table.selects
+import com.ealva.welite.db.table.where
+import com.ealva.welite.db.view.View
+
+/**
+ * Used as an optimization if there are many "unknown" items, eg. Composer is often unknown. This
+ * is used in ignore case comparisons to prevent a DB call after the first time an ID is
+ * established for "Unknown" of a particular type - Composer, Genre, etc. Other fields, Title,
+ * Album, Artist, ..., are typically known so this shortcut is of no value.
+ */
+const val UNKNOWN_NAME = "Unknown"
 
 val setOfAllTables = setOf(
   ArtistTable,
@@ -33,12 +54,13 @@ val setOfAllTables = setOf(
   GenreMediaTable,
   EqPresetTable,
   EqPresetAssociationTable,
+  AudioQueueTable,
   QueueStateTable
 )
 
 object ArtistTable : Table() {
   val id = long("_id") { primaryKey() }
-  val artist = text("Artist") { collateNoCase() }
+  val artistName = text("Artist") { collateNoCase() }
   val artistSort = text("ArtistSort") { collateNoCase() }
   val artistImage = text("ArtistImageUri") { default("") }
   val artistMbid = text("ArtistMbid") { default("") }
@@ -47,26 +69,32 @@ object ArtistTable : Table() {
   val updatedTime = long("ArtistTimeUpdated") { default(0L) }
 
   init {
-    uniqueIndex(artist) // artist may appear only once
+    uniqueIndex(artistName) // artist may appear only once
   }
 }
 
 object AlbumTable : Table() {
   val id = long("_id") { primaryKey() }
-  val album = text("Album") { collateNoCase() }
+  val albumTitle = text("Album") { collateNoCase() }
   val albumSort = text("AlbumSort") { collateNoCase() }
-  val albumImage = text("AlbumImageUri") { default("") }
-  val releaseMbid = text("ReleaseMbid") { default("") }
+  val albumArtistId = reference("Album_ArtistId", ArtistTable.id)
+  val albumLocalArtUri = text("AlbumLocalArtUri") { default("") }
+  val albumArtUri = text("AlbumArtUri") { default("") }
+  val releaseMbid = text("AlbumReleaseMbid") { default("") }
   val releaseGroupMbid = text("AlbumReleaseGroupMbid") { default("") }
   val lastArtSearchTime = long("AlbumLastArtSearchTime") { default(0L) }
   val createdTime = long("AlbumCreated")
   val updatedTime = long("AlbumUpdated") { default(0L) }
 
   init {
-    uniqueIndex(album)
+    uniqueIndex(albumTitle, albumArtistId)
   }
 }
 
+/**
+ * Relationship between and Album and an Album Artist. There can be only 1 Album but an Album
+ * Artist may have many Albums.
+ */
 object ArtistAlbumTable : Table() {
   val artistId = reference(
     "ArtistAlbum_Artist_id",
@@ -82,8 +110,7 @@ object ArtistAlbumTable : Table() {
   override val primaryKey = PrimaryKey(artistId, albumId)
 
   init {
-    index(artistId) // quickly find all albums for an artist
-    uniqueIndex(albumId) // find all artist for an album
+    uniqueIndex(albumId)
   }
 }
 
@@ -95,6 +122,7 @@ object ArtistAlbumTable : Table() {
  * need to be made for display purposes and some metadata will be unavailable as it doesn't exist
  * for video.
  */
+@Suppress("unused")
 object MediaTable : Table() {
   val id = long("_id") { primaryKey() }
 
@@ -165,9 +193,15 @@ object MediaTable : Table() {
     // several of these indices exist for faster smart playlist functionality
     uniqueIndex(location) // media may appear only once
     uniqueIndex(contentId) // content may appear only once and need to find quickly
+    /*
+     * Note: Adding all of the following indices resulted in a worst case cost of approx 3-4%
+     * inserting over 2500 during initial scanning, which includes parsing all metadata (on a Galaxy
+     * S10e, all media residing on internal storage). So, we'll keep the indices given many of them
+     * greatly speed up complex smart playlist queries, such as the Rock Station example
+     */
     index(mediaType) // to find all audio or all video
-    index(albumId) // denormalization for quick album info
-    index(artistId) // denormalization to quickly find first track artist
+    index(albumId) // for quick album info
+    index(artistId) // to quickly find first track artist
     index(albumArtistId) // find album artist media (currently no association table for this)
     index(title) // quickly find a somewhat familiar title (eg. LIKE %Sunshine%)
     index(year) // smart playlist query (eg. find media in the 1970s)
@@ -221,8 +255,7 @@ object ArtistMediaTable : Table() {
   override val primaryKey = PrimaryKey(artistId, mediaId)
 
   init {
-    index(artistId) // quickly find all media for an artist
-    index(mediaId) // find all artists for a piece of media
+    index(mediaId) // quickly find all artists for a piece of media
   }
 }
 
@@ -241,7 +274,6 @@ object ComposerMediaTable : Table() {
   override val primaryKey = PrimaryKey(composerId, mediaId)
 
   init {
-    index(composerId)
     index(mediaId)
   }
 }
@@ -257,7 +289,6 @@ object GenreMediaTable : Table() {
   override val primaryKey: PrimaryKey = PrimaryKey(genreId, mediaId)
 
   init {
-    index(genreId) // to query all media for a genre
     index(mediaId) // to query all genre for a piece of media
   }
 }
@@ -330,9 +361,26 @@ object EqPresetAssociationTable : Table() {
   override val primaryKey = PrimaryKey(presetId, associationType, associationId)
 
   init {
-    index(presetId)
-    index(associationType)
-    index(associationId)
+    index(associationType, associationId)
+  }
+}
+
+/**
+ * Stores the Up Next Queue for audio items. The queue position is determined by insertion order
+ * as the column is a rowId column and is assigned largest rowId + 1 during insert. This provides
+ * the ordering for a query. Example, to build the up next queue, query all mediaId with
+ * shuffled = false and order by queuePosition. To get the shuffled queue, use the same query
+ * except shuffled = true. The queuePosition will not be an index into the resulting list but
+ * simply an ordering number. A mediaId may repeat in a queue based on user settings (controlled
+ * in another scope)
+ */
+object AudioQueueTable : Table() {
+  val queuePosition = long("Position") { primaryKey() }
+  val mediaId = long("MediaId")
+  val shuffled = bool("IsShuffled")
+
+  init {
+    index(shuffled)
   }
 }
 
@@ -345,4 +393,30 @@ object QueueStateTable : Table() {
   val mediaId = long("ServiceState_MediaId") { default(-1) }
   val queueIndex = integer("ServiceState_QueueIndex") { default(0) }
   val playbackPosition = long("ServiceState_PlaybackPosition") { default(0) }
+}
+
+private val album_ArtistTableAlias = ArtistTable.alias("AlbumArtistTable")
+private val song_ArtistTableAlias = ArtistTable.alias("SongArtistTable")
+
+private val FullAudioViewQuery = MediaTable
+  .join(AlbumTable, JoinType.INNER, albumId, AlbumTable.id)
+  .join(album_ArtistTableAlias, JoinType.INNER, albumArtistId, ArtistTable.id)
+  .join(song_ArtistTableAlias, JoinType.INNER, artistId, ArtistTable.id)
+  .selects {
+    listOf(
+      MediaTable.id,
+      MediaTable.title,
+      AlbumTable.albumTitle,
+      album_ArtistTableAlias[ArtistTable.artistName],
+      song_ArtistTableAlias[ArtistTable.artistName]
+    )
+  }
+  .where { mediaType eq MediaType.Audio.id }
+
+object FullAudioView : View(FullAudioViewQuery) {
+  val mediaId = column(MediaTable.id)
+  val mediaTitle = column(MediaTable.title)
+  val albumTitle = column(AlbumTable.albumTitle)
+  val albumArtistName = column(album_ArtistTableAlias[ArtistTable.artistName])
+  val songArtistName = column(song_ArtistTableAlias[ArtistTable.artistName])
 }

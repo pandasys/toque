@@ -16,7 +16,7 @@
 
 package com.ealva.toque.service.scrobble
 
-import com.ealva.toque.service.queue.AudioQueueItem
+import com.ealva.toque.service.audio.AudioQueueItem
 
 /**
  * Interface to all scrobblers. To add a Scrobbler, add the package/title to

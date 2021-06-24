@@ -18,7 +18,7 @@ package com.ealva.toque.service.scrobble
 
 import com.ealva.toque.prefs.ScrobblerPackage
 import com.ealva.toque.service.queue.AudioQueueItemFake
-import com.ealva.toque.test.prefs.AppPreferencesStub
+import com.ealva.toque.test.prefs.AppPrefsStub
 import com.ealva.toque.test.service.scrobbler.ScrobblerFactoryStub
 import com.ealva.toque.test.service.scrobbler.ScrobblerStub
 import com.ealva.toque.test.shared.CoroutineRule
@@ -34,11 +34,11 @@ class ScrobblerFacadeTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
-  private lateinit var prefs: AppPreferencesStub
+  private lateinit var prefs: AppPrefsStub
 
   @Before
   fun setup() {
-    prefs = AppPreferencesStub()
+    prefs = AppPrefsStub()
   }
 
   @Test
@@ -49,9 +49,9 @@ class ScrobblerFacadeTest {
     factory._makeReturns = mutableListOf(scrobbler)
     factory._makeReturns
 
-    prefs._scrobblerItems = mutableListOf(ScrobblerPackage.LastFm)
+    prefs.scrobbler._value = ScrobblerPackage.LastFm
     val flow = MutableStateFlow(ScrobblerPackage.LastFm)
-    prefs._scrobblerFlow = flow
+    prefs.scrobbler._asFlow = flow
     val facade = ScrobblerFacade(prefs, factory, coroutineRule.testDispatcher)
     facade.start(item)
     facade.pause(item)
@@ -80,9 +80,9 @@ class ScrobblerFacadeTest {
     val scrobbler2 = ScrobblerStub()
     val factory = ScrobblerFactoryStub()
     factory._makeReturns = mutableListOf(scrobbler1, scrobbler2)
-    prefs._scrobblerItems = mutableListOf(ScrobblerPackage.LastFm)
+    prefs.scrobbler._value = ScrobblerPackage.LastFm
     val flow = MutableStateFlow(ScrobblerPackage.LastFm)
-    prefs._scrobblerFlow = flow
+    prefs.scrobbler._asFlow = flow
     val facade = ScrobblerFacade(prefs, factory, coroutineRule.testDispatcher)
     facade.start(item)
 
@@ -113,9 +113,9 @@ class ScrobblerFacadeTest {
     val factory = ScrobblerFactoryStub()
     // Set factory to return 2 scrobbler instances, but should not be called to produce 2nd
     factory._makeReturns = mutableListOf(scrobbler1, scrobbler2)
-    prefs._scrobblerItems = mutableListOf(ScrobblerPackage.LastFm)
+    prefs.scrobbler._value = ScrobblerPackage.LastFm
     val flow = MutableStateFlow(ScrobblerPackage.LastFm)
-    prefs._scrobblerFlow = flow
+    prefs.scrobbler._asFlow = flow
     val facade = ScrobblerFacade(prefs, factory, coroutineRule.testDispatcher)
     facade.start(item)
 

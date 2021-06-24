@@ -14,38 +14,29 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE")
-
 package com.ealva.toque.common
 
-inline fun Int.toAmp(): Amp = Amp(this.toFloat())
-inline fun Float.toAmp(): Amp = Amp(this)
+fun Int.toAmp(): Amp = Amp(this.toFloat())
+fun Float.toAmp(): Amp = Amp(this)
 
-inline operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean =
+operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean =
   contains(amp.value)
 
 /** Represents Amplitude */
-inline class Amp(val value: Float) : Comparable<Amp> {
+@JvmInline
+value class Amp(val value: Float) : Comparable<Amp> {
   override fun compareTo(other: Amp): Int = value.compareTo(other.value)
   override fun toString(): String = value.toString()
 
   companion object {
+    operator fun invoke(amp: Int) = Amp(amp.toFloat())
+
     val ZERO = 0.toAmp()
     val TWELVE = 12.toAmp()
   }
 }
 
-inline operator fun Amp.compareTo(rhs: Float): Int = value.compareTo(rhs)
+operator fun Amp.compareTo(rhs: Float): Int = value.compareTo(rhs)
 
-inline operator fun Amp.plus(rhs: Amp): Amp = (value + rhs.value).toAmp()
-inline operator fun Amp.plus(rhs: Float): Amp = (value + rhs).toAmp()
-
-// inline fun Amp.coerceIn(range: ClosedFloatingPointRange<Float>): Amp {
-//   require(!range.isEmpty()) { "Range must not be empty" }
-//   return value.coerceIn(range.start, range.endInclusive).toAmp()
-// }
-
-inline fun Amp.clampTo(range: ClosedFloatingPointRange<Float>): Amp {
-  require(!range.isEmpty()) { "Range must not be empty" }
-  return value.coerceIn(range.start, range.endInclusive).toAmp()
-}
+operator fun Amp.plus(rhs: Amp): Amp = (value + rhs.value).toAmp()
+operator fun Amp.plus(rhs: Float): Amp = (value + rhs).toAmp()

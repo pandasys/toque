@@ -29,7 +29,7 @@ inline fun <T : Mbid> T.updateOrNull(block: () -> T?): T? =
   block().let { newValue -> if (isObsolete(newValue)) newValue else null }
 
 inline fun <T : PersistentId> T.updateOrNull(block: () -> T): T? =
-  block().let { newValue -> if (id != newValue.id) newValue else null }
+  block().let { newValue -> if (value != newValue.value) newValue else null }
 
 // inline fun Long.updateOrNull(block: () -> Long): Long? =
 //  block().let { newValue -> if (this != newValue) newValue else null }
@@ -44,3 +44,9 @@ inline fun Millis.updateOrNull(block: () -> Millis): Millis? =
   block().let { newValue -> if (this != newValue) newValue else null }
 
 inline fun anyNotNull(block: () -> Array<Any?>): Boolean = block().any { it != null }
+
+/*
+public inline fun <T : Mbid> T.isObsolete(newValue: T?): Boolean {
+  return (newValue != null && newValue.isValid && (this.isInvalid || newValue != this))
+
+ */

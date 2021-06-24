@@ -35,11 +35,11 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.sendBlocking
+import kotlinx.coroutines.channels.onFailure
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,9 +52,9 @@ sealed class LoadEvent {
     val parentId: String,
     val children: List<MediaBrowserCompat.MediaItem>,
     val options: Bundle
-  )
+  ) : LoadEvent()
 
-  data class Error(val parentId: String, val options: Bundle)
+  data class Error(val parentId: String, val options: Bundle) : LoadEvent()
 }
 
 private typealias ChildList = MutableList<MediaBrowserCompat.MediaItem>
@@ -63,7 +63,7 @@ interface MediaSessionClient {
   val isConnected: StateFlow<Boolean>
   val networkError: StateFlow<Boolean>
   val playbackState: StateFlow<PlaybackStateCompat>
-  val nowPlaying: StateFlow<MediaMetadataCompat>
+  val nowPlaying: StateFlow<MediaMetadata>
   val queue: StateFlow<List<MediaSessionCompat.QueueItem>>
   val queueTitle: StateFlow<String>
   val extras: StateFlow<Bundle>
@@ -116,7 +116,6 @@ private class MediaSessionClientImpl(
 
   @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
   fun onDestroy() {
-    LOG._e { it("onDestroy release browser") }
     mediaBrowser.disconnect()
   }
 
@@ -124,16 +123,25 @@ private class MediaSessionClientImpl(
   override fun loadChildren(parentId: String, options: Bundle): Flow<LoadEvent> = callbackFlow {
     val callback = object : MediaBrowserCompat.SubscriptionCallback() {
       override fun onChildrenLoaded(parentId: String, children: ChildList) =
-        sendBlocking(LoadEvent.ChildrenLoaded(parentId, children, Bundle.EMPTY))
+        doSendBlocking(LoadEvent.ChildrenLoaded(parentId, children, Bundle.EMPTY))
 
       override fun onChildrenLoaded(parentId: String, children: ChildList, options: Bundle) =
-        sendBlocking(LoadEvent.ChildrenLoaded(parentId, children, options))
+        doSendBlocking(LoadEvent.ChildrenLoaded(parentId, children, options))
 
       override fun onError(parentId: String) =
-        sendBlocking(LoadEvent.Error(parentId, Bundle.EMPTY))
+        doSendBlocking(LoadEvent.Error(parentId, Bundle.EMPTY))
 
       override fun onError(parentId: String, options: Bundle) =
-        sendBlocking(LoadEvent.Error(parentId, options))
+        doSendBlocking(LoadEvent.Error(parentId, options))
+
+      private fun doSendBlocking(event: LoadEvent) {
+        @Suppress("BlockingMethodInNonBlockingContext")
+        trySendBlocking(event)
+          .onFailure { exception: Throwable? ->
+            exception?.let { ex -> LOG.w(ex) { it("LoadChildren flow failure") } }
+              ?: LOG.w { it("LoadChildren flow failure") }
+          }
+      }
     }
 
     if (options !== Bundle.EMPTY)
@@ -190,7 +198,7 @@ private class MediaSessionClientImpl(
     }
 
     override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
-      nowPlaying.value = if (metadata?.id == null) NOTHING_PLAYING else metadata
+      nowPlaying.value = if (metadata?.id == null) NOTHING_PLAYING else MediaMetadata(metadata)
     }
 
     override fun onQueueChanged(queue: MutableList<MediaSessionCompat.QueueItem>) {

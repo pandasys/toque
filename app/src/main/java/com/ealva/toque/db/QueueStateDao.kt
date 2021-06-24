@@ -46,13 +46,18 @@ import java.util.concurrent.Executors
 
 private val LOG by lazyLogger(QueueStateTable::class)
 
-inline class QueueId(val id: Long)
+@JvmInline
+value class QueueId(val value: Long)
 
 data class QueueState(
   val mediaId: MediaId,
   val queueIndex: Int,
   val playbackPosition: Millis
-)
+) {
+  companion object {
+    val INACTIVE_QUEUE_STATE = QueueState(MediaId.INVALID, -1, Millis.ZERO)
+  }
+}
 
 interface QueueStateDaoFactory {
   fun makeQueueStateDao(queueId: QueueId): QueueStateDao
@@ -130,16 +135,16 @@ private class QueueStateDaoImpl(
         if (state.mediaId.isValid) {
           db.transaction {
             val updateResult = UPDATE.update {
-              it[BIND_QUEUE_ID] = queueId.id
-              it[BIND_MEDIA_ID] = state.mediaId.id
+              it[BIND_QUEUE_ID] = queueId.value
+              it[BIND_MEDIA_ID] = state.mediaId.value
               it[BIND_QUEUE_INDEX] = state.queueIndex
               it[BIND_POSITION] = state.playbackPosition.value
             }
             if (updateResult < 1) {
               LOG.i { it("MediaServiceStateTable queueId:$queueId not initialized, inserting row") }
               val insertResult = QueueStateTable.insert {
-                it[id] = queueId.id
-                it[mediaId] = state.mediaId.id
+                it[id] = queueId.value
+                it[mediaId] = state.mediaId.value
                 it[queueIndex] = state.queueIndex
                 it[playbackPosition] = state.playbackPosition.value
               }
@@ -163,7 +168,7 @@ private class QueueStateDaoImpl(
   private fun TransactionInProgress.doGetState(): QueueState {
     return QueueStateTable
       .selects { listOf(mediaId, queueIndex, playbackPosition) }
-      .where { id eq queueId.id }
+      .where { id eq queueId.value }
       .sequence { QueueState(MediaId(it[mediaId]), it[queueIndex], Millis(it[playbackPosition])) }
       .singleOrNull()
       ?: UNINITIALIZED_STATE

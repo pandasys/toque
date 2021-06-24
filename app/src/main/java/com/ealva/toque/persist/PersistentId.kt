@@ -26,12 +26,12 @@ import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 
 /**
- * Interface for persistent IDs, used to define [id] property, the constant [ID_INVALID], and
+ * Interface for persistent IDs, used to define [value] property, the constant [ID_INVALID], and
  * extension functions [isValid] and [isInvalid] so expected inline subclasses do not need to define
  * these common functions.
  */
 interface PersistentId {
-  val id: Long
+  val value: Long
 
   companion object {
     const val ID_INVALID = -1L
@@ -40,7 +40,7 @@ interface PersistentId {
 }
 
 inline val PersistentId.isValid: Boolean
-  get() = isValidId(id)
+  get() = isValidId(value)
 
 inline val PersistentId.isInvalid: Boolean
   get() = !isValid
@@ -60,27 +60,38 @@ inline fun <reified T : PersistentId> idIterator(
 inline fun Long.toMediaId(): MediaId = MediaId(this)
 inline fun Int.toMediaId() = toLong().toMediaId()
 
-inline class MediaId(override val id: Long) : PersistentId {
+@JvmInline
+value class MediaId(override val value: Long) : PersistentId {
   companion object {
     val INVALID = MediaId(ID_INVALID)
   }
 }
 
-inline class MediaIdList(val idList: LongList) : Iterable<MediaId> {
+@JvmInline
+value class MediaIdList(val value: LongList) : Iterable<MediaId> {
+  inline fun isEmpty(): Boolean = size == 0
+  inline fun isNotEmpty(): Boolean = !isEmpty()
+
   inline val size: Int
-    get() = idList.size
+    get() = value.size
 
   inline operator fun plusAssign(mediaId: MediaId) {
-    idList.add(mediaId.id)
+    value.add(mediaId.value)
   }
 
-  inline operator fun get(index: Int): MediaId = idList.getLong(index).toMediaId()
+  inline operator fun get(index: Int): MediaId = value.getLong(index).toMediaId()
 
   companion object {
-    inline operator fun invoke(capacity: Int): MediaIdList = MediaIdList(LongArrayList(capacity))
+    inline operator fun invoke(capacity: Int = 16): MediaIdList =
+      MediaIdList(LongArrayList(capacity))
   }
 
-  override fun iterator(): Iterator<MediaId> = idIterator(idList, ::MediaId)
+  override fun iterator(): Iterator<MediaId> = idIterator(value, ::MediaId)
+
+  override fun toString(): String = buildString {
+    append("MediaIdList")
+    append(value.toString())
+  }
 }
 
 /**

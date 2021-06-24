@@ -54,7 +54,7 @@ interface EqPresetAssociationDao {
   /**
    * As part of [txn] delete all media and album associations. Typically done when cleaning the DB.
    */
-  suspend fun deleteMediaAndAlbumAssociations(txn: TransactionInProgress)
+  fun deleteMediaAndAlbumAssociations(txn: TransactionInProgress)
 
   /**
    * Delete any current default association and then set this [preset] as the default preset. The
@@ -91,12 +91,13 @@ interface EqPresetAssociationDao {
 
 private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociationDao {
 
-  override suspend fun deleteMediaAndAlbumAssociations(txn: TransactionInProgress) = txn.run {
-    EqPresetAssociationTable.delete {
-      (associationType eq PresetAssociationType.Media.id) or
-        (associationType eq PresetAssociationType.Album.id)
+  override fun deleteMediaAndAlbumAssociations(txn: TransactionInProgress) {
+    txn.run {
+      EqPresetAssociationTable.delete {
+        (associationType eq PresetAssociationType.Media.id) or
+          (associationType eq PresetAssociationType.Album.id)
+      }
     }
-    Unit
   }
 
   private fun Transaction.insertAssociation(
@@ -143,8 +144,8 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     runCatching {
       QUERY_DEFAULT
         .sequence({
-          it[BIND_MEDIA_ID] = mediaId.id
-          it[BIND_ALBUM_ID] = albumId.id
+          it[BIND_MEDIA_ID] = mediaId.value
+          it[BIND_ALBUM_ID] = albumId.value
           it[BIND_ROUTE_ID] = route.longId
         }) { it[presetId] }
         .singleOrNull() ?: defaultValue()
@@ -310,8 +311,12 @@ class PresetAssociation {
 
   companion object {
     val DEFAULT = PresetAssociation(PresetAssociationType.Default.id, 0)
-    fun makeForMedia(mediaId: MediaId) = PresetAssociation(PresetAssociationType.Media, mediaId.id)
-    fun makeForAlbum(albumId: AlbumId) = PresetAssociation(PresetAssociationType.Album, albumId.id)
+    fun makeForMedia(mediaId: MediaId) =
+      PresetAssociation(PresetAssociationType.Media, mediaId.value)
+
+    fun makeForAlbum(albumId: AlbumId) =
+      PresetAssociation(PresetAssociationType.Album, albumId.value)
+
     fun makeForOutput(output: AudioOutputRoute) =
       PresetAssociation(PresetAssociationType.Output, output.longId)
 

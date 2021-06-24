@@ -17,22 +17,21 @@
 package com.ealva.toque.service.controller
 
 import android.net.Uri
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import com.ealva.toque.common.Millis
-import com.ealva.toque.service.player.TransitionSelector
-import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.session.PlaybackActions
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 object NullMediaController : ToqueMediaController {
-  override val isActive: LiveData<Boolean> = MutableLiveData(false)
+  override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override val mediaIsLoaded: Boolean = false
   override fun setCurrentQueue(type: QueueType) = Unit
-  override fun play(transition: TransitionSelector) = Unit
+  override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
-  override fun pause(transition: TransitionSelector) = Unit
+  override fun pause(immediate: Boolean) = Unit
   override val isSeekable: Boolean = false
   override fun seekTo(position: Millis) = Unit
   override fun nextShuffleMode(): ShuffleMode = ShuffleMode.None
@@ -43,6 +42,7 @@ object NullMediaController : ToqueMediaController {
   override fun next() = Unit
   override fun previous() = Unit
   override fun goToQueueIndexMaybePlay(index: Int) = Unit
-  override fun loadUri(uri: Uri?) = Unit
+  override fun loadUri(uri: Uri) = Unit
+  override fun startMediaScannerFirstRun() = Unit
   override val enabledActions: PlaybackActions = PlaybackActions()
 }

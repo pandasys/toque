@@ -20,7 +20,7 @@ import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reifyRequire
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 @Suppress("NOTHING_TO_INLINE")
 inline fun Long.toAudioOutputRoute(): AudioOutputRoute =
@@ -31,8 +31,8 @@ inline val AudioOutputRoute.longId: Long
 
 enum class AudioOutputRoute(
   override val id: Int,
-  @StringRes override val stringRes: Int
-) : HasConstId, HasDescription {
+  @StringRes override val titleRes: Int
+) : HasConstId, HasTitle {
   /** Audio is being output via the device's built-in speakers */
   Speaker(1, R.string.Speaker),
 

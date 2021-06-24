@@ -16,17 +16,23 @@
 
 package com.ealva.toque.service.queue
 
+import com.ealva.toque.common.Title
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
 interface PlayableMediaQueue<T : QueueMediaItem> {
   /**
-   * What type of item is in the queue
+   * The type of this media queue
    */
   val queueType: QueueType
+
+  val isActive: StateFlow<Boolean>
 
   /**
    * Activate the queue, reestablishing index and position if [resume] is true, start playing if
    * [startPlayer] is true
    */
-  fun activate(
+  suspend fun activate(
     resume: Boolean,
     startPlayer: Boolean,
     haveWritePermission: Boolean
@@ -34,15 +40,13 @@ interface PlayableMediaQueue<T : QueueMediaItem> {
 
   fun deactivate()
 
-  val isActive: Boolean
-
-  val upNextQueue: List<T>
+  val queue: List<T>
 
   val currentItem: T
 
   val currentItemIndex: Int
 
-  suspend fun getNextMediaTitle(): String
+  suspend fun getNextMediaTitle(): Title
 
   fun play(immediate: Boolean = false)
 
@@ -57,4 +61,27 @@ interface PlayableMediaQueue<T : QueueMediaItem> {
   fun goToIndexMaybePlay(index: Int)
 
   val streamVolume: StreamVolume
+}
+
+object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
+  override val queueType: QueueType = QueueType.NullQueue
+  override suspend fun activate(
+    resume: Boolean,
+    startPlayer: Boolean,
+    haveWritePermission: Boolean
+  ) = Unit
+
+  override fun deactivate() = Unit
+  override val isActive = MutableStateFlow(false)
+  override val queue: List<NullQueueMediaItem> = emptyList()
+  override val currentItem: NullQueueMediaItem = NullQueueMediaItem
+  override val currentItemIndex: Int = -1
+  override suspend fun getNextMediaTitle(): Title = NullQueueMediaItem.title
+  override fun play(immediate: Boolean) = Unit
+  override fun pause(immediate: Boolean) = Unit
+  override fun togglePlayPause() = Unit
+  override fun next() = Unit
+  override fun previous() = Unit
+  override fun goToIndexMaybePlay(index: Int) = Unit
+  override val streamVolume: StreamVolume = NullStreamVolume
 }

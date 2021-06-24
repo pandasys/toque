@@ -22,7 +22,8 @@ inline fun String?.toTitle(): Title {
   return this?.let { Title(trim()) } ?: Title.UNKNOWN
 }
 
-inline class Title(val value: String) {
+@JvmInline
+value class Title(val value: String) {
   companion object {
     val UNKNOWN: Title = Title("Unknown")
   }

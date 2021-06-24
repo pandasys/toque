@@ -24,8 +24,8 @@ import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.debug
-import com.ealva.toque.service.queue.AudioQueueItem
-import com.ealva.toque.service.queue.NullAudioQueueItem
+import com.ealva.toque.service.audio.AudioQueueItem
+import com.ealva.toque.service.audio.NullAudioQueueItem
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Complete
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Pause
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Resume
@@ -109,7 +109,7 @@ internal class SimpleLastFmScrobbler(
       .putExtra(EXTRA_TRACK_NUMBER, item.trackNumber)
       .putExtra(EXTRA_STATE, state.value)
       .putExtra(EXTRA_APP_NAME, appName)
-      .putExtra(EXTRA_APP_PKG, pkgName.name)
+      .putExtra(EXTRA_APP_PKG, pkgName.prop)
       .putExtra(EXTRA_SOURCE, "P")
     debug { logIntent(intent) }
     intentBroadcaster.broadcast(intent)

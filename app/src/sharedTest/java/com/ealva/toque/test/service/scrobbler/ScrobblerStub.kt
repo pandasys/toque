@@ -18,7 +18,7 @@
 
 package com.ealva.toque.test.service.scrobbler
 
-import com.ealva.toque.service.queue.AudioQueueItem
+import com.ealva.toque.service.audio.AudioQueueItem
 import com.ealva.toque.service.queue.QueueMediaItem
 import com.ealva.toque.service.scrobble.Scrobbler
 import com.nhaarman.expect.fail

@@ -20,10 +20,10 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.prefs.AppPreferences
+import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.ScrobblerPackage
-import com.ealva.toque.service.queue.AudioQueueItem
-import com.ealva.toque.service.queue.NullAudioQueueItem
+import com.ealva.toque.service.audio.AudioQueueItem
+import com.ealva.toque.service.audio.NullAudioQueueItem
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +46,7 @@ private val LOG by lazyLogger(ScrobblerFacade::class)
 interface ScrobblerFacade : Scrobbler {
   companion object {
     operator fun invoke(
-      prefs: AppPreferences,
+      prefs: AppPrefs,
       scrobblerFactory: ScrobblerFactory,
       dispatcher: CoroutineDispatcher = Dispatchers.IO
     ): Scrobbler {
@@ -59,7 +59,7 @@ interface ScrobblerFacade : Scrobbler {
  * Wraps the real scrobbler as it may change based on user selection.
  */
 private class ScrobblerFacadeImpl(
-  private val prefs: AppPreferences,
+  private val prefs: AppPrefs,
   private val scrobblerFactory: ScrobblerFactory,
   private val dispatcher: CoroutineDispatcher
 ) : Scrobbler {
@@ -68,7 +68,7 @@ private class ScrobblerFacadeImpl(
   private var lastActiveItem: AudioQueueItem = NullAudioQueueItem
   private var lastAction = ScrobblerAction.Shutdown
   private val scope: CoroutineScope = MainScope().apply {
-    prefs.scrobblerFlow()
+    prefs.scrobbler.asFlow()
       .onEach { selectedScrobbler ->
         if (selectedScrobbler != lastSelectedScrobbler) {
           lastSelectedScrobbler = selectedScrobbler

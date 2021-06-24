@@ -17,25 +17,25 @@
 package com.ealva.toque.service.controller
 
 import android.net.Uri
-import androidx.lifecycle.LiveData
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.service.player.TransitionSelector
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.session.PlaybackActions
+import kotlinx.coroutines.flow.StateFlow
 
 interface ToqueMediaController {
-  val isActive: LiveData<Boolean>
+  val isActive: StateFlow<Boolean>
 
   val mediaIsLoaded: Boolean
 
   fun setCurrentQueue(type: QueueType)
 
   /**
-   * Start playing current media, if loaded, and apply the selected [transition]
+   * Start playing current media, if loaded, applying the user selected transition. If [immediate]
+   * is true any user selected transition is ignored and play is immediate.
    */
-  fun play(transition: TransitionSelector)
+  fun play(immediate: Boolean = false)
 
   /**
    * Stop the current media item.
@@ -43,9 +43,10 @@ interface ToqueMediaController {
   fun stop()
 
   /**
-   * Pause current media item applying the selected transition
+   * Pause current media item applying the selected transition. If [immediate] is true any
+   * user selected transition is ignored and pause is immediate.
    */
-  fun pause(transition: TransitionSelector)
+  fun pause(immediate: Boolean = false)
 
   val isSeekable: Boolean
 
@@ -76,7 +77,10 @@ interface ToqueMediaController {
 
   /** Go to the index of the up next queue and play if currently playing */
   fun goToQueueIndexMaybePlay(index: Int)
-  fun loadUri(uri: Uri?)
+
+  fun loadUri(uri: Uri)
+
+  fun startMediaScannerFirstRun()
 
   /** Current playback actions */
   val enabledActions: PlaybackActions

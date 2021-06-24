@@ -87,13 +87,23 @@
         <signature name=\"%1$s\" package=\"%2$s\">\n\t<key>%3$s</key>\n</signature>\n
         ]]>
     </string>
-    <string name="No_media_found">No media found</string>
+  <string name="No_media_found">No media found</string>
   <string name="No_playlist_found">No playlist found</string>
   <string name="Library">Library</string>
   <string name="Playlists">Playlists</string>
-    <string name="Artists">Artists</string>
+  <string name="Artists">Artists</string>
   <string name="Albums">Albums</string>
   <string name="Genres">Genres</string>
   <string name="Tracks">Tracks</string>
+  <string name="Searching_for_artwork">Searching for artwork</string>
+  <string name="RequiredToScanRationale">Permission is required to scan for media. Toque will be unable to function without this permission.</string>
+  <string name="RepeatRequiredToScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.</string>
+  <string name="SettingsRepeatRequiredToScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.\n\nSettings->Permissions->Storage->Allow</string>
+  <string name="AccessExternalStorage">Access External Storage</string>
+  <string name="RequestPermission">Request Permission</string>
+  <string name="Exit">Exit</string>
+  <string name="OK">OK</string>
+  <string name="Settings">Settings</string>
+    <string name="NotImplemented">Not Implemented</string>
 
 </resources>

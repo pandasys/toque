@@ -22,7 +22,8 @@ inline fun String?.toPackageName(): PackageName {
   return this?.let { PackageName(trim()) } ?: PackageName.NONE
 }
 
-inline class PackageName(val name: String) {
+@JvmInline
+value class PackageName(val prop: String) {
   companion object {
     val NONE: PackageName = PackageName("NONE")
   }

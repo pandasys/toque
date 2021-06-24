@@ -19,9 +19,60 @@ package com.ealva.toque.service.media
 import com.ealva.toque.common.Millis
 import com.ealva.toque.service.player.PlayerTransition
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
+enum class ParsedStatus(private val status: Int) {
+  Unknown(-1),
+  NotParsed(0),
+  Skipped(1),
+  Failed(2),
+  Timeout(3),
+  Done(4)
+}
+
+enum class MediaState(private val state: Int) {
+  Unknown(-1),
+  NothingSpecial(0),
+  Opening(1),
+  Playing(3),
+  Paused(4),
+  Stopped(5),
+  Ended(6),
+  Error(7)
+}
+
+enum class MetadataField(private val field: Int) {
+  Unknown(-1),
+  Title(0),
+  Artist(1),
+  Genre(2),
+  Copyright(3),
+  Album(4),
+  TrackNumber(5),
+  Description(6),
+  Rating(7),
+  Date(8),
+  Setting(9),
+  URL(10),
+  Language(11),
+  NowPlaying(12),
+  Publisher(13),
+  EncodedBy(14),
+  ArtworkURL(15),
+  TrackID(16),
+  TrackTotal(17),
+  Director(18),
+  Season(19),
+  Episode(20),
+  ShowName(21),
+  Actors(22),
+  AlbumArtist(23),
+  DiscNumber(24)
+}
+
+/**  */
 sealed class MediaEvent {
-  data class MetadataUpdate(val metadata: MediaMetadata) : MediaEvent()
+  data class MetadataUpdate(val field: MetadataField) : MediaEvent()
 }
 
 sealed class MediaPlayerEvent {
@@ -35,6 +86,14 @@ sealed class MediaPlayerEvent {
 }
 
 interface Media {
+  /** If true the media is being streamed via network connection, else is local (on device) */
+  val isStream: Boolean
+
+  /** Indicates if the native media has parsed the file tag for metadata */
+  val parsedStatus: StateFlow<ParsedStatus>
+
+  val state: StateFlow<MediaState>
+  val duration: StateFlow<Millis>
   val mediaEventFlow: Flow<MediaEvent>
   val playerEventFlow: Flow<MediaPlayerEvent>
 

@@ -26,8 +26,12 @@ import kotlin.math.roundToInt
  Each increment of 10 is 1/2 star. Some file tags expect 0..100 while MP3s are 0..256 or "*-"
  characters.
  */
+@JvmInline
+value class Rating(val value: Int) : Comparable<Rating> {
+  init {
+    require(value in -1..100) { "Rating must be between -1 (no rating) and 100" }
+  }
 
-inline class Rating(val value: Int) : Comparable<Rating> {
   override fun compareTo(other: Rating): Int = value.compareTo(other.value)
 
   val isValid: Boolean
@@ -83,7 +87,8 @@ fun Int.toRating(): Rating = when (this) {
 
 fun String.toRating(): Rating = toIntOrNull()?.toRating() ?: Rating.RATING_NONE
 
-inline class StarRating(val value: Float) : Comparable<StarRating> {
+@JvmInline
+value class StarRating(val value: Float) : Comparable<StarRating> {
   override fun compareTo(other: StarRating): Int = value.compareTo(other.value)
 
   val isValid: Boolean
@@ -201,7 +206,8 @@ fun StarRating.toRating(): Rating {
  * "*****" = 5
  * etc...
  */
-inline class Mp3Rating(val value: Int) : Comparable<Mp3Rating> {
+@JvmInline
+value class Mp3Rating(val value: Int) : Comparable<Mp3Rating> {
   override fun compareTo(other: Mp3Rating): Int = value.compareTo(other.value)
 
   val isValid: Boolean

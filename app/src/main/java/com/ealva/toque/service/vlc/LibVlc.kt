@@ -18,10 +18,7 @@ package com.ealva.toque.service.vlc
 
 import android.content.Context
 import android.net.Uri
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.log._e
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -30,8 +27,6 @@ import kotlinx.coroutines.withContext
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
-
-private val LOG by lazyLogger(LibVlc::class)
 
 interface LibVlcSingleton {
   /**
@@ -44,7 +39,7 @@ interface LibVlcSingleton {
   companion object {
     operator fun invoke(
       context: Context,
-      prefsSingleton: LibVlcPreferencesSingleton,
+      prefsSingleton: LibVlcPrefsSingleton,
       vlcUtil: VlcUtil? = null,
       dispatcher: CoroutineDispatcher = Dispatchers.IO
     ): LibVlcSingleton = LibVlcSingletonImpl(context, prefsSingleton, vlcUtil, dispatcher)
@@ -53,7 +48,7 @@ interface LibVlcSingleton {
 
 private class LibVlcSingletonImpl(
   private val context: Context,
-  private val prefsSingleton: LibVlcPreferencesSingleton,
+  private val prefsSingleton: LibVlcPrefsSingleton,
   /** Default to null because don't want this during injection but want to stub for test */
   private val vlcUtil: VlcUtil?,
   private val dispatcher: CoroutineDispatcher
@@ -93,10 +88,10 @@ interface LibVlc {
     uri: Uri,
     initialSeek: Millis,
     startPaused: Boolean,
-    prefs: LibVlcPreferences
+    prefs: LibVlcPrefs
   ): IMedia
 
-  fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPreferences): IMedia
+  fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPrefs): IMedia
 
   fun makeMediaPlayer(media: IMedia): MediaPlayer
 }
@@ -120,7 +115,7 @@ private class LibVlcImpl(
     uri: Uri,
     initialSeek: Millis,
     startPaused: Boolean,
-    prefs: LibVlcPreferences
+    prefs: LibVlcPrefs
   ): IMedia {
     return makeNativeMedia(uri).setAudioMediaOptions(startPaused, initialSeek, prefs)
   }
@@ -128,7 +123,7 @@ private class LibVlcImpl(
   private fun IMedia.setAudioMediaOptions(
     startPaused: Boolean,
     initialSeek: Millis,
-    prefs: LibVlcPreferences
+    prefs: LibVlcPrefs
   ) = apply {
     if (startPaused) {
       addMediaOption { ":start-paused" }
@@ -146,7 +141,7 @@ private class LibVlcImpl(
 //    }
   }
 
-  private inline fun IMedia.maybeSetReplayGain(prefs: () -> LibVlcPreferences) = prefs().apply {
+  private inline fun IMedia.maybeSetReplayGain(prefs: () -> LibVlcPrefs) = prefs().apply {
     if (replayGainMode() != ReplayGainMode.None) {
       addMediaOption { """:audio-replay-gain-mode=${replayGainMode()}""" }
       addMediaOption { """:audio-replay-gain-preamp=${replayPreamp()}""" }
@@ -154,7 +149,7 @@ private class LibVlcImpl(
     }
   }
 
-  private inline fun IMedia.setMediaHardwareAcceleration(prefs: () -> LibVlcPreferences) {
+  private inline fun IMedia.setMediaHardwareAcceleration(prefs: () -> LibVlcPrefs) {
     when (prefs().hardwareAcceleration()) {
       HardwareAcceleration.Disabled -> setHWDecoderEnabled(false, false)
       HardwareAcceleration.Full -> setHWDecoderEnabled(true, true)
@@ -168,12 +163,9 @@ private class LibVlcImpl(
     }
   }
 
-  private inline fun IMedia.addMediaOption(option: () -> String) {
-    LOG._e { it("IMedia option=${option()}") }
-    addOption(option())
-  }
+  private inline fun IMedia.addMediaOption(option: () -> String) = addOption(option())
 
-  override fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPreferences): IMedia {
+  override fun makeVideoMedia(uri: Uri, startPaused: Boolean, prefs: LibVlcPrefs): IMedia {
     TODO("Not yet implemented")
   }
 

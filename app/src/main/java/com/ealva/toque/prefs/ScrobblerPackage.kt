@@ -21,7 +21,7 @@ import com.ealva.toque.R
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.toPackageName
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 /**
  * Don't change any enum instance [id] as it is persisted in the app preferences.
@@ -29,8 +29,8 @@ import com.ealva.toque.res.HasDescription
 enum class ScrobblerPackage(
   override val id: Int,
   val packageName: PackageName,
-  @StringRes override val stringRes: Int
-) : HasConstId, HasDescription {
+  @StringRes override val titleRes: Int
+) : HasConstId, HasTitle {
   None(0, PackageName.NONE, R.string.None),
   LastFm(1, "com.adam.aslfms".toPackageName(), R.string.LastFm),
   SimpleLastFm(2, "com.adam.aslfms".toPackageName(), R.string.SimpleLastFm);

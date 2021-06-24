@@ -18,12 +18,12 @@ package com.ealva.toque.prefs
 
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasDescription
+import com.ealva.toque.res.HasTitle
 
 enum class PlayUpNextAction(
   override val id: Int,
-  override val stringRes: Int
-) : HasConstId, HasDescription {
+  override val titleRes: Int
+) : HasConstId, HasTitle {
   ClearUpNext(1, R.string.ClearUpNext),
   PlayNext(2, R.string.PlayNext),
   Prompt(3, R.string.Prompt);

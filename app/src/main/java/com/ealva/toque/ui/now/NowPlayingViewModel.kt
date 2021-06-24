@@ -16,44 +16,78 @@
 
 package com.ealva.toque.ui.now
 
-import android.content.Context
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.prefstore.store.invoke
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.Title
-import com.ealva.toque.common.toTitle
+import com.ealva.toque.common.RepeatMode
+import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaIdList
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
+import com.ealva.toque.service.MediaPlayerServiceConnection
+import com.ealva.toque.service.audio.AudioQueueItem
+import com.ealva.toque.service.audio.NullAudioQueueItem
+import com.ealva.toque.service.controller.NullMediaController
+import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.player.TransitionSelector
-import com.ealva.toque.service.queue.AudioQueueItem
-import com.ealva.toque.service.queue.NullAudioQueueItem
-import com.ealva.toque.common.RepeatMode
-import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.service.queue.StreamVolume
-import com.ealva.toque.service.vlc.VlcEqPreset
+import com.zhuinden.simplestack.ScopedServices
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+
+enum class PlayState {
+  Playing,
+  Paused,
+  Stopped
+}
+
+data class NowPlayingState(
+  val queue: List<AudioQueueItem>,
+  val queueIndex: Int,
+  val position: Millis,
+  val duration: Millis,
+  val playingState: PlayState,
+  val repeatMode: RepeatMode,
+  val shuffleMode: ShuffleMode,
+  val eqMode: EqMode,
+  val presets: List<EqPreset>,
+  val currentPreset: EqPreset,
+  val extraMediaInfo: String
+) {
+  val currentItem: AudioQueueItem
+    get() = if (queueIndex in queue.indices) queue[queueIndex] else NullAudioQueueItem
+
+  companion object {
+    val NONE = NowPlayingState(
+      queue = emptyList(),
+      queueIndex = -1,
+      position = Millis.ZERO,
+      duration = Millis.ZERO,
+      playingState = PlayState.Stopped,
+      repeatMode = RepeatMode.None,
+      shuffleMode = ShuffleMode.None,
+      eqMode = EqMode.Off,
+      presets = emptyList(),
+      currentPreset = EqPreset.NULL,
+      extraMediaInfo = ""
+    )
+  }
+}
 
 interface NowPlayingViewModel {
-  val currentIndex: StateFlow<Int>
-  val currentItem: StateFlow<AudioQueueItem>
-  val positionDuration: StateFlow<Pair<Millis, Millis>>
-  val repeat: StateFlow<RepeatMode>
-  val shuffle: StateFlow<ShuffleMode>
-  val eqMode: StateFlow<EqMode>
-  val playing: StateFlow<Boolean>
-
-  //  val presets: StateFlow<List<Equalizer>>
-  val currentPreset: StateFlow<EqPreset>
-  val nextTitle: StateFlow<Title>
-//  val itemUpdated: StateFlow<QueueItemUpdatedEvent>
-//  val paletteUpdated: StateFlow<PaletteUpdate>
-
+  val nowPlayingState: StateFlow<NowPlayingState>
 //  suspend fun getItemArt(itemId: Long, caller: String): Pair<Uri?, AlbumSongArtInfo?>
 
   fun nextShuffleMode()
@@ -125,65 +159,49 @@ interface NowPlayingViewModel {
 
   companion object {
     const val INVALID_INDEX = -1
+
+    operator fun invoke(
+      serviceConnection: MediaPlayerServiceConnection,
+      appPrefsSingleton: AppPrefsSingleton
+    ): NowPlayingViewModel =
+      NowPlayingViewModelImpl(serviceConnection, appPrefsSingleton)
   }
 }
 
-inline val NowPlayingViewModel.isPlaying: Boolean
-  get() = playing.value == true
-
-// inline val NowPlayingViewModel.playStatus: PlayStatusUpdate
-//  get() {
-//    val (pos, dur) = positionDuration.value ?: Pair(0L, 0L)
-//    return PlayStatusUpdate(pos, dur, isPlaying)
-//  }
-
-fun FragmentActivity.getNowPlayingViewModel(
-  context: Context,
-  addNewMedia: Boolean = false
-): NowPlayingViewModel {
-  @Suppress("EXPERIMENTAL_API_USAGE")
-  return ViewModelProvider(
-    this,
-    NowPlayingViewModelFactory(context, addNewMedia)
-  )[NowPlayingViewModelImpl::class.java]
-}
-
-private class NowPlayingViewModelFactory(
-  private val context: Context,
-  private val addNewMedia: Boolean
-) : ViewModelProvider.Factory {
-  @Suppress("EXPERIMENTAL_API_USAGE")
-  override fun <T : ViewModel?> create(modelClass: Class<T>): T {
-    require(modelClass.isAssignableFrom(NowPlayingViewModelImpl::class.java))
-    @Suppress("UNCHECKED_CAST")
-    return NowPlayingViewModelImpl(context, addNewMedia) as T
-  }
-}
-
-@Suppress("EXPERIMENTAL_API_USAGE")
-fun Fragment.getNowPlayingViewModel(): NowPlayingViewModel {
-  return ViewModelProvider(requireActivity())[NowPlayingViewModelImpl::class.java]
-}
+private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
 
 @OptIn(ExperimentalCoroutinesApi::class)
-private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
-private const val ADD_NEW_MEDIA_COUNT = 10
-
-@ExperimentalCoroutinesApi
 private class NowPlayingViewModelImpl(
-  private val context: Context,
-  private var addNewMedia: Boolean
-) : ViewModel(), NowPlayingViewModel {
-  override val currentIndex: MutableStateFlow<Int> = MutableStateFlow(-1)
-  override val currentItem: StateFlow<AudioQueueItem> = MutableStateFlow(NullAudioQueueItem)
-  override val positionDuration: StateFlow<Pair<Millis, Millis>> =
-    MutableStateFlow(Pair(Millis.ZERO, Millis.ZERO))
-  override val repeat: StateFlow<RepeatMode> = MutableStateFlow(RepeatMode.None)
-  override val shuffle: StateFlow<ShuffleMode> = MutableStateFlow(ShuffleMode.None)
-  override val eqMode: StateFlow<EqMode> = MutableStateFlow(EqMode.Off)
-  override val playing: StateFlow<Boolean> = MutableStateFlow(false)
-  override val currentPreset: StateFlow<EqPreset> = MutableStateFlow(VlcEqPreset.NONE)
-  override val nextTitle: StateFlow<Title> = MutableStateFlow("".toTitle())
+  private val serviceConnection: MediaPlayerServiceConnection,
+  private val appPrefsSingleton: AppPrefsSingleton
+) : NowPlayingViewModel, ScopedServices.Registered {
+  private val scope = CoroutineScope(Dispatchers.Main + Job())
+  private var mediaController: ToqueMediaController = NullMediaController
+  private lateinit var appPrefs: AppPrefs
+  private var connectedToService = false
+
+  override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
+
+  override fun onServiceRegistered() {
+    LOG._i { it("NowPlayingViewModel") }
+    scope.launch {
+      appPrefs = appPrefsSingleton.instance()
+      serviceConnection.mediaController.collect { controller ->
+        mediaController = controller
+        connectedToService = controller !== NullMediaController
+        LOG._i { it("NowPlayingViewModel connected to service=%s", connectedToService) }
+        if (connectedToService) {
+          mediaController = controller
+          LOG._e { it("firstRun=%s", appPrefs.firstRun()) }
+          if (appPrefs.firstRun()) controller.startMediaScannerFirstRun()
+        }
+      }
+    }
+  }
+
+  override fun onServiceUnregistered() {
+    scope.cancel()
+  }
 
   override fun nextShuffleMode() {
     TODO("Not yet implemented")

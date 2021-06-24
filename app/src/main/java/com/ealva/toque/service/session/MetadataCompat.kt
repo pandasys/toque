@@ -21,8 +21,8 @@ package com.ealva.toque.service.session
 import android.graphics.Bitmap
 import android.net.Uri
 import android.support.v4.media.MediaMetadataCompat
-import androidx.core.net.toUri
 import com.ealva.toque.common.toMillis
+import com.ealva.toque.file.toUriOrEmpty
 
 inline val MediaMetadataCompat.id: String?
   get() = getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID)
@@ -72,17 +72,17 @@ inline val MediaMetadataCompat.discNumber
 inline val MediaMetadataCompat.albumArtist: String?
   get() = getString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST)
 
-inline val MediaMetadataCompat.art: Bitmap
+inline val MediaMetadataCompat.art: Bitmap?
   get() = getBitmap(MediaMetadataCompat.METADATA_KEY_ART)
 
 inline val MediaMetadataCompat.artUri: Uri
-  get() = getString(MediaMetadataCompat.METADATA_KEY_ART_URI).toUri()
+  get() = getString(MediaMetadataCompat.METADATA_KEY_ART_URI).toUriOrEmpty()
 
 inline val MediaMetadataCompat.albumArt: Bitmap?
   get() = getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART)
 
 inline val MediaMetadataCompat.albumArtUri: Uri
-  get() = getString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI).toUri()
+  get() = getString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI).toUriOrEmpty()
 
 inline val MediaMetadataCompat.userRating
   get() = getLong(MediaMetadataCompat.METADATA_KEY_USER_RATING)
@@ -99,14 +99,14 @@ inline val MediaMetadataCompat.displaySubtitle: String?
 inline val MediaMetadataCompat.displayDescription: String?
   get() = getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION)
 
-inline val MediaMetadataCompat.displayIcon: Bitmap
+inline val MediaMetadataCompat.displayIcon: Bitmap?
   get() = getBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON)
 
 inline val MediaMetadataCompat.displayIconUri: Uri
-  get() = this.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI).toUri()
+  get() = getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI).toUriOrEmpty()
 
 inline val MediaMetadataCompat.mediaUri: Uri
-  get() = this.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI).toUri()
+  get() = getString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI).toUriOrEmpty()
 
 inline val MediaMetadataCompat.downloadStatus
   get() = getLong(MediaMetadataCompat.METADATA_KEY_DOWNLOAD_STATUS)

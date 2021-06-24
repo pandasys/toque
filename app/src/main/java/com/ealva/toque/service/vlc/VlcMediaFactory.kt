@@ -20,7 +20,7 @@ import android.net.Uri
 import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.prefs.AppPreferencesSingleton
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.media.Media
 import com.ealva.toque.service.media.MediaFactory
 import kotlinx.coroutines.CoroutineDispatcher
@@ -30,8 +30,8 @@ import org.videolan.libvlc.interfaces.IMedia.Parse
 
 class VlcMediaFactory(
   private val libVlcSingleton: LibVlcSingleton,
-  private val appPrefsSingleton: AppPreferencesSingleton,
-  private val libVlcPrefsSingleton: LibVlcPreferencesSingleton,
+  private val appPrefsSingleton: AppPrefsSingleton,
+  private val libVlcPrefsSingleton: LibVlcPrefsSingleton,
   private val presetFactory: VlcPresetFactory,
   private val vlcPlayerFactory: VlcPlayerFactory,
   private val dispatcher: CoroutineDispatcher? = null

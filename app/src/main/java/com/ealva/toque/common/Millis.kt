@@ -25,7 +25,8 @@ typealias MillisRange = ClosedRange<Millis>
 inline fun Long.toMillis(): Millis = Millis(this)
 inline fun Int.toMillis(): Millis = Millis(toLong())
 
-inline class Millis(val value: Long) : Comparable<Millis> {
+@JvmInline
+value class Millis(val value: Long) : Comparable<Millis> {
   override fun toString(): String = value.toString()
 
   override operator fun compareTo(other: Millis): Int = value.compareTo(other.value)
@@ -45,9 +46,11 @@ inline class Millis(val value: Long) : Comparable<Millis> {
 
   companion object {
     // Some commonly used Millis
-    val ZERO = 0.toMillis()
-    val ONE_HUNDRED = 100.toMillis()
-    val TWO_HUNDRED = 200.toMillis()
-    val ONE_MINUTE = 60000.toMillis()
+    val ZERO = Millis(0)
+    val ONE_HUNDRED = Millis(100)
+    val TWO_HUNDRED = Millis(200)
+    val ONE_SECOND = Millis(1000)
+    val THREE_SECONDS = Millis(3000)
+    val ONE_MINUTE = Millis(60000)
   }
 }

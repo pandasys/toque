@@ -19,40 +19,30 @@ package com.ealva.toque.android.prefs
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.ealva.prefstore.store.invoke
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
-import com.ealva.toque.common.toMillis
-import com.ealva.toque.common.toVolume
-import com.ealva.toque.prefs.AppPreferences
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_ALLOW_DUPLICATES
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_DUCK_ACTION
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_DUCK_VOLUME
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_END_OF_QUEUE_ACTION
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_FADE_ON_PLAY_PAUSE
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_GO_TO_NOW_PLAYING
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_IGNORE_SMALL_FILES
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_IGNORE_THRESHOLD
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_LAST_SCAN_TIME
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_PLAY_PAUSE_FADE
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_SCROBBLER
-import com.ealva.toque.prefs.AppPreferences.Companion.DEFAULT_SELECT_MEDIA_ACTION
-import com.ealva.toque.prefs.AppPreferencesSingleton
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.DuckAction
 import com.ealva.toque.prefs.EndOfQueueAction
 import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.prefs.ScrobblerPackage
 import com.ealva.toque.prefs.SelectMediaAction
 import com.ealva.toque.test.shared.CoroutineRule
-import com.ealva.toque.test.shared.expect
 import com.ealva.toque.test.shared.toNotBe
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.TestCoroutineScope
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.ExpectedException
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import java.io.File
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -60,258 +50,272 @@ class AppPreferencesTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
-  @Suppress("DEPRECATION")
   @get:Rule
-  var thrown: ExpectedException = ExpectedException.none()
+  val tempFolder: TemporaryFolder = TemporaryFolder()
 
   private lateinit var appCtx: Context
-  private lateinit var prefsSingleton: AppPreferencesSingleton
+  private lateinit var testFile: File
+  private lateinit var dataStoreScope: TestCoroutineScope
+  private lateinit var prefsSingleton: AppPrefsSingleton
 
   @Before
   fun setup() {
     appCtx = ApplicationProvider.getApplicationContext()
-    prefsSingleton = AppPreferencesSingleton(appCtx, coroutineRule.testDispatcher)
+    testFile = tempFolder.newFile("dummy.preferences_pb")
+    dataStoreScope = TestCoroutineScope(coroutineRule.testDispatcher + Job())
+    prefsSingleton = AppPrefsSingleton(AppPrefs.Companion::make, testFile, dataStoreScope)
+  }
+
+  @After
+  fun cleanup() {
+    dataStoreScope.cleanupTestCoroutines()
+  }
+
+  @Test
+  fun testFirstRunWithPermission() = coroutineRule.runBlockingTest {
+    prefsSingleton {
+      expect(firstRun()).toBe(firstRun.default)
+      clear()
+      expectAllAreDefault()
+    }
   }
 
   @Test
   fun testAllowDuplicates() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(allowDuplicates()).toBe(DEFAULT_ALLOW_DUPLICATES)
-      allowDuplicates(true)
+    prefsSingleton {
+      expect(allowDuplicates()).toBe(allowDuplicates.default)
+      allowDuplicates.set(true)
       expect(allowDuplicates()).toBe(true)
-      allowDuplicates(false)
+      allowDuplicates.set(false)
       expect(allowDuplicates()).toBe(false)
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testGoToNowPlaying() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(goToNowPlaying()).toBe(DEFAULT_GO_TO_NOW_PLAYING)
-      goToNowPlaying(false)
+    prefsSingleton {
+      expect(goToNowPlaying()).toBe(goToNowPlaying.default)
+      goToNowPlaying.set(false)
       expect(goToNowPlaying()).toBe(false)
-      goToNowPlaying(true)
+      goToNowPlaying.set(true)
       expect(goToNowPlaying()).toBe(true)
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testIgnoreSmallFiles() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(ignoreSmallFiles()).toBe(DEFAULT_IGNORE_SMALL_FILES)
-      expect(ignoreSmallFiles(true)).toBe(true)
+    prefsSingleton {
+      expect(ignoreSmallFiles()).toBe(ignoreSmallFiles.default)
+      ignoreSmallFiles.set(true)
       expect(ignoreSmallFiles()).toBe(true)
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testIgnoreThreshold() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(ignoreThreshold()).toBe(DEFAULT_IGNORE_THRESHOLD)
-      ignoreThreshold(5000.toMillis())
-      expect(ignoreThreshold()).toBe(5000.toMillis())
+    prefsSingleton {
+      expect(ignoreThreshold()).toBe(ignoreThreshold.default)
+      ignoreThreshold.set(Millis(5000))
+      expect(ignoreThreshold()).toBe(Millis(5000))
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testLastScanTime() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(lastScanTime()).toBe(DEFAULT_LAST_SCAN_TIME)
-      lastScanTime(Millis.ONE_MINUTE)
+    prefsSingleton {
+      // we never reset last scan time to default of DEFAULT_LAST_SCAN_TIME, so let's not test that
+      lastScanTime.set(Millis.ONE_MINUTE)
       expect(lastScanTime()).toBe(Millis.ONE_MINUTE)
-      lastScanTime(DEFAULT_LAST_SCAN_TIME)
+      lastScanTime.set(lastScanTime.default)
+      expect(lastScanTime()).toBe(lastScanTime.default)
+
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testFadeOnPlayPause() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(fadeOnPlayPause()).toBe(DEFAULT_FADE_ON_PLAY_PAUSE)
-      expect(fadeOnPlayPause(true)).toBe(true)
-      expect(fadeOnPlayPause()).toBe(true)
+    prefsSingleton {
+      expect(playPauseFade()).toBe(playPauseFade.default)
+      playPauseFade.set(true)
+      expect(playPauseFade()).toBe(true)
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testPlayPauseFade() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(playPauseFadeLength()).toBe(DEFAULT_PLAY_PAUSE_FADE)
-      playPauseFadeLength(1000.toMillis())
-      expect(playPauseFadeLength()).toBe(1000.toMillis())
-      playPauseFadeLength(2000.toMillis())
-      expect(playPauseFadeLength()).toBe(2000.toMillis())
-      playPauseFadeLength(100.toMillis())
-      expect(playPauseFadeLength()).toBe(AppPreferences.PLAY_PAUSE_FADE_RANGE.start)
-      playPauseFadeLength(5000.toMillis())
-      expect(playPauseFadeLength()).toBe(AppPreferences.PLAY_PAUSE_FADE_RANGE.endInclusive)
+    prefsSingleton {
+      expect(playPauseFadeLength()).toBe(playPauseFadeLength.default)
+      playPauseFadeLength.set(Millis(1000))
+      expect(playPauseFadeLength()).toBe(Millis(1000))
+      playPauseFadeLength.set(Millis(2000))
+      expect(playPauseFadeLength()).toBe(Millis(2000))
+      playPauseFadeLength.set(Millis(100))
+      expect(playPauseFadeLength()).toBe(PLAY_PAUSE_FADE_RANGE.start)
+      playPauseFadeLength.set(Millis(5000))
+      expect(playPauseFadeLength()).toBe(PLAY_PAUSE_FADE_RANGE.endInclusive)
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testScrobblerPackage() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(scrobbler()).toBe(DEFAULT_SCROBBLER)
+    prefsSingleton {
+      expect(scrobbler()).toBe(scrobbler.default)
       ScrobblerPackage.values().forEach { pkg ->
-        expect(scrobbler(pkg)).toBe(true)
+        scrobbler.set(pkg)
         expect(scrobbler()).toBe(pkg)
       }
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testDuckAction() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(duckAction()).toBe(DEFAULT_DUCK_ACTION)
+    prefsSingleton {
+      expect(duckAction()).toBe(duckAction.default)
       DuckAction.values().forEach { action ->
-        expect(duckAction(action)).toBe(true)
+        duckAction.set(action)
         expect(duckAction()).toBe(action)
       }
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testDuckVolume() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(duckVolume()).toBe(DEFAULT_DUCK_VOLUME)
-      expect(duckVolume((-100).toVolume())).toBe(true)
+    prefsSingleton {
+      expect(duckVolume()).toBe(duckVolume.default)
+      duckVolume.set(Volume(-100))
       expect(duckVolume()).toBe(Volume.ZERO)
-      expect(duckVolume(1000.toVolume())).toBe(true)
+      duckVolume.set(Volume(1000))
       expect(duckVolume()).toBe(Volume.ONE_HUNDRED)
-      arrayOf(10.toVolume(), 30.toVolume(), 67.toVolume(), 91.toVolume()).forEach { vol ->
-        expect(duckVolume(vol)).toBe(true)
+      arrayOf(Volume(10), Volume(30), Volume(67), Volume(91)).forEach { vol ->
+        duckVolume.set(vol)
         expect(duckVolume()).toBe(vol)
       }
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testPlayUpNextAction() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(playUpNextAction()).toBe(DEFAULT_PLAY_UP_NEXT_ACTION)
+    prefsSingleton {
+      expect(playUpNextAction()).toBe(playUpNextAction.default)
       PlayUpNextAction.values().forEach { action ->
-        expect(playUpNextAction(action)).toBe(true)
+        playUpNextAction.set(action)
         expect(playUpNextAction()).toBe(action)
       }
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testEndOfQueueAction() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(endOfQueueAction()).toBe(DEFAULT_END_OF_QUEUE_ACTION)
+    prefsSingleton {
+      expect(endOfQueueAction()).toBe(endOfQueueAction.default)
       EndOfQueueAction.values().forEach { action ->
-        expect(endOfQueueAction(action)).toBe(true)
+        endOfQueueAction.set(action)
         expect(endOfQueueAction()).toBe(action)
       }
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
   @Test
   fun testSelectMediaAction() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(selectMediaAction()).toBe(DEFAULT_SELECT_MEDIA_ACTION)
+    prefsSingleton {
+      expect(selectMediaAction()).toBe(selectMediaAction.default)
       SelectMediaAction.values().forEach { action ->
-        expect(selectMediaAction(action)).toBe(true)
+        selectMediaAction.set(action)
         expect(selectMediaAction()).toBe(action)
       }
 
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
-    }
-  }
-
-  /**
-   * Ensure expected key count same as actual to ensure tests match actual
-   */
-  @Test
-  fun testExpectedKeyCount() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(asMap().keys).toHaveSize(13)
     }
   }
 
   @Test
   fun testResetAllToDefault() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      resetAllToDefault()
+    prefsSingleton {
+      clear()
       expectAllAreDefault()
-      expect(allowDuplicates(!DEFAULT_ALLOW_DUPLICATES)).toBe(true)
-      expect(goToNowPlaying(!DEFAULT_GO_TO_NOW_PLAYING)).toBe(true)
-      expect(ignoreSmallFiles(!DEFAULT_IGNORE_SMALL_FILES)).toBe(true)
-      expect(ignoreThreshold(DEFAULT_IGNORE_THRESHOLD + 1000L)).toBe(true)
-      expect(fadeOnPlayPause(!DEFAULT_FADE_ON_PLAY_PAUSE)).toBe(true)
-      expect(playPauseFadeLength(DEFAULT_PLAY_PAUSE_FADE + 500L)).toBe(true)
-      expect(scrobbler(ScrobblerPackage.LastFm)).toBe(true)
-      expect(duckAction(DuckAction.Pause)).toBe(true)
-      expect(duckVolume(DEFAULT_DUCK_VOLUME + 1)).toBe(true)
-      expect(playUpNextAction(PlayUpNextAction.ClearUpNext)).toBe(true)
-      expect(endOfQueueAction(EndOfQueueAction.Stop)).toBe(true)
-      expect(selectMediaAction(SelectMediaAction.AddToUpNext)).toBe(true)
+      firstRun(!firstRun.default)
+      allowDuplicates(!allowDuplicates.default)
+      goToNowPlaying(!goToNowPlaying.default)
+      ignoreSmallFiles(!ignoreSmallFiles.default)
+      ignoreThreshold(ignoreThreshold.default + 1000L)
+      playPauseFade(!playPauseFade.default)
+      playPauseFadeLength(playPauseFadeLength.default + 500L)
+      scrobbler(ScrobblerPackage.LastFm)
+      duckAction(DuckAction.Pause)
+      duckVolume(duckVolume.default + 1)
+      playUpNextAction(PlayUpNextAction.ClearUpNext)
+      endOfQueueAction(EndOfQueueAction.Stop)
+      selectMediaAction(SelectMediaAction.AddToUpNext)
       expectAllAreNotDefault()
-      resetAllToDefault()
+      clear()
       expectAllAreDefault()
     }
   }
 
-  private fun AppPreferences.expectAllAreDefault() {
-    expect(allowDuplicates()).toBe(DEFAULT_ALLOW_DUPLICATES)
-    expect(goToNowPlaying()).toBe(DEFAULT_GO_TO_NOW_PLAYING)
-    expect(ignoreSmallFiles()).toBe(DEFAULT_IGNORE_SMALL_FILES)
-    expect(ignoreThreshold()).toBe(DEFAULT_IGNORE_THRESHOLD)
-    expect(fadeOnPlayPause()).toBe(DEFAULT_FADE_ON_PLAY_PAUSE)
-    expect(playPauseFadeLength()).toBe(DEFAULT_PLAY_PAUSE_FADE)
-    expect(scrobbler()).toBe(DEFAULT_SCROBBLER)
-    expect(duckAction()).toBe(DEFAULT_DUCK_ACTION)
-    expect(duckVolume()).toBe(DEFAULT_DUCK_VOLUME)
-    expect(playUpNextAction()).toBe(DEFAULT_PLAY_UP_NEXT_ACTION)
-    expect(selectMediaAction()).toBe(DEFAULT_SELECT_MEDIA_ACTION)
+  private fun AppPrefs.expectAllAreDefault() {
+    expect(firstRun()).toBe(firstRun.default)
+    expect(lastScanTime()).toBe(lastScanTime.default)
+    expect(allowDuplicates()).toBe(allowDuplicates.default)
+    expect(goToNowPlaying()).toBe(goToNowPlaying.default)
+    expect(ignoreSmallFiles()).toBe(ignoreSmallFiles.default)
+    expect(ignoreThreshold()).toBe(ignoreThreshold.default)
+    expect(playPauseFade()).toBe(playPauseFade.default)
+    expect(playPauseFadeLength()).toBe(playPauseFadeLength.default)
+    expect(scrobbler()).toBe(scrobbler.default)
+    expect(duckAction()).toBe(duckAction.default)
+    expect(duckVolume()).toBe(duckVolume.default)
+    expect(playUpNextAction()).toBe(playUpNextAction.default)
+    expect(selectMediaAction()).toBe(selectMediaAction.default)
   }
 
-  private fun AppPreferences.expectAllAreNotDefault() {
-    expect(allowDuplicates()).toNotBe(DEFAULT_ALLOW_DUPLICATES)
-    expect(goToNowPlaying()).toNotBe(DEFAULT_GO_TO_NOW_PLAYING)
-    expect(ignoreSmallFiles()).toNotBe(DEFAULT_IGNORE_SMALL_FILES)
-    expect(ignoreThreshold()).toNotBe(DEFAULT_IGNORE_THRESHOLD)
-    expect(fadeOnPlayPause()).toNotBe(DEFAULT_FADE_ON_PLAY_PAUSE)
-    expect(playPauseFadeLength()).toNotBe(DEFAULT_PLAY_PAUSE_FADE)
-    expect(scrobbler()).toNotBe(DEFAULT_SCROBBLER)
-    expect(duckAction()).toNotBe(DEFAULT_DUCK_ACTION)
-    expect(duckVolume()).toNotBe(DEFAULT_DUCK_VOLUME)
-    expect(playUpNextAction()).toNotBe(DEFAULT_PLAY_UP_NEXT_ACTION)
-    expect(selectMediaAction()).toNotBe(DEFAULT_SELECT_MEDIA_ACTION)
+  private fun AppPrefs.expectAllAreNotDefault() {
+    expect(firstRun()).toNotBe(firstRun.default)
+    expect(allowDuplicates()).toNotBe(allowDuplicates.default)
+    expect(goToNowPlaying()).toNotBe(goToNowPlaying.default)
+    expect(ignoreSmallFiles()).toNotBe(ignoreSmallFiles.default)
+    expect(ignoreThreshold()).toNotBe(ignoreThreshold.default)
+    expect(playPauseFade()).toNotBe(playPauseFade.default)
+    expect(playPauseFadeLength()).toNotBe(playPauseFadeLength.default)
+    expect(scrobbler()).toNotBe(scrobbler.default)
+    expect(duckAction()).toNotBe(duckAction.default)
+    expect(duckVolume()).toNotBe(duckVolume.default)
+    expect(playUpNextAction()).toNotBe(playUpNextAction.default)
+    expect(selectMediaAction()).toNotBe(selectMediaAction.default)
   }
 }

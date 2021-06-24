@@ -14,110 +14,192 @@
  * limitations under the License.
  */
 
-object Sdk {
-  const val COMPILE_SDK_VERSION = 30
-  const val MIN_SDK_VERSION = 21
-  const val TARGET_SDK_VERSION = 30
+object SdkVersion {
+  const val COMPILE = 30
+  const val MIN = 21
+  const val TARGET = 30
 }
 
-object Versions {
-  const val ANDROIDX_TEST = "1.3.1-alpha03"
-  const val ANDROIDX_TEST_ANNOTATIONS = "28.0.0"
-  const val ANDROIDX_TEST_EXT = "1.1.2"
-  const val APPCOMPAT = "1.2.0"
-  const val COMPOSE = "1.0.0-alpha08"
-  const val CORE_KTX = "1.3.2"
-  const val COROUTINES = "1.4.1"
-  const val COROUTINES_TEST = "1.4.1"
-  const val DATASTORE = "1.0.0-alpha02"
-  const val DESUGAR = "1.0.10"
-  const val EALVABRAINZ = "0.0.5-SNAPSHOT"
-  const val EALVALOG = "0.5.6-SNAPSHOT"
-  const val EALVATAG = "0.4.7-SNAPSHOT"
-  const val ESPRESSO_CORE = "3.2.0"
-  const val EXPECT = "1.0.1"
-  const val FASTUTIL = "7.2.1"
-  const val JUNIT = "4.13"
-  const val KOIN = "2.2.2"
-  const val KOTLIN = "1.4.21"
-  const val KOTLIN_RESULT = "1.1.10"
-  const val KOTLIN_RESULT_CO = "1.1.10"
-  const val LIFECYCLE = "2.3.0-rc01"
-  const val MATERIAL = "1.2.1"
-  const val PHOENIX = "2.0.0"
-  const val ROBOLECTRIC = "4.4"
-  const val VLC_ANDROID = "3.3.2"
-  const val WELITE = "0.0.21-SNAPSHOT"
+object PluginsVersion {
+  const val AGP = "7.0.0-beta04"
+  const val DETEKT = "1.17.1"
+  const val DOKKA = "1.4.32"
+  const val KOTLIN = "1.5.10"
+  const val PUBLISH = "0.16.0"
+  const val SERIALIZATION = "1.5.10"
+  const val VERSIONS = "0.39.0"
 }
 
-object BuildPluginsVersion {
-  const val AGP = "7.0.0-alpha05"
-  const val DETEKT = "1.14.1"
-  const val DOKKA = "1.4.10.2"
-  const val KOTLIN = "1.4.21"
-  const val VERSIONS = "0.33.0"
-}
+object Libs {
+  const val AGP = "com.android.tools.build:gradle:${PluginsVersion.AGP}"
+  const val DESUGAR = "com.android.tools:desugar_jdk_libs:1.1.5"
 
-object SupportLibs {
-  const val ANDROIDX_APPCOMPAT = "androidx.appcompat:appcompat:${Versions.APPCOMPAT}"
-  const val ANDROIDX_CORE_KTX = "androidx.core:core-ktx:${Versions.CORE_KTX}"
-  const val ANDROIDX_DATASTORE_PREFERENCES =
-    "androidx.datastore:datastore-preferences:${Versions.DATASTORE}"
-  const val ANDROIDX_LIFECYCLE_RUNTIME_KTX =
-    "androidx.lifecycle:lifecycle-runtime-ktx:${Versions.LIFECYCLE}"
-  const val ANDROIDX_LIFECYCLE_COMMON =
-    "androidx.lifecycle:lifecycle-common-java8:${Versions.LIFECYCLE}"
-//  const val ANDROIDX_LIFECYCLE_EXTS =
-//    "androidx.lifecycle:lifecycle-extensions:${Versions.LIFECYCLE}"
-  const val ANDROIDX_LIFECYCLE_SERVICE =
-    "androidx.lifecycle:lifecycle-service:${Versions.LIFECYCLE}"
+  object Accompanist {
+    private const val VERSION = "0.12.0"
+    const val GLIDE = "com.google.accompanist:accompanist-glide:$VERSION"
+    const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
+    const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
+  }
 
-  const val ANDROID_MATERIAL = "com.google.android.material:material:${Versions.MATERIAL}"
-  const val COMPOSE_MATERIAL = "androidx.compose.material:material:${Versions.COMPOSE}"
-  const val COMPOSE_UI = "androidx.compose.ui:ui:${Versions.COMPOSE}"
-  const val COMPOSE_UI_TOOLING = "androidx.compose.ui:ui-tooling:${Versions.COMPOSE}"
-}
+  object Android {
+    const val MATERIAL = "com.google.android.material:material:1.3.0"
+  }
 
-object ThirdParty {
-  const val COROUTINE_ANDROID =
-    "org.jetbrains.kotlinx:kotlinx-coroutines-android:${Versions.COROUTINES}"
-  const val COROUTINE_CORE = "org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES}"
-  const val EALVABRAINZ = "com.ealva:ealvabrainz:${Versions.EALVABRAINZ}"
-  const val EALVABRAINZ_SERVICE = "com.ealva:ealvabrainz-service:${Versions.EALVABRAINZ}"
-  const val EALVALOG = "com.ealva:ealvalog:${Versions.EALVALOG}"
-  const val EALVALOG_ANDROID = "com.ealva:ealvalog-android:${Versions.EALVALOG}"
-  const val EALVALOG_CORE = "com.ealva:ealvalog-core:${Versions.EALVALOG}"
-  const val EALVATAG = "com.ealva:ealvatag:${Versions.EALVATAG}"
-  const val FASTUTIL = "it.unimi.dsi:fastutil:${Versions.FASTUTIL}"
-  const val KOIN = "org.koin:koin-core:${Versions.KOIN}"
-  const val KOIN_ANDROID = "org.koin:koin-android:${Versions.KOIN}"
-  const val KOIN_TEST = "org.koin:koin-test:${Versions.KOIN}"
-  const val KOTLIN_RESULT = "com.michael-bull.kotlin-result:kotlin-result:${Versions.KOTLIN_RESULT}"
-  const val KOTLIN_RESULT_CO =
-    "com.michael-bull.kotlin-result:kotlin-result-coroutines:${Versions.KOTLIN_RESULT_CO}"
-  const val PHOENIX = "com.jakewharton:process-phoenix:${Versions.PHOENIX}"
-  const val VLC_ANDROID = "org.videolan.android:libvlc-all:${Versions.VLC_ANDROID}"
-  const val WELITE_CORE = "com.ealva:welite-core:${Versions.WELITE}"
-}
+  object AndroidX {
+    const val APPCOMPAT = "androidx.appcompat:appcompat:1.3.0"
+    const val PALETTE = "androidx.palette:palette:1.0.0"
 
-object TestingLib {
-  const val COROUTINE_TEST =
-    "org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_TEST}"
-  const val EXPECT = "com.nhaarman:expect.kt:${Versions.EXPECT}"
-  const val JUNIT = "junit:junit:${Versions.JUNIT}"
-  const val ROBOLECTRIC = "org.robolectric:robolectric:${Versions.ROBOLECTRIC}"
-}
+    object Ktx {
+      const val CORE = "androidx.core:core-ktx:1.6.0-alpha03"
+    }
 
-object AndroidTestingLib {
-  const val ANDROIDX_TEST_ANNOTATIONS =
-    "com.android.support:support-annotations:${Versions.ANDROIDX_TEST_ANNOTATIONS}"
-  const val ANDROIDX_TEST_CORE = "androidx.test:core:${Versions.ANDROIDX_TEST}"
-  const val ANDROIDX_TEST_EXT_JUNIT = "androidx.test.ext:junit:${Versions.ANDROIDX_TEST_EXT}"
-  const val ANDROIDX_TEST_RULES = "androidx.test:rules:${Versions.ANDROIDX_TEST}"
-  const val ANDROIDX_TEST_RUNNER = "androidx.test:runner:${Versions.ANDROIDX_TEST}"
-  const val ESPRESSO_CORE = "androidx.test.espresso:espresso-core:${Versions.ESPRESSO_CORE}"
-}
+    object Activity {
+      const val COMPOSE = "androidx.activity:activity-compose:1.3.0-alpha08"
+    }
 
-object ToolsLib {
-  const val DESUGARING = "com.android.tools:desugar_jdk_libs:${Versions.DESUGAR}"
+    object Constraint {
+      const val LAYOUT_COMPOSE = "androidx.constraintlayout:constraintlayout-compose:1.0.0-alpha07"
+    }
+
+    object Compose {
+      const val VERSION = "1.0.0-beta09"
+      const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
+      const val UI = "androidx.compose.ui:ui:$VERSION"
+      const val MATERIAL = "androidx.compose.material:material:$VERSION"
+      const val TOOLING = "androidx.compose.ui:ui-tooling:$VERSION"
+
+//      const val RUNTIME = "androidx.compose.runtime:runtime:$VERSION"
+//      const val LAYOUT = "androidx.compose.foundation:foundation-layout:${VERSION}"
+//      const val MATERIAL_ICONS_EXTENDED =
+//        "androidx.compose.material:material-icons-extended:${VERSION}"
+    }
+
+    object Lifecycle {
+      private const val VERSION = "2.4.0-alpha01"
+      const val RUNTIME_KTX = "androidx.lifecycle:lifecycle-runtime-ktx:$VERSION"
+      const val COMMON_JAVA8 = "androidx.lifecycle:lifecycle-common-java8:$VERSION"
+      const val SERVICE = "androidx.lifecycle:lifecycle-service:$VERSION"
+//    const val VIEW_MODEL_COMPOSE = "androidx.lifecycle:lifecycle-viewmodel-compose:1.0.0-alpha05"
+//    const val VIEW_MODEL_KTX = "androidx.lifecycle:lifecycle-viewmodel-ktx:$VERSION"
+    }
+
+    object Test {
+      private const val VERSION = "1.4.0-alpha04"
+      const val CORE = "androidx.test:core:$VERSION"
+      const val RULES = "androidx.test:rules:$VERSION"
+      const val RUNNER = "androidx.test:runner:$VERSION"
+
+      object Ext {
+        private const val VERSION = "1.1.3-alpha04"
+        const val JUNIT = "androidx.test.ext:junit-ktx:$VERSION"
+      }
+
+      // const val ESPRESSO_CORE = "androidx.test.espresso:espresso-core:3.2.0"
+    }
+  }
+
+  object Datastore {
+    const val PREFERENCES = "androidx.datastore:datastore-preferences:1.0.0-beta01"
+  }
+
+  object EAlvaBrainz {
+    private const val VERSION = "0.7.0-SNAPSHOT"
+    const val BRAINZ = "com.ealva:ealvabrainz:$VERSION"
+    const val BRAINZ_SERVICE = "com.ealva:ealvabrainz-service:$VERSION"
+  }
+
+  object EAlvaLog {
+    private const val VERSION = "0.5.6-SNAPSHOT"
+    const val EALVALOG = "com.ealva:ealvalog:$VERSION"
+    const val ANDROID = "com.ealva:ealvalog-android:$VERSION"
+    const val CORE = "com.ealva:ealvalog-core:$VERSION"
+  }
+
+  object EAlvaTag {
+    const val EALVATAG = "com.ealva:ealvatag:0.4.7-SNAPSHOT"
+  }
+
+  object Expect {
+    const val EXPECT = "com.nhaarman:expect.kt:1.0.1"
+  }
+
+  object FastUtil {
+    const val FASTUTIL = "it.unimi.dsi:fastutil:7.2.1"
+  }
+
+  object JUnit {
+    private const val VERSION = "4.13.2"
+    const val JUNIT = "junit:junit:$VERSION"
+  }
+
+  object Koin {
+    private const val VERSION = "3.0.2"
+    private const val COMPOSE_VERSION = "3.0.1"
+    const val COMPOSE = "io.insert-koin:koin-androidx-compose:$COMPOSE_VERSION"
+    const val CORE = "io.insert-koin:koin-core:$VERSION"
+    const val ANDROID = "io.insert-koin:koin-android:$VERSION"
+    const val ANDROID_EXT = "io.insert-koin:koin-android-ext:$VERSION"
+    const val EXT = "io.insert-koin:koin-core-ext:$VERSION"
+    const val TEST = "io.insert-koin:koin-test:$VERSION"
+  }
+
+  object Kotlin {
+    private const val VERSION = "1.5.10"
+    const val KGP = "org.jetbrains.kotlin:kotlin-gradle-plugin:$VERSION"
+
+    // const val STDLIB = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$VERSION"
+    // const val EXTENSIONS = "org.jetbrains.kotlin:kotlin-android-extensions:$VERSION"
+
+    object Coroutines {
+      private const val VERSION = "1.5.0"
+      const val CORE = "org.jetbrains.kotlinx:kotlinx-coroutines-core:$VERSION"
+      const val ANDROID =
+        "org.jetbrains.kotlinx:kotlinx-coroutines-android:$VERSION"
+      const val TEST = "org.jetbrains.kotlinx:kotlinx-coroutines-test:$VERSION"
+    }
+
+    object Serialization {
+      private const val VERSION = "1.2.1"
+      const val CORE = "org.jetbrains.kotlinx:kotlinx-serialization-core:$VERSION"
+      const val JSON = "org.jetbrains.kotlinx:kotlinx-serialization-json:$VERSION"
+    }
+  }
+
+  object LibVLC {
+    const val ALL = "org.videolan.android:libvlc-all:3.3.14"
+  }
+
+  object Navigation {
+    const val COMPOSE = "androidx.navigation:navigation-compose:2.4.0-alpha01"
+  }
+
+  object Phoenix {
+    const val PHOENIX = "com.jakewharton:process-phoenix:2.0.0"
+  }
+
+  object PreferenceStore {
+    private const val VERSION = "0.7.6-SNAPSHOT"
+    const val STORE = "com.ealva:preference-store:$VERSION"
+    const val COMPOSE = "com.ealva:compose-preference:$VERSION"
+  }
+
+  object Result {
+    private const val VERSION = "1.1.12"
+    const val RESULT = "com.michael-bull.kotlin-result:kotlin-result:$VERSION"
+    const val COROUTINES = "com.michael-bull.kotlin-result:kotlin-result-coroutines:$VERSION"
+  }
+
+  object Robolectric {
+    const val ROBOLECTRIC = "org.robolectric:robolectric:4.5.1"
+  }
+
+  object SimpleStack {
+    const val CORE = "com.github.Zhuinden:simple-stack:2.6.2"
+    const val EXT = "com.github.Zhuinden:simple-stack-extensions:2.2.2"
+    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.4.2"
+  }
+
+  object WeLite {
+    const val CORE = "com.ealva:welite-core:0.1.4-SNAPSHOT"
+  }
 }

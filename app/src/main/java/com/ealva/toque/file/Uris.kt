@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("NOTHING_TO_INLINE")
+
 package com.ealva.toque.file
 
 import android.content.ContentResolver.SCHEME_CONTENT
@@ -21,10 +23,11 @@ import android.content.ContentResolver.SCHEME_FILE
 import android.net.Uri
 import com.ealva.toque.service.media.FileExtensions
 import com.ealva.toque.service.media.MediaFormat
-import java.util.Locale
 
 private val supportedSet = setOf(SCHEME_FILE, "smb", "ssh", "nfs", "ftp", "ftps", SCHEME_CONTENT)
 private val networkSet = setOf("smb", "ssh", "nfs", "ftp", "ftps")
+
+inline fun String?.toUriOrEmpty(): Uri = if (isNullOrEmpty()) Uri.EMPTY else Uri.parse(this)
 
 fun Uri.schemeIsSupported(): Boolean = supportedSet.contains(scheme)
 
@@ -51,7 +54,7 @@ fun String.mimeTypeFromExt(): String = substringAfterLast('.').let { ext ->
 }
 
 private fun mimeTypeFromLookup(ext: String): String = when {
-  FileExtensions.audio.contains(ext.toLowerCase(Locale.ROOT)) -> "audio/*"
-  FileExtensions.video.contains(ext.toLowerCase(Locale.ROOT)) -> "video/*"
+  FileExtensions.audio.contains(ext.lowercase()) -> "audio/*"
+  FileExtensions.video.contains(ext.lowercase()) -> "video/*"
   else -> ""
 }

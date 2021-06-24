@@ -19,35 +19,29 @@ package com.ealva.toque.android.service.vlc
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.common.toAmp
-import com.ealva.toque.common.toMillis
+import com.ealva.prefstore.store.invoke
+import com.ealva.toque.common.Amp
+import com.ealva.toque.common.Millis
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.vlc.Chroma
 import com.ealva.toque.service.vlc.HardwareAcceleration
-import com.ealva.toque.service.vlc.LibVlcPreferences
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ALLOW_TIME_STRETCH
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_CHROMA
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ENABLE_DIGITAL_AUDIO
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ENABLE_FRAME_SKIP
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_ENABLE_VERBOSE_MODE
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_HARDWARE_ACCELERATION
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_NETWORK_CACHING
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_REPLAY_GAIN_DEFAULT
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_REPLAY_GAIN_MODE
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_REPLAY_PREAMP
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_SKIP_LOOP_FILTER
-import com.ealva.toque.service.vlc.LibVlcPreferences.Companion.DEFAULT_SUBTITLE_ENCODING
-import com.ealva.toque.service.vlc.LibVlcPreferencesSingleton
+import com.ealva.toque.service.vlc.LibVlcPrefs
+import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
 import com.ealva.toque.service.vlc.SubtitleEncoding
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.test.TestCoroutineScope
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExpectedException
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import java.io.File
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -59,170 +53,182 @@ class LibVlcPreferencesTest {
   @get:Rule
   var thrown: ExpectedException = ExpectedException.none()
 
+  @get:Rule
+  val tempFolder: TemporaryFolder = TemporaryFolder()
+
   private lateinit var appCtx: Context
-  private lateinit var prefsSingleton: LibVlcPreferencesSingleton
+  private lateinit var testFile: File
+  private lateinit var dataStoreScope: TestCoroutineScope
+  private lateinit var prefsSingleton: LibVlcPrefsSingleton
 
   @Before
   fun setup() {
     appCtx = ApplicationProvider.getApplicationContext()
-    prefsSingleton = LibVlcPreferencesSingleton(appCtx, coroutineRule.testDispatcher)
+    testFile = tempFolder.newFile("dummy.preferences_pb")
+    dataStoreScope = TestCoroutineScope(coroutineRule.testDispatcher + Job())
+    prefsSingleton = LibVlcPrefsSingleton(LibVlcPrefs.Companion::make, testFile, dataStoreScope)
+  }
+
+  @After
+  fun cleanup() {
+    dataStoreScope.cleanupTestCoroutines()
   }
 
   @Test
   fun testEnableVerboseMode() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
       expect(enableVerboseMode()).toBe(false)
-      expect(enableVerboseMode(true)).toBe(true)
+      enableVerboseMode.set(true)
       expect(enableVerboseMode()).toBe(true)
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testChroma() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
       expect(chroma()).toBe(Chroma.DEFAULT)
       Chroma.values().forEach { chroma ->
-        expect(chroma(chroma)).toBe(true)
+        this.chroma.set(chroma)
         expect(chroma()).toBe(chroma)
       }
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testNetworkCachingAmount() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(networkCachingAmount()).toBe(DEFAULT_NETWORK_CACHING)
-      expect(networkCachingAmount(5000.toMillis())).toBe(true)
-      expect(networkCachingAmount()).toBe(5000.toMillis())
-      resetAllToDefault()
+    prefsSingleton {
+      expect(networkCachingAmount()).toBe(networkCachingAmount.default)
+      networkCachingAmount.set(Millis(5000))
+      expect(networkCachingAmount()).toBe(Millis(5000))
+      clear()
     }
   }
 
   @Test
   fun testSubtitleEncoding() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
       expect(subtitleEncoding()).toBe(SubtitleEncoding.DEFAULT)
       SubtitleEncoding.values().forEach { encoding ->
-        expect(subtitleEncoding(encoding)).toBe(true)
+        subtitleEncoding.set(encoding)
         expect(subtitleEncoding()).toBe(encoding)
       }
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testReplayGainMode() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
       expect(replayGainMode()).toBe(ReplayGainMode.DEFAULT)
       ReplayGainMode.values().forEach { mode ->
-        expect(replayGainMode(mode)).toBe(true)
+        replayGainMode.set(mode)
         expect(replayGainMode()).toBe(mode)
       }
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testReplayPreamp() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(replayPreamp()).toBe(DEFAULT_REPLAY_PREAMP)
-      expect(replayPreamp((-50).toAmp())).toBe(true)
+    prefsSingleton {
+      expect(replayPreamp()).toBe(replayPreamp.default)
+      replayPreamp.set(Amp(-50))
       expect(replayPreamp()).toBe(EqPreset.AMP_RANGE.start)
-      expect(replayPreamp(100.toAmp())).toBe(true)
+      replayPreamp.set(Amp(100))
       expect(replayPreamp()).toBe(EqPreset.AMP_RANGE.endInclusive)
-      expect(replayPreamp(15.toAmp())).toBe(true)
-      expect(replayPreamp()).toBe(15.toAmp())
+      replayPreamp.set(Amp(15))
+      expect(replayPreamp()).toBe(Amp(15))
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testDefaultReplayGain() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(defaultReplayGain()).toBe(DEFAULT_REPLAY_GAIN_DEFAULT)
-      expect(defaultReplayGain(5.toAmp())).toBe(true)
-      expect(defaultReplayGain()).toBe(5.toAmp())
-      resetAllToDefault()
+    prefsSingleton {
+      expect(defaultReplayGain()).toBe(defaultReplayGain.default)
+      defaultReplayGain.set(Amp(5))
+      expect(defaultReplayGain()).toBe(Amp(5))
+      clear()
     }
   }
 
   @Test
   fun testEnableFrameSkip() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(enableFrameSkip()).toBe(DEFAULT_ENABLE_FRAME_SKIP)
-      expect(enableFrameSkip(!DEFAULT_ENABLE_FRAME_SKIP)).toBe(true)
-      expect(enableFrameSkip()).toBe(!DEFAULT_ENABLE_FRAME_SKIP)
-      resetAllToDefault()
+    prefsSingleton {
+      expect(enableFrameSkip()).toBe(enableFrameSkip.default)
+      enableFrameSkip.set(!enableFrameSkip.default)
+      expect(enableFrameSkip()).toBe(!enableFrameSkip.default)
+      clear()
     }
   }
 
   @Test
   fun testSkipLoopFilter() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testAllowTimeStretchAudio() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testDigitalAudioOutputEnabled() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      expect(digitalAudioOutputEnabled()).toBe(DEFAULT_ENABLE_DIGITAL_AUDIO)
-      expect(digitalAudioOutputEnabled(!DEFAULT_ENABLE_DIGITAL_AUDIO)).toBe(true)
-      expect(digitalAudioOutputEnabled()).toBe(!DEFAULT_ENABLE_DIGITAL_AUDIO)
+    prefsSingleton {
+      expect(digitalAudioOutputEnabled()).toBe(digitalAudioOutputEnabled.default)
+      digitalAudioOutputEnabled.set(!digitalAudioOutputEnabled.default)
+      expect(digitalAudioOutputEnabled()).toBe(!digitalAudioOutputEnabled.default)
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testHardwareAcceleration() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
+    prefsSingleton {
       expect(hardwareAcceleration()).toBe(HardwareAcceleration.DEFAULT)
       HardwareAcceleration.values().forEach { accel ->
-        expect(hardwareAcceleration(accel)).toBe(true)
+        hardwareAcceleration.set(accel)
         expect(hardwareAcceleration()).toBe(accel)
       }
 
-      resetAllToDefault()
+      clear()
     }
   }
 
   @Test
   fun testResetAllToDefault() = coroutineRule.runBlockingTest {
-    with(prefsSingleton.instance()) {
-      resetAllToDefault()
+    prefsSingleton {
+      clear()
       expectAllAreDefault()
     }
   }
 
-  private fun LibVlcPreferences.expectAllAreDefault() {
-    expect(enableVerboseMode()).toBe(DEFAULT_ENABLE_VERBOSE_MODE)
-    expect(chroma()).toBe(DEFAULT_CHROMA)
-    expect(networkCachingAmount()).toBe(DEFAULT_NETWORK_CACHING)
-    expect(subtitleEncoding()).toBe(DEFAULT_SUBTITLE_ENCODING)
-    expect(replayGainMode()).toBe(DEFAULT_REPLAY_GAIN_MODE)
-    expect(replayPreamp()).toBe(DEFAULT_REPLAY_PREAMP)
-    expect(defaultReplayGain()).toBe(DEFAULT_REPLAY_GAIN_DEFAULT)
-    expect(enableFrameSkip()).toBe(DEFAULT_ENABLE_FRAME_SKIP)
-    expect(skipLoopFilter()).toBe(DEFAULT_SKIP_LOOP_FILTER)
-    expect(allowTimeStretchAudio()).toBe(DEFAULT_ALLOW_TIME_STRETCH)
-    expect(digitalAudioOutputEnabled()).toBe(DEFAULT_ENABLE_DIGITAL_AUDIO)
-    expect(hardwareAcceleration()).toBe(DEFAULT_HARDWARE_ACCELERATION)
+  private fun LibVlcPrefs.expectAllAreDefault() {
+    expect(enableVerboseMode()).toBe(enableVerboseMode.default)
+    expect(chroma()).toBe(chroma.default)
+    expect(networkCachingAmount()).toBe(networkCachingAmount.default)
+    expect(subtitleEncoding()).toBe(subtitleEncoding.default)
+    expect(replayGainMode()).toBe(replayGainMode.default)
+    expect(replayPreamp()).toBe(replayPreamp.default)
+    expect(defaultReplayGain()).toBe(defaultReplayGain.default)
+    expect(enableFrameSkip()).toBe(enableFrameSkip.default)
+    expect(skipLoopFilter()).toBe(skipLoopFilter.default)
+    expect(allowTimeStretchAudio()).toBe(allowTimeStretchAudio.default)
+    expect(digitalAudioOutputEnabled()).toBe(digitalAudioOutputEnabled.default)
+    expect(hardwareAcceleration()).toBe(hardwareAcceleration.default)
   }
 }

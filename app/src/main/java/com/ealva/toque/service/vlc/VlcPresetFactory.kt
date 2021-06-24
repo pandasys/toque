@@ -22,14 +22,13 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioOutputRoute
 import com.ealva.toque.audio.AudioOutputState
-import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetInfo
 import com.ealva.toque.db.NullEqPresetDao
-import com.ealva.toque.db.getErrorString
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPresetFactory
@@ -116,7 +115,7 @@ class VlcPresetFactory(
   ) {
     is Ok -> getPreset(result.value)
     is Err -> {
-      LOG.e { it("getPreferred ${result.getErrorString(appCtx)}") }
+      LOG.e { it("getPreferred ${result.error}") }
       getPreset(defaultPresetId)
     }
   }

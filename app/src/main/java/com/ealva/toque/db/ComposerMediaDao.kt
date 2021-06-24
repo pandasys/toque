@@ -46,7 +46,7 @@ interface ComposerMediaDao {
   }
 }
 
-private val INSERT_COMPOSER_MEDIA = ComposerMediaTable.insertValues(OnConflict.Replace) {
+private val INSERT_COMPOSER_MEDIA = ComposerMediaTable.insertValues(OnConflict.Ignore) {
   it[composerId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
@@ -62,8 +62,8 @@ private class ComposerMediaDaoImpl : ComposerMediaDao {
     createTime: Millis
   ) = txn.run {
     INSERT_COMPOSER_MEDIA.insert {
-      it[composerId] = replaceComposerId.id
-      it[mediaId] = replaceMediaId.id
+      it[composerId] = replaceComposerId.value
+      it[mediaId] = replaceMediaId.value
       it[createdTime] = createTime.value
     }
     Unit

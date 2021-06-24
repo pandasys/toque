@@ -16,10 +16,20 @@
 
 package com.ealva.toque.prefs
 
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
+private const val APP_PREFS_FILENAME = "AppPrefsToque"
+
 object PrefsModule {
-  val module = module {
-    single { AppPreferencesSingleton(get()) }
+  val koinModule = module {
+    single(named("AppPrefs")) {
+      AppPrefsSingleton(
+        AppPrefs.Companion::make,
+        androidContext(),
+        APP_PREFS_FILENAME
+      )
+    }
   }
 }

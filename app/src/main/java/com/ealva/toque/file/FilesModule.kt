@@ -21,7 +21,7 @@ import org.koin.dsl.module
 
 object FilesModule {
 
-  val module = module {
+  val koinModule = module {
     single { MediaStorage(androidContext()) }
   }
 }

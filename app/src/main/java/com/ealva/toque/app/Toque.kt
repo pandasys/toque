@@ -36,22 +36,24 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.logger
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.audio.AudioModule
+import com.ealva.toque.common.debug
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
-import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.prefs.PrefsModule
 import com.ealva.toque.service.vlc.LibVlcModule
 import com.ealva.toque.tag.TagModule
 import com.jakewharton.processphoenix.ProcessPhoenix
+import com.zhuinden.simplestack.GlobalServices
 import ealvatag.logging.EalvaTagLog
 import org.koin.android.ext.koin.androidContext
-import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
-import org.koin.core.logger.Level
 import org.koin.dsl.module
 
 interface Toque {
   fun restartApp(intent: Intent, context: Context)
+
+  val globalServicesBuilder: GlobalServices.Builder
 
   companion object {
     /** Not valid until the [Application.onCreate] function is called */
@@ -61,6 +63,10 @@ interface Toque {
 }
 
 class ToqueImpl : Application(), Toque {
+  private lateinit var _globalServicesBuilder: GlobalServices.Builder
+  override val globalServicesBuilder: GlobalServices.Builder
+    get() = _globalServicesBuilder
+
   private val appModule = module {
     single<Toque> { this@ToqueImpl }
     single<AudioManager> { requireSystemService() }
@@ -74,10 +80,17 @@ class ToqueImpl : Application(), Toque {
   override fun onCreate() {
     super.onCreate()
     appContext = applicationContext
+    _globalServicesBuilder = GlobalServices.builder()
+
     setupLogging()
 
     val logger = logger()
-    logger._e { it("App create") }
+    logger._i { it("App create") }
+
+    debug {
+//      WeLiteLog.logQueryPlans = true
+//      WeLiteLog.logSql = true
+    }
 
 //    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 //      StrictMode.VmPolicy.Builder()
@@ -93,17 +106,18 @@ class ToqueImpl : Application(), Toque {
 //    StrictMode.setVmPolicy(policy)
 
     startKoin {
-      androidLogger(level = Level.INFO)
+//      androidLogger(Level.NONE)
       androidContext(androidContext = this@ToqueImpl)
 
       modules(
         appModule,
-        PrefsModule.module,
-        AudioModule.module,
-        FilesModule.module,
-        TagModule.module,
-        LibVlcModule.module,
-        DbModule.module,
+        PrefsModule.koinModule,
+        AudioModule.koinModule,
+        FilesModule.koinModule,
+        TagModule.koinModule,
+        LibVlcModule.koinModule,
+        DbModule.koinModule,
+//        MainModule.koinModule
 //        brainzModule,
 //        spotifyModule,
 //        artModule,

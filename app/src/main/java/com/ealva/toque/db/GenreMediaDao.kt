@@ -49,7 +49,7 @@ interface GenreMediaDao {
   }
 }
 
-private val INSERT_GENRE_MEDIA = GenreMediaTable.insertValues(OnConflict.Replace) {
+private val INSERT_GENRE_MEDIA = GenreMediaTable.insertValues(OnConflict.Ignore) {
   it[genreId].bindArg()
   it[mediaId].bindArg()
   it[createdTime].bindArg()
@@ -65,11 +65,11 @@ private class GenreMediaDaoImpl : GenreMediaDao {
     newMediaId: MediaId,
     createTime: Millis
   ) = txn.run {
-    DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = newMediaId.id }
+    DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = newMediaId.value }
     genreIdList.forEach { newGenreId ->
       INSERT_GENRE_MEDIA.insert {
-        it[genreId] = newGenreId.id
-        it[mediaId] = newMediaId.id
+        it[genreId] = newGenreId.value
+        it[mediaId] = newMediaId.value
         it[createdTime] = createTime.value
       }
     }

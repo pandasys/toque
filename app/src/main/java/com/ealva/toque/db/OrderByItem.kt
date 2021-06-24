@@ -1,0 +1,51 @@
+/*
+ * Copyright 2021 eAlva.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.ealva.toque.db
+
+import androidx.annotation.StringRes
+import com.ealva.toque.R
+import com.ealva.toque.res.HasTitle
+import com.ealva.welite.db.table.OrderBy
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class OrderByItem(
+  val orderBy: OrderBy,
+  @StringRes override val titleRes: Int
+) : HasTitle {
+  fun copy(
+    ascDesc: String = orderBy.ascDesc,
+    collate: String = orderBy.collate
+  ): OrderByItem = OrderByItem(orderBy.copy(ascDesc = ascDesc, collate = collate), titleRes)
+}
+
+val MediaTable.TITLE_ORDER by lazy { OrderByItem(OrderBy(MediaTable.title), R.string.Title) }
+
+/*
+Album Artist
+Album
+Rating
+Composer
+year
+Disc
+Track
+Last Played
+Last Skipped
+Play Count
+Skipped Count
+Date Added
+ */

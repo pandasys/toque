@@ -19,7 +19,7 @@ package com.ealva.toque.audio
 import org.koin.dsl.module
 
 object AudioModule {
-  val module = module {
+  val koinModule = module {
     single { AudioOutputState(get()) }
   }
 }

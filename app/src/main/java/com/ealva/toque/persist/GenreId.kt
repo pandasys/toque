@@ -21,24 +21,33 @@ package com.ealva.toque.persist
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 
-inline class GenreId(override val id: Long) : PersistentId
+@JvmInline
+value class GenreId(override val value: Long) : PersistentId
 
 inline fun Long.toGenreId(): GenreId = GenreId(this)
 inline fun Int.toGenreId(): GenreId = toLong().toGenreId()
 
-inline class GenreIdList(val idList: LongList) : Iterable<GenreId> {
+@JvmInline
+value class GenreIdList(val prop: LongList) : Iterable<GenreId> {
+  inline val isEmpty: Boolean
+    get() = size == 0
+
+  inline val isNotEmpty: Boolean
+    get() = !isEmpty
+
   inline val size: Int
-    get() = idList.size
+    get() = prop.size
 
   inline operator fun plusAssign(genreId: GenreId) {
-    idList.add(genreId.id)
+    prop.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): GenreId = GenreId(idList.getLong(index))
+  inline operator fun get(index: Int): GenreId = GenreId(prop.getLong(index))
 
   companion object {
-    operator fun invoke(capacity: Int): GenreIdList = GenreIdList(LongArrayList(capacity))
+    inline operator fun invoke(capacity: Int = 16): GenreIdList =
+      GenreIdList(LongArrayList(capacity))
   }
 
-  override fun iterator(): Iterator<GenreId> = idIterator(idList, ::GenreId)
+  override fun iterator(): Iterator<GenreId> = idIterator(prop, ::GenreId)
 }

@@ -16,16 +16,19 @@
 
 package com.ealva.toque.db
 
+import android.net.Uri
 import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
-import com.ealva.ealvabrainz.brainz.data.toReleaseGroupMbid
-import com.ealva.ealvabrainz.brainz.data.toReleaseMbid
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.toAlbumId
+import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
@@ -34,18 +37,52 @@ import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
+import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.runCatching
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(AlbumDao::class)
 
+sealed class AlbumDaoEvent {
+  data class AlbumCreated(val albumId: AlbumId) : AlbumDaoEvent()
+  data class AlbumUpdated(val albumId: AlbumId) : AlbumDaoEvent()
+}
+
+data class AlbumDescription(
+  val albumId: AlbumId,
+  val albumName: String,
+  val albumLocalArt: Uri,
+  val albumArt: Uri,
+  val artistName: ArtistName
+)
+
+/**
+ * If a function receives a transaction parameter it is not suspending, whereas suspend functions
+ * are expected to start transaction or query which will dispatch on another thread, should return a
+ * [Result] if not returningUnit and not throw exceptions. Functions receiving a transaction are
+ * typically called by the media scanner, directly or indirectly, and are already dispatched on a
+ * background thread.
+ */
 interface AlbumDao {
+  val albumDaoEvents: SharedFlow<AlbumDaoEvent>
+
   /**
    * Update the Album if it exists otherwise insert it
    */
@@ -53,6 +90,8 @@ interface AlbumDao {
     txn: TransactionInProgress,
     album: String,
     albumSort: String,
+    albumArt: Uri,
+    albumArtistId: ArtistId,
     releaseMbid: ReleaseMbid?,
     releaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Millis
@@ -62,14 +101,31 @@ interface AlbumDao {
 
   fun deleteAlbumsWithNoMedia(txn: TransactionInProgress): Long
 
+  suspend fun getAllAlbums(limit: Long): Result<List<AlbumDescription>, DaoMessage>
+
+  suspend fun getAllAlbumsFor(
+    artistId: ArtistId,
+    limit: Long
+  ): Result<List<AlbumDescription>, DaoMessage>
+
   companion object {
-    operator fun invoke(): AlbumDao = AlbumDaoImpl()
+    operator fun invoke(
+      db: Database,
+      dispatcher: CoroutineDispatcher? = null
+    ): AlbumDao = AlbumDaoImpl(db, dispatcher ?: Dispatchers.Main)
   }
 }
 
-private val upsertLock: Lock = ReentrantLock()
+private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispatcher) : AlbumDao {
+  private val upsertLock: Lock = ReentrantLock()
+  private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
-private class AlbumDaoImpl : AlbumDao {
+  override val albumDaoEvents = MutableSharedFlow<AlbumDaoEvent>()
+
+  private fun emit(event: AlbumDaoEvent) {
+    scope.launch { albumDaoEvents.emit(event) }
+  }
+
   /**
    * Given the current design of the media scanner there wouldn't be a race condition between
    * query/update/insert as an artist/album are processed in a group. But we'll hold a lock
@@ -79,6 +135,8 @@ private class AlbumDaoImpl : AlbumDao {
     txn: TransactionInProgress,
     album: String,
     albumSort: String,
+    albumArt: Uri,
+    albumArtistId: ArtistId,
     releaseMbid: ReleaseMbid?,
     releaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Millis
@@ -87,6 +145,8 @@ private class AlbumDaoImpl : AlbumDao {
     txn.doUpsertAlbum(
       album,
       albumSort,
+      albumArtistId,
+      albumArt,
       releaseMbid,
       releaseGroupMbid,
       createUpdateTime
@@ -101,9 +161,59 @@ private class AlbumDaoImpl : AlbumDao {
     }.delete()
   }
 
+  override suspend fun getAllAlbums(
+    limit: Long
+  ): Result<List<AlbumDescription>, DaoMessage> = db.query {
+    runCatching { doGetAlbums(limit = limit) }
+      .mapError { DaoExceptionMessage(it) }
+  }
+
+  override suspend fun getAllAlbumsFor(
+    artistId: ArtistId,
+    limit: Long
+  ): Result<List<AlbumDescription>, DaoMessage> = db.query {
+    runCatching { doGetAlbums(artistId, limit) }
+      .mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetAlbums(
+    artistId: ArtistId? = null,
+    limit: Long = Long.MAX_VALUE
+  ): List<AlbumDescription> = AlbumTable
+    .join(ArtistAlbumTable, JoinType.INNER, AlbumTable.id, ArtistAlbumTable.albumId)
+    .join(ArtistTable, JoinType.INNER, ArtistAlbumTable.artistId, ArtistTable.id)
+    .selects {
+      listOf(
+        AlbumTable.id,
+        AlbumTable.albumTitle,
+        AlbumTable.albumLocalArtUri,
+        AlbumTable.albumArtUri,
+        ArtistTable.artistName
+      )
+    }
+    .where {
+      if (artistId != null) (ArtistAlbumTable.artistId eq artistId.value) else {
+        null
+      }
+    }
+    .orderByAsc { AlbumTable.albumTitle }
+    .limit(limit)
+    .sequence {
+      AlbumDescription(
+        it[AlbumTable.id].toAlbumId(),
+        it[AlbumTable.albumTitle],
+        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+        it[AlbumTable.albumArtUri].toUriOrEmpty(),
+        ArtistName(it[ArtistTable.artistName])
+      )
+    }
+    .toList()
+
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,
     newAlbumSort: String,
+    newAlbumArtistId: ArtistId,
+    albumArt: Uri,
     newReleaseMbid: ReleaseMbid?,
     newReleaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Millis
@@ -115,8 +225,10 @@ private class AlbumDaoImpl : AlbumDao {
       newReleaseGroupMbid,
       createUpdateTime
     ) ?: INSERT_STATEMENT.insert {
-      it[album] = newAlbum
+      it[albumTitle] = newAlbum
       it[albumSort] = newAlbumSort
+      it[albumArtistId] = newAlbumArtistId.value
+      it[albumLocalArtUri] = albumArt.toString()
       it[releaseMbid] = newReleaseMbid?.value ?: ""
       it[releaseGroupMbid] = newReleaseGroupMbid?.value ?: ""
       it[createdTime] = createUpdateTime.value
@@ -142,7 +254,7 @@ private class AlbumDaoImpl : AlbumDao {
     val updateAlbum = info.album.updateOrNull { newAlbum }
     val updateAlbumSort = info.albumSort.updateOrNull { newAlbumSort }
     val updateReleaseMbid = info.releaseMbid.updateOrNull { newReleaseMbid }
-    val updateReleaseGroupMbid = info.releaseMbid.updateOrNull { newReleaseGroupMbid }
+    val updateReleaseGroupMbid = info.releaseGroupMbid.updateOrNull { newReleaseGroupMbid }
 
     val updateNeeded = anyNotNull {
       arrayOf(
@@ -154,14 +266,15 @@ private class AlbumDaoImpl : AlbumDao {
     }
     if (updateNeeded) {
       val updated = AlbumTable.updateColumns {
-        updateAlbum?.let { update -> it[album] = update }
+        updateAlbum?.let { update -> it[albumTitle] = update }
         updateAlbumSort?.let { update -> it[albumSort] = update }
         updateReleaseMbid?.let { update -> it[releaseMbid] = update.value }
         updateReleaseGroupMbid?.let { update -> it[releaseGroupMbid] = update.value }
         it[updatedTime] = newUpdateTime.value
-      }.where { id eq info.id.id }.update()
+      }.where { id eq info.id.value }.update()
 
-      if (updated < 1) LOG.e { it("Could not update $info") }
+      if (updated >= 1) emit(AlbumDaoEvent.AlbumUpdated(info.id))
+      else LOG.e { it("Could not update $info") }
     }
     info.id
   }
@@ -170,17 +283,19 @@ private class AlbumDaoImpl : AlbumDao {
     .sequence({ it[0] = albumName }) {
       AlbumInfo(
         it[id].toAlbumId(),
-        it[album],
+        it[albumTitle],
         it[albumSort],
-        it[releaseMbid].toReleaseMbid(),
-        it[releaseGroupMbid].toReleaseGroupMbid()
+        ReleaseMbid(it[releaseMbid]),
+        ReleaseGroupMbid(it[releaseGroupMbid])
       )
     }.singleOrNull()
 }
 
 private val INSERT_STATEMENT = AlbumTable.insertValues {
-  it[album].bindArg()
+  it[albumTitle].bindArg()
   it[albumSort].bindArg()
+  it[albumArtistId].bindArg()
+  it[albumLocalArtUri].bindArg()
   it[releaseMbid].bindArg()
   it[releaseGroupMbid].bindArg()
   it[createdTime].bindArg()
@@ -189,8 +304,8 @@ private val INSERT_STATEMENT = AlbumTable.insertValues {
 
 private val QUERY_ALBUM_INFO = Query(
   AlbumTable
-    .selects { listOf(id, album, albumSort, releaseMbid, releaseGroupMbid) }
-    .where { album eq bindString() }
+    .selects { listOf(id, albumTitle, albumSort, releaseMbid, releaseGroupMbid) }
+    .where { albumTitle eq bindString() }
 )
 
 private data class AlbumInfo(

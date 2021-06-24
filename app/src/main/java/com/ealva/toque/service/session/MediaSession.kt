@@ -23,7 +23,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.media.MediaDescriptionCompat
-import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.RatingCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS
@@ -40,37 +39,36 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.asCompat
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
-import com.ealva.toque.common.asCompat
 import com.ealva.toque.common.toMillis
-import com.ealva.toque.log._e
-import com.ealva.toque.service.media.StarRating
+import com.ealva.toque.log._i
+import com.ealva.toque.service.controller.MediaSessionEvent
 import com.ealva.toque.service.media.toStarRating
-import com.ealva.toque.service.session.MediaSessionEvent.AddItemAt
-import com.ealva.toque.service.session.MediaSessionEvent.EnableCaption
-import com.ealva.toque.service.session.MediaSessionEvent.FastForward
-import com.ealva.toque.service.session.MediaSessionEvent.Pause
-import com.ealva.toque.service.session.MediaSessionEvent.Play
-import com.ealva.toque.service.session.MediaSessionEvent.PlayFromId
-import com.ealva.toque.service.session.MediaSessionEvent.PlayFromSearch
-import com.ealva.toque.service.session.MediaSessionEvent.PlayFromUri
-import com.ealva.toque.service.session.MediaSessionEvent.Prepare
-import com.ealva.toque.service.session.MediaSessionEvent.PrepareFromId
-import com.ealva.toque.service.session.MediaSessionEvent.PrepareFromSearch
-import com.ealva.toque.service.session.MediaSessionEvent.PrepareFromUri
-import com.ealva.toque.service.session.MediaSessionEvent.RemoveItem
-import com.ealva.toque.service.session.MediaSessionEvent.Repeat
-import com.ealva.toque.service.session.MediaSessionEvent.Rewind
-import com.ealva.toque.service.session.MediaSessionEvent.SetRating
-import com.ealva.toque.service.session.MediaSessionEvent.Shuffle
-import com.ealva.toque.service.session.MediaSessionEvent.SkipToNext
-import com.ealva.toque.service.session.MediaSessionEvent.SkipToPrevious
-import com.ealva.toque.service.session.MediaSessionEvent.SkipToQueueItem
-import com.ealva.toque.service.session.MediaSessionEvent.Stop
+import com.ealva.toque.service.controller.MediaSessionEvent.AddItemAt
+import com.ealva.toque.service.controller.MediaSessionEvent.EnableCaption
+import com.ealva.toque.service.controller.MediaSessionEvent.FastForward
+import com.ealva.toque.service.controller.MediaSessionEvent.Pause
+import com.ealva.toque.service.controller.MediaSessionEvent.Play
+import com.ealva.toque.service.controller.MediaSessionEvent.PlayFromId
+import com.ealva.toque.service.controller.MediaSessionEvent.PlayFromSearch
+import com.ealva.toque.service.controller.MediaSessionEvent.PlayFromUri
+import com.ealva.toque.service.controller.MediaSessionEvent.Prepare
+import com.ealva.toque.service.controller.MediaSessionEvent.PrepareFromId
+import com.ealva.toque.service.controller.MediaSessionEvent.PrepareFromSearch
+import com.ealva.toque.service.controller.MediaSessionEvent.PrepareFromUri
+import com.ealva.toque.service.controller.MediaSessionEvent.RemoveItem
+import com.ealva.toque.service.controller.MediaSessionEvent.Repeat
+import com.ealva.toque.service.controller.MediaSessionEvent.Rewind
+import com.ealva.toque.service.controller.MediaSessionEvent.SetRating
+import com.ealva.toque.service.controller.MediaSessionEvent.Shuffle
+import com.ealva.toque.service.controller.MediaSessionEvent.SkipToNext
+import com.ealva.toque.service.controller.MediaSessionEvent.SkipToPrevious
+import com.ealva.toque.service.controller.MediaSessionEvent.SkipToQueueItem
+import com.ealva.toque.service.controller.MediaSessionEvent.Stop
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -131,7 +129,7 @@ interface MediaSession {
   fun setState(state: PlaybackStateCompat)
 
   /** Updates the current metadata. New metadata can be created using MediaMetadataCompat.Builder */
-  fun setMetadata(metadata: MediaMetadataCompat)
+  fun setMetadata(metadata: MediaMetadata)
 
   /** Send queue info to controllers for display */
   fun setQueue(queue: List<MediaSessionCompat.QueueItem>)
@@ -153,10 +151,7 @@ interface MediaSession {
       lifecycleOwner: LifecycleOwner,
       active: Boolean = true,
       dispatcher: CoroutineDispatcher? = null
-    ): MediaSession = MediaSessionImpl(
-      makeMediaSessionCompat(context, active),
-      dispatcher
-    ).apply {
+    ): MediaSession = MediaSessionImpl(makeMediaSessionCompat(context, active), dispatcher).apply {
       lifecycleOwner.lifecycle.addObserver(this)
     }
 
@@ -181,7 +176,7 @@ private val Context.mediaSessionTag: String
 private class MediaSessionImpl(
   private val session: MediaSessionCompat,
   dispatcher: CoroutineDispatcher?
-) : MediaSession, LifecycleObserver {
+) : MediaSession, LifecycleObserver, RecentMediaProvider {
   private val scope = CoroutineScope(SupervisorJob() + (dispatcher ?: Dispatchers.Main))
   private var mediaButtonHandler: MediaButtonHandler? = null
   override val eventFlow by lazy { establishCallbackFlow() }
@@ -193,7 +188,7 @@ private class MediaSessionImpl(
   // Wait to set the session callback until the flow is requested
   private fun establishCallbackFlow(): MutableSharedFlow<MediaSessionEvent> =
     MutableSharedFlow<MediaSessionEvent>().also {
-      LOG._e { it("establishCallbackFlow") }
+      LOG._i { it("establishCallbackFlow") }
       session.setCallback(makeCallback())
     }
 
@@ -214,27 +209,38 @@ private class MediaSessionImpl(
   }
 
   override fun setSessionActivity(pi: PendingIntent) = session.setSessionActivity(pi)
-  override fun setState(state: PlaybackStateCompat) = session.setPlaybackState(state)
-  override fun setMetadata(metadata: MediaMetadataCompat) = session.setMetadata(metadata)
+  private var lastPlaybackState: PlaybackStateCompat = EMPTY_PLAYBACK_STATE
+  override fun setState(state: PlaybackStateCompat) {
+    lastPlaybackState = state
+    session.setPlaybackState(state)
+  }
+
+  private var lastMetadata: MediaMetadata = NOTHING_PLAYING
+  override fun setMetadata(metadata: MediaMetadata) {
+    lastMetadata = metadata
+    session.setMetadata(lastMetadata.metadataCompat)
+  }
+
   override fun setQueue(queue: List<MediaSessionCompat.QueueItem>) = session.setQueue(queue)
   override fun setQueueTitle(title: String) = session.setQueueTitle(title)
   override fun setShuffle(shuffleMode: ShuffleMode) = session.setShuffleMode(shuffleMode.asCompat)
   override fun setRepeat(repeatMode: RepeatMode) = session.setRepeatMode(repeatMode.asCompat)
 
-  private val _browser: MediaSessionBrowser by lazy { MediaSessionBrowser(scope, dispatcher) }
+  override fun getRecentMedia(): MediaDescriptionCompat? =
+    if (lastMetadata === NOTHING_PLAYING) null else lastMetadata.metadataCompat.description
+
+  private val _browser: MediaSessionBrowser by lazy { MediaSessionBrowser(this, scope, dispatcher) }
   override val browser: MediaSessionBrowser
     get() = _browser
 
   @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
   fun onDestroy() {
-    LOG._e { it("onDestroy release media session") }
     session.setCallback(null)
     scope.cancel()
     session.release()
   }
 
   private fun makeCallback(): MediaSessionCompat.Callback {
-    LOG._e { it("make MediaSessionCompat.Callback()") }
     return object : MediaSessionCompat.Callback() {
       private var inMediaButtonEvent = false
       override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
@@ -314,41 +320,11 @@ private class MediaSessionImpl(
           ?: LOG.e { it("onRemoveQueueItem null description") }
     }
   }
+
+  companion object {
+    const val MEDIA_DESCRIPTION_EXTRAS_START_PLAYBACK_POSITION_MS = "playback_start_position_ms"
+  }
 }
 
 private val Intent.keyEvent: KeyEvent?
   get() = getParcelableExtra(Intent.EXTRA_KEY_EVENT)
-
-sealed class MediaSessionEvent {
-  object Prepare : MediaSessionEvent()
-  data class PrepareFromId(val mediaId: String, val extras: Bundle) : MediaSessionEvent() {
-    fun accept(visitor: OnMediaType) = MediaSessionBrowser.handleMedia(mediaId, extras, visitor)
-  }
-
-  data class PrepareFromSearch(val query: String, val extras: Bundle) : MediaSessionEvent()
-  data class PrepareFromUri(val uri: Uri, val extras: Bundle) : MediaSessionEvent()
-  object Play : MediaSessionEvent()
-  data class PlayFromId(val mediaId: String, val extras: Bundle) : MediaSessionEvent() {
-    fun accept(visitor: OnMediaType) = MediaSessionBrowser.handleMedia(mediaId, extras, visitor)
-  }
-
-  data class PlayFromSearch(val query: String, val extras: Bundle) : MediaSessionEvent()
-  data class PlayFromUri(val uri: Uri, val extras: Bundle) : MediaSessionEvent()
-  data class SkipToQueueItem(val index: Long) : MediaSessionEvent()
-  object Pause : MediaSessionEvent()
-  object SkipToNext : MediaSessionEvent()
-  object SkipToPrevious : MediaSessionEvent()
-  object FastForward : MediaSessionEvent()
-  object Rewind : MediaSessionEvent()
-  object Stop : MediaSessionEvent()
-  data class SeekTo(val position: Millis) : MediaSessionEvent()
-  data class SetRating(val rating: StarRating, val extras: Bundle) : MediaSessionEvent()
-  data class EnableCaption(val enable: Boolean) : MediaSessionEvent()
-  data class Repeat(val repeatMode: RepeatMode) : MediaSessionEvent()
-  data class Shuffle(val shuffleMode: ShuffleMode) : MediaSessionEvent()
-  data class CustomAction(val action: String, val extras: Bundle) : MediaSessionEvent()
-  data class RemoveItem(val item: MediaDescriptionCompat) : MediaSessionEvent()
-  data class AddItemAt(val item: MediaDescriptionCompat, val pos: Int = -1) : MediaSessionEvent() {
-    val addToEnd = pos < 0
-  }
-}

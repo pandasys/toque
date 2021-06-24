@@ -27,7 +27,6 @@ import android.view.KeyEvent.FLAG_KEEP_TOUCH_MODE
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.toMillis
 import com.ealva.toque.service.controller.ToqueMediaController
-import com.ealva.toque.service.player.TransitionSelector
 import com.ealva.toque.service.queue.QueueType
 
 private const val TEN_SECONDS = 10000L
@@ -42,11 +41,11 @@ class MediaSessionCallback(
   private var seeking = false
 
   override fun onPlay() {
-    if (playerService.mediaIsLoaded) playerService.play(TransitionSelector.Current)
+    if (playerService.mediaIsLoaded) playerService.play(false)
     else playerService.setCurrentQueue(QueueType.Audio)
   }
 
-  override fun onPause() = playerService.pause(TransitionSelector.Current)
+  override fun onPause() = playerService.pause()
 
   override fun onStop() = playerService.stop()
 
