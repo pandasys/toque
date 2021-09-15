@@ -16,6 +16,8 @@
 
 package com.ealva.toque.service.player
 
+import com.ealva.toque.service.audio.PlayerTransition
+
 /**
  * Determines which transition is applied during a play or pause.
  */

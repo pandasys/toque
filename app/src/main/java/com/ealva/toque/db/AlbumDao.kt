@@ -19,8 +19,11 @@ package com.ealva.toque.db
 import android.net.Uri
 import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
+import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
+import com.ealva.ealvabrainz.common.toAlbumTitle
 import com.ealva.ealvalog.e
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
@@ -33,6 +36,7 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
@@ -67,10 +71,15 @@ sealed class AlbumDaoEvent {
 
 data class AlbumDescription(
   val albumId: AlbumId,
-  val albumName: String,
+  val albumTitle: AlbumTitle,
   val albumLocalArt: Uri,
   val albumArt: Uri,
   val artistName: ArtistName
+)
+
+data class AlbumNameId(
+  val albumId: AlbumId,
+  val albumTitle: AlbumTitle
 )
 
 /**
@@ -107,6 +116,8 @@ interface AlbumDao {
     artistId: ArtistId,
     limit: Long
   ): Result<List<AlbumDescription>, DaoMessage>
+
+  suspend fun getNextAlbum(albumTitle: AlbumTitle): Result<AlbumNameId, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -201,13 +212,33 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .sequence {
       AlbumDescription(
         it[AlbumTable.id].toAlbumId(),
-        it[AlbumTable.albumTitle],
+        it[AlbumTable.albumTitle].toAlbumTitle(),
         it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
         it[AlbumTable.albumArtUri].toUriOrEmpty(),
         ArtistName(it[ArtistTable.artistName])
       )
     }
     .toList()
+
+  override suspend fun getNextAlbum(
+    albumTitle: AlbumTitle
+  ): Result<AlbumNameId, DaoMessage> = db.query {
+    runCatching {
+      LOG.i { it("getNextAlbum after %s", albumTitle) }
+      doGetNextAlbum(albumTitle)
+    }.mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no album title > greater than [previousTitle]
+   */
+  private fun Queryable.doGetNextAlbum(previousTitle: AlbumTitle): AlbumNameId = AlbumTable
+    .selects { listOf(id, albumTitle) }
+    .where { albumTitle greater previousTitle.value }
+    .orderByAsc { albumTitle }
+    .limit(1)
+    .sequence { AlbumNameId(it[id].toAlbumId(), it[albumTitle].toAlbumTitle()) }
+    .single()
 
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,
@@ -231,8 +262,8 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       it[albumLocalArtUri] = albumArt.toString()
       it[releaseMbid] = newReleaseMbid?.value ?: ""
       it[releaseGroupMbid] = newReleaseGroupMbid?.value ?: ""
-      it[createdTime] = createUpdateTime.value
-      it[updatedTime] = createUpdateTime.value
+      it[createdTime] = createUpdateTime()
+      it[updatedTime] = createUpdateTime()
     }.toAlbumId()
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with album='%s'", newAlbum) }
@@ -270,7 +301,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         updateAlbumSort?.let { update -> it[albumSort] = update }
         updateReleaseMbid?.let { update -> it[releaseMbid] = update.value }
         updateReleaseGroupMbid?.let { update -> it[releaseGroupMbid] = update.value }
-        it[updatedTime] = newUpdateTime.value
+        it[updatedTime] = newUpdateTime()
       }.where { id eq info.id.value }.update()
 
       if (updated >= 1) emit(AlbumDaoEvent.AlbumUpdated(info.id))

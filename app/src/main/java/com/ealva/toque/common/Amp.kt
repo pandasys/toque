@@ -14,29 +14,33 @@
  * limitations under the License.
  */
 
+@file:Suppress("NOTHING_TO_INLINE")
+
 package com.ealva.toque.common
 
-fun Int.toAmp(): Amp = Amp(this.toFloat())
-fun Float.toAmp(): Amp = Amp(this)
-
 operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean =
-  contains(amp.value)
+  contains(amp())
 
 /** Represents Amplitude */
 @JvmInline
 value class Amp(val value: Float) : Comparable<Amp> {
   override fun compareTo(other: Amp): Int = value.compareTo(other.value)
+  operator fun compareTo(other: Float): Int = value.compareTo(other)
+
+  operator fun plus(rhs: Amp): Amp = Amp(value + rhs.value)
+  operator fun plus(rhs: Float): Amp = Amp(value + rhs)
+
+  inline operator fun invoke(): Float = value
+
   override fun toString(): String = value.toString()
 
   companion object {
-    operator fun invoke(amp: Int) = Amp(amp.toFloat())
+    inline operator fun invoke(value: Int) = Amp(value.toFloat())
 
-    val ZERO = 0.toAmp()
-    val TWELVE = 12.toAmp()
+    val NONE = Amp(0F)
+    val DEFAULT_PREAMP = Amp(12F)
+    val MIN = Amp(-20F)
+    val MAX = Amp(20F)
+    val RANGE = MIN..MAX
   }
 }
-
-operator fun Amp.compareTo(rhs: Float): Int = value.compareTo(rhs)
-
-operator fun Amp.plus(rhs: Amp): Amp = (value + rhs.value).toAmp()
-operator fun Amp.plus(rhs: Float): Amp = (value + rhs).toAmp()

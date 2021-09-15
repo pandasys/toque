@@ -64,7 +64,7 @@ private class ComposerMediaDaoImpl : ComposerMediaDao {
     INSERT_COMPOSER_MEDIA.insert {
       it[composerId] = replaceComposerId.value
       it[mediaId] = replaceMediaId.value
-      it[createdTime] = createTime.value
+      it[createdTime] = createTime()
     }
     Unit
   }

@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.player
 
+import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.test.service.player.TransitionPlayerStub
@@ -73,7 +74,7 @@ class PauseImmediateTransitionTest {
     expect(player._pauseCalled).toBe(1)
     expect(player._notifyPausedCalled).toBe(1)
     expect(player._volumeSetCalled).toBe(1)
-    expect(player._volume).toBe(Volume.ZERO)
+    expect(player._volume).toBe(Volume.NONE)
     expect(transition.isCancelled).toBe(false)
     expect(transition.isFinished).toBe(true)
   }

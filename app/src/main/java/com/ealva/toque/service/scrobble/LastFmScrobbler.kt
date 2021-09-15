@@ -23,8 +23,8 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.debug
-import com.ealva.toque.service.audio.AudioQueueItem
-import com.ealva.toque.service.audio.NullAudioQueueItem
+import com.ealva.toque.service.audio.NullPlayableAudioItem
+import com.ealva.toque.service.audio.PlayableAudioItem
 
 private val LOG by lazyLogger(LastFmScrobbler::class)
 private const val ACTION_META_CHANGED = "fm.last.android.metachanged"
@@ -53,41 +53,41 @@ internal class LastFmScrobbler(
   private val pkgName: PackageName,
   private val intentBroadcaster: IntentBroadcaster
 ) : Scrobbler {
-  private var lastItem: AudioQueueItem = NullAudioQueueItem
+  private var lastItem: PlayableAudioItem = NullPlayableAudioItem
 
-  override fun start(item: AudioQueueItem) {
+  override fun start(item: PlayableAudioItem) {
     broadcastIntent(ACTION_META_CHANGED, item, item.isPlaying)
   }
 
-  override fun resume(item: AudioQueueItem) {
+  override fun resume(item: PlayableAudioItem) {
     broadcastIntent(ACTION_PLAY_STATE_CHANGED, item, true)
   }
 
-  override fun pause(item: AudioQueueItem) {
+  override fun pause(item: PlayableAudioItem) {
     broadcastIntent(ACTION_PLAY_STATE_CHANGED, item, false)
   }
 
-  override fun complete(item: AudioQueueItem) {
+  override fun complete(item: PlayableAudioItem) {
     if (item == lastItem) {
       broadcastIntent(ACTION_PLAYBACK_COMPLETE, item, false)
     }
   }
 
   override fun shutdown() {
-    if (lastItem !== NullAudioQueueItem) {
+    if (lastItem !== NullPlayableAudioItem) {
       pause(lastItem)
-      lastItem = NullAudioQueueItem
+      lastItem = NullPlayableAudioItem
     }
   }
 
-  private fun broadcastIntent(action: String, item: AudioQueueItem, isPlaying: Boolean) {
+  private fun broadcastIntent(action: String, item: PlayableAudioItem, isPlaying: Boolean) {
     lastItem = item
     val intent = Intent(action)
-      .putExtra(EXTRA_TRACK, item.title.value)
-      .putExtra(EXTRA_ARTIST, item.getArtist(false).value)
-      .putExtra(EXTRA_ALBUM, item.albumName.value)
-      .putExtra(EXTRA_DURATION, item.duration.value)
-      .putExtra(EXTRA_POSITION, item.position.value)
+      .putExtra(EXTRA_TRACK, item.title())
+      .putExtra(EXTRA_ARTIST, item.albumArtist.value)
+      .putExtra(EXTRA_ALBUM, item.albumTitle.value)
+      .putExtra(EXTRA_DURATION, item.duration())
+      .putExtra(EXTRA_POSITION, item.position())
       .putExtra(EXTRA_PLAYING, isPlaying)
       .putExtra(EXTRA_PLAYER, pkgName.prop)
     debug { logIntent(intent) }

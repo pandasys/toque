@@ -24,5 +24,5 @@ inline fun buildDescription(
 ): MediaDescriptionCompat = MediaDescriptionCompat.Builder().apply(builderAction).build()
 
 inline fun MediaDescriptionCompat.Builder.setMediaItemId(mediaId: () -> PersistentId) {
-  setMediaId(MediaSessionBrowser.makeMediaId(mediaId()))
+  setMediaId(mediaId().toCompatMediaId())
 }

@@ -20,6 +20,7 @@ plugins {
   id("com.android.application") version PluginsVersion.AGP apply false
   kotlin("android") version PluginsVersion.KOTLIN apply false
   kotlin("plugin.serialization") version PluginsVersion.SERIALIZATION apply false
+  kotlin("kapt") version PluginsVersion.SERIALIZATION apply false
   id("io.gitlab.arturbosch.detekt") version PluginsVersion.DETEKT
   id("com.github.ben-manes.versions") version PluginsVersion.VERSIONS
   id("org.jetbrains.dokka") version PluginsVersion.DOKKA

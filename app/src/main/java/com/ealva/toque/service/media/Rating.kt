@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress("MagicNumber")
+@file:Suppress("NOTHING_TO_INLINE", "MagicNumber")
 
 package com.ealva.toque.service.media
 
@@ -31,6 +31,8 @@ value class Rating(val value: Int) : Comparable<Rating> {
   init {
     require(value in -1..100) { "Rating must be between -1 (no rating) and 100" }
   }
+
+  inline operator fun invoke(): Int = value
 
   override fun compareTo(other: Rating): Int = value.compareTo(other.value)
 

@@ -17,7 +17,7 @@
 package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Volume
-import com.ealva.toque.service.player.PlayerTransition.Type
+import com.ealva.toque.service.audio.PlayerTransition.Type
 
 /**
  * Do immediate play with no fade
@@ -25,7 +25,7 @@ import com.ealva.toque.service.player.PlayerTransition.Type
 class PlayImmediateTransition : BasePlayerTransition(Type.Play) {
   override suspend fun doExecute(player: TransitionPlayer) {
     player.play()
-    player.volume = Volume.ONE_HUNDRED
+    player.volume = Volume.MAX
     player.notifyPlaying()
     setComplete()
   }

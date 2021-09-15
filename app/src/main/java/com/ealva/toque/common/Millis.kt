@@ -22,22 +22,29 @@ import java.util.Date
 
 typealias MillisRange = ClosedRange<Millis>
 
-inline fun Long.toMillis(): Millis = Millis(this)
-inline fun Int.toMillis(): Millis = Millis(toLong())
+private const val MILLIS_PER_SECOND = 1000.0F
 
 @JvmInline
 value class Millis(val value: Long) : Comparable<Millis> {
+  inline operator fun invoke(): Long = value
+
   override fun toString(): String = value.toString()
+
+  inline fun toDouble(): Double = value.toDouble()
+
+  fun toFloatSeconds(): Float = value / MILLIS_PER_SECOND
 
   override operator fun compareTo(other: Millis): Int = value.compareTo(other.value)
 
-  inline operator fun minus(rhs: Millis): Millis = (value - rhs.value).toMillis()
-  inline operator fun minus(rhs: Long): Millis = (value - rhs).toMillis()
+  inline operator fun minus(rhs: Millis): Millis = Millis(value - rhs.value)
+  inline operator fun minus(rhs: Long): Millis = Millis(value - rhs)
 
-  inline operator fun div(other: Millis): Millis = (value / other.value).toMillis()
+  inline operator fun times(rhs: Millis): Millis = Millis(value * rhs.value)
+  inline operator fun times(rhs: Long): Millis = Millis(value * rhs)
+  inline operator fun div(rhs: Millis): Millis = Millis(value / rhs.value)
 
-  inline operator fun plus(rhs: Millis): Millis = (value + rhs.value).toMillis()
-  inline operator fun plus(rhs: Long): Millis = (value + rhs).toMillis()
+  inline operator fun plus(rhs: Millis): Millis = Millis(value + rhs.value)
+  inline operator fun plus(rhs: Long): Millis = Millis(value + rhs)
 
   inline operator fun compareTo(rhs: Long): Int = value.compareTo(rhs)
   inline operator fun compareTo(rhs: Int): Int = value.compareTo(rhs)
@@ -45,12 +52,16 @@ value class Millis(val value: Long) : Comparable<Millis> {
   inline fun toDate(): Date = Date(value)
 
   companion object {
+    operator fun invoke(value: Int): Millis = Millis(value.toLong())
+
     // Some commonly used Millis
     val ZERO = Millis(0)
     val ONE_HUNDRED = Millis(100)
     val TWO_HUNDRED = Millis(200)
     val ONE_SECOND = Millis(1000)
     val THREE_SECONDS = Millis(3000)
+    val FIVE_SECONDS = Millis(5000)
+    val TEN_SECONDS = Millis(10000)
     val ONE_MINUTE = Millis(60000)
   }
 }

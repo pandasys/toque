@@ -20,6 +20,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.prefstore.store.invoke
+import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPrefs
@@ -84,10 +85,10 @@ class AppPreferencesTest {
   fun testAllowDuplicates() = coroutineRule.runBlockingTest {
     prefsSingleton {
       expect(allowDuplicates()).toBe(allowDuplicates.default)
-      allowDuplicates.set(true)
-      expect(allowDuplicates()).toBe(true)
-      allowDuplicates.set(false)
-      expect(allowDuplicates()).toBe(false)
+      allowDuplicates.set(AllowDuplicates(true))
+      expect(allowDuplicates()).toBe(AllowDuplicates(true))
+      allowDuplicates.set(AllowDuplicates(false))
+      expect(allowDuplicates()).toBe(AllowDuplicates(false))
 
       clear()
       expectAllAreDefault()
@@ -209,9 +210,9 @@ class AppPreferencesTest {
     prefsSingleton {
       expect(duckVolume()).toBe(duckVolume.default)
       duckVolume.set(Volume(-100))
-      expect(duckVolume()).toBe(Volume.ZERO)
+      expect(duckVolume()).toBe(Volume.NONE)
       duckVolume.set(Volume(1000))
-      expect(duckVolume()).toBe(Volume.ONE_HUNDRED)
+      expect(duckVolume()).toBe(Volume.MAX)
       arrayOf(Volume(10), Volume(30), Volume(67), Volume(91)).forEach { vol ->
         duckVolume.set(vol)
         expect(duckVolume()).toBe(vol)

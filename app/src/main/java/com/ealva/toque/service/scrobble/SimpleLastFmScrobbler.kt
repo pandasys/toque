@@ -24,8 +24,8 @@ import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PackageName
 import com.ealva.toque.common.debug
-import com.ealva.toque.service.audio.AudioQueueItem
-import com.ealva.toque.service.audio.NullAudioQueueItem
+import com.ealva.toque.service.audio.NullPlayableAudioItem
+import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Complete
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Pause
 import com.ealva.toque.service.scrobble.SimpleLastFmState.Resume
@@ -72,39 +72,39 @@ internal class SimpleLastFmScrobbler(
   private val pkgName: PackageName,
   private val intentBroadcaster: IntentBroadcaster
 ) : Scrobbler {
-  private var lastItem: AudioQueueItem = NullAudioQueueItem
+  private var lastItem: PlayableAudioItem = NullPlayableAudioItem
 
-  override fun start(item: AudioQueueItem) {
+  override fun start(item: PlayableAudioItem) {
     scrobble(Start, item)
   }
 
-  override fun resume(item: AudioQueueItem) {
+  override fun resume(item: PlayableAudioItem) {
     scrobble(Resume, item)
   }
 
-  override fun pause(item: AudioQueueItem) {
+  override fun pause(item: PlayableAudioItem) {
     scrobble(Pause, item)
   }
 
-  override fun complete(item: AudioQueueItem) {
+  override fun complete(item: PlayableAudioItem) {
     if (item == lastItem) {
       scrobble(Complete, item)
     }
   }
 
   override fun shutdown() {
-    if (lastItem !== NullAudioQueueItem) {
+    if (lastItem !== NullPlayableAudioItem) {
       pause(lastItem)
-      lastItem = NullAudioQueueItem
+      lastItem = NullPlayableAudioItem
     }
   }
 
-  private fun scrobble(state: SimpleLastFmState, item: AudioQueueItem) {
+  private fun scrobble(state: SimpleLastFmState, item: PlayableAudioItem) {
     lastItem = item
     val intent = Intent(ACTION_SIMPLE_LAST_FM)
-      .putExtra(EXTRA_TRACK, item.title.value)
-      .putExtra(EXTRA_ARTIST, item.getArtist(false).value)
-      .putExtra(EXTRA_ALBUM, item.albumName.value)
+      .putExtra(EXTRA_TRACK, item.title())
+      .putExtra(EXTRA_ARTIST, item.albumArtist.value)
+      .putExtra(EXTRA_ALBUM, item.albumTitle.value)
       .putExtra(EXTRA_DURATION, item.duration.toSeconds())
       .putExtra(EXTRA_TRACK_NUMBER, item.trackNumber)
       .putExtra(EXTRA_STATE, state.value)

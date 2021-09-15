@@ -70,7 +70,7 @@ private class ArtistMediaDaoImpl : ArtistMediaDao {
       INSERT_ARTIST_MEDIA.insert {
         it[artistId] = newArtistId.value
         it[mediaId] = replaceMediaId.value
-        it[createdTime] = createTime.value
+        it[createdTime] = createTime()
       }
     }
   }

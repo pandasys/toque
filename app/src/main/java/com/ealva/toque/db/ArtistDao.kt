@@ -17,7 +17,9 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.brainz.data.ArtistMbid
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
@@ -29,6 +31,7 @@ import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.statements.DeleteStatement
@@ -59,7 +62,7 @@ import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(ArtistDao::class)
 
-data class ArtistIdName(val artistId: ArtistId, val artistName: String)
+data class ArtistIdName(val artistId: ArtistId, val artistName: ArtistName)
 
 sealed class ArtistDaoEvent {
   data class ArtistCreated(val artistId: ArtistId) : ArtistDaoEvent()
@@ -91,6 +94,8 @@ interface ArtistDao {
   fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
 
   suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage>
+
+  suspend fun getNextArtist(artistName: ArtistName): Result<ArtistIdName, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -136,8 +141,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       it[artistName] = newArtist
       it[artistSort] = newArtistSort
       it[artistMbid] = newArtistMbid?.value ?: ""
-      it[createdTime] = createUpdateTime.value
-      it[updatedTime] = createUpdateTime.value
+      it[createdTime] = createUpdateTime()
+      it[updatedTime] = createUpdateTime()
     }.toArtistId().also { id -> onCommit { emit(ArtistDaoEvent.ArtistCreated(id)) } }
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with artist='%s'", newArtist) }
@@ -168,7 +173,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         updateArtist?.let { update -> it[artistName] = update }
         updateSort?.let { update -> it[artistSort] = update }
         updateMbid?.let { update -> it[artistMbid] = update.value }
-        it[updatedTime] = newUpdateTime.value
+        it[updatedTime] = newUpdateTime()
       }.where { id eq info.id.value }.update()
 
       if (updated >= 1) onCommit { emit(ArtistDaoEvent.ArtistUpdated(info.id)) }
@@ -209,8 +214,28 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     .all()
     .orderByAsc { artistName }
     .limit(limit)
-    .sequence { ArtistIdName(it[id].toArtistId(), it[artistName]) }
+    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
     .toList()
+
+  override suspend fun getNextArtist(
+    artistName: ArtistName
+  ): Result<ArtistIdName, DaoMessage> = db.query {
+    runCatching {
+      LOG.i { it("getNextArtist after %s", artistName) }
+      doGetNextArtist(artistName)
+    }.mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
+   */
+  private fun Queryable.doGetNextArtist(previousArtist: ArtistName): ArtistIdName = ArtistTable
+    .selects { listOf(id, artistName) }
+    .where { artistName greater previousArtist.value }
+    .orderByAsc { artistName }
+    .limit(1)
+    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+    .single()
 }
 
 private val INSERT_STATEMENT = ArtistTable.insertValues {

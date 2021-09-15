@@ -17,7 +17,6 @@
 package com.ealva.toque.service.media
 
 import com.ealva.toque.common.Amp
-import com.ealva.toque.common.toAmp
 
 data class PreAmpAndBands(val preAmp: Amp, val bands: Array<Amp>) {
   override fun equals(other: Any?): Boolean {
@@ -86,7 +85,7 @@ interface EqPreset {
   /**
    * Set this preset's PreAmp [amplitude]. Not a var as we need to suspend on set
    * @throws UnsupportedOperationException if this is a system preset
-   * @throws IllegalArgumentException if value is not in [AMP_RANGE]
+   * @throws IllegalArgumentException if value is not in [Amp.RANGE]
    */
   @Throws(UnsupportedOperationException::class)
   suspend fun setPreAmp(amplitude: Amp)
@@ -101,7 +100,7 @@ interface EqPreset {
   /**
    * Set a new amplification [amplitude] for the equalizer frequency band at [index].
    * @throws UnsupportedOperationException if this is a system preset
-   * @throws IllegalArgumentException if value is not in [AMP_RANGE]
+   * @throws IllegalArgumentException if value is not in [Amp.RANGE]
    * @throws IllegalArgumentException if index is not in [bandIndices]
    */
   @Throws(UnsupportedOperationException::class)
@@ -123,40 +122,33 @@ interface EqPreset {
    * Set the preamp and all band values. The size of the amp array must be equal to [bandCount].
    * Oh, and this one time at band camp...
    * @throws UnsupportedOperationException if this is a system preset
-   * @throws IllegalArgumentException if value is not in [AMP_RANGE]
+   * @throws IllegalArgumentException if value is not in [Amp.RANGE]
    * @throws IllegalArgumentException if index is not in [bandIndices]
    */
   @Throws(UnsupportedOperationException::class)
   suspend fun setAllValues(preAmpAndBands: PreAmpAndBands)
 
   companion object {
-    @Suppress("MemberVisibilityCanBePrivate")
-    val MAX_AMP = 20F.toAmp()
-
-    @Suppress("MemberVisibilityCanBePrivate")
-    val MIN_AMP = (-20F).toAmp()
-    val AMP_RANGE = MIN_AMP..MAX_AMP
-    val PRE_AMP_DEFAULT = 12F.toAmp()
-    val BAND_DEFAULT = 0F.toAmp()
+    val BAND_DEFAULT = Amp.NONE
     private const val DEFAULT_BAND_COUNT = 10
 
-    val NULL = object : EqPreset {
+    val NONE = object : EqPreset {
       override val presetId = -1L
-      override val name = "Null"
-      override val displayName = "Null"
+      override val name = "None"
+      override val displayName = "None"
       override val isSystemPreset = true
       override val bandCount = DEFAULT_BAND_COUNT
       override val bandIndices = 0 until bandCount
       override fun getBandFrequency(index: Int): Float = 0F
-      override val preAmp: Amp = Amp.ZERO
+      override val preAmp: Amp = Amp.NONE
       override suspend fun setPreAmp(amplitude: Amp) {}
-      override fun getAmp(index: Int): Amp = Amp.ZERO
+      override fun getAmp(index: Int): Amp = Amp.NONE
       override suspend fun setAmp(index: Int, amplitude: Amp) {}
       override suspend fun resetAllToDefault() {}
       override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {}
       override fun getAllValues(): PreAmpAndBands = PreAmpAndBands(
-        Amp.ZERO,
-        Array(bandCount) { Amp.ZERO }
+        Amp.NONE,
+        Array(bandCount) { Amp.NONE }
       )
     }
   }

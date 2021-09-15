@@ -22,7 +22,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.prefstore.store.invoke
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.Millis
-import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.vlc.Chroma
 import com.ealva.toque.service.vlc.HardwareAcceleration
 import com.ealva.toque.service.vlc.LibVlcPrefs
@@ -139,9 +138,9 @@ class LibVlcPreferencesTest {
     prefsSingleton {
       expect(replayPreamp()).toBe(replayPreamp.default)
       replayPreamp.set(Amp(-50))
-      expect(replayPreamp()).toBe(EqPreset.AMP_RANGE.start)
+      expect(replayPreamp()).toBe(Amp.RANGE.start)
       replayPreamp.set(Amp(100))
-      expect(replayPreamp()).toBe(EqPreset.AMP_RANGE.endInclusive)
+      expect(replayPreamp()).toBe(Amp.RANGE.endInclusive)
       replayPreamp.set(Amp(15))
       expect(replayPreamp()).toBe(Amp(15))
 

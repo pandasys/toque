@@ -17,20 +17,16 @@
 package com.ealva.toque.service.vlc
 
 import com.ealva.toque.common.Amp
-import com.ealva.toque.common.toAmp
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.NullEqPresetDao
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.EqPreset.Companion.AMP_RANGE
 import com.ealva.toque.service.media.EqPreset.Companion.BAND_DEFAULT
-import com.ealva.toque.service.media.EqPreset.Companion.PRE_AMP_DEFAULT
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.github.michaelbull.result.onFailure
 import org.videolan.libvlc.MediaPlayer
 
-private val ZERO_AMP: Amp = 0.toAmp()
-private val ZEROED_BANDS: Array<Amp> = Array(VlcEqPreset.BAND_COUNT) { ZERO_AMP }
+private val ZEROED_BANDS: Array<Amp> = Array(VlcEqPreset.BAND_COUNT) { Amp.NONE }
 
 class VlcEqPreset private constructor(
   private val nativeEq: MediaPlayer.Equalizer?,
@@ -52,24 +48,24 @@ class VlcEqPreset private constructor(
   override fun getBandFrequency(index: Int): Float = MediaPlayer.Equalizer.getBandFrequency(index)
 
   override val preAmp: Amp
-    get() = nativeEq?.preAmp?.toAmp() ?: ZERO_AMP
+    get() = nativeEq?.preAmp?.let { Amp(it) } ?: Amp.NONE
 
   override suspend fun setPreAmp(amplitude: Amp) {
     checkNotSystemPreset()
-    require(amplitude in AMP_RANGE)
-    nativeEq?.preAmp = amplitude.value
+    require(amplitude in Amp.RANGE)
+    nativeEq?.preAmp = amplitude()
   }
 
   override fun getAmp(index: Int): Amp {
     require(index in BAND_INDICES)
-    return nativeEq?.getAmp(index)?.toAmp() ?: ZERO_AMP
+    return nativeEq?.getAmp(index)?.let { Amp(it) } ?: Amp.NONE
   }
 
   override suspend fun setAmp(index: Int, amplitude: Amp) {
     checkNotSystemPreset()
-    require(amplitude in AMP_RANGE)
+    require(amplitude in Amp.RANGE)
     require(index in BAND_INDICES)
-    nativeEq?.setAmp(index, amplitude.value)
+    nativeEq?.setAmp(index, amplitude())
   }
 
   override suspend fun resetAllToDefault() {
@@ -77,8 +73,8 @@ class VlcEqPreset private constructor(
     nativeEq?.let { native ->
       val currentValues = getAllValues()
       try {
-        for (i in BAND_INDICES) native.setAmp(i, BAND_DEFAULT.value)
-        nativeEq.preAmp = PRE_AMP_DEFAULT.value
+        for (i in BAND_INDICES) native.setAmp(i, BAND_DEFAULT())
+        nativeEq.preAmp = Amp.DEFAULT_PREAMP()
       } catch (e: Exception) {
         native.setNativeEqValues(currentValues)
       }
@@ -88,12 +84,12 @@ class VlcEqPreset private constructor(
   override fun getAllValues(): PreAmpAndBands {
     return nativeEq?.let { native ->
       PreAmpAndBands(
-        native.preAmp.toAmp(),
+        Amp(native.preAmp),
         Array(BAND_COUNT) { index ->
-          native.getAmp(index).toAmp()
+          Amp(native.getAmp(index))
         }
       )
-    } ?: PreAmpAndBands(ZERO_AMP, ZEROED_BANDS)
+    } ?: PreAmpAndBands(Amp.NONE, ZEROED_BANDS)
   }
 
   override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {
@@ -126,11 +122,11 @@ class VlcEqPreset private constructor(
     ): VlcEqPreset = VlcEqPreset(nativeEq, name, isSystemPreset, presetId, eqPresetDao)
 
     fun MediaPlayer.Equalizer.setNativeEqValues(preAmpAndBands: PreAmpAndBands) = apply {
-      require(preAmpAndBands.preAmp in AMP_RANGE)
-      preAmp = preAmpAndBands.preAmp.value
+      require(preAmpAndBands.preAmp in Amp.RANGE)
+      preAmp = preAmpAndBands.preAmp()
       preAmpAndBands.bands.forEachIndexed { index, amp ->
-        require(amp in AMP_RANGE)
-        setAmp(index, amp.value)
+        require(amp in Amp.RANGE)
+        setAmp(index, amp())
       }
     }
 

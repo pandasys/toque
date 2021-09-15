@@ -20,9 +20,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._w
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -100,16 +98,12 @@ private class MediaPlayerServiceConnectionImpl(
         name: ComponentName,
         service: IBinder
       ) {
-        LOG._w { it("-->onServiceConnected %s", binderName) }
         val binder = service as MediaPlayerService.MediaServiceBinder
         mediaController.value = binder.controller
-        LOG._w { it("<--onServiceConnected %s", binderName) }
       }
 
       override fun onServiceDisconnected(name: ComponentName) {
-        LOG._w { it("-->onServiceDisconnected %s", binderName) }
         mediaController.value = NullMediaController
-        LOG._w { it("<--onServiceDisconnected %s", binderName) }
       }
     }
   }

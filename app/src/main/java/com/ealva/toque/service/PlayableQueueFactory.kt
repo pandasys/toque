@@ -16,27 +16,75 @@
 
 package com.ealva.toque.service
 
+import android.media.AudioManager
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.ealvalog.unaryPlus
+import com.ealva.toque.db.QueueStateDaoFactory
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.audio.LocalAudioQueue
+import com.ealva.toque.service.audio.PlayableAudioItemFactory
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
+import com.ealva.toque.service.session.MediaSessionControl
+import com.ealva.toque.service.session.MediaSessionState
 
 interface PlayableQueueFactory {
-  fun make(queueType: QueueType, servicePrefs: PlayerServicePrefs): PlayableMediaQueue<*>
+  suspend fun make(
+    queueType: QueueType,
+    sessionControl: MediaSessionControl,
+    sessionState: MediaSessionState
+  ): PlayableMediaQueue<*>
 
   companion object {
-    operator fun invoke(): PlayableQueueFactory = PlayableQueueFactoryImpl()
+    operator fun invoke(
+      queueStateDaoFactory: QueueStateDaoFactory,
+      playableAudioItemFactory: PlayableAudioItemFactory,
+      audioManager: AudioManager,
+      appPrefsSingleton: AppPrefsSingleton
+    ): PlayableQueueFactory = PlayableQueueFactoryImpl(
+      queueStateDaoFactory,
+      playableAudioItemFactory,
+      audioManager,
+      appPrefsSingleton
+    )
   }
 }
 
-class PlayableQueueFactoryImpl : PlayableQueueFactory {
-  override fun make(queueType: QueueType, servicePrefs: PlayerServicePrefs): PlayableMediaQueue<*> {
+private val LOG by lazyLogger(PlayableQueueFactory::class)
+
+private class PlayableQueueFactoryImpl(
+  private val queueStateDaoFactory: QueueStateDaoFactory,
+  private val playableAudioItemFactory: PlayableAudioItemFactory,
+  private val audioManager: AudioManager,
+  private val appPrefsSingleton: AppPrefsSingleton
+) : PlayableQueueFactory {
+  override suspend fun make(
+    queueType: QueueType,
+    sessionControl: MediaSessionControl,
+    sessionState: MediaSessionState
+  ): PlayableMediaQueue<*> {
     return when (queueType) {
-      QueueType.Audio -> makeLocalAudioQueue(servicePrefs)
-      else -> throw IllegalStateException("Unknown QueueType")
+      QueueType.Audio -> makeLocalAudioQueue(sessionControl, sessionState)
+      else -> {
+        LOG.e { +it("Unknown QueueType=%s illegal state", queueType) }
+        throw IllegalStateException("Unknown QueueType")
+      }
     }
   }
 
-  private fun makeLocalAudioQueue(servicePrefs: PlayerServicePrefs): PlayableMediaQueue<*> {
-    return LocalAudioQueue(servicePrefs)
+  private suspend fun makeLocalAudioQueue(
+    sessionControl: MediaSessionControl,
+    sessionState: MediaSessionState
+  ): PlayableMediaQueue<*> {
+    return LocalAudioQueue.make(
+      sessionControl,
+      sessionState,
+      queueStateDaoFactory,
+      playableAudioItemFactory,
+      audioManager,
+      appPrefsSingleton.instance()
+    )
   }
 }

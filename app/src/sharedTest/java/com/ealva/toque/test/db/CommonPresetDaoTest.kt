@@ -19,8 +19,6 @@ package com.ealva.toque.test.db
 import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
 import com.ealva.toque.common.Amp
-import com.ealva.toque.common.toAmp
-import com.ealva.toque.common.plus
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.DaoNotFound
@@ -69,8 +67,8 @@ object CommonPresetDaoTest {
         id = 1000,
         name = "NotThere",
         preAmpAndBands = PreAmpAndBands(
-          10F.toAmp(),
-          Array(EqPresetDao.BAND_COUNT) { 0F.toAmp() }
+          Amp(10F),
+          Array(EqPresetDao.BAND_COUNT) { Amp(0F) }
         )
       )
       val result = dao.updatePreset(presetData)
@@ -85,10 +83,10 @@ object CommonPresetDaoTest {
       }
       val dao = EqPresetDao(this)
       val name = "MyPreset"
-      val initialPreAmp = 12F.toAmp()
+      val initialPreAmp = Amp(12F)
       val preAmpAndBands = PreAmpAndBands(
         initialPreAmp,
-        Array(EqPresetDao.BAND_COUNT) { index -> index.toAmp() }
+        Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       val insertResult = dao.insertPreset(
         name,
@@ -113,10 +111,10 @@ object CommonPresetDaoTest {
       }
       val dao = EqPresetDao(this)
       val name = "MyPreset"
-      val initialPreAmp = 12F.toAmp()
+      val initialPreAmp = Amp(12F)
       val preAmpAndBands = PreAmpAndBands(
         initialPreAmp,
-        Array(EqPresetDao.BAND_COUNT) { index -> index.toAmp() }
+        Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       dao.insertPreset(name, preAmpAndBands).let { result ->
         val id = result.get() ?: -1
@@ -147,10 +145,10 @@ object CommonPresetDaoTest {
       }
       val dao = EqPresetDao(this)
       val name = "MyPreset"
-      val initialPreAmp = 12F.toAmp()
+      val initialPreAmp = Amp(12F)
       val preAmpAndBands = PreAmpAndBands(
         initialPreAmp,
-        Array<Amp>(EqPresetDao.BAND_COUNT) { index -> index.toAmp() }
+        Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       var id: Long
       dao.insertPreset(name, preAmpAndBands).let { result ->
@@ -165,7 +163,7 @@ object CommonPresetDaoTest {
         }
       }
 
-      val updatedPreAmp = 11.5F.toAmp()
+      val updatedPreAmp = Amp(11.5F)
       val updatedBands = Array(preAmpAndBands.bands.size) { index ->
         preAmpAndBands.bands[index] + 1F
       }
@@ -190,17 +188,17 @@ object CommonPresetDaoTest {
       }
       val dao = EqPresetDao(this)
       val name = "MyPreset"
-      val initialPreAmp = 12F.toAmp()
+      val initialPreAmp = Amp(12F)
       val preAmpAndBands = PreAmpAndBands(
         initialPreAmp,
-        Array(EqPresetDao.BAND_COUNT) { index -> index.toAmp() }
+        Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       val insertResult = dao.insertPreset(
         name,
         preAmpAndBands
       )
       val id = insertResult.get() ?: -1
-      val updatedPreAmp = 0.toAmp()
+      val updatedPreAmp = Amp(0)
       val result = dao.updatePreAmp(id, updatedPreAmp)
       expect(result).toBe(Ok(true))
       val data = dao.getPresetData(id).get() ?: error("unexpected null data")
@@ -215,10 +213,10 @@ object CommonPresetDaoTest {
       }
       val dao = EqPresetDao(this)
       val name = "MyPreset"
-      val initialPreAmp = 12F.toAmp()
+      val initialPreAmp = Amp(12F)
       val preAmpAndBands = PreAmpAndBands(
         initialPreAmp,
-        Array(EqPresetDao.BAND_COUNT) { index -> index.toAmp() }
+        Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       val id = dao.insertPreset(name, preAmpAndBands).get() ?: -1
       expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)
@@ -244,10 +242,10 @@ object CommonPresetDaoTest {
       }
       val dao = EqPresetDao(this)
       val name = "MyPreset"
-      val initialPreAmp = 12F.toAmp()
+      val initialPreAmp = Amp.DEFAULT_PREAMP
       val preAmpAndBands = PreAmpAndBands(
         initialPreAmp,
-        Array(EqPresetDao.BAND_COUNT) { index -> index.toAmp() }
+        Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       val id = dao.insertPreset(name, preAmpAndBands).get() ?: -1
       expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)

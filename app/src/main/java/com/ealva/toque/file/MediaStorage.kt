@@ -19,11 +19,11 @@ package com.ealva.toque.file
 import android.content.ContentUris
 import android.content.Context
 import android.database.Cursor
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Millis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.File
@@ -50,7 +50,7 @@ interface MediaStorage {
    * album and another list would contain all the songs on the Beatles Revolver album. This
    * grouping is based on the MediaStore database sorted by artist then album
    */
-  fun audioFlow(modifiedAfter: Date): Flow<List<AudioInfo>>
+  fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<List<AudioInfo>>
 
   companion object {
     operator fun invoke(context: Context): MediaStorage = MediaStorageImpl(context)
@@ -70,7 +70,7 @@ private const val DEFAULT_AUDIO_LIST_SIZE = 64
 private class MediaStorageImpl(context: Context) : MediaStorage {
   private val resolver = context.contentResolver
 
-  private val audioCollection: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+  private val audioCollectionUri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
     MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
   } else {
     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
@@ -90,20 +90,19 @@ private class MediaStorageImpl(context: Context) : MediaStorage {
   )
 
   override suspend fun location(id: AudioContentId): Uri =
-    ContentUris.withAppendedId(audioCollection, id.prop)
+    ContentUris.withAppendedId(audioCollectionUri, id.prop)
 
   fun Cursor.longColumnToDate(columnIndex: Int): Date =
     Date(TimeUnit.SECONDS.toMillis(getLong(columnIndex)))
 
-  override fun audioFlow(modifiedAfter: Date): Flow<List<AudioInfo>> {
-    val lastScan = TimeUnit.MILLISECONDS.toSeconds(modifiedAfter.time)
+  override fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<List<AudioInfo>> {
     return flow {
       resolver.query(
-        audioCollection,
+        audioCollectionUri,
         audioQueryFields,
-        MediaStore.MediaColumns.DATE_MODIFIED + " > " + lastScan,
+        makeAudioQueryWhereClause(modifiedAfter, minimumDuration),
         null,
-        MediaStore.Audio.ArtistColumns.ARTIST + ", " + MediaStore.Audio.AlbumColumns.ALBUM
+        makeAudioQuerySortClause()
       )?.use { cursor: Cursor ->
         val iId = cursor.indexOf(MediaStore.Audio.Media._ID)
         val iAlbum = cursor.indexOf(MediaStore.Audio.AlbumColumns.ALBUM)
@@ -152,6 +151,13 @@ private class MediaStorageImpl(context: Context) : MediaStorage {
     }
   }
 
+  private fun makeAudioQuerySortClause() =
+    "${MediaStore.Audio.ArtistColumns.ARTIST}, ${MediaStore.Audio.AlbumColumns.ALBUM}"
+
+  private fun makeAudioQueryWhereClause(lastScan: Date, minimumDuration: Millis) =
+    """${MediaStore.MediaColumns.DATE_MODIFIED} > ${TimeUnit.MILLISECONDS.toSeconds(lastScan.time)}
+      | AND ${MediaStore.Audio.Media.DURATION} > ${minimumDuration()}""".trimMargin()
+
   private fun Long.albumArtFor(): Uri = ContentUris.withAppendedId(ARTWORK_URI, this).let { uri ->
     if (uri.exists()) uri else Uri.EMPTY
   }
@@ -178,15 +184,3 @@ data class AudioInfo(
   val size: Long,
   val albumArt: Uri
 )
-
-fun Context.runMediaScanner(
-  paths: List<String>,
-  completed: MediaScannerConnection.OnScanCompletedListener
-) {
-  MediaScannerConnection.scanFile(
-    this,
-    paths.toTypedArray(),
-    null,
-    completed
-  )
-}

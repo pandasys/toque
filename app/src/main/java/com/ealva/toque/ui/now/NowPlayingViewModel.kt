@@ -16,20 +16,17 @@
 
 package com.ealva.toque.ui.now
 
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.prefstore.store.invoke
+import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.log._e
-import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.MediaPlayerServiceConnection
-import com.ealva.toque.service.audio.AudioQueueItem
-import com.ealva.toque.service.audio.NullAudioQueueItem
+import com.ealva.toque.service.audio.NullPlayableAudioItem
+import com.ealva.toque.service.audio.PlayState
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.media.EqMode
@@ -40,21 +37,15 @@ import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-enum class PlayState {
-  Playing,
-  Paused,
-  Stopped
-}
-
 data class NowPlayingState(
-  val queue: List<AudioQueueItem>,
+  internal val queue: List<AudioItem>,
   val queueIndex: Int,
   val position: Millis,
   val duration: Millis,
@@ -66,8 +57,8 @@ data class NowPlayingState(
   val currentPreset: EqPreset,
   val extraMediaInfo: String
 ) {
-  val currentItem: AudioQueueItem
-    get() = if (queueIndex in queue.indices) queue[queueIndex] else NullAudioQueueItem
+  val currentItem: AudioItem
+    get() = if (queueIndex in queue.indices) queue[queueIndex] else NullPlayableAudioItem
 
   companion object {
     val NONE = NowPlayingState(
@@ -80,7 +71,7 @@ data class NowPlayingState(
       shuffleMode = ShuffleMode.None,
       eqMode = EqMode.Off,
       presets = emptyList(),
-      currentPreset = EqPreset.NULL,
+      currentPreset = EqPreset.NONE,
       extraMediaInfo = ""
     )
   }
@@ -105,7 +96,7 @@ interface NowPlayingViewModel {
   fun mediaIsLoaded(): Boolean
 
   //  fun paletteUpdated(it: NowPlayingPaletteData, id: Long)
-  fun getItemFromId(id: Long): AudioQueueItem
+  fun getItemFromId(id: Long): AudioItem
   fun deleteMedia(mediaId: Long)
 
   /**
@@ -170,12 +161,14 @@ interface NowPlayingViewModel {
 
 private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
 
+// NOTE: Implement Bundleable to save and restore state
+
 @OptIn(ExperimentalCoroutinesApi::class)
 private class NowPlayingViewModelImpl(
   private val serviceConnection: MediaPlayerServiceConnection,
   private val appPrefsSingleton: AppPrefsSingleton
 ) : NowPlayingViewModel, ScopedServices.Registered {
-  private val scope = CoroutineScope(Dispatchers.Main + Job())
+  private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
   private var mediaController: ToqueMediaController = NullMediaController
   private lateinit var appPrefs: AppPrefs
   private var connectedToService = false
@@ -183,17 +176,13 @@ private class NowPlayingViewModelImpl(
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
 
   override fun onServiceRegistered() {
-    LOG._i { it("NowPlayingViewModel") }
     scope.launch {
       appPrefs = appPrefsSingleton.instance()
       serviceConnection.mediaController.collect { controller ->
         mediaController = controller
         connectedToService = controller !== NullMediaController
-        LOG._i { it("NowPlayingViewModel connected to service=%s", connectedToService) }
         if (connectedToService) {
           mediaController = controller
-          LOG._e { it("firstRun=%s", appPrefs.firstRun()) }
-          if (appPrefs.firstRun()) controller.startMediaScannerFirstRun()
         }
       }
     }
@@ -259,7 +248,7 @@ private class NowPlayingViewModelImpl(
     TODO("Not yet implemented")
   }
 
-  override fun getItemFromId(id: Long): AudioQueueItem {
+  override fun getItemFromId(id: Long): AudioItem {
     TODO("Not yet implemented")
   }
 

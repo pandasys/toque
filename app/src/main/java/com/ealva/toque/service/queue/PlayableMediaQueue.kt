@@ -16,11 +16,13 @@
 
 package com.ealva.toque.service.queue
 
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
+import com.ealva.toque.service.session.PlaybackActions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-interface PlayableMediaQueue<T : QueueMediaItem> {
+interface PlayableMediaQueue<T : Any> {
   /**
    * The type of this media queue
    */
@@ -28,14 +30,15 @@ interface PlayableMediaQueue<T : QueueMediaItem> {
 
   val isActive: StateFlow<Boolean>
 
+  val enabledActions: PlaybackActions
+
   /**
    * Activate the queue, reestablishing index and position if [resume] is true, start playing if
-   * [startPlayer] is true
+   * [playNow] is true
    */
   suspend fun activate(
     resume: Boolean,
-    startPlayer: Boolean,
-    haveWritePermission: Boolean
+    playNow: PlayNow
   )
 
   fun deactivate()
@@ -48,17 +51,29 @@ interface PlayableMediaQueue<T : QueueMediaItem> {
 
   suspend fun getNextMediaTitle(): Title
 
-  fun play(immediate: Boolean = false)
+  suspend fun play(immediate: Boolean = false)
 
-  fun pause(immediate: Boolean = false)
+  suspend fun pause(immediate: Boolean = false)
 
-  fun togglePlayPause()
+  suspend fun stop()
 
-  fun next()
+//  fun togglePlayPause()
 
-  fun previous()
+  suspend fun next()
 
-  fun goToIndexMaybePlay(index: Int)
+  suspend fun previous()
+
+  suspend fun seekTo(position: Millis)
+
+  suspend fun fastForward()
+
+  suspend fun rewind()
+
+  suspend fun goToIndexMaybePlay(index: Int)
+
+  suspend fun duck()
+
+  suspend fun endDuck()
 
   val streamVolume: StreamVolume
 }
@@ -67,8 +82,7 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
   override val queueType: QueueType = QueueType.NullQueue
   override suspend fun activate(
     resume: Boolean,
-    startPlayer: Boolean,
-    haveWritePermission: Boolean
+    playNow: PlayNow
   ) = Unit
 
   override fun deactivate() = Unit
@@ -76,12 +90,19 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
   override val queue: List<NullQueueMediaItem> = emptyList()
   override val currentItem: NullQueueMediaItem = NullQueueMediaItem
   override val currentItemIndex: Int = -1
-  override suspend fun getNextMediaTitle(): Title = NullQueueMediaItem.title
-  override fun play(immediate: Boolean) = Unit
-  override fun pause(immediate: Boolean) = Unit
-  override fun togglePlayPause() = Unit
-  override fun next() = Unit
-  override fun previous() = Unit
-  override fun goToIndexMaybePlay(index: Int) = Unit
+  override suspend fun getNextMediaTitle(): Title = Title.UNKNOWN
+  override suspend fun play(immediate: Boolean) = Unit
+  override suspend fun pause(immediate: Boolean) = Unit
+  override suspend fun stop() = Unit
+//  override fun togglePlayPause() = Unit
+  override suspend fun next() = Unit
+  override suspend fun previous() = Unit
+  override suspend fun goToIndexMaybePlay(index: Int) = Unit
   override val streamVolume: StreamVolume = NullStreamVolume
+  override suspend fun fastForward() = Unit
+  override suspend fun rewind() = Unit
+  override suspend fun seekTo(position: Millis) = Unit
+  override val enabledActions: PlaybackActions = PlaybackActions.DEFAULT
+  override suspend fun duck() = Unit
+  override suspend fun endDuck() = Unit
 }

@@ -16,7 +16,7 @@
 
 package com.ealva.toque.res
 
-import com.ealva.toque.common.Content
+import com.ealva.toque.common.fetch
 
 interface HasTitle {
   /** The [com.ealva.toque.R.string] string resource */
@@ -25,4 +25,4 @@ interface HasTitle {
 
 /** Use the global application context to get the description */
 inline val HasTitle.description: String
-  get() = Content.fetch(titleRes)
+  get() = fetch(titleRes)

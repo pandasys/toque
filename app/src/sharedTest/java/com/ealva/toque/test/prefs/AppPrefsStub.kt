@@ -16,11 +16,12 @@
 
 package com.ealva.toque.test.prefs
 
+import com.ealva.prefstore.store.BoolPref
 import com.ealva.prefstore.store.MutablePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.StoreHolder
-import com.ealva.prefstore.store.StorePref
-import com.ealva.toque.audio.AudioOutputModule
+import com.ealva.toque.audioout.AudioOutputModule
+import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPrefs
@@ -37,8 +38,18 @@ typealias MillisPrefStub = PrefStub<Long, Millis>
 
 @Suppress("MemberVisibilityCanBePrivate", "PropertyName")
 class AppPrefsStub : AppPrefs {
+  override val updateFlow: Flow<StoreHolder<AppPrefs>> = emptyFlow()
+
+  override suspend fun clear(vararg prefs: PreferenceStore.Preference<*, *>) {
+    TODO("Not yet implemented")
+  }
+
+  override suspend fun edit(block: suspend AppPrefs.(MutablePreferenceStore) -> Unit) {
+    TODO("Not yet implemented")
+  }
+
   override val firstRun = BoolPrefStub()
-  override val allowDuplicates = BoolPrefStub()
+  override val allowDuplicates = PrefStub<Boolean, AllowDuplicates>()
   override val goToNowPlaying = BoolPrefStub()
   override val ignoreSmallFiles = BoolPrefStub()
   override val ignoreThreshold = MillisPrefStub()
@@ -55,15 +66,7 @@ class AppPrefsStub : AppPrefs {
   override val playUpNextAction = PrefStub<Int, PlayUpNextAction>()
   override val endOfQueueAction = PrefStub<Int, EndOfQueueAction>()
   override val selectMediaAction = PrefStub<Int, SelectMediaAction>()
-  override val audioOutputModule: StorePref<Int, AudioOutputModule>
-    get() = TODO("Not yet implemented")
-  override val updateFlow: Flow<StoreHolder<AppPrefs>> = emptyFlow()
-
-  override suspend fun clear(vararg prefs: PreferenceStore.Preference<*, *>) {
-    TODO("Not yet implemented")
-  }
-
-  override suspend fun edit(block: suspend AppPrefs.(MutablePreferenceStore) -> Unit) {
-    TODO("Not yet implemented")
-  }
+  override val audioOutputModule = PrefStub<Int, AudioOutputModule>()
+  override val markPlayedPercentage = PrefStub<Int, Int>()
+  override val rewindThenPrevious: BoolPref = BoolPrefStub()
 }

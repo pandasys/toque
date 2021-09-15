@@ -17,21 +17,41 @@
 package com.ealva.toque.service.player
 
 import android.os.PowerManager
+import android.os.PowerManager.PARTIAL_WAKE_LOCK
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+
+private val LOG by lazyLogger(WakeLock::class)
 
 interface WakeLock {
   fun acquire()
   fun release()
+}
+
+interface WakeLockFactory {
+  fun makeWakeLock(timeout: Millis, tag: String): WakeLock
 
   companion object {
-    operator fun invoke(
-      lock: PowerManager.WakeLock,
-      timeout: Millis
-    ): WakeLock = WakeLockImpl(lock, timeout)
+    operator fun invoke(powerManager: PowerManager): WakeLockFactory =
+      WakeLockFactoryImpl(powerManager)
   }
 }
 
-private class WakeLockImpl(val lock: PowerManager.WakeLock, val timeout: Millis) : WakeLock {
-  override fun acquire() = lock.acquire(timeout.value)
+private class WakeLockFactoryImpl(private val powerManager: PowerManager) : WakeLockFactory {
+  override fun makeWakeLock(timeout: Millis, tag: String): WakeLock =
+    WakeLockImpl(powerManager, timeout, tag)
+}
+
+private class WakeLockImpl(
+  powerManager: PowerManager,
+  private val timeout: Millis,
+  tag: String
+) : WakeLock {
+  private val lock: PowerManager.WakeLock = powerManager.makeWakeLock(tag)
+  override fun acquire() = lock.acquire(timeout())
   override fun release() = lock.release()
+}
+
+private fun PowerManager.makeWakeLock(tag: String) = newWakeLock(PARTIAL_WAKE_LOCK, tag).apply {
+  setReferenceCounted(false)
 }

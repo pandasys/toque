@@ -26,15 +26,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.app.Toque
-import com.ealva.toque.log._i
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.ealva.toque.ui.theme.ToqueTheme
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
 import com.zhuinden.simplestack.AsyncStateChanger
 import com.zhuinden.simplestack.GlobalServices
 import com.zhuinden.simplestack.History
@@ -46,6 +51,7 @@ import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
 import com.zhuinden.simplestackextensions.navigatorktx.backstack
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import com.zhuinden.simplestackextensions.servicesktx.add
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
 
@@ -56,29 +62,31 @@ class MainActivity : AppCompatActivity() {
   private var haveReadExternalPermission = false
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
   private val appPrefsSingleton: AppPrefsSingleton by inject(named("AppPrefs"))
+  private val audioMediaDao: AudioMediaDao by inject()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    playerServiceConnection.bind()
 
-    LOG._i { it("fit system windows") }
+    lifecycleScope.launch {
+      when (val result = audioMediaDao.getCountAllAudio()) {
+        is Ok -> LOG.i { it("Audio count=%d", result.value) }
+        is Err -> LOG.e { it("Failed to get count of all audio") }
+      }
+    }
+
     WindowCompat.setDecorFitsSystemWindows(window, false) // we'll handle the system insets
     haveReadExternalPermission = havePermission(READ_EXTERNAL_STORAGE)
 
-    LOG._i { it("configure navigator") }
     val backstack = Navigator.configure()
       .setGlobalServices(getGlobalServicesBuilder().build())
       .setScopedServices(DefaultServiceProvider())
       .setStateChanger(AsyncStateChanger(composeStateChanger))
       .install(this, androidContentFrame, makeInitialHistory(haveReadExternalPermission))
 
-    LOG._i { it("set content") }
     setContent {
-      LOG._i { it("establish backstack") }
       BackstackProvider(backstack) {
         ToqueTheme {
           Box(Modifier.fillMaxSize()) {
-            LOG._i { it("render screen") }
             composeStateChanger.RenderScreen()
           }
         }
@@ -91,6 +99,7 @@ class MainActivity : AppCompatActivity() {
     // If user goes to settings and enables permission we'll react to that here
     if (!haveReadExternalPermission) {
       if (havePermission(READ_EXTERNAL_STORAGE)) {
+        playerServiceConnection.bind()
         haveReadExternalPermission = true
         backstack.setHistory(History.of(NowPlayingScreen()), REPLACE)
       }
@@ -118,21 +127,18 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private fun makeInitialHistory(haveReadExternalPermission: Boolean): History<ComposeKey> {
-    return if (haveReadExternalPermission) {
-      LOG._i { it("History.of(NowPlayingScreen())") }
-      History.of(NowPlayingScreen())
-    } else {
-      History.of(GetReadExternalPermissionScreen(showRationale()))
-    }
+  private fun makeInitialHistory(
+    haveReadExternalPermission: Boolean
+  ): History<ComposeKey> = if (haveReadExternalPermission) {
+    History.of(NowPlayingScreen())
+  } else {
+    History.of(GetReadExternalPermissionScreen(showRationale()))
   }
 
-  private fun showRationale(): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      shouldShowRequestPermissionRationale(READ_EXTERNAL_STORAGE)
-    } else {
-      false
-    }
+  private fun showRationale(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+    shouldShowRequestPermissionRationale(READ_EXTERNAL_STORAGE)
+  } else {
+    false
   }
 
   @Suppress("SameParameterValue")

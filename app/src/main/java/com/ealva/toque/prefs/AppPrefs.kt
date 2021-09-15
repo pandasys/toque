@@ -17,22 +17,42 @@
 package com.ealva.toque.prefs
 
 import com.ealva.prefstore.store.BoolPref
+import com.ealva.prefstore.store.IntPref
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
-import com.ealva.toque.audio.AudioOutputModule
+import com.ealva.toque.audioout.AudioOutputModule
+import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_ALLOW_DUPLICATES
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_AUTO_ADVANCE_FADE
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_AUTO_ADVANCE_FADE_LENGTH
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_DUCK_ACTION
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_DUCK_VOLUME
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_END_OF_QUEUE_ACTION
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_GO_TO_NOW_PLAYING
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_IGNORE_SMALL_FILES
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_FADE
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_FADE_LENGTH
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MARK_PLAYED_PERCENTAGE
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE_LENGTH
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SCROBBLER_PACKAGE
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SELECT_MEDIA_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 
 typealias AppPrefsSingleton = PreferenceStoreSingleton<AppPrefs>
 
+typealias AllowDuplicatesPref = StorePref<Boolean, AllowDuplicates>
+
 interface AppPrefs : PreferenceStore<AppPrefs> {
   val firstRun: BoolPref
-  val allowDuplicates: BoolPref
+  val allowDuplicates: AllowDuplicatesPref
   val goToNowPlaying: BoolPref
   val ignoreSmallFiles: BoolPref
   val ignoreThreshold: MillisStorePref
@@ -50,44 +70,69 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val endOfQueueAction: StorePref<Int, EndOfQueueAction>
   val selectMediaAction: StorePref<Int, SelectMediaAction>
   val audioOutputModule: StorePref<Int, AudioOutputModule>
+  val markPlayedPercentage: IntPref
+  val rewindThenPrevious: BoolPref
 
   companion object {
-    val PLAY_PAUSE_FADE_RANGE = Millis(500)..Millis(2000)
-    val MEDIA_FADE_RANGE = Millis(2000)..Millis(10000)
-    val DUCK_VOLUME_RANGE = Volume.ZERO..Volume.ONE_HUNDRED
+    val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
+    const val DEFAULT_GO_TO_NOW_PLAYING = true
+    const val DEFAULT_IGNORE_SMALL_FILES = false
+    const val DEFAULT_PLAY_PAUSE_FADE = false
+    val PLAY_PAUSE_FADE_RANGE: ClosedRange<Millis> = Millis(500)..Millis(2000)
+    val DEFAULT_PLAY_PAUSE_FADE_LENGTH = Millis.ONE_SECOND.coerceIn(PLAY_PAUSE_FADE_RANGE)
+    val MEDIA_FADE_RANGE: ClosedRange<Millis> = Millis(2000)..Millis(10000)
+    const val DEFAULT_AUTO_ADVANCE_FADE = false
+    val DEFAULT_AUTO_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
+    const val DEFAULT_MANUAL_ADVANCE_FADE = false
+    val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
+    val DEFAULT_SCROBBLER_PACKAGE = ScrobblerPackage.None
+    val DEFAULT_PLAY_UP_NEXT_ACTION = PlayUpNextAction.Prompt
+    val DEFAULT_END_OF_QUEUE_ACTION = EndOfQueueAction.PlayNextList
+    val DEFAULT_SELECT_MEDIA_ACTION = SelectMediaAction.Play
+    val DEFAULT_DUCK_ACTION = DuckAction.Duck
+    val DUCK_VOLUME_RANGE: ClosedRange<Volume> = Volume.NONE..Volume.MAX
+    val DEFAULT_DUCK_VOLUME: Volume = DUCK_VOLUME_RANGE.endInclusive / 2
+    const val DEFAULT_MARK_PLAYED_PERCENTAGE: Int = 50
 
     fun make(storage: Storage): AppPrefs = AppPrefsImpl(storage)
   }
 }
 
+@Suppress("MagicNumber")
+private val MARK_PLAYED_PERCENTAGE_RANGE = 1..100
+
 private class AppPrefsImpl(
   storage: Storage
 ) : BaseToquePreferenceStore<AppPrefs>(storage), AppPrefs {
   override val firstRun by preference(true)
-  override val allowDuplicates by preference(false)
-  override val goToNowPlaying by preference(true)
-  override val ignoreSmallFiles by preference(false)
+  override val allowDuplicates by booleanValuePref(DEFAULT_ALLOW_DUPLICATES, ::AllowDuplicates)
+  override val goToNowPlaying by preference(DEFAULT_GO_TO_NOW_PLAYING)
+  override val ignoreSmallFiles by preference(DEFAULT_IGNORE_SMALL_FILES)
   override val ignoreThreshold by millisPref(Millis.ZERO)
   override val lastScanTime by millisPref(Millis.ZERO)
-  override val playPauseFade by preference(false)
-  override val playPauseFadeLength by millisPref(Millis.ONE_SECOND) { millis ->
+  override val playPauseFade by preference(DEFAULT_PLAY_PAUSE_FADE)
+  override val playPauseFadeLength by millisPref(DEFAULT_PLAY_PAUSE_FADE_LENGTH) { millis ->
     millis.coerceIn(PLAY_PAUSE_FADE_RANGE)
   }
-  override val autoAdvanceFade by preference(false)
-  override val autoAdvanceFadeLength by millisPref(Millis.THREE_SECONDS) { millis ->
+  override val autoAdvanceFade by preference(DEFAULT_AUTO_ADVANCE_FADE)
+  override val autoAdvanceFadeLength by millisPref(DEFAULT_AUTO_ADVANCE_FADE_LENGTH) { millis ->
     millis.coerceIn(MEDIA_FADE_RANGE)
   }
-  override val manualChangeFade by preference(false)
-  override val manualChangeFadeLength by millisPref(Millis.THREE_SECONDS) { millis ->
+  override val manualChangeFade by preference(DEFAULT_MANUAL_ADVANCE_FADE)
+  override val manualChangeFadeLength by millisPref(DEFAULT_MANUAL_ADVANCE_FADE_LENGTH) { millis ->
     millis.coerceIn(MEDIA_FADE_RANGE)
   }
-  override val scrobbler by enumPref(ScrobblerPackage.None)
-  override val duckAction by enumPref(DuckAction.Duck)
-  override val duckVolume by volumePref(DUCK_VOLUME_RANGE.endInclusive / 2) {
+  override val scrobbler by enumPref(DEFAULT_SCROBBLER_PACKAGE)
+  override val duckAction by enumPref(DEFAULT_DUCK_ACTION)
+  override val duckVolume by volumePref(DEFAULT_DUCK_VOLUME) {
     it.coerceIn(DUCK_VOLUME_RANGE)
   }
-  override val playUpNextAction by enumPref(PlayUpNextAction.Prompt)
-  override val endOfQueueAction by enumPref(EndOfQueueAction.PlayNextList)
-  override val selectMediaAction by enumPref(SelectMediaAction.Play)
+  override val playUpNextAction by enumPref(DEFAULT_PLAY_UP_NEXT_ACTION)
+  override val endOfQueueAction by enumPref(DEFAULT_END_OF_QUEUE_ACTION)
+  override val selectMediaAction by enumPref(DEFAULT_SELECT_MEDIA_ACTION)
   override val audioOutputModule by enumPref(AudioOutputModule.DEFAULT)
+  override val markPlayedPercentage by preference(DEFAULT_MARK_PLAYED_PERCENTAGE) { percentage ->
+    percentage.coerceIn(MARK_PLAYED_PERCENTAGE_RANGE)
+  }
+  override val rewindThenPrevious: BoolPref by preference(true)
 }

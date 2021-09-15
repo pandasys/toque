@@ -24,11 +24,13 @@ import com.ealva.toque.res.HasTitle
 
 enum class RepeatMode(
   override val id: Int,
+  val current: Boolean,
+  val queue: Boolean,
   @StringRes override val titleRes: Int
 ) : HasConstId, HasTitle {
-  None(1, R.string.RepeatOff),
-  All(2, R.string.RepeatQueue),
-  One(3, R.string.RepeatCurrent);
+  None(1, false, false, R.string.RepeatOff),
+  All(2, false, true, R.string.RepeatQueue),
+  One(3, true, false, R.string.RepeatCurrent);
 
   fun getNext(): RepeatMode = when (this) {
     None -> All

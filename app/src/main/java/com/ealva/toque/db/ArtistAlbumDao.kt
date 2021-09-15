@@ -62,7 +62,7 @@ private class ArtistAlbumDaoImpl : ArtistAlbumDao {
     INSERT_ARTIST_ALBUM.insert {
       it[artistId] = newArtistId.value
       it[albumId] = newAlbumId.value
-      it[createdTime] = createTime.value
+      it[createdTime] = createTime()
     }
     Unit
   }

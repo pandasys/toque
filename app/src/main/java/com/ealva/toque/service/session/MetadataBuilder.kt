@@ -57,15 +57,10 @@ inline fun buildMetadata(
   builderAction: MediaMetadataCompat.Builder.() -> Unit
 ): MediaMetadataCompat = MediaMetadataCompat.Builder().apply(builderAction).build()
 
-val NOTHING_PLAYING: MediaMetadata = MediaMetadata().apply {
-  edit {
-    id = ""
-    duration = Millis.ZERO
-  }
-}
+val NOTHING_PLAYING: MediaMetadataCompat = MediaMetadataCompat.Builder().build()
 
 inline fun MediaMetadataCompat.Builder.mediaItemId(mediaId: () -> PersistentId) {
-  mediaItemIdString { MediaSessionBrowser.makeMediaId(mediaId()) }
+  mediaItemIdString { mediaId().toCompatMediaId() }
 }
 
 inline fun MediaMetadataCompat.Builder.mediaItemIdString(mediaId: () -> String) {

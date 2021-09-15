@@ -14,33 +14,39 @@
  * limitations under the License.
  */
 
+@file:Suppress("NOTHING_TO_INLINE")
+
 package com.ealva.toque.service.session
 
 import android.support.v4.media.session.PlaybackStateCompat
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._i
-import com.ealva.toque.service.session.PlaybackActions.Action.PlayFromMediaId
-import com.ealva.toque.service.session.PlaybackActions.Action.PlayFromSearch
-import com.ealva.toque.service.session.PlaybackActions.Action.PlayFromUri
-import com.ealva.toque.service.session.PlaybackActions.Action.PlayPause
 import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap
 
-private val LOG by lazyLogger(PlaybackActions::class)
+private inline fun Long.addFlag(action: PlaybackActions.Action): Long = this or action.value
 
-@Suppress("NOTHING_TO_INLINE")
-private inline fun Long.add(action: PlaybackActions.Action): Long = this or action.value
+private val DEFAULT_ACTION_FLAGS = PlaybackActions.Action.Stop.value or
+  PlaybackActions.Action.SetRating.value or
+  PlaybackActions.Action.PlayFromMediaId.value or
+  PlaybackActions.Action.PlayFromSearch.value or
+  PlaybackActions.Action.PlayFromUri.value or
+  PlaybackActions.Action.SetRepeatMode.value or
+  PlaybackActions.Action.SetShuffleMode.value
 
-class PlaybackActions(
-  initial: List<Action> = listOf(PlayFromSearch, PlayFromMediaId, PlayFromUri, PlayPause)
-) {
-  private var actionFlags: Long = 0L
+class PlaybackActions(hasMedia: Boolean, isPlaying: Boolean, hasPrev: Boolean, hasNext: Boolean) {
+  private var actionFlags: Long = DEFAULT_ACTION_FLAGS
 
   init {
-    addAll(initial)
+    if (hasMedia) addAll(Action.SkipToQueueItem, Action.PlayPause)
+    if (hasPrev) add(Action.SkipToPrevious)
+    if (hasNext) add(Action.SkipToNext)
+    if (isPlaying) {
+      addAll(Action.Pause, Action.Rewind, Action.FastForward, Action.SeekTo)
+    } else if (hasMedia) {
+      addAll(Action.Play, Action.Rewind, Action.FastForward, Action.SeekTo)
+    }
   }
 
+  @Suppress("unused")
   enum class Action(val value: Long) {
     Stop(PlaybackStateCompat.ACTION_STOP),
     Pause(PlaybackStateCompat.ACTION_PAUSE),
@@ -71,18 +77,11 @@ class PlaybackActions(
   val hasSkipToPrevious: Boolean
     get() = (actionFlags and Action.SkipToPrevious.value) != 0L
 
-  fun add(action: Action) {
-    LOG._i { it("add flag ${action.value.flagsToString()}") }
-    actionFlags = actionFlags.add(action)
+  private inline fun add(action: Action) {
+    actionFlags = actionFlags.addFlag(action)
   }
 
-  fun addAll(vararg actions: Action) {
-    addAll(actions.toList())
-  }
-
-  private fun addAll(list: List<Action>) {
-    list.forEach { add(it) }
-  }
+  private inline fun addAll(vararg actions: Action) = actions.forEach { action -> add(action) }
 
   /** Suitable to pass to [PlaybackStateCompat.Builder.setActions] */
   val asCompat: Long
@@ -90,20 +89,40 @@ class PlaybackActions(
 
   override fun toString(): String = actionFlags.flagsToString()
 
-  private fun Long.flagsToString() = actionNameMap
-    .long2ReferenceEntrySet()
-    .asSequence()
-    .mapNotNull { entry -> if (this and entry.longKey > 0) entry.value else null }
-    .joinToString()
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is PlaybackActions) return false
+
+    if (actionFlags != other.actionFlags) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int {
+    return actionFlags.hashCode()
+  }
 
   companion object {
-    val actionNameMap: Long2ReferenceMap<String> by lazy {
-      Long2ReferenceLinkedOpenHashMap<String>().apply {
-        defaultReturnValue("UNKNOWN")
-        Action.values().forEach { action ->
-          put(action.value, action.name)
-        }
-      }
+    val DEFAULT = PlaybackActions(
+      hasMedia = false,
+      isPlaying = false,
+      hasPrev = false,
+      hasNext = false
+    )
+  }
+}
+
+private fun Long.flagsToString() = actionNameMap
+  .long2ReferenceEntrySet()
+  .asSequence()
+  .mapNotNull { entry -> if (this and entry.longKey > 0) entry.value else null }
+  .joinToString()
+
+private val actionNameMap: Long2ReferenceMap<String> by lazy {
+  Long2ReferenceLinkedOpenHashMap<String>().apply {
+    defaultReturnValue("UNKNOWN")
+    PlaybackActions.Action.values().forEach { action ->
+      put(action.value, action.name)
     }
   }
 }

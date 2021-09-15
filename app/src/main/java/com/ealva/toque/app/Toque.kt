@@ -19,6 +19,7 @@ package com.ealva.toque.app
 import android.app.Application
 import android.app.KeyguardManager
 import android.app.NotificationManager
+import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -35,12 +36,12 @@ import com.ealva.ealvalog.core.BasicMarkerFactory
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.logger
 import com.ealva.toque.android.content.requireSystemService
-import com.ealva.toque.audio.AudioModule
-import com.ealva.toque.common.debug
+import com.ealva.toque.audioout.AudioModule
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
-import com.ealva.toque.log._i
+import com.ealva.toque.log._e
 import com.ealva.toque.prefs.PrefsModule
+import com.ealva.toque.service.ServiceModule
 import com.ealva.toque.service.vlc.LibVlcModule
 import com.ealva.toque.tag.TagModule
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -63,6 +64,12 @@ interface Toque {
 }
 
 class ToqueImpl : Application(), Toque {
+  /**
+   * Get the DB check (early create) off of Main as it's busy during start up. Simple, crude
+   * timing tests show more than twice as fast to completion on new install moving DB creation
+   * to background. Currently we immediately ask for read external permission at start, so good
+   * opportunity to create DB (on first query)
+   */
   private lateinit var _globalServicesBuilder: GlobalServices.Builder
   override val globalServicesBuilder: GlobalServices.Builder
     get() = _globalServicesBuilder
@@ -75,6 +82,7 @@ class ToqueImpl : Application(), Toque {
     single<TelephonyManager> { requireSystemService() }
     single<KeyguardManager> { requireSystemService() }
     single<WindowManager> { requireSystemService() }
+    single<UiModeManager> { requireSystemService() }
   }
 
   override fun onCreate() {
@@ -84,13 +92,10 @@ class ToqueImpl : Application(), Toque {
 
     setupLogging()
 
-    val logger = logger()
-    logger._i { it("App create") }
-
-    debug {
+//    debug {
 //      WeLiteLog.logQueryPlans = true
 //      WeLiteLog.logSql = true
-    }
+//    }
 
 //    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 //      StrictMode.VmPolicy.Builder()
@@ -117,6 +122,7 @@ class ToqueImpl : Application(), Toque {
         TagModule.koinModule,
         LibVlcModule.koinModule,
         DbModule.koinModule,
+        ServiceModule.koinModule,
 //        MainModule.koinModule
 //        brainzModule,
 //        spotifyModule,

@@ -41,8 +41,8 @@
 
   <application
     android:name=".app.ToqueImpl"
-    android:allowBackup="true"
-    android:fullBackupContent="@xml/backup_descriptor"
+    android:allowBackup="false"
+    android:fullBackupOnly="false"
     android:hardwareAccelerated="true"
     android:icon="@mipmap/ic_launcher"
     android:label="@string/app_name"
@@ -54,17 +54,25 @@
 
     <meta-data
       android:name="com.google.android.gms.car.application"
-      android:resource="@xml/auto_description"/>
+      android:resource="@xml/auto_description" />
 
-<!--    <meta-data-->
-<!--      android:name="com.google.android.gms.car.notification.SmallIcon"-->
-<!--      android:resource="@drawable/icon"/>-->
+    <!--    <meta-data-->
+    <!--      android:name="com.google.android.gms.car.notification.SmallIcon"-->
+    <!--      android:resource="@drawable/icon"/>-->
+
+    <receiver
+      android:name="androidx.media.session.MediaButtonReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+      </intent-filter>
+    </receiver>
 
     <activity
       android:name=".ui.main.MainActivity"
+      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|locale|layoutDirection|keyboard"
+      android:exported="true"
       android:label="@string/app_name"
-      android:configChanges=
-        "orientation|screenSize|screenLayout|keyboardHidden|locale|layoutDirection|keyboard"
       android:theme="@style/Theme.Toque.NoActionBar">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
@@ -73,9 +81,9 @@
     </activity>
 
     <service
-      android:name=".scanner.MediaScannerJobIntentService"
-      android:exported="false"
-      android:permission="android.permission.BIND_JOB_SERVICE" />
+      android:name=".scanner.MediaScannerService"
+      android:enabled="true"
+      android:exported="false" />
 
     <service
       android:name=".service.MediaPlayerService"
@@ -86,6 +94,7 @@
         <action android:name="android.media.browse.MediaBrowserService" />
       </intent-filter>
     </service>
+
   </application>
 
 </manifest>

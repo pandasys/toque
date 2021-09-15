@@ -17,7 +17,7 @@
 package com.ealva.toque.service.media
 
 import com.ealva.toque.common.Millis
-import com.ealva.toque.service.player.PlayerTransition
+import com.ealva.toque.service.audio.PlayerTransition
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -75,14 +75,25 @@ sealed class MediaEvent {
   data class MetadataUpdate(val field: MetadataField) : MediaEvent()
 }
 
-sealed class MediaPlayerEvent {
-  data class Prepared(val currentPosition: Millis, val duration: Millis) : MediaPlayerEvent()
-  data class PositionUpdate(val currentPosition: Millis, val duration: Millis) : MediaPlayerEvent()
-  data class Start(val firstStart: Boolean) : MediaPlayerEvent()
-  data class Paused(val position: Millis) : MediaPlayerEvent()
-  object Stopped : MediaPlayerEvent()
-  object PlaybackComplete : MediaPlayerEvent()
-  object Error : MediaPlayerEvent()
+sealed interface MediaPlayerEvent {
+  data class Prepared(val currentPosition: Millis, val duration: Millis) : MediaPlayerEvent
+  data class PositionUpdate(
+    val currentPosition: Millis,
+    val duration: Millis,
+    val isPlaying: Boolean
+  ) : MediaPlayerEvent
+  data class Start(val firstStart: Boolean) : MediaPlayerEvent
+  data class Paused(val position: Millis) : MediaPlayerEvent
+  data class Stopped(val position: Millis) : MediaPlayerEvent
+  object PlaybackComplete : MediaPlayerEvent {
+    override fun toString(): String = "PlaybackComplete"
+  }
+  object Error : MediaPlayerEvent {
+    override fun toString(): String = "Error"
+  }
+  object None : MediaPlayerEvent {
+    override fun toString(): String = "None"
+  }
 }
 
 interface Media {

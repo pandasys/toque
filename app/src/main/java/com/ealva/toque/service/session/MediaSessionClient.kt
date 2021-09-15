@@ -63,7 +63,7 @@ interface MediaSessionClient {
   val isConnected: StateFlow<Boolean>
   val networkError: StateFlow<Boolean>
   val playbackState: StateFlow<PlaybackStateCompat>
-  val nowPlaying: StateFlow<MediaMetadata>
+  val nowPlaying: StateFlow<MediaMetadataCompat>
   val queue: StateFlow<List<MediaSessionCompat.QueueItem>>
   val queueTitle: StateFlow<String>
   val extras: StateFlow<Bundle>
@@ -198,7 +198,7 @@ private class MediaSessionClientImpl(
     }
 
     override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
-      nowPlaying.value = if (metadata?.id == null) NOTHING_PLAYING else MediaMetadata(metadata)
+      nowPlaying.value = if (metadata?.id == null) NOTHING_PLAYING else metadata
     }
 
     override fun onQueueChanged(queue: MutableList<MediaSessionCompat.QueueItem>) {

@@ -18,7 +18,6 @@ package com.ealva.toque.common
 
 @JvmInline
 value class Micros(val value: Long) {
-  companion object {
-    val ZERO = Micros(0)
-  }
+  @Suppress("NOTHING_TO_INLINE")
+  inline operator fun invoke(): Long = value
 }

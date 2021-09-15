@@ -16,33 +16,14 @@
 
 package com.ealva.toque.service.controller
 
-import android.net.Uri
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.RepeatMode
-import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.service.queue.NullPlayableMediaQueue
+import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
-import com.ealva.toque.service.session.PlaybackActions
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 object NullMediaController : ToqueMediaController {
-  override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
+  override val currentQueue: Flow<PlayableMediaQueue<*>> = flowOf(NullPlayableMediaQueue)
   override val mediaIsLoaded: Boolean = false
-  override fun setCurrentQueue(type: QueueType) = Unit
-  override fun play(immediate: Boolean) = Unit
-  override fun stop() = Unit
-  override fun pause(immediate: Boolean) = Unit
-  override val isSeekable: Boolean = false
-  override fun seekTo(position: Millis) = Unit
-  override fun nextShuffleMode(): ShuffleMode = ShuffleMode.None
-  override fun nextRepeatMode(): RepeatMode = RepeatMode.None
-  override val position: Millis = Millis.ZERO
-  override val duration: Millis = Millis.ZERO
-  override fun togglePlayPause() = Unit
-  override fun next() = Unit
-  override fun previous() = Unit
-  override fun goToQueueIndexMaybePlay(index: Int) = Unit
-  override fun loadUri(uri: Uri) = Unit
-  override fun startMediaScannerFirstRun() = Unit
-  override val enabledActions: PlaybackActions = PlaybackActions()
+  override suspend fun setCurrentQueue(type: QueueType, resume: Boolean) = Unit
 }

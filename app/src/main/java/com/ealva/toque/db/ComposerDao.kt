@@ -16,25 +16,32 @@
 
 package com.ealva.toque.db
 
+import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.toComposerId
+import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
+import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +55,8 @@ import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(ComposerDao::class)
 private val getOrInsertLock: Lock = ReentrantLock()
+
+data class ComposerIdName(val composerId: ComposerId, val composerName: ComposerName)
 
 sealed class ComposerDaoEvent {
   data class ComposerCreated(val composerId: ComposerId) : ComposerDaoEvent()
@@ -76,10 +85,13 @@ interface ComposerDao {
 
   fun deleteAll(txn: TransactionInProgress)
   fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
+  suspend fun getNextComposer(composerName: ComposerName): Result<ComposerIdName, DaoMessage>
 
   companion object {
-    operator fun invoke(dispatcher: CoroutineDispatcher? = null): ComposerDao =
-      ComposerDaoImpl(dispatcher ?: Dispatchers.Main)
+    operator fun invoke(
+      db: Database,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): ComposerDao = ComposerDaoImpl(db, dispatcher)
   }
 }
 
@@ -95,7 +107,10 @@ private val QUERY_COMPOSER_ID = Query(
     .where { composer eq composerNameBind }
 )
 
-private class ComposerDaoImpl(dispatcher: CoroutineDispatcher) : ComposerDao {
+private class ComposerDaoImpl(
+  private val db: Database,
+  dispatcher: CoroutineDispatcher
+) : ComposerDao {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   override val composerDaoEvents = MutableSharedFlow<ComposerDaoEvent>()
 
@@ -120,6 +135,28 @@ private class ComposerDaoImpl(dispatcher: CoroutineDispatcher) : ComposerDao {
       literal(0) eq (ComposerMediaTable.selectCount { composerId eq id }).asExpression()
     }.delete()
   }
+
+  override suspend fun getNextComposer(
+    composerName: ComposerName
+  ): Result<ComposerIdName, DaoMessage> = db.query {
+    runCatching {
+      LOG.i { it("getNextComposer after %s", composerName) }
+      doGetNextComposer(composerName)
+    }.mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no composer name > greater than [previousComposer]
+   */
+  private fun Queryable.doGetNextComposer(
+    previousComposer: ComposerName
+  ): ComposerIdName = ComposerTable
+    .selects { listOf(id, composer) }
+    .where { composer greater previousComposer.value }
+    .orderByAsc { composer }
+    .limit(1)
+    .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
+    .single()
 
   /**
    * Could be a race condition if two threads are trying to insert the same composer at the same
@@ -151,7 +188,7 @@ private class ComposerDaoImpl(dispatcher: CoroutineDispatcher) : ComposerDao {
     getComposer(newComposer) ?: INSERT_COMPOSER.insert {
       it[composer] = newComposer
       it[composerSort] = newComposerSort
-      it[createdTime] = createTime.value
+      it[createdTime] = createTime()
     }.toComposerId().also { id -> emit(ComposerDaoEvent.ComposerCreated(id)) }
   }
 }

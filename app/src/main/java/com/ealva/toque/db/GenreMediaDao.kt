@@ -70,7 +70,7 @@ private class GenreMediaDaoImpl : GenreMediaDao {
       INSERT_GENRE_MEDIA.insert {
         it[genreId] = newGenreId.value
         it[mediaId] = newMediaId.value
-        it[createdTime] = createTime.value
+        it[createdTime] = createTime()
       }
     }
   }

@@ -67,6 +67,7 @@
   <string name="ShuffleLists">Shuffle lists</string>
   <string name="ShuffleMediaAndLists">Shuffle media and lists</string>
   <string name="Duck">Duck</string>
+  <string name="Play">Play</string>
   <string name="Pause">Pause</string>
   <string name="DoNothing">Do Nothing</string>
   <string name="Speaker">Speaker</string>
@@ -104,6 +105,12 @@
   <string name="Exit">Exit</string>
   <string name="OK">OK</string>
   <string name="Settings">Settings</string>
-    <string name="NotImplemented">Not Implemented</string>
+  <string name="NotImplemented">Not Implemented</string>
+  <string name="NowPlayingChannelName">Now Playing</string>
+  <string name="Next">Next</string>
+  <string name="Previous">Previous</string>
+  <string name="NowPlayingChannelDescription">Shows what media Toque is playing now</string>
+  <string name="Stop">Stop</string>
+  <string name="LocalAudio">Local Audio</string>
 
 </resources>

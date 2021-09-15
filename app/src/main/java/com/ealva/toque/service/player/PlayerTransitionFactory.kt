@@ -16,8 +16,9 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.audio.AudioOutputModule
-import com.ealva.toque.audio.AudioOutputModule.AudioTrack
+import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.audioout.AudioOutputModule
+import com.ealva.toque.audioout.AudioOutputModule.AudioTrack
 import com.ealva.toque.common.Millis
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.player.PlayerTransitionFactory.MediaTransitionType
@@ -28,26 +29,26 @@ interface PlayerTransitionFactory {
 
   enum class MediaTransitionType {
     AutoAdvance {
-      override fun make(prefs: AppPrefs): MediaExitEnterTransitionPair =
+      override fun make(prefs: AppPrefs): PlayerTransitionPair =
         make(prefs.autoAdvanceFade(), prefs.autoAdvanceFadeLength(), prefs.audioOutputModule())
     },
     ManualAdvance {
-      override fun make(prefs: AppPrefs): MediaExitEnterTransitionPair =
+      override fun make(prefs: AppPrefs): PlayerTransitionPair =
         make(prefs.manualChangeFade(), prefs.manualChangeFadeLength(), prefs.audioOutputModule())
     };
 
-    abstract fun make(prefs: AppPrefs): MediaExitEnterTransitionPair
+    abstract fun make(prefs: AppPrefs): PlayerTransitionPair
 
     protected fun make(
       shouldFade: Boolean,
       length: Millis,
       outputModule: AudioOutputModule
-    ): MediaExitEnterTransitionPair = if (shouldFade) {
+    ): PlayerTransitionPair = if (shouldFade) {
       CrossFadeTransition(length, outputModule == AudioTrack)
     } else DirectTransition()
   }
 
-  fun getMediaTransition(type: MediaTransitionType): MediaExitEnterTransitionPair
+  fun getMediaTransition(type: MediaTransitionType): PlayerTransitionPair
 
   companion object {
     operator fun invoke(appPrefs: AppPrefs): PlayerTransitionFactory =
@@ -64,6 +65,6 @@ private class PlayerTransitionFactoryImpl(val prefs: AppPrefs) : PlayerTransitio
     FadeInTransition(prefs.playPauseFadeLength())
   } else PlayImmediateTransition()
 
-  override fun getMediaTransition(type: MediaTransitionType): MediaExitEnterTransitionPair =
+  override fun getMediaTransition(type: MediaTransitionType): PlayerTransitionPair =
     type.make(prefs)
 }

@@ -16,11 +16,15 @@
 package com.ealva.toque.persist
 
 import android.util.SparseArray
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import kotlin.reflect.KClass
 
+private val LOG by lazyLogger(ConstIdValues::class)
 private val ENUM_VALUES_MAP: MutableMap<Class<*>, ConstIdValues<*>> = Reference2ObjectOpenHashMap()
 
 /**
@@ -54,8 +58,14 @@ inline fun <T> KClass<T>.reifyRequire(id: Int): T where T : Enum<T>, T : HasCons
 /**
  * Return the enum with [id] or [defaultValue] if the enum with [id] could not be found
  */
-fun <T> Class<T>.reify(id: Int, defaultValue: T): T where T : Enum<T>, T : HasConstId =
-  getEnumValues().fromId(id) ?: defaultValue
+fun <T> Class<T>.reify(id: Int, defaultValue: T): T where T : Enum<T>, T : HasConstId {
+  return try {
+    getEnumValues().fromId(id) ?: defaultValue
+  } catch (e: Exception) {
+    LOG.e(e) { it("Class=%s", this) }
+    defaultValue
+  }
+}
 
 /**
  * Return the enum with [id] or null if the enum with [id] could not be found
@@ -86,11 +96,10 @@ private inline fun <T : HasConstId> Array<T>?.requireNotEmptyAndDistinct(msg: ()
     returns() implies (this@requireNotEmptyAndDistinct != null)
   }
 
-  if (this == null || isEmpty() || distinctBy { it.id }.size != size) {
-    throw IllegalArgumentException(msg().toString())
-  } else {
-    return this
-  }
+  if (this == null) throw IllegalArgumentException("Is null, ${msg()}")
+  if (isEmpty()) throw IllegalArgumentException("Is empty, ${msg()}")
+  if (distinctBy { it.id }.size != size) throw IllegalArgumentException("IDs not unique, ${msg()}")
+  return this
 }
 
 private const val ITERATIVE_MAX = 8
@@ -110,7 +119,7 @@ interface ConstIdValues<T> where T : Enum<T>, T : HasConstId {
     private val VALID_INDEXED_RANGE = 0..32
 
     operator fun <T> invoke(values: Array<T>?): ConstIdValues<T> where T : Enum<T>, T : HasConstId =
-      make(values.requireNotEmptyAndDistinct() { EMPTY_ENUM_ERROR_MSG })
+      make(values.requireNotEmptyAndDistinct { EMPTY_ENUM_ERROR_MSG })
 
     private fun <T> make(values: Array<T>): ConstIdValues<T> where T : Enum<T>, T : HasConstId =
       if (values.allIdsInRange()) EnumValuesIndexed(values) else nonIndexed(values)

@@ -17,12 +17,8 @@
 package com.ealva.toque.test.db
 
 import com.ealva.toque.common.Amp
-import com.ealva.toque.common.toAmp
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.EqPreset.Companion.PRE_AMP_DEFAULT
 import com.ealva.toque.service.media.PreAmpAndBands
-
-private val ZERO_AMP = 0.toAmp()
 
 class EqPresetStub(override var presetId: Long = 0) : EqPreset {
   override var name: String = "EqPresetStub"
@@ -36,23 +32,12 @@ class EqPresetStub(override var presetId: Long = 0) : EqPreset {
 
   override fun getBandFrequency(index: Int): Float = bandFrequencies[index]
 
-  override var preAmp: Amp = 12F.toAmp()
+  override var preAmp: Amp = Amp.DEFAULT_PREAMP
   override suspend fun setPreAmp(amplitude: Amp) {
     preAmp = amplitude
   }
 
-  private val defaultBandValues: Array<Amp> = arrayOf(
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP,
-    ZERO_AMP
-  )
+  private val defaultBandValues: Array<Amp> = Array(10) { Amp.NONE }
   private var bandValues: Array<Amp> = defaultBandValues
   override fun getAmp(index: Int): Amp = bandValues[index]
 
@@ -61,7 +46,7 @@ class EqPresetStub(override var presetId: Long = 0) : EqPreset {
   }
 
   override suspend fun resetAllToDefault() {
-    preAmp = PRE_AMP_DEFAULT
+    preAmp = Amp.DEFAULT_PREAMP
     bandValues = defaultBandValues
   }
 

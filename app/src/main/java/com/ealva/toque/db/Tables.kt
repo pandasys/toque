@@ -18,21 +18,14 @@
 
 package com.ealva.toque.db
 
-import com.ealva.toque.db.MediaTable.albumArtistId
-import com.ealva.toque.db.MediaTable.albumId
-import com.ealva.toque.db.MediaTable.artistId
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.db.MediaTable.contentId
 import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.db.QueueStateTable.id
-import com.ealva.toque.service.media.MediaType
-import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.table.ForeignKeyAction
-import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Table
-import com.ealva.welite.db.table.alias
-import com.ealva.welite.db.table.selects
-import com.ealva.welite.db.table.where
-import com.ealva.welite.db.view.View
+
+private val LOG by lazyLogger("Tables.kt")
 
 /**
  * Used as an optimization if there are many "unknown" items, eg. Composer is often unknown. This
@@ -54,12 +47,12 @@ val setOfAllTables = setOf(
   GenreMediaTable,
   EqPresetTable,
   EqPresetAssociationTable,
-  AudioQueueTable,
+  QueueTable,
   QueueStateTable
 )
 
 object ArtistTable : Table() {
-  val id = long("_id") { primaryKey() }
+  val id = long("ArtistId") { primaryKey() }
   val artistName = text("Artist") { collateNoCase() }
   val artistSort = text("ArtistSort") { collateNoCase() }
   val artistImage = text("ArtistImageUri") { default("") }
@@ -74,7 +67,7 @@ object ArtistTable : Table() {
 }
 
 object AlbumTable : Table() {
-  val id = long("_id") { primaryKey() }
+  val id = long("AlbumId") { primaryKey() }
   val albumTitle = text("Album") { collateNoCase() }
   val albumSort = text("AlbumSort") { collateNoCase() }
   val albumArtistId = reference("Album_ArtistId", ArtistTable.id)
@@ -97,12 +90,12 @@ object AlbumTable : Table() {
  */
 object ArtistAlbumTable : Table() {
   val artistId = reference(
-    "ArtistAlbum_Artist_id",
+    "ArtistAlbum_ArtistId",
     ArtistTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
   val albumId = reference(
-    "ArtistAlbum_Album_id",
+    "ArtistAlbum_AlbumId",
     AlbumTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
@@ -124,7 +117,7 @@ object ArtistAlbumTable : Table() {
  */
 @Suppress("unused")
 object MediaTable : Table() {
-  val id = long("_id") { primaryKey() }
+  val id = long("MediaId") { primaryKey() }
 
   /**
    * Location of the media - need not be local to the device. If [contentId] is null then
@@ -150,13 +143,13 @@ object MediaTable : Table() {
   val mediaFormat = integer("MediaFormat")
   val title = text("MediaTitle") { collateNoCase() }
   val titleSort = text("MediaTitleSort") { collateNoCase() }
-  val albumId = reference("Media_Album_id", AlbumTable.id)
+  val albumId = reference("Media_AlbumId", AlbumTable.id)
 
   /** Artist associated with the album */
-  val albumArtistId = reference("Media_AlbumArtist_id", ArtistTable.id)
+  val albumArtistId = reference("Media_AlbumArtistId", ArtistTable.id)
 
   /** Primary track artist. Primary = first in the list of artists */
-  val artistId = reference("Media_Artist_id", ArtistTable.id)
+  val artistId = reference("Media_ArtistId", ArtistTable.id)
 
   val year = integer("MediaYear") { default(0) }
   val rating = integer("MediaRating") { default(-1) }
@@ -217,7 +210,7 @@ object MediaTable : Table() {
 }
 
 object ComposerTable : Table() {
-  val id = long("_id") { primaryKey() }
+  val id = long("ComposerId") { primaryKey() }
   val composer = text("Composer") { collateNoCase() }
   val composerSort = text("ComposerSort") { collateNoCase() }
   val createdTime = long("ComposerCreated")
@@ -228,7 +221,7 @@ object ComposerTable : Table() {
 }
 
 object GenreTable : Table() {
-  val id = long("_id") { primaryKey() }
+  val id = long("GenreId") { primaryKey() }
   val genre = text("Genre") { collateNoCase() }
   val createdTime = long("GenreCreated")
 
@@ -238,16 +231,18 @@ object GenreTable : Table() {
 }
 
 /**
- * Contains association between an artist and a particular piece of media - a "Track"
+ * Contains association between an artist and a particular piece of media - a "Track". Album
+ * artists appear in this table too but the relationship ID is kept directly in the MediaTable -
+ * [MediaTable.albumArtistId]
  */
 object ArtistMediaTable : Table() {
   val artistId = reference(
-    "ArtistMedia_Artist_id",
+    "ArtistMedia_ArtistId",
     ArtistTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
   val mediaId = reference(
-    "ArtistMedia_Media_id",
+    "ArtistMedia_MediaId",
     MediaTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
@@ -261,12 +256,12 @@ object ArtistMediaTable : Table() {
 
 object ComposerMediaTable : Table() {
   val composerId = reference(
-    "ComposerMedia_Composer_id",
+    "ComposerMedia_ComposerId",
     ComposerTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
   val mediaId = reference(
-    "ComposerMedia_Media_id",
+    "ComposerMedia_MediaId",
     MediaTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
@@ -279,9 +274,9 @@ object ComposerMediaTable : Table() {
 }
 
 object GenreMediaTable : Table() {
-  val genreId = reference("GenreMedia_Genre_id", GenreTable.id, ForeignKeyAction.CASCADE)
+  val genreId = reference("GenreMedia_GenreId", GenreTable.id, ForeignKeyAction.CASCADE)
   val mediaId = reference(
-    "GenreMedia_Media_id",
+    "GenreMedia_MediaId",
     MediaTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
@@ -294,7 +289,7 @@ object GenreMediaTable : Table() {
 }
 
 object EqPresetTable : Table() {
-  val id = long("_id") { primaryKey().autoIncrement() }
+  val id = long("PresetId") { primaryKey().autoIncrement() }
   val presetName = text("PresetName")
   val preAmp = float("PresetPreAmp") { default(DEFAULT_PREAMP_VALUE) }
 
@@ -366,57 +361,12 @@ object EqPresetAssociationTable : Table() {
 }
 
 /**
- * Stores the Up Next Queue for audio items. The queue position is determined by insertion order
- * as the column is a rowId column and is assigned largest rowId + 1 during insert. This provides
- * the ordering for a query. Example, to build the up next queue, query all mediaId with
- * shuffled = false and order by queuePosition. To get the shuffled queue, use the same query
- * except shuffled = true. The queuePosition will not be an index into the resulting list but
- * simply an ordering number. A mediaId may repeat in a queue based on user settings (controlled
- * in another scope)
- */
-object AudioQueueTable : Table() {
-  val queuePosition = long("Position") { primaryKey() }
-  val mediaId = long("MediaId")
-  val shuffled = bool("IsShuffled")
-
-  init {
-    index(shuffled)
-  }
-}
-
-/**
  * Stores the state of a queue in the media player service. The [id] is specific to a queue and
  * IDs can't overlap or they corrupt each other's data
  */
 object QueueStateTable : Table() {
-  val id = long("_id") { primaryKey() }
+  val id = integer("QueueId") { primaryKey() }
   val mediaId = long("ServiceState_MediaId") { default(-1) }
   val queueIndex = integer("ServiceState_QueueIndex") { default(0) }
   val playbackPosition = long("ServiceState_PlaybackPosition") { default(0) }
-}
-
-private val album_ArtistTableAlias = ArtistTable.alias("AlbumArtistTable")
-private val song_ArtistTableAlias = ArtistTable.alias("SongArtistTable")
-
-private val FullAudioViewQuery = MediaTable
-  .join(AlbumTable, JoinType.INNER, albumId, AlbumTable.id)
-  .join(album_ArtistTableAlias, JoinType.INNER, albumArtistId, ArtistTable.id)
-  .join(song_ArtistTableAlias, JoinType.INNER, artistId, ArtistTable.id)
-  .selects {
-    listOf(
-      MediaTable.id,
-      MediaTable.title,
-      AlbumTable.albumTitle,
-      album_ArtistTableAlias[ArtistTable.artistName],
-      song_ArtistTableAlias[ArtistTable.artistName]
-    )
-  }
-  .where { mediaType eq MediaType.Audio.id }
-
-object FullAudioView : View(FullAudioViewQuery) {
-  val mediaId = column(MediaTable.id)
-  val mediaTitle = column(MediaTable.title)
-  val albumTitle = column(AlbumTable.albumTitle)
-  val albumArtistName = column(album_ArtistTableAlias[ArtistTable.artistName])
-  val songArtistName = column(song_ArtistTableAlias[ArtistTable.artistName])
 }

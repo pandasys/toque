@@ -17,14 +17,14 @@
 package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Volume
-import com.ealva.toque.service.player.PlayerTransition.Type
+import com.ealva.toque.service.audio.PlayerTransition.Type
 
 /**
  * Immediately pause a player
  */
 class PauseImmediateTransition : BasePlayerTransition(Type.Pause) {
   override suspend fun doExecute(player: TransitionPlayer) {
-    player.volume = Volume.ZERO
+    player.volume = Volume.NONE
     player.pause()
     player.notifyPaused()
     setComplete()

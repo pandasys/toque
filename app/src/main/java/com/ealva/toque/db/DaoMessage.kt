@@ -18,7 +18,7 @@ package com.ealva.toque.db
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
-import com.ealva.toque.common.Content
+import com.ealva.toque.common.fetch
 import com.github.michaelbull.result.Result
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -50,7 +50,7 @@ abstract class DaoStringMessage(
   @StringRes private val res: Int,
   private vararg val args: Any
 ) : DaoMessage() {
-  override fun toString(): String = Content.fetch(res, args)
+  override fun toString(): String = fetch(res, args)
 }
 
 class DaoNotFound(itemNotFound: Any) : DaoStringMessage(R.string.NotFoundItem, itemNotFound)
@@ -59,5 +59,5 @@ class DaoFailedToUpdate(item: Any) : DaoStringMessage(R.string.FailedToUpdateIte
 class DaoFailedToDelete(item: Any) : DaoStringMessage(R.string.FailedToDeleteItem, item)
 
 object DaoNotImplemented : DaoMessage() {
-  override fun toString(): String = Content.fetch(R.string.NotImplemented)
+  override fun toString(): String = fetch(R.string.NotImplemented)
 }

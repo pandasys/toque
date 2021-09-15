@@ -18,11 +18,11 @@ package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
-import com.ealva.toque.common.toVolume
-import com.ealva.toque.service.player.PlayerTransition.Type
+import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.service.audio.PlayerTransition.Type
 
 @Suppress("NOTHING_TO_INLINE")
-inline operator fun Volume.div(rhs: Millis): Volume = (value / rhs.value.toInt()).toVolume()
+inline operator fun Volume.div(rhs: Millis): Volume = Volume(value / rhs().toInt())
 
 /**
  * Concrete transitions subclass this and only need implement [doExecute] and anything

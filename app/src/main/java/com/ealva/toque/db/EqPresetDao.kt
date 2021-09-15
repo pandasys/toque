@@ -17,7 +17,6 @@
 package com.ealva.toque.db
 
 import com.ealva.toque.common.Amp
-import com.ealva.toque.common.toAmp
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -132,18 +131,18 @@ private class EqPresetDaoImpl(
   ): Long = INSERT_PRESET.insert {
     it[presetName] = name
     it[updatedTime] = System.currentTimeMillis()
-    it[preAmp] = preAmpAndBands.preAmp.value
+    it[preAmp] = preAmpAndBands.preAmp()
     with(preAmpAndBands) {
-      it[band0] = bands[0].value
-      it[band1] = bands[1].value
-      it[band2] = bands[2].value
-      it[band3] = bands[3].value
-      it[band4] = bands[4].value
-      it[band5] = bands[5].value
-      it[band6] = bands[6].value
-      it[band7] = bands[7].value
-      it[band8] = bands[8].value
-      it[band9] = bands[9].value
+      it[band0] = bands[0]()
+      it[band1] = bands[1]()
+      it[band2] = bands[2]()
+      it[band3] = bands[3]()
+      it[band4] = bands[4]()
+      it[band5] = bands[5]()
+      it[band6] = bands[6]()
+      it[band7] = bands[7]()
+      it[band8] = bands[8]()
+      it[band9] = bands[9]()
     }
   }
 
@@ -163,8 +162,8 @@ private class EqPresetDaoImpl(
       .singleOrNull()
 
   private fun EqPresetTable.dataFromCursor(cursor: Cursor) = PreAmpAndBands(
-    cursor[preAmp].toAmp(),
-    Array(bandColumns.size) { index -> cursor[bandColumns[index]].toAmp() }
+    Amp(cursor[preAmp]),
+    Array(bandColumns.size) { index -> Amp(cursor[bandColumns[index]]) }
   )
 
   override suspend fun getAllUserPresets(): Result<List<EqPresetInfo>, DaoMessage> = db.query {
@@ -192,18 +191,18 @@ private class EqPresetDaoImpl(
   private fun TransactionInProgress.doUpdatePreset(presetData: EqPresetData) = UPDATE_ALL.update {
     it[BIND_PRESET_ID] = presetData.id
     it[updatedTime] = System.currentTimeMillis()
-    it[preAmp] = presetData.preAmpAndBands.preAmp.value
+    it[preAmp] = presetData.preAmpAndBands.preAmp()
     with(presetData.preAmpAndBands) {
-      it[band0] = bands[0].value
-      it[band1] = bands[1].value
-      it[band2] = bands[2].value
-      it[band3] = bands[3].value
-      it[band4] = bands[4].value
-      it[band5] = bands[5].value
-      it[band6] = bands[6].value
-      it[band7] = bands[7].value
-      it[band8] = bands[8].value
-      it[band9] = bands[9].value
+      it[band0] = bands[0]()
+      it[band1] = bands[1]()
+      it[band2] = bands[2]()
+      it[band3] = bands[3]()
+      it[band4] = bands[4]()
+      it[band5] = bands[5]()
+      it[band6] = bands[6]()
+      it[band7] = bands[7]()
+      it[band8] = bands[8]()
+      it[band9] = bands[9]()
     }
   }
 
@@ -214,7 +213,7 @@ private class EqPresetDaoImpl(
     runCatching {
       EqPresetTable
         .updateColumns {
-          it[preAmp] = amplitude.value
+          it[preAmp] = amplitude()
           it[updatedTime] = System.currentTimeMillis()
         }
         .where { id eq presetId }
@@ -235,7 +234,7 @@ private class EqPresetDaoImpl(
     require(index in columnIndices) { "Index $index not in bounds $columnIndices" }
     runCatching {
       EqPresetTable.updateColumns {
-        it[bandColumns[index]] = amplitude.value
+        it[bandColumns[index]] = amplitude()
         it[updatedTime] = System.currentTimeMillis()
       }.where {
         id eq presetId

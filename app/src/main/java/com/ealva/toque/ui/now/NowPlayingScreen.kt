@@ -27,9 +27,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.google.accompanist.insets.ExperimentalAnimatedInsets
 import com.google.accompanist.insets.ProvideWindowInsets
@@ -56,12 +54,10 @@ data class NowPlayingScreen(private val noArgPlaceholder: String = "") : Compose
 
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-    LOG._i { it("NowPlaying ScreenComposable") }
 //    val viewModel = rememberService<DogListViewModel>()
 //
 //    val dogs = viewModel.dogList.subscribeAsState(OptionalWrapper.absent())
     NowPlaying()
-    LOG._i { it("after NowPlaying") }
   }
 }
 
@@ -69,7 +65,6 @@ data class NowPlayingScreen(private val noArgPlaceholder: String = "") : Compose
 @Composable
 fun NowPlaying() {
   ProvideWindowInsets(windowInsetsAnimationsEnabled = true) {
-    LOG._i { it("NowPlaying Greeting") }
     Greeting(name = "Toque")
   }
 }

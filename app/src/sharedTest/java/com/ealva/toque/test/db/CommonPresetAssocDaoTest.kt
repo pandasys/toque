@@ -17,7 +17,7 @@
 package com.ealva.toque.test.db
 
 import android.content.Context
-import com.ealva.toque.audio.AudioOutputRoute
+import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetAssociationTable
 import com.ealva.toque.db.PresetAssociation

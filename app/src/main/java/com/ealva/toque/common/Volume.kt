@@ -14,31 +14,37 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE")
-
 package com.ealva.toque.common
 
 typealias VolumeRange = ClosedRange<Volume>
 
-inline fun Int.toVolume(): Volume = Volume(this)
-
+/**
+ * Represents a Volume value, which is typically an integer between 0 and 100. Some Android
+ * streams have a difference range, so no attempt is made to coerce in 0..100 here. However,
+ * constants here, such as [MAX], [HALF], and [RANGE] refer to the Toque (libVLC) range of 0..100.
+ */
 @JvmInline
 value class Volume(val value: Int) : Comparable<Volume> {
   override fun toString(): String = value.toString()
 
   override fun compareTo(other: Volume): Int = value.compareTo(other.value)
-  inline operator fun minus(other: Volume): Volume = (value - other.value).toVolume()
-  inline operator fun plus(other: Volume): Volume = (value + other.value).toVolume()
-  inline operator fun div(other: Volume): Volume = (value / other.value).toVolume()
-  inline operator fun div(other: Int): Volume = (value / other).toVolume()
 
-  inline operator fun plus(rhs: Int): Volume = (value + rhs).toVolume()
+  operator fun minus(rhs: Volume): Volume = Volume((value - rhs.value))
+  operator fun minus(rhs: Int): Volume = Volume(value - rhs)
+  operator fun plus(rhs: Volume): Volume = Volume(value + rhs.value)
+  operator fun plus(rhs: Int): Volume = Volume(value + rhs)
+  operator fun div(rhs: Volume): Volume = Volume(value / rhs.value)
+  operator fun div(rhs: Int): Volume = Volume(value / rhs)
+
+  @Suppress("NOTHING_TO_INLINE")
+  inline operator fun invoke(): Int = value
 
   companion object {
     // Commonly used Volumes
-    val ZERO = Volume(0)
+    val NONE = Volume(0)
     val ONE = Volume(1)
-    val FIFTY = Volume(50)
-    val ONE_HUNDRED = Volume(100)
+    val HALF = Volume(50)
+    val MAX = Volume(100)
+    val RANGE: VolumeRange = NONE..MAX
   }
 }

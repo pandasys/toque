@@ -49,7 +49,7 @@ class TransitionPlayerStub : TransitionPlayer {
       return _isShutdown
     }
 
-  var _volume = Volume.ZERO
+  var _volume = Volume.NONE
   var _volumeGetCalled = 0
   var _volumeSetCalled = 0
   override var volume: Volume
@@ -62,7 +62,7 @@ class TransitionPlayerStub : TransitionPlayer {
       _volume = value
     }
 
-  var _volumeRange = Volume.ZERO..Volume.ONE_HUNDRED
+  var _volumeRange = Volume.NONE..Volume.MAX
   var _volumeRangeCalled = 0
   override val volumeRange: VolumeRange
     get() {

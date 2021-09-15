@@ -20,14 +20,10 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
-import android.provider.MediaStore.EXTRA_MEDIA_ALBUM
-import android.provider.MediaStore.EXTRA_MEDIA_ARTIST
-import android.provider.MediaStore.EXTRA_MEDIA_FOCUS
-import android.provider.MediaStore.EXTRA_MEDIA_GENRE
-import android.provider.MediaStore.EXTRA_MEDIA_TITLE
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import androidx.core.net.toUri
+import androidx.core.text.isDigitsOnly
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.MediaBrowserServiceCompat.BrowserRoot
 import com.ealva.ealvalog.e
@@ -41,6 +37,7 @@ import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.GenreDao
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -49,20 +46,7 @@ import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
-import com.ealva.toque.persist.toAlbumId
-import com.ealva.toque.persist.toArtistId
-import com.ealva.toque.persist.toComposerId
-import com.ealva.toque.persist.toGenreId
-import com.ealva.toque.persist.toMediaId
-import com.ealva.toque.persist.toPlaylistId
-import com.ealva.toque.service.session.MediaItemFlags.Browsable
-import com.ealva.toque.service.session.MediaItemFlags.Playable
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.ID_NO_MEDIA
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.ID_NO_PLAYLIST
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.ID_RECENT_ROOT
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.ID_ROOT
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.handleMedia
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.makeMediaId
+import com.ealva.toque.service.session.MediaSessionBrowser.Companion.MAX_LIST_SIZE
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -78,70 +62,6 @@ private val LOG by lazyLogger(MediaSessionBrowser::class)
 
 typealias BrowserResult = MediaBrowserServiceCompat.Result<List<MediaItem>>
 
-interface MediaSessionBrowser {
-
-  fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle): BrowserRoot?
-  fun onLoadChildren(parentId: String, result: BrowserResult)
-  fun onSearch(query: String, extras: Bundle, result: BrowserResult)
-
-  companion object {
-    operator fun invoke(
-      recentMediaProvider: RecentMediaProvider,
-      scope: CoroutineScope,
-      dispatcher: CoroutineDispatcher? = null
-    ): MediaSessionBrowser = MediaSessionBrowserImpl(recentMediaProvider, scope, dispatcher)
-
-    const val ID_ROOT = "ROOT_ID"
-    const val ID_RECENT_ROOT = "RECENTS_ROOT_ID"
-    const val ALBUM_PREFIX = "album"
-    const val ARTIST_PREFIX = "artist"
-    const val GENRE_PREFIX = "genre"
-    const val PLAYLIST_PREFIX = "playlist"
-    const val COMPOSER_PREFIX = "composer"
-    const val ID_NO_MEDIA = "NO_MEDIA_ID"
-    const val ID_NO_PLAYLIST = "NO_PLAYLIST_ID"
-
-    fun makeMediaId(id: PersistentId): String {
-      val prefix = when (id) {
-        is MediaId -> return id.value.toString()
-        is AlbumId -> ALBUM_PREFIX
-        is ArtistId -> ARTIST_PREFIX
-        is GenreId -> GENRE_PREFIX
-        is PlaylistId -> PLAYLIST_PREFIX
-        is ComposerId -> COMPOSER_PREFIX
-        else -> throw IllegalArgumentException("Unrecognized PersistentId type for $id")
-      }
-      return "${prefix}_${id.value}"
-    }
-
-    /** Throws IllegalArgumentException if [mediaId] is not of a recognized type */
-    suspend fun <T> handleMedia(
-      mediaId: String,
-      extras: Bundle,
-      onMediaType: OnMediaType<T>
-    ): T {
-      val list = mediaId.split('_')
-      return if (list.size > 1) {
-        val id = list[1].toLongOrNull() ?: -1
-        when (list[0]) {
-          ARTIST_PREFIX -> onMediaType.onArtist(id.toArtistId(), extras)
-          ALBUM_PREFIX -> onMediaType.onAlbum(id.toAlbumId(), extras)
-          GENRE_PREFIX -> onMediaType.onGenre(id.toGenreId(), extras)
-          COMPOSER_PREFIX -> onMediaType.onComposer(id.toComposerId(), extras)
-          PLAYLIST_PREFIX -> onMediaType.onPlaylist(id.toPlaylistId(), extras)
-          else -> throw IllegalArgumentException("Unrecognized MediaId:$mediaId")
-        }
-      } else {
-        val id = mediaId.toLongOrNull()
-          ?: throw IllegalArgumentException("Unrecognized MediaId:$mediaId")
-        onMediaType.onMedia(id.toMediaId(), extras)
-      }
-    }
-  }
-}
-
-private typealias ItemListResult = Result<List<MediaItem>, DaoMessage>
-
 interface OnMediaType<T> {
   suspend fun onMedia(mediaId: MediaId, extras: Bundle): T
   suspend fun onArtist(artistId: ArtistId, extras: Bundle): T
@@ -151,29 +71,85 @@ interface OnMediaType<T> {
   suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle): T
 }
 
+interface MediaSessionBrowser {
+  fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle): BrowserRoot?
+  fun onLoadChildren(parentId: String, result: BrowserResult)
+  fun onSearch(query: String, extras: Bundle, result: BrowserResult)
+
+  companion object {
+    const val MAX_LIST_SIZE = 1000L
+
+    const val ID_ROOT = "ROOT_ID"
+    const val ID_RECENT_ROOT = "RECENTS_ROOT_ID"
+    const val MEDIA_PREFIX = "media"
+    const val ALBUM_PREFIX = "album"
+    const val ARTIST_PREFIX = "artist"
+    const val GENRE_PREFIX = "genre"
+    const val PLAYLIST_PREFIX = "playlist"
+    const val COMPOSER_PREFIX = "composer"
+    const val ID_NO_MEDIA = "NO_MEDIA_ID"
+    const val ID_NO_PLAYLIST = "NO_PLAYLIST_ID"
+
+    operator fun invoke(
+      recentMediaProvider: RecentMediaProvider,
+      scope: CoroutineScope,
+      dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ): MediaSessionBrowser = MediaSessionBrowserImpl(
+      recentMediaProvider,
+      scope,
+      dispatcher
+    )
+    /** Throws IllegalArgumentException if [mediaId] is not of a recognized type */
+    suspend fun <T> handleMedia(
+      mediaId: String,
+      extras: Bundle,
+      onMediaType: OnMediaType<T>
+    ): T {
+      return when (val id = mediaId.toPersistentId()) {
+        is MediaId -> onMediaType.onMedia(id, extras)
+        is ArtistId -> onMediaType.onArtist(id, extras)
+        is AlbumId -> onMediaType.onAlbum(id, extras)
+        is GenreId -> onMediaType.onGenre(id, extras)
+        is ComposerId -> onMediaType.onComposer(id, extras)
+        is PlaylistId -> onMediaType.onPlaylist(id, extras)
+        else -> throw IllegalArgumentException("Unrecognized media ID")
+      }
+    }
+
+    object NullMediaSessionBrowser : MediaSessionBrowser {
+      override fun onGetRoot(
+        clientPackageName: String,
+        clientUid: Int,
+        rootHints: Bundle
+      ): BrowserRoot? = null
+
+      override fun onLoadChildren(parentId: String, result: BrowserResult) =
+        result.sendResult(emptyList())
+
+      override fun onSearch(query: String, extras: Bundle, result: BrowserResult) =
+        result.sendResult(emptyList())
+    }
+  }
+}
+
+private typealias ItemListResult = Result<List<MediaItem>, DaoMessage>
+
 private class MediaSessionBrowserImpl(
   private val recentMediaProvider: RecentMediaProvider,
   private val scope: CoroutineScope,
-  dispatcher: CoroutineDispatcher?
+  private val dispatcher: CoroutineDispatcher
 ) : MediaSessionBrowser, KoinComponent {
-  private val dispatcher = dispatcher ?: Dispatchers.IO
   private val context: Context by inject()
   private val artistDao: ArtistDao by inject()
   private val albumDao: AlbumDao by inject()
   private val genreDao: GenreDao by inject()
   private val audioMediaDao: AudioMediaDao by inject()
-  private val packageValidator = PackageValidator(context, R.xml.allowed_media_browser_callers)
 
   override fun onGetRoot(
     clientPackageName: String,
     clientUid: Int,
     rootHints: Bundle
-  ): BrowserRoot? {
-    val isKnownCaller = packageValidator.isKnownCaller(clientPackageName, clientUid)
-    return if (isKnownCaller) {
-      makeBrowserRoot(rootHints)
-    } else null
-  }
+  ) = makeBrowserRoot(rootHints)
 
   private fun makeBrowserRoot(rootHints: Bundle): BrowserRoot {
     val rootExtras = Bundle().apply {
@@ -183,11 +159,14 @@ private class MediaSessionBrowserImpl(
       putInt(CONTENT_STYLE_PLAYABLE_HINT, CONTENT_STYLE_LIST)
     }
     return if (rootHints.getBoolean(BrowserRoot.EXTRA_RECENT)) {
-      // Return a tree with a single playable media item for resumption.
+      LOG._e { it("Recent Root") }
+      // Return a tree with a single playable media item for resumption
       rootExtras.putBoolean(BrowserRoot.EXTRA_RECENT, true)
-      BrowserRoot(ID_RECENT_ROOT, rootExtras)
-    } else
-      BrowserRoot(ID_ROOT, rootExtras)
+      BrowserRoot(MediaSessionBrowser.ID_RECENT_ROOT, rootExtras)
+    } else {
+      LOG._e { it("Browser Tree Root") }
+      BrowserRoot(MediaSessionBrowser.ID_ROOT, rootExtras)
+    }
   }
 
   override fun onLoadChildren(
@@ -208,15 +187,15 @@ private class MediaSessionBrowserImpl(
 
     return try {
       when (parentId) {
-        ID_ROOT -> makeRootList()
-        ID_RECENT_ROOT -> makeRecentTrack()
+        MediaSessionBrowser.ID_ROOT -> makeRootList()
+        MediaSessionBrowser.ID_RECENT_ROOT -> makeRecentTrack()
         ID_LIBRARY -> makeLibraryList()
         ID_ARTISTS -> valueFromList { makeArtistList() }
         ID_ALBUMS -> valueFromList { makeAlbumList() }
         ID_GENRES -> valueFromList { makeGenreList() }
         ID_TRACKS -> valueFromList { makeTrackList() }
         else -> {
-          handleMedia(
+          MediaSessionBrowser.handleMedia(
             parentId,
             Bundle.EMPTY,
             object : OnMediaType<List<MediaItem>> {
@@ -226,7 +205,10 @@ private class MediaSessionBrowserImpl(
                 extras: Bundle
               ): List<MediaItem> = emptyList()
 
-              override suspend fun onArtist(artistId: ArtistId, extras: Bundle): List<MediaItem> =
+              override suspend fun onArtist(
+                artistId: ArtistId,
+                extras: Bundle
+              ): List<MediaItem> =
                 valueFromList { makeArtistAlbumList(artistId) }
 
               override suspend fun onAlbum(
@@ -256,7 +238,7 @@ private class MediaSessionBrowserImpl(
           )
         }
       }.apply {
-        if (isEmpty()) listOf(MediaItem(makeEmptyMediaDesc(parentId), Playable))
+        if (isEmpty()) listOf(MediaItem(makeEmptyMediaDesc(parentId), MediaItemFlags.Playable))
       }
     } catch (e: Exception) {
       LOG.e(e) { it("Error getChildren(\"%s\")") }
@@ -265,8 +247,8 @@ private class MediaSessionBrowserImpl(
   }
 
   private fun makeRootList(): List<MediaItem> = listOf(
-    MediaItem(makePlaylistItemDesc(), Browsable),
-    MediaItem(makeLibraryItemDesc(), Browsable)
+    MediaItem(makePlaylistItemDesc(), MediaItemFlags.Browsable),
+    MediaItem(makeLibraryItemDesc(), MediaItemFlags.Browsable)
   )
 
   private fun makeLibraryItemDesc() =
@@ -279,18 +261,18 @@ private class MediaSessionBrowserImpl(
     extras = getContentStyle(CONTENT_STYLE_GRID, CONTENT_STYLE_GRID)
   )
 
-  private fun makeRecentTrack(): List<MediaItem> {
+  private suspend fun makeRecentTrack(): List<MediaItem> {
     return recentMediaProvider.getRecentMedia()?.let { description ->
-      listOf(MediaItem(description, Playable))
+      listOf(MediaItem(description, MediaItemFlags.Playable))
     } ?: emptyList()
   }
 
   private fun makeLibraryList(): List<MediaItem> {
     return listOf(
-      MediaItem(makeArtistListItemDesc(), Browsable),
-      MediaItem(makeAlbumListItemDesc(), Browsable),
-      MediaItem(makeGenreListItemDesc(), Browsable),
-      MediaItem(makeTrackListItemDesc(), Browsable),
+      MediaItem(makeArtistListItemDesc(), MediaItemFlags.Browsable),
+      MediaItem(makeAlbumListItemDesc(), MediaItemFlags.Browsable),
+      MediaItem(makeGenreListItemDesc(), MediaItemFlags.Browsable),
+      MediaItem(makeTrackListItemDesc(), MediaItemFlags.Browsable),
     )
   }
 
@@ -304,11 +286,17 @@ private class MediaSessionBrowserImpl(
     extras = getContentStyle(CONTENT_STYLE_GRID, CONTENT_STYLE_LIST)
   )
 
-  private suspend fun makeArtistList(): Result<List<MediaItem>, DaoMessage> = artistDao
-    .getAllArtists(MAX_LIST_SIZE)
-    .mapAll {
-      Ok(MediaItem(makeItemDesc(it.artistId, it.artistName, ARTIST_ICON), Browsable))
-    }
+  private suspend fun makeArtistList(): Result<List<MediaItem>, DaoMessage> =
+    artistDao
+      .getAllArtists(MAX_LIST_SIZE)
+      .mapAll {
+        Ok(
+          MediaItem(
+            makeItemDesc(it.artistId, it.artistName.value, ARTIST_ICON),
+            MediaItemFlags.Browsable
+          )
+        )
+      }
 
   private fun makeItemDesc(
     id: String,
@@ -325,23 +313,24 @@ private class MediaSessionBrowserImpl(
   }
 
   private fun makeItemDesc(id: PersistentId, name: String, icon: Uri, subtitle: String? = null) =
-    makeItemDesc(makeMediaId(id), name, icon, subtitle)
+    makeItemDesc(id.toCompatMediaId(), name, icon, subtitle, Bundle.EMPTY)
 
-  private suspend fun makeAlbumList(): Result<List<MediaItem>, DaoMessage> = albumDao
-    .getAllAlbums(MAX_LIST_SIZE)
-    .mapAll {
-      Ok(
-        MediaItem(
-          makeItemDesc(
-            it.albumId,
-            it.albumName,
-            selectAlbumArt(it.albumLocalArt, it.albumArt, ALBUM_ICON),
-            it.artistName.value,
-          ),
-          Browsable
+  private suspend fun makeAlbumList(): Result<List<MediaItem>, DaoMessage> =
+    albumDao
+      .getAllAlbums(MAX_LIST_SIZE)
+      .mapAll {
+        Ok(
+          MediaItem(
+            makeItemDesc(
+              it.albumId,
+              it.albumTitle.value,
+              selectAlbumArt(it.albumLocalArt, it.albumArt, ALBUM_ICON),
+              it.artistName.value,
+            ),
+            MediaItemFlags.Browsable
+          )
         )
-      )
-    }
+      }
 
   private suspend fun makeArtistAlbumList(
     artistId: ArtistId
@@ -352,11 +341,11 @@ private class MediaSessionBrowserImpl(
         MediaItem(
           makeItemDesc(
             it.albumId,
-            it.albumName,
+            it.albumTitle.value,
             selectAlbumArt(it.albumLocalArt, it.albumArt, ALBUM_ICON),
             it.artistName.value
           ),
-          Browsable
+          MediaItemFlags.Browsable
         )
       )
     }
@@ -369,16 +358,25 @@ private class MediaSessionBrowserImpl(
     }
   }
 
-  private suspend fun makeGenreList(): Result<List<MediaItem>, DaoMessage> = genreDao
-    .getAllGenreNames(MAX_LIST_SIZE)
-    .mapAll { Ok(MediaItem(makeItemDesc(it.genreId, it.genreName, GENRE_ICON), Browsable)) }
+  private suspend fun makeGenreList(): Result<List<MediaItem>, DaoMessage> =
+    genreDao
+      .getAllGenreNames(MAX_LIST_SIZE)
+      .mapAll {
+        Ok(
+          MediaItem(
+            makeItemDesc(it.genreId, it.genreName, GENRE_ICON),
+            MediaItemFlags.Browsable
+          )
+        )
+      }
 
   private fun makeGenreListItemDesc(): MediaDescriptionCompat =
     makeItemDesc(ID_GENRES, context.getString(R.string.Genres), GENRE_ICON)
 
-  private suspend fun makeTrackList(): Result<List<MediaItem>, DaoMessage> = audioMediaDao
-    .getAllAudio(MAX_LIST_SIZE)
-    .mapToMediaList()
+  private suspend fun makeTrackList(): Result<List<MediaItem>, DaoMessage> =
+    audioMediaDao
+      .getAllAudio(MAX_LIST_SIZE)
+      .mapToMediaList()
 
   private fun makeTrackListItemDesc(): MediaDescriptionCompat =
     makeItemDesc(ID_TRACKS, context.getString(R.string.Tracks), TRACK_ICON)
@@ -401,10 +399,10 @@ private class MediaSessionBrowserImpl(
         MediaItem(
           makeItemDesc(
             item.mediaId,
-            item.title.value,
+            item.title(),
             selectAlbumArt(item.albumLocalArt, item.albumArt, TRACK_ICON)
           ),
-          Playable
+          MediaItemFlags.Playable
         )
       )
     }
@@ -416,7 +414,7 @@ private class MediaSessionBrowserImpl(
     .mapToMediaList()
 
   private fun makeEmptyMediaDesc(parentId: String) = MediaDescriptionCompat.Builder()
-    .setMediaId(ID_NO_MEDIA)
+    .setMediaId(MediaSessionBrowser.ID_NO_MEDIA)
     .setIconUri(TRACK_ICON)
     .setTitle(context.getString(R.string.No_media_found))
     .apply {
@@ -425,7 +423,7 @@ private class MediaSessionBrowserImpl(
         ID_ALBUMS -> setIconUri(ALBUM_ICON)
         ID_GENRES -> setIconUri(null)
         ID_PLAYLISTS -> {
-          setMediaId(ID_NO_PLAYLIST)
+          setMediaId(MediaSessionBrowser.ID_NO_PLAYLIST)
           setTitle(context.getString(R.string.No_playlist_found))
         }
         // ID_STREAMS -> emptyMediaDesc.setIconUri(DEFAULT_STREAM_ICON)
@@ -445,32 +443,45 @@ private class MediaSessionBrowserImpl(
 
   private fun doSearch(query: String, extras: Bundle): List<MediaItem> {
     val focusedResults: List<MediaItem> = if (extras.isFocusedSearch()) {
-      when (extras[EXTRA_MEDIA_FOCUS]) {
+      when (extras[MediaStore.EXTRA_MEDIA_FOCUS]) {
         MediaStore.Audio.Genres.ENTRY_CONTENT_TYPE -> {
-          extras.getString(EXTRA_MEDIA_GENRE)?.let { genre ->
+          extras.getString(MediaStore.EXTRA_MEDIA_GENRE)?.let { genre ->
             LOG._i { it("Search genre '%s'", genre) }
             emptyList()
           } ?: emptyList()
         }
         MediaStore.Audio.Artists.ENTRY_CONTENT_TYPE -> {
-          extras.getString(EXTRA_MEDIA_ARTIST)?.let { artist ->
+          extras.getString(MediaStore.EXTRA_MEDIA_ARTIST)?.let { artist ->
             // song.artist == artist || song.albumArtist == artist)
             LOG._i { it("Search artist '%s'", artist) }
             emptyList()
           } ?: emptyList()
         }
         MediaStore.Audio.Albums.ENTRY_CONTENT_TYPE -> {
-          val artist = extras.getString(EXTRA_MEDIA_ARTIST, "")
-          val album = extras.getString(EXTRA_MEDIA_ALBUM, "")
-          LOG._i { it("Search album '%s' artist '%s'", album, artist) }
+          val artist = extras.getString(MediaStore.EXTRA_MEDIA_ARTIST, "")
+          val album = extras.getString(MediaStore.EXTRA_MEDIA_ALBUM, "")
+          LOG._i {
+            it(
+              "Search album '%s' artist '%s'",
+              album,
+              artist
+            )
+          }
           // (song.artist == artist || song.albumArtist == artist) && song.album == album
           emptyList()
         }
         MediaStore.Audio.Media.ENTRY_CONTENT_TYPE -> {
-          val title = extras.getString(EXTRA_MEDIA_TITLE, "")
-          val album = extras.getString(EXTRA_MEDIA_ALBUM, "")
-          val artist = extras.getString(EXTRA_MEDIA_ARTIST, "")
-          LOG._i { it("Search media title '%s' album '%s' artist '%s'", title, album, artist) }
+          val title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE, "")
+          val album = extras.getString(MediaStore.EXTRA_MEDIA_ALBUM, "")
+          val artist = extras.getString(MediaStore.EXTRA_MEDIA_ARTIST, "")
+          LOG._i {
+            it(
+              "Search media title '%s' album '%s' artist '%s'",
+              title,
+              album,
+              artist
+            )
+          }
           // (song.artist == artist || song.albumArtist == artist) && song.album == album
           //                            && song.title == title
           emptyList()
@@ -511,8 +522,6 @@ private class MediaSessionBrowserImpl(
     private val TRACK_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_audio}".toUri()
     private val LIBRARY_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_library_music}".toUri()
 
-    private const val MAX_LIST_SIZE = 1000L
-
     fun getContentStyle(browsableHint: Int, playableHint: Int): Bundle {
       return Bundle().apply {
         putBoolean(CONTENT_STYLE_SUPPORTED, true)
@@ -523,8 +532,8 @@ private class MediaSessionBrowserImpl(
   }
 }
 
-private fun Bundle.isFocusedSearch(): Boolean {
-  return this !== Bundle.EMPTY && containsKey(EXTRA_MEDIA_FOCUS)
+fun Bundle.isFocusedSearch(): Boolean {
+  return this !== Bundle.EMPTY && containsKey(MediaStore.EXTRA_MEDIA_FOCUS)
 }
 
 enum class MediaItemFlags(private val flags: Int) {
@@ -570,3 +579,56 @@ const val CONTENT_STYLE_CATEGORY_LIST = 3
 const val CONTENT_STYLE_CATEGORY_GRID = 4
 
 const val MEDIA_SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
+
+/**
+ * Converts the specific PersistentId type to a string or throws [IllegalArgumentException] if
+ * a new PersistentId type has been introduced and this function has not been updated.
+ *
+ * Note: calling this function causes boxing
+ */
+fun PersistentId.toCompatMediaId(): String {
+  val prefix = when (this) {
+    is MediaId -> MediaSessionBrowser.MEDIA_PREFIX
+    is AlbumId -> MediaSessionBrowser.ALBUM_PREFIX
+    is ArtistId -> MediaSessionBrowser.ARTIST_PREFIX
+    is GenreId -> MediaSessionBrowser.GENRE_PREFIX
+    is PlaylistId -> MediaSessionBrowser.PLAYLIST_PREFIX
+    is ComposerId -> MediaSessionBrowser.COMPOSER_PREFIX
+    else -> throw IllegalArgumentException("Unrecognized PersistentId type for $this")
+  }
+  return "${prefix}_$value"
+}
+
+/**
+ * Converts this String to a specific PersistentId type if the prefix is recognized or to a MediaId
+ * if it's all digits. If this String is null returns [PersistentId.INVALID].
+ *
+ * It's expected that the String will have a prefix indicating it's type followed by an underscore
+ * '_' character and end in a number which may be parsed as a long. If no prefix and all digits,
+ * returns a [MediaId]. Throws an [IllegalArgumentException] if the prefix unrecognized. If the
+ * number part after the underscore is missing or cannot be parsed as a long, the returned
+ * persistent ID will have a value of -1.
+ *
+ * Note: This function causes boxing as it returns the base interface
+ */
+fun String?.toPersistentId(): PersistentId {
+  if (this == null) return PersistentId.INVALID
+  val list = split('_')
+  return if (list.size > 1) {
+    val id = list[1].toLongOrNull() ?: -1
+    when (list[0]) {
+      MediaSessionBrowser.MEDIA_PREFIX -> MediaId(id)
+      MediaSessionBrowser.ARTIST_PREFIX -> ArtistId(id)
+      MediaSessionBrowser.ALBUM_PREFIX -> AlbumId(id)
+      MediaSessionBrowser.GENRE_PREFIX -> GenreId(id)
+      MediaSessionBrowser.COMPOSER_PREFIX -> ComposerId(id)
+      MediaSessionBrowser.PLAYLIST_PREFIX -> PlaylistId(id)
+      else -> throw IllegalArgumentException("Unrecognized MediaId:$this")
+    }
+  } else {
+    // In test app such as Media Controller Tester we can directly enter the media ID
+    if (isDigitsOnly()) {
+      MediaId(toLong())
+    } else throw IllegalArgumentException("Unrecognized MediaId:$this")
+  }
+}

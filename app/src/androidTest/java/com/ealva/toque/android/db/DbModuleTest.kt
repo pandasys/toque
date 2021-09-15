@@ -26,7 +26,7 @@ import com.ealva.toque.db.ArtistMediaDao
 import com.ealva.toque.db.ArtistMediaTable
 import com.ealva.toque.db.ArtistTable
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.AudioQueueTable
+import com.ealva.toque.db.QueueTable
 import com.ealva.toque.db.ComposerDao
 import com.ealva.toque.db.ComposerMediaDao
 import com.ealva.toque.db.ComposerMediaTable
@@ -77,7 +77,7 @@ class DbModuleTest : KoinTest {
         GenreMediaTable,
         EqPresetTable,
         EqPresetAssociationTable,
-        AudioQueueTable,
+        QueueTable,
         QueueStateTable
       )
     )

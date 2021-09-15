@@ -25,151 +25,80 @@ import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.service.media.StarRating
 
 sealed interface MediaSessionEvent {
-  fun execute(controller: ToqueMediaController)
 
   object Prepare : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "Prepare"
   }
 
-  data class PrepareFromId(val mediaId: String, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-//    /** Throws IllegalArgumentException if [mediaId] is not of a recognized type */
-//    suspend fun accept(visitor: OnMediaType<Unit>) =
-//      MediaSessionBrowser.handleMedia(mediaId, extras, visitor)
-  }
+  data class PrepareFromId(val mediaId: String, val extras: Bundle) : MediaSessionEvent
 
-  data class PrepareFromSearch(val query: String, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class PrepareFromSearch(val query: String, val extras: Bundle) : MediaSessionEvent
 
-  data class PrepareFromUri(val uri: Uri, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class PrepareFromUri(val uri: Uri, val extras: Bundle) : MediaSessionEvent
 
   object Play : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "Play"
   }
 
-  data class PlayFromId(val mediaId: String, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-//    /** Throws IllegalArgumentException if [mediaId] is not of a recognized type */
-//    suspend fun accept(visitor: OnMediaType<Unit>) =
-//      MediaSessionBrowser.handleMedia(mediaId, extras, visitor)
-  }
+  data class PlayFromId(val mediaId: String, val extras: Bundle) : MediaSessionEvent
 
-  data class PlayFromSearch(val query: String, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class PlayFromSearch(val query: String, val extras: Bundle) : MediaSessionEvent
 
-  data class PlayFromUri(val uri: Uri, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class PlayFromUri(val uri: Uri, val extras: Bundle) : MediaSessionEvent
 
-  data class SkipToQueueItem(val index: Long) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  /**
+   * When a list of QueueItem
+   */
+  data class SkipToQueueItem(val instanceId: Long) : MediaSessionEvent
 
   object Pause : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      controller.pause()
-    }
+    override fun toString(): String = "Pause"
   }
 
   object SkipToNext : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "SkipToNext"
   }
 
   object SkipToPrevious : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "SkipToPrevious"
   }
 
   object FastForward : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "FastForward"
   }
 
   object Rewind : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "Rewind"
   }
 
   object Stop : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+    override fun toString(): String = "Stop"
   }
 
-  data class SeekTo(val position: Millis) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class SeekTo(val position: Millis) : MediaSessionEvent
 
-  data class SetRating(val rating: StarRating, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class SetRating(val rating: StarRating, val extras: Bundle) : MediaSessionEvent
 
-  data class EnableCaption(val enable: Boolean) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class EnableCaption(val enable: Boolean) : MediaSessionEvent
 
-  data class Repeat(val repeatMode: RepeatMode) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class Repeat(val repeatMode: RepeatMode) : MediaSessionEvent
 
-  data class Shuffle(val shuffleMode: ShuffleMode) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class Shuffle(val shuffleMode: ShuffleMode) : MediaSessionEvent
 
-  data class CustomAction(val action: String, val extras: Bundle) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class CustomAction(val action: String, val extras: Bundle) : MediaSessionEvent
 
-  data class RemoveItem(val item: MediaDescriptionCompat) : MediaSessionEvent {
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
-  }
+  data class RemoveItem(val item: MediaDescriptionCompat) : MediaSessionEvent
 
   data class AddItemAt(val item: MediaDescriptionCompat, val pos: Int = -1) : MediaSessionEvent {
     @Suppress("unused")
     val addToEnd = pos < 0
-    override fun execute(controller: ToqueMediaController) {
-      TODO("Not yet implemented")
-    }
+  }
+
+  object Duck : MediaSessionEvent {
+    override fun toString(): String = "Duck"
+  }
+
+  object EndDuck : MediaSessionEvent {
+    override fun toString(): String = "EndDuck"
   }
 }

@@ -24,7 +24,10 @@ inline fun String?.toTitle(): Title {
 
 @JvmInline
 value class Title(val value: String) {
+  inline operator fun invoke(): String = value
+
   companion object {
     val UNKNOWN: Title = Title("Unknown")
+    val EMPTY: Title = Title("")
   }
 }

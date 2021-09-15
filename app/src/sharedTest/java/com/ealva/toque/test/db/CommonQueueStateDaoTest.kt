@@ -17,7 +17,7 @@
 package com.ealva.toque.test.db
 
 import android.content.Context
-import com.ealva.toque.common.toMillis
+import com.ealva.toque.common.Millis
 import com.ealva.toque.db.QueueId
 import com.ealva.toque.db.QueueState
 import com.ealva.toque.db.QueueStateDao
@@ -47,7 +47,7 @@ object CommonQueueStateDaoTest {
       val dao = QueueStateDao(FIRST_QUEUE, this, testDispatcher)
       val mediaId = 1.toMediaId()
       val queueIndex = 5
-      val playbackPosition = 5000.toMillis()
+      val playbackPosition = Millis(5000)
       val state = QueueState(mediaId, queueIndex, playbackPosition)
       dao.persistState(state)
       dao.getState().let { result ->
@@ -69,7 +69,7 @@ object CommonQueueStateDaoTest {
       val factory = QueueStateDaoFactory(this, testDispatcher)
 
       val daoOne = factory.makeQueueStateDao(FIRST_QUEUE)
-      val state = QueueState(1.toMediaId(), 0, 1000.toMillis())
+      val state = QueueState(1.toMediaId(), 0, Millis(1000))
       daoOne.persistState(state)
       daoOne.getState().let { result ->
         expect(result).toBeInstanceOf<Ok<QueueState>>()
@@ -77,7 +77,7 @@ object CommonQueueStateDaoTest {
       }
 
       val daoTwo = factory.makeQueueStateDao(SECOND_QUEUE)
-      val state2 = QueueState(100.toMediaId(), 100, 5000.toMillis())
+      val state2 = QueueState(100.toMediaId(), 100, Millis(5000))
       daoTwo.persistState(state2)
       daoTwo.getState().let { result ->
         expect(result).toBeInstanceOf<Ok<QueueState>>()
@@ -91,7 +91,7 @@ object CommonQueueStateDaoTest {
       val factory = QueueStateDaoFactory(this, testDispatcher)
 
       val dao = factory.makeQueueStateDao(FIRST_QUEUE)
-      val state = QueueState(1.toMediaId(), 0, 1000.toMillis())
+      val state = QueueState(1.toMediaId(), 0, Millis(1000))
       dao.persistState(state)
       dao.getState().let { result ->
         expect(result).toBeInstanceOf<Ok<QueueState>>()
@@ -112,7 +112,7 @@ object CommonQueueStateDaoTest {
       val factory = QueueStateDaoFactory(this, testDispatcher)
 
       val dao = factory.makeQueueStateDao(FIRST_QUEUE)
-      val state = QueueState(1.toMediaId(), 0, 1000.toMillis())
+      val state = QueueState(1.toMediaId(), 0, Millis(1000))
       dao.persistState(state)
       dao.getState().let { result ->
         expect(result).toBeInstanceOf<Ok<QueueState>>()

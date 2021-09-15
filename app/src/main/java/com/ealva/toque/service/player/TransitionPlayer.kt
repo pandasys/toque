@@ -19,8 +19,6 @@ package com.ealva.toque.service.player
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
-import com.ealva.toque.common.toMillis
-import com.ealva.toque.common.toVolume
 
 interface TransitionPlayer {
   val isPlaying: Boolean
@@ -59,7 +57,7 @@ object NullTransitionPlayer : TransitionPlayer {
     get() = false
 
   override var volume: Volume
-    get() = 0.toVolume()
+    get() = Volume.NONE
     set(@Suppress("UNUSED_PARAMETER") volume) {
     }
   override val volumeRange: VolumeRange
@@ -67,7 +65,7 @@ object NullTransitionPlayer : TransitionPlayer {
 
   override fun notifyPaused() = Unit
   override fun notifyPlaying() = Unit
-  override val remainingTime: Millis = 0.toMillis()
+  override val remainingTime: Millis = Millis(0)
   override fun pause() = Unit
   override fun play() = Unit
   override fun shutdown() = Unit

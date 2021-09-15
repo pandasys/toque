@@ -21,7 +21,7 @@ package com.ealva.toque.service.player
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.SuspendingThrottle
 import com.ealva.toque.common.Volume
-import com.ealva.toque.service.player.PlayerTransition.Type
+import com.ealva.toque.service.audio.PlayerTransition.Type
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -110,7 +110,7 @@ class FadeInTransition(
   }
 
   private fun TransitionPlayer.getStartVolume(): Volume {
-    return if (forceStartVolumeZero) Volume.ZERO else volume
+    return if (forceStartVolumeZero) Volume.NONE else volume
   }
 
   override fun toString(): String = buildString {

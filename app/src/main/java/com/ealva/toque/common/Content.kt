@@ -19,9 +19,7 @@ package com.ealva.toque.common
 import androidx.annotation.StringRes
 import com.ealva.toque.app.Toque
 
-object Content {
-  fun fetch(@StringRes stringRes: Int): String = Toque.appContext.getString(stringRes)
+fun fetch(@StringRes stringRes: Int): String = Toque.appContext.getString(stringRes)
 
-  fun fetch(@StringRes stringRes: Int, vararg formatArgs: Any): String =
-    Toque.appContext.getString(stringRes, *formatArgs)
-}
+fun fetch(@StringRes stringRes: Int, vararg formatArgs: Any): String =
+  Toque.appContext.getString(stringRes, *formatArgs)

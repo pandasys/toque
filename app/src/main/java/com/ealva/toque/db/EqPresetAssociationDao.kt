@@ -16,9 +16,9 @@
 
 package com.ealva.toque.db
 
-import com.ealva.toque.audio.AudioOutputRoute
-import com.ealva.toque.audio.longId
-import com.ealva.toque.audio.toAudioOutputRoute
+import com.ealva.toque.audioout.AudioOutputRoute
+import com.ealva.toque.audioout.longId
+import com.ealva.toque.audioout.toAudioOutputRoute
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.MediaId

@@ -16,55 +16,46 @@
 
 package com.ealva.toque.service
 
-import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.PendingIntent
+import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.Service
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.content.Intent.ACTION_MEDIA_BUTTON
 import android.os.Binder
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.support.v4.media.session.PlaybackStateCompat
+import android.view.KeyEvent
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ServiceLifecycleDispatcher
-import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.media.MediaBrowserServiceCompat
+import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.android.content.orNullObject
 import com.ealva.toque.app.Toque
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.RepeatMode
-import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.db.AudioDaoEvent
-import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
-import com.ealva.toque.scanner.MediaScannerJobIntentService
-import com.ealva.toque.scanner.MediaScannerJobIntentService.RescanType
+import com.ealva.toque.log.logExecTime
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
+import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.session.BrowserResult
-import com.ealva.toque.service.session.EMPTY_PLAYBACK_STATE
 import com.ealva.toque.service.session.MediaSession
-import com.ealva.toque.service.session.NOTHING_PLAYING
-import com.ealva.toque.service.session.NullMediaSession
-import com.ealva.toque.service.session.PlaybackActions
+import com.ealva.toque.service.session.MediaSessionState
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 private val LOG by lazyLogger(MediaPlayerService::class)
-
-private const val ADD_NEW_MEDIA_COUNT = 10
 
 private val servicePrefsSingleton: PlayerServicePrefsSingleton = PlayerServicePrefsSingleton(
   PlayerServicePrefs.Companion::make,
@@ -72,50 +63,48 @@ private val servicePrefsSingleton: PlayerServicePrefsSingleton = PlayerServicePr
   "PlayerServicePrefs"
 )
 
-class MediaPlayerService : MediaBrowserServiceCompat(), LifecycleOwner, ToqueMediaController {
+class MediaPlayerService :
+  MediaBrowserServiceCompat(),
+  ToqueMediaController,
+  LifecycleOwner {
   // Because we inherit from MediaBrowserServiceCompat we need to maintain our own lifecycle
   private val dispatcher = ServiceLifecycleDispatcher(this)
-  override fun getLifecycle(): Lifecycle = dispatcher.lifecycle
   private inline val scope: LifecycleCoroutineScope get() = lifecycleScope
-  private val audioMediaDao: AudioMediaDao by inject()
-
-  override val isActive = MutableStateFlow(false)
-
   private lateinit var servicePrefs: PlayerServicePrefs
-  private val queueFactory = PlayableQueueFactory()
-  private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
+  private val queueFactory: PlayableQueueFactory by inject()
+  private var inForeground = false
+  private var isStarted = false
+  private lateinit var mediaSession: MediaSession
 
-  private var _mediaSession: MediaSession = NullMediaSession
-  private val mediaSession: MediaSession
-    @SuppressLint("UnspecifiedImmutableFlag")
-    get() {
-      if (_mediaSession === NullMediaSession) {
-        LOG._i { it("create MediaSession") }
-        _mediaSession = MediaSession(context = this, lifecycleOwner = this, active = true)
-        packageManager?.getLaunchIntentForPackage(packageName)?.let { sessionIntent ->
-          _mediaSession.setSessionActivity(PendingIntent.getActivity(this, 0, sessionIntent, 0))
-        }
-        sessionToken = _mediaSession.token
-        _mediaSession.setState(EMPTY_PLAYBACK_STATE)
-        _mediaSession.setMetadata(NOTHING_PLAYING)
-        scope.launch {
-          _mediaSession.eventFlow
-            .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-            .collect { event ->
-              LOG._i { it("event=%s", event.javaClass.simpleName) }
-            }
-        }
-      }
-      return _mediaSession
-    }
+  override fun getLifecycle(): Lifecycle = dispatcher.lifecycle
+  override val currentQueue = MutableStateFlow<PlayableMediaQueue<*>>(NullPlayableMediaQueue)
 
   override fun onCreate() {
     dispatcher.onServicePreSuperOnCreate()
     super.onCreate()
-    val session = mediaSession
-    scope.launchWhenCreated {
-      servicePrefs = servicePrefsSingleton.instance()
-      currentQueue = queueFactory.make(servicePrefs.currentQueueType(), servicePrefs)
+    mediaSession = MediaSession(
+      context = this,
+      notificationListener = NotificationListener(),
+      lifecycleOwner = this,
+      active = true
+    )
+    packageManager?.getLaunchIntentForPackage(packageName)?.let { sessionIntent ->
+      mediaSession.setSessionActivity(
+        PendingIntent.getActivity(
+          this,
+          0,
+          sessionIntent,
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) FLAG_IMMUTABLE else 0
+        )
+      )
+    }
+    sessionToken = mediaSession.token
+    scope.launch {
+      logExecTime({ time -> LOG.e { it("setCurrentQueue %d", time) } }) {
+        servicePrefs = servicePrefsSingleton.instance()
+        setCurrentQueue(servicePrefs.currentQueueType(), false)
+        mediaSession.isActive = true
+      }
     }
   }
 
@@ -127,8 +116,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), LifecycleOwner, ToqueMed
   private val binder = MediaServiceBinder()
   override fun onBind(intent: Intent): IBinder? {
     dispatcher.onServicePreSuperOnBind()
-    LOG._i { it("onBind action=%s", intent.action ?: "null") }
-    mediaSession
     return when (intent.action) {
       SERVICE_INTERFACE -> super.onBind(intent)
       else -> binder
@@ -137,22 +124,73 @@ class MediaPlayerService : MediaBrowserServiceCompat(), LifecycleOwner, ToqueMed
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     dispatcher.onServicePreSuperOnStart()
-    LOG._i { it("onStartCommand action=%s", intent?.action ?: "none") }
-    return Service.START_NOT_STICKY
+
+    val startIntent = intent.orNullObject()
+
+    LOG._e { it("onStartCommand intent=%s", intent ?: "null") }
+
+    val action = startIntent.action.orEmpty()
+
+    if (action.isNotEmpty()) {
+      isStarted = true
+      val intentIsPlay = intentIsPlay(startIntent)
+      LOG._i { it("started=%s intentIsPlay=%s", isStarted, intentIsPlay) }
+      handleStartIntent(startIntent, action)
+    }
+    return Service.START_STICKY
+  }
+
+  private fun intentIsPlay(intent: Intent): Boolean =
+    if (ACTION_MEDIA_BUTTON == intent.action.orEmpty() && intent.hasExtra(Intent.EXTRA_KEY_EVENT)) {
+      when (intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)?.keyCode) {
+        KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> true
+        else -> false
+      }
+    } else {
+      false
+//      @Suppress("NON_EXHAUSTIVE_WHEN")
+//      return when (actionFromName(intent.action)) {
+//        Action.Play, Action.TogglePlayPause -> true
+//        else -> false
+//      }
+    }
+
+  private fun handleStartIntent(intent: Intent, action: String) {
+    LOG._e { it("handleStartIntent action=%s", action) }
+    if (action.isNotEmpty()) {
+      if (ACTION_MEDIA_BUTTON == action) {
+        LOG._e { it("is media button") }
+        mediaSession.handleMediaButtonIntent(intent)?.let {
+          // if this is a recognized key event, prevent redelivery on service restart
+          val emptyIntent = Intent(intent)
+          emptyIntent.action = ""
+          startService(emptyIntent)
+        }
+      } else {
+        // assume it's one of our actions. If not, None is returned
+//        actionFromName(action).execute(this, intent)
+      }
+    }
   }
 
   override fun onDestroy() {
     dispatcher.onServicePreSuperOnDestroy()
     super.onDestroy()
+    LOG._e { it("onDestroy") }
+    isStarted = false
+    mediaSession.isActive = false
     mediaSession.release()
   }
 
   override fun onGetRoot(
-    clientPackageName: String,
+    packageName: String,
     clientUid: Int,
     rootHints: Bundle?
-  ): BrowserRoot? =
-    mediaSession.browser.onGetRoot(clientPackageName, clientUid, rootHints ?: Bundle.EMPTY)
+  ): BrowserRoot? = mediaSession.browser.onGetRoot(
+    packageName,
+    clientUid,
+    rootHints ?: Bundle.EMPTY
+  )
 
   override fun onLoadChildren(parentId: String, result: BrowserResult) =
     mediaSession.browser.onLoadChildren(parentId, result)
@@ -163,151 +201,57 @@ class MediaPlayerService : MediaBrowserServiceCompat(), LifecycleOwner, ToqueMed
   override val mediaIsLoaded: Boolean
     get() = false
 
-  override fun setCurrentQueue(type: QueueType) {
-    TODO("Not yet implemented")
-  }
-
-  override fun play(immediate: Boolean) {
-    TODO("Not yet implemented")
-  }
-
-  override fun stop() {
-    TODO("Not yet implemented")
-  }
-
-  override fun pause(immediate: Boolean) {
-    TODO("Not yet implemented")
-  }
-
-  override val isSeekable: Boolean
-    get() = TODO("Not yet implemented")
-
-  override fun seekTo(position: Millis) {
-    TODO("Not yet implemented")
-  }
-
-  override fun nextShuffleMode(): ShuffleMode {
-    TODO("Not yet implemented")
-  }
-
-  override fun nextRepeatMode(): RepeatMode {
-    TODO("Not yet implemented")
-  }
-
-  override val position: Millis
-    get() = TODO("Not yet implemented")
-
-  override val duration: Millis
-    get() = TODO("Not yet implemented")
-
-  override fun togglePlayPause() {
-    TODO("Not yet implemented")
-  }
-
-  override fun next() {
-    TODO("Not yet implemented")
-  }
-
-  override fun previous() {
-    TODO("Not yet implemented")
-  }
-
-  override fun goToQueueIndexMaybePlay(index: Int) {
-    TODO("Not yet implemented")
-  }
-
-  override fun loadUri(uri: Uri) {
-    TODO("Not yet implemented")
-  }
-
-  override fun startMediaScannerFirstRun() {
-    LOG._i { it("startMediaScannerFirstRun") }
-    scope.launch {
-      var addToQueueCount = ADD_NEW_MEDIA_COUNT
-      audioMediaDao
-        .audioDaoEvents
-        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-        .collect { event ->
-          LOG._e { it("audioDaoEvent=%s", event) }
-          if (event is AudioDaoEvent.MediaCreated) {
-            LOG._e { it("MediaCreated:%d", event.mediaIds.size) }
-          }
-        }
+  override suspend fun setCurrentQueue(type: QueueType, resume: Boolean) {
+    val current = currentQueue.value
+    if (current.queueType != type) {
+      if (current !== NullPlayableMediaQueue) {
+        current.deactivate()
+        mediaSession.resetSessionEventReplayCache()
+      }
+      val newQueue = queueFactory.make(type, mediaSession, mediaSession)
+      newQueue.activate(resume, PlayNow(false))
+      currentQueue.value = newQueue
     }
-    MediaScannerJobIntentService.startRescan(this, "FirstRun", RescanType.ModifiedSinceLast)
   }
 
-  override var enabledActions: PlaybackActions = PlaybackActions()
+  private fun putInForeground(notificationId: Int, notification: Notification) {
+    startForegroundService(this, Action.None)
+    LOG._e { it("startForeground notificationId=%d", notificationId) }
+    startForeground(notificationId, notification)
+    inForeground = true
+  }
+
+  private fun removeFromForegroundAndStopSelf() {
+    LOG._e { it("stopForeground inForeground=%s", inForeground) }
+    stopForeground(false)
+    inForeground = false
+    LOG._e { it("stopSelf") }
+    stopSelf()
+  }
+
+  private inner class NotificationListener : MediaSessionState.NotificationListener {
+    override fun onPosted(notificationId: Int, notification: Notification) {
+      if (!inForeground) putInForeground(notificationId, notification)
+    }
+
+    override fun onCanceled() = removeFromForegroundAndStopSelf()
+  }
 
   enum class Action {
     None {
       override fun execute(playerService: MediaPlayerService, intent: Intent) {}
-    },
-    PreviousSong {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-//        playerService.previousSong()
-      }
-    },
-    Play {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-        playerService.play(false)
-      }
-    },
-    TogglePlayPause {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-        playerService.togglePlayPause()
-      }
-    },
-    NextSong {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-//        playerService.nextSong()
-      }
-    },
-    RemoveNotification {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-//        playerService.removeNotificationAndStopForeground()
-      }
-    },
-    UpdateWidgets {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-        val appWidgetIds = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
-//        if (appWidgetIds != null) {
-//          playerService.tempForegroundNotificationIfRequired()
-//          playerService.updateWidgets(
-//            appWidgetIds,
-//            playerService.currentItem,
-//            playerService.currentItem.isPlaying
-//          )
-//        }
-      }
-    },
-    NextRepeat {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-        playerService.nextRepeatMode()
-      }
-    },
-    ToggleShuffle {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-//        playerService.toggleShuffle()
-      }
-    },
-    ExternalIntent {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-//        playerService.handleExternalIntent(intent)
-      }
-    },
-    UpdateNotificationChannelSettings {
-      override fun execute(playerService: MediaPlayerService, intent: Intent) {
-//        playerService.updateNotificationChannelSettings()
-      }
     };
 
     abstract fun execute(playerService: MediaPlayerService, intent: Intent)
   }
 
   companion object {
-    fun getComponentName(context: Context): ComponentName =
-      ComponentName(context, MediaPlayerService::class.java)
+    fun startForegroundService(
+      context: Context,
+      action: Action
+    ) = with(context.applicationContext) {
+      ContextCompat.startForegroundService(this, makeStartIntent(this, action, null))
+    }
 
     fun makeStartIntent(context: Context, action: Action, externalIntent: Intent?): Intent {
       val intent = Intent(action.name, null, context, MediaPlayerService::class.java)
@@ -318,10 +262,5 @@ class MediaPlayerService : MediaBrowserServiceCompat(), LifecycleOwner, ToqueMed
     }
   }
 }
-
-private const val PLAYBACK_BASE_ACTIONS = PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
-  PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
-  PlaybackStateCompat.ACTION_PLAY_FROM_URI or
-  PlaybackStateCompat.ACTION_PLAY_PAUSE
 
 private const val EXTRA_ORIGINAL_INTENT = "OriginalIntentExtrasKey"

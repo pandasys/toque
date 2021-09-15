@@ -24,11 +24,11 @@ import com.ealva.ealvabrainz.brainz.data.TrackMbid
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.ealvalog.w
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.toMillis
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
-import com.ealva.toque.log._e
+import com.ealva.toque.file.isNetworkScheme
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParser
 import com.ealva.toque.service.media.MediaMetadataParserFactory
@@ -70,7 +70,7 @@ private class MediaMetadataParserImpl(
         VlcTagInfo(uri, libVlc, artistParser)
       }
     } else {
-      LOG._e { it("Fallback to LibVLC as no parser found for %s", uri) }
+      LOG.w { it("Fallback to LibVLC as no parser found for %s", uri) }
       VlcTagInfo(uri, libVlc, artistParser)
     }
   }
@@ -81,7 +81,7 @@ private class FileTagInfo private constructor(
   private val artistParser: ArtistParser
 ) : MediaFileTagInfo {
   override val duration: Millis
-    get() = tag.duration.toMillis()
+    get() = Millis(tag.duration)
   override val title: String
     get() = tag.title
   override val titleSort: String
@@ -181,7 +181,7 @@ private class VlcTagInfo private constructor(
   private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist).orUnknown()))
   private val _artistsSort = _artists.map { it.toArtistSort() }
   override val duration: Millis
-    get() = media.duration.toMillis()
+    get() = Millis(media.duration)
   override val title: String
     get() = meta(IMedia.Meta.Title).orUnknown()
   override val titleSort: String
@@ -266,10 +266,19 @@ private class VlcTagInfo private constructor(
       artistParser: ArtistParser
     ): MediaFileTagInfo {
       return VlcTagInfo(
-        libVlc.makeNativeMedia(uri).apply { if (!isParsed) parse(VlcMedia.parseFlagFromUri(uri)) },
+        libVlc.makeNativeMedia(uri).apply { if (!isParsed) parse(parseFlagFromUri(uri)) },
         artistParser
       )
     }
+
+    private fun parseFlagFromUri(uri: Uri): Int =
+      if (uri.isNetworkScheme()) PARSE_NETWORK else PARSE_LOCAL
+
+    /** Parse metadata if the file is local. Doesn't bother with artwork */
+    private const val PARSE_LOCAL = IMedia.Parse.ParseLocal
+
+    /** Parse metadata even if over a network connection. Doesn't bother with artwork */
+    private const val PARSE_NETWORK = IMedia.Parse.ParseNetwork
   }
 }
 

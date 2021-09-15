@@ -25,5 +25,5 @@ enum class EndOfQueueAction(
 ) : HasConstId {
   PlayNextList(1, true, false),
   ShuffleNextList(2, true, true),
-  Stop(3, false, false)
+  Stop(3, false, false);
 }

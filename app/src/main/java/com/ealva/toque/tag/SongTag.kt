@@ -27,6 +27,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.ealvalog.w
 import com.ealva.toque.common.debug
+import com.ealva.toque.log._e
 import com.ealva.toque.service.media.MediaFormat
 import com.ealva.toque.service.media.MediaType
 import com.ealva.toque.service.media.Mp3Rating

@@ -17,6 +17,7 @@
 package com.ealva.toque.service.player
 
 import android.net.Uri
+import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId

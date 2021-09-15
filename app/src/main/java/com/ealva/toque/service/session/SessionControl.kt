@@ -184,7 +184,7 @@ private class SessionControlImpl(
   override fun skipToQueueItem(id: Long) = controls.skipToQueueItem(id)
   override fun pause() = controls.pause()
   override fun stop() = controls.stop()
-  override fun seekTo(pos: Millis) = controls.seekTo(pos.value)
+  override fun seekTo(pos: Millis) = controls.seekTo(pos())
   override fun fastForward() = controls.fastForward()
   override fun skipToNext() = controls.skipToNext()
   override fun rewind() = controls.rewind()

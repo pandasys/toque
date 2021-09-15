@@ -20,8 +20,8 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.ealvalog.w
 import com.ealva.toque.common.Millis
-import com.ealva.toque.db.QueueStateDao.Companion.UNINITIALIZED_STATE
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.isValid
 import com.ealva.welite.db.Database
@@ -38,6 +38,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
@@ -47,7 +48,7 @@ import java.util.concurrent.Executors
 private val LOG by lazyLogger(QueueStateTable::class)
 
 @JvmInline
-value class QueueId(val value: Long)
+value class QueueId(val value: Int)
 
 data class QueueState(
   val mediaId: MediaId,
@@ -90,7 +91,7 @@ interface QueueStateDao {
    * Persist the state. Hands off the state ASAP and if invoked quickly enough only the last value
    * is persisted (conflated)
    */
-  fun persistState(state: QueueState)
+  fun persistState(state: QueueState): QueueState
 
   /**
    * Cancels the underlying state flow collector job and no further values will be persisted.
@@ -107,7 +108,7 @@ interface QueueStateDao {
     /**
      * If no state has been persisted this is the value returned [getState]
      */
-    val UNINITIALIZED_STATE = QueueState(MediaId.INVALID, 0, Millis.ZERO)
+    val UNINITIALIZED_STATE = QueueState.INACTIVE_QUEUE_STATE
 
     /**
      * Default dispatcher should only be changed for tests
@@ -128,35 +129,38 @@ private class QueueStateDaoImpl(
   private var closed = false
   private val scope =
     CoroutineScope(dispatcher ?: Executors.newSingleThreadExecutor().asCoroutineDispatcher())
-  private val stateFlow = MutableStateFlow(UNINITIALIZED_STATE)
+  private val stateFlow = MutableStateFlow(QueueState.INACTIVE_QUEUE_STATE)
   private val collectJob = scope.launch {
     stateFlow
-      .onEach { state ->
-        if (state.mediaId.isValid) {
-          db.transaction {
-            val updateResult = UPDATE.update {
-              it[BIND_QUEUE_ID] = queueId.value
-              it[BIND_MEDIA_ID] = state.mediaId.value
-              it[BIND_QUEUE_INDEX] = state.queueIndex
-              it[BIND_POSITION] = state.playbackPosition.value
-            }
-            if (updateResult < 1) {
-              LOG.i { it("MediaServiceStateTable queueId:$queueId not initialized, inserting row") }
-              val insertResult = QueueStateTable.insert {
-                it[id] = queueId.value
-                it[mediaId] = state.mediaId.value
-                it[queueIndex] = state.queueIndex
-                it[playbackPosition] = state.playbackPosition.value
-              }
-              if (insertResult < 1) {
-                LOG.e { it("Update and insert fail, service state not persisted") }
-              }
-            }
+      .onEach { state -> handleNewQueueState(state) }
+      .catch { cause -> LOG.e(cause) { it("Error processing QueueDao state flow") } }
+      .onCompletion { LOG.i { it("QueueStateDao $queueId completed") } }
+      .collect()
+  }
+
+  private suspend fun handleNewQueueState(state: QueueState) {
+    if (state.mediaId.isValid) {
+      db.transaction {
+        val updateResult = UPDATE.update {
+          it[BIND_QUEUE_ID] = queueId.value
+          it[BIND_MEDIA_ID] = state.mediaId.value
+          it[BIND_QUEUE_INDEX] = state.queueIndex
+          it[BIND_POSITION] = state.playbackPosition()
+        }
+        if (updateResult < 1) {
+          LOG.w { it("MediaServiceStateTable queueId:$queueId not initialized, inserting row") }
+          val insertResult = QueueStateTable.insert {
+            it[id] = queueId.value
+            it[mediaId] = state.mediaId.value
+            it[queueIndex] = state.queueIndex
+            it[playbackPosition] = state.playbackPosition()
+          }
+          if (insertResult < 1) {
+            LOG.e { it("Update and insert fail, service state not persisted") }
           }
         }
       }
-      .onCompletion { LOG.i { it("QueueStateDao $queueId completed") } }
-      .collect()
+    }
   }
 
   override suspend fun getState(): DaoResult<QueueState> = db.transaction {
@@ -171,12 +175,13 @@ private class QueueStateDaoImpl(
       .where { id eq queueId.value }
       .sequence { QueueState(MediaId(it[mediaId]), it[queueIndex], Millis(it[playbackPosition])) }
       .singleOrNull()
-      ?: UNINITIALIZED_STATE
+      ?: QueueState.INACTIVE_QUEUE_STATE
   }
 
-  override fun persistState(state: QueueState) {
+  override fun persistState(state: QueueState): QueueState {
     check(!closed) { "" }
     stateFlow.value = state
+    return state
   }
 
   override fun close() {
@@ -188,7 +193,7 @@ private class QueueStateDaoImpl(
     get() = closed
 }
 
-private val BIND_QUEUE_ID = bindLong()
+private val BIND_QUEUE_ID = bindInt()
 private val BIND_MEDIA_ID = bindLong()
 private val BIND_QUEUE_INDEX = bindInt()
 private val BIND_POSITION = bindLong()

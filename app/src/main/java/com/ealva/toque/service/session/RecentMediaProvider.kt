@@ -19,5 +19,5 @@ package com.ealva.toque.service.session
 import android.support.v4.media.MediaDescriptionCompat
 
 interface RecentMediaProvider {
-  fun getRecentMedia(): MediaDescriptionCompat?
+  suspend fun getRecentMedia(): MediaDescriptionCompat?
 }

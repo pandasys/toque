@@ -24,6 +24,7 @@ import com.ealva.toque.persist.PersistentId.Companion.ID_INVALID
 import com.ealva.toque.persist.PersistentId.Companion.isValidId
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
+import it.unimi.dsi.fastutil.longs.LongLists
 
 /**
  * Interface for persistent IDs, used to define [value] property, the constant [ID_INVALID], and
@@ -36,6 +37,9 @@ interface PersistentId {
   companion object {
     const val ID_INVALID = -1L
     inline fun isValidId(id: Long): Boolean = id > 0
+    val INVALID = object : PersistentId {
+      override val value: Long = ID_INVALID
+    }
   }
 }
 
@@ -62,6 +66,7 @@ inline fun Int.toMediaId() = toLong().toMediaId()
 
 @JvmInline
 value class MediaId(override val value: Long) : PersistentId {
+  inline operator fun invoke(): Long = value
   companion object {
     val INVALID = MediaId(ID_INVALID)
   }
@@ -81,16 +86,20 @@ value class MediaIdList(val value: LongList) : Iterable<MediaId> {
 
   inline operator fun get(index: Int): MediaId = value.getLong(index).toMediaId()
 
-  companion object {
-    inline operator fun invoke(capacity: Int = 16): MediaIdList =
-      MediaIdList(LongArrayList(capacity))
-  }
-
   override fun iterator(): Iterator<MediaId> = idIterator(value, ::MediaId)
 
   override fun toString(): String = buildString {
     append("MediaIdList")
     append(value.toString())
+  }
+
+  companion object {
+    inline operator fun invoke(capacity: Int = 16): MediaIdList =
+      MediaIdList(LongArrayList(capacity))
+
+    operator fun invoke(mediaId: Long): MediaIdList = MediaIdList(LongLists.singleton(mediaId))
+
+    val EMPTY_LIST = MediaIdList(LongLists.EMPTY_LIST)
   }
 }
 

@@ -16,9 +16,12 @@
 
 package com.ealva.toque.service.vlc
 
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.StartPaused
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -27,6 +30,7 @@ import kotlinx.coroutines.withContext
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
+import java.io.FileNotFoundException
 
 interface LibVlcSingleton {
   /**
@@ -58,6 +62,7 @@ private class LibVlcSingletonImpl(
    */
   private suspend fun make(): LibVlc {
     return LibVlcImpl(
+      context,
       LibVLC(context, libVlcOptions(prefsSingleton.instance(), vlcUtil ?: VlcUtil(context)))
     )
   }
@@ -70,6 +75,8 @@ private class LibVlcSingletonImpl(
     mutex.withLock { instance ?: make().also { instance = it } }
   }
 }
+
+private val LOG by lazyLogger(LibVlc::class)
 
 interface LibVlc {
   fun libVlcVersion(): String
@@ -87,7 +94,7 @@ interface LibVlc {
   fun makeAudioMedia(
     uri: Uri,
     initialSeek: Millis,
-    startPaused: Boolean,
+    startPaused: StartPaused,
     prefs: LibVlcPrefs
   ): IMedia
 
@@ -100,36 +107,41 @@ interface LibVlc {
 inline fun Millis.toFloat(): Float = value.toFloat()
 
 private class LibVlcImpl(
+  context: Context,
   private val libVLC: LibVLC
 ) : LibVlc {
-
-  override fun libVlcVersion(): String {
-    return LibVLC.version()
-  }
+  private val resolver = context.contentResolver
+  override fun libVlcVersion(): String = LibVLC.version()
 
   override fun makeNativeMedia(uri: Uri): IMedia {
-    return org.videolan.libvlc.Media(libVLC, uri)
+    return when (uri.scheme) {
+      ContentResolver.SCHEME_CONTENT -> makeNativeMediaFromContentUri(uri)
+      else -> org.videolan.libvlc.Media(libVLC, uri)
+    }
   }
+
+  private fun makeNativeMediaFromContentUri(uri: Uri) =
+    resolver.openFileDescriptor(uri, "r")?.let { parcelFileDescriptor ->
+      org.videolan.libvlc.Media(libVLC, parcelFileDescriptor.fileDescriptor)
+    } ?: throw FileNotFoundException(uri.toString())
 
   override fun makeAudioMedia(
     uri: Uri,
     initialSeek: Millis,
-    startPaused: Boolean,
+    startPaused: StartPaused,
     prefs: LibVlcPrefs
-  ): IMedia {
-    return makeNativeMedia(uri).setAudioMediaOptions(startPaused, initialSeek, prefs)
-  }
+  ): IMedia = makeNativeMedia(uri).setAudioMediaOptions(startPaused, initialSeek, prefs)
 
   private fun IMedia.setAudioMediaOptions(
-    startPaused: Boolean,
+    startPaused: StartPaused,
     initialSeek: Millis,
     prefs: LibVlcPrefs
   ) = apply {
-    if (startPaused) {
+    if (startPaused()) {
       addMediaOption { ":start-paused" }
     }
     if (initialSeek > Millis.ZERO) {
-      addMediaOption { """:start-time=${initialSeek.toFloat()}""" }
+      addMediaOption { """:start-time=${initialSeek.toFloatSeconds()}""" }
     }
     addMediaOption { ":no-video" }
     addMediaOption { ":no-volume-save" }

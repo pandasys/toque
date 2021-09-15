@@ -20,8 +20,8 @@ import android.content.Context
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.audio.AudioOutputRoute
-import com.ealva.toque.audio.AudioOutputState
+import com.ealva.toque.audioout.AudioOutputRoute
+import com.ealva.toque.audioout.AudioOutputState
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.EqPresetAssociationDao
@@ -30,6 +30,7 @@ import com.ealva.toque.db.EqPresetInfo
 import com.ealva.toque.db.NullEqPresetDao
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
+import com.ealva.toque.service.audio.EqPresetSelector
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPresetFactory
 import com.ealva.toque.service.media.EqPresetFactory.Companion.DEFAULT_SYSTEM_PRESET_NAME
@@ -50,11 +51,13 @@ class VlcPresetFactory(
   private val eqPresetAssocDao: EqPresetAssociationDao,
   private val audioOutputState: AudioOutputState
 ) : EqPresetFactory, EqPresetSelector {
-  override val bandCount: Int = MediaPlayer.Equalizer.getBandCount()
-  override val bandIndices: IntRange = 0 until bandCount
+  override val bandCount: Int
+    get() = MediaPlayer.Equalizer.getBandCount()
+  override val bandIndices: IntRange by lazy { 0 until bandCount }
   override val allPresets: List<EqPresetInfo>
     get() = TODO("Not yet implemented")
-  override val systemPresetCount: Int = MediaPlayer.Equalizer.getPresetCount()
+  override val systemPresetCount: Int
+    get() = presetCount
 
   override suspend fun getPreset(presetId: Long): Result<EqPreset, DaoMessage> =
     runCatching {
@@ -131,13 +134,21 @@ class VlcPresetFactory(
     get() = NONE
 
   companion object {
-    private var defaultPresetId: Long = 0L
+    private val presetCount: Int
+      get() = MediaPlayer.Equalizer.getPresetCount()
 
-    init {
-      for (i in 0 until MediaPlayer.Equalizer.getPresetCount()) {
-        if (MediaPlayer.Equalizer.getPresetName(i) == DEFAULT_SYSTEM_PRESET_NAME)
-          defaultPresetId = i.toLong()
+    /** Try to set the default to "Flat" system preset */
+    private var systemDefaultPresetId = 0L
+    private val defaultPresetId: Long
+      get() {
+        if (systemDefaultPresetId == 0L) {
+          for (i in 0 until presetCount) {
+            if (MediaPlayer.Equalizer.getPresetName(i)
+                .equals(DEFAULT_SYSTEM_PRESET_NAME, ignoreCase = true)
+            ) systemDefaultPresetId = i.toLong()
+          }
+        }
+        return systemDefaultPresetId
       }
-    }
   }
 }

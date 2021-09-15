@@ -16,33 +16,14 @@
 
 package com.ealva.toque.service.queue
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.Title
-import com.ealva.toque.common.toTitle
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.PersistentId
 
-interface QueueMediaItem : HasId {
-  val isValid: Boolean
-
-  val title: Title
-
-  val duration: Millis
-
-  val position: Millis
-
-  val isPlaying: Boolean
-}
+interface QueueMediaItem : HasId
 
 object NullQueueMediaItem : QueueMediaItem {
   override val id = object : PersistentId {
     override val value: Long = PersistentId.ID_INVALID
   }
-
-  override val isValid: Boolean = false
-  override val title: Title = "NullItem".toTitle()
-  override val duration: Millis = Millis.ZERO
-  override val position: Millis = Millis.ZERO
-  override val isPlaying: Boolean = false
-  override val instanceId: Long = -1
+  override val instanceId: Long = id.value
 }

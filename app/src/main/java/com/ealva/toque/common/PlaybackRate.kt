@@ -30,6 +30,8 @@ value class PlaybackRate(val value: Float) : Comparable<PlaybackRate> {
 
   override fun compareTo(other: PlaybackRate): Int = value.compareTo(other.value)
 
+  inline operator fun invoke(): Float = value
+
   companion object {
     operator fun invoke(rate: Double) = PlaybackRate(rate.toFloat())
 

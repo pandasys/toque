@@ -23,6 +23,7 @@ import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.BooleanValue
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.persist.HasConstId
@@ -39,19 +40,26 @@ open class BaseToquePreferenceStore<T : PreferenceStore<T>>(
     default: Millis,
     customName: String? = null,
     sanitize: ((Millis) -> Millis)? = null
-  ): MillisStorePref = asTypePref(default, ::Millis, { it.value }, customName, sanitize)
+  ): MillisStorePref = asTypePref(default, ::Millis, { it() }, customName, sanitize)
+
+  protected fun <T : BooleanValue> booleanValuePref(
+    default: T,
+    maker: (Boolean) -> T,
+    customName: String? = null,
+    sanitize: ((T) -> T)? = null
+  ): StorePref<Boolean, T> = asTypePref(default, maker, { it.value }, customName, sanitize)
 
   protected fun volumePref(
     default: Volume,
     customName: String? = null,
     sanitize: ((Volume) -> Volume)? = null
-  ): VolumeStorePref = asTypePref(default, ::Volume, { it.value }, customName, sanitize)
+  ): VolumeStorePref = asTypePref(default, ::Volume, { it() }, customName, sanitize)
 
   protected fun ampPref(
     default: Amp,
     customName: String? = null,
-    sanitize: ((Amp) -> Amp)? = null
-  ): AmpStorePref = asTypePref(default, ::Amp, { it.value }, customName, sanitize)
+    sanitize: ((Amp) -> Amp) = { it.coerceIn(Amp.RANGE) }
+  ): AmpStorePref = asTypePref(default, ::Amp, { it() }, customName, sanitize)
 
   protected inline fun <reified T> enumPref(
     default: T,

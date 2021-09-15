@@ -19,7 +19,7 @@ package com.ealva.toque.service.player
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.NullSuspendingThrottle
 import com.ealva.toque.common.Volume
-import com.ealva.toque.common.toMillis
+import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
@@ -40,7 +40,7 @@ class ShutdownFadeoutTransitionTest {
   fun init() {
     player = TransitionPlayerStub()
     transition = ShutdownFadeOutTransition(
-      2000.toMillis(),
+      Millis(2000),
       NullSuspendingThrottle,
       coroutineRule.testDispatcher
     )
@@ -72,9 +72,9 @@ class ShutdownFadeoutTransitionTest {
   @Test
   fun execute() = coroutineRule.runBlockingTest {
     // given
-    player._volume = Volume.ONE_HUNDRED
+    player._volume = Volume.MAX
     player._isPlaying = true
-    player._remainingTime = 2000.toMillis()
+    player._remainingTime = Millis(2000)
     player._shouldContinue = true
 
     // when
@@ -88,7 +88,7 @@ class ShutdownFadeoutTransitionTest {
     expect(player._shouldContinueCalled).toBeGreaterThan(0)
     expect(player._remainingTimeCalled).toBe(1)
     expect(player._volumeSetCalled).toBeGreaterThan(20)
-    expect(player._volume).toBe(Volume.ZERO)
+    expect(player._volume).toBe(Volume.NONE)
     expect(transition.isCancelled).toBe(false)
     expect(transition.isFinished).toBe(true)
   }

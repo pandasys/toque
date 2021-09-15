@@ -20,16 +20,12 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
-private const val APP_PREFS_FILENAME = "AppPrefsToque"
+private const val APP_PREFS_FILENAME = "AppPrefs"
 
 object PrefsModule {
   val koinModule = module {
     single(named("AppPrefs")) {
-      AppPrefsSingleton(
-        AppPrefs.Companion::make,
-        androidContext(),
-        APP_PREFS_FILENAME
-      )
+      AppPrefsSingleton(AppPrefs.Companion::make, androidContext(), APP_PREFS_FILENAME)
     }
   }
 }

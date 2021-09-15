@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.koin.android.ext.android.inject
-import org.koin.core.component.inject
 import org.koin.core.qualifier.named
 
 private val LOG by lazyLogger(ArtworkSearchService::class)

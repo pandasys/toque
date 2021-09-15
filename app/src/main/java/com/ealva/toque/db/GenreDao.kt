@@ -164,7 +164,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   ): GenreId = getOrInsertLock.withLock {
     getGenreId(newGenre) ?: INSERT_GENRE.insert {
       it[genre] = newGenre
-      it[createdTime] = createTime.value
+      it[createdTime] = createTime()
     }.toGenreId().also { id -> genreIdList += id }
   }
 }

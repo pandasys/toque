@@ -27,7 +27,6 @@ import com.ealva.toque.common.MillisRange
 import com.ealva.toque.prefs.AmpStorePref
 import com.ealva.toque.prefs.BaseToquePreferenceStore
 import com.ealva.toque.prefs.MillisStorePref
-import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.NETWORK_CACHING_RANGE
 
 typealias LibVlcPrefsSingleton = PreferenceStoreSingleton<LibVlcPrefs>
@@ -66,13 +65,13 @@ private class LibVlcPrefsImpl(
   }
   override val subtitleEncoding by enumPref(SubtitleEncoding.DEFAULT)
   override val replayGainMode by enumPref(ReplayGainMode.DEFAULT)
-  override val replayPreamp by ampPref(Amp.ZERO) {
-    it.coerceIn(EqPreset.AMP_RANGE)
+  override val replayPreamp by ampPref(Amp.NONE) {
+    it.coerceIn(Amp.RANGE)
   }
 
   @Suppress("MagicNumber")
   override val defaultReplayGain by ampPref(Amp(-7F)) {
-    it.coerceIn(EqPreset.AMP_RANGE)
+    it.coerceIn(Amp.RANGE)
   }
   override val enableFrameSkip by preference(false)
   override val skipLoopFilter by enumPref(SkipLoopFilter.DEFAULT)
