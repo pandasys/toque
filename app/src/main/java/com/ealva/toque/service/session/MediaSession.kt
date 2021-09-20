@@ -70,8 +70,8 @@ import com.ealva.toque.app.Toque
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.asCompat
-import com.ealva.toque.common.debug
 import com.ealva.toque.common.fetch
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
 import com.ealva.toque.service.controller.MediaSessionEvent
 import com.ealva.toque.service.session.PlaybackState.Companion.NullPlaybackState
@@ -210,6 +210,7 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
   companion object {
     operator fun invoke(
       context: Context,
+      audioMediaDao: AudioMediaDao,
       notificationListener: MediaSessionState.NotificationListener,
       lifecycleOwner: LifecycleOwner,
       active: Boolean,
@@ -218,6 +219,7 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
       return MediaSessionImpl(
         context,
         makeMediaSessionCompat(context, active),
+        audioMediaDao,
         context.requireSystemService<NotificationManager>().apply {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             createNotificationChannel(NOW_PLAYING_CHANNEL_ID)
@@ -271,6 +273,7 @@ private val Context.mediaSessionTag: String
 private class MediaSessionImpl(
   private val ctx: Context,
   private val session: MediaSessionCompat,
+  audioMediaDao: AudioMediaDao,
   private val notificationManager: NotificationManager,
   audioManager: AudioManager,
   private val notificationListener: MediaSessionState.NotificationListener,
@@ -417,7 +420,7 @@ private class MediaSessionImpl(
     return if (lastMetadata === Metadata.NullMetadata) null else lastMetadata.toCompat().description
   }
 
-  override var browser: MediaSessionBrowser = MediaSessionBrowser(this, scope)
+  override var browser: MediaSessionBrowser = MediaSessionBrowser(this, audioMediaDao, scope)
 
   @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
   fun onDestroy() {

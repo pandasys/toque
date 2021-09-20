@@ -22,16 +22,14 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.MediaPlayerEvent
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
 interface AvPlayer {
-  val eventFlow: SharedFlow<MediaPlayerEvent>
+  val eventFlow: SharedFlow<AvPlayerEvent>
 
   val isSeekable: Boolean
   val isPausable: Boolean
-  val isPrepared: Boolean
   val isValid: Boolean
   val equalizer: EqPreset
   val duration: Millis
@@ -50,8 +48,8 @@ interface AvPlayer {
   val isAudioPlayer: Boolean
 
   fun playStartPaused()
-  fun play(immediate: Boolean = false)
-  fun pause(immediate: Boolean = false)
+  fun play(immediateTransition: Boolean = false)
+  fun pause(immediateTransition: Boolean = false)
   fun seek(position: Millis)
   fun stop()
   fun shutdown()
@@ -76,18 +74,79 @@ interface AvPlayer {
   }
 }
 
+/**
+ * Events which emanate from [AvPlayer.eventFlow] regarding the state of the player
+ */
+sealed interface AvPlayerEvent {
+  /**
+   * The player has been prepared, which currently means it has progressed far enough through
+   * opening and buffering that it is considered "playable". [position] is within 0..[duration]. The
+   * starting playback position is not always Millis(0).
+   */
+  data class Prepared(val position: Millis, val duration: Millis) : AvPlayerEvent
+  /**
+   * The position within the media has changed. [position] is within 0..[duration]. If [isPlaying]
+   * this PositionUpdate is due to media playing else it's due to user seeking.
+   */
+  data class PositionUpdate(
+    val position: Millis,
+    val duration: Millis,
+    val isPlaying: Boolean
+  ) : AvPlayerEvent
+
+  /**
+   * Playback has started. If [firstStart] is true it's the first time the user has initiated
+   * playback, either via pressing play or manually/automatically transition from one media to
+   * the next.
+   */
+  data class Start(val firstStart: Boolean) : AvPlayerEvent
+
+  /**
+   * Playback has been paused. The [position] is the time reported by the underlying MediaPlayer
+   */
+  data class Paused(val position: Millis) : AvPlayerEvent
+
+  /**
+   * Playback has been stopped. This differs from paused in that resources are released as if
+   * playback will not resume. The underlying player should support resumption but must reacquire
+   * necessary resources and prepare for playback.
+   */
+  data class Stopped(val position: Millis) : AvPlayerEvent
+
+  /**
+   * Playback has reached the end of the media.
+   */
+  object PlaybackComplete : AvPlayerEvent {
+    override fun toString(): String = "PlaybackComplete"
+  }
+
+  /**
+   * The was an error during playback. The player isn't valid anymore and playback has stopped.
+   */
+  object Error : AvPlayerEvent {
+    override fun toString(): String = "Error"
+  }
+
+  /**
+   * Placeholder for primordial event if necessary, such as a StateFlow of some type. Currently,
+   * player implementations use a SharedFlow to support replay for a client which is not
+   * well-established when the flow starts.
+   */
+  object None : AvPlayerEvent {
+    override fun toString(): String = "None"
+  }
+}
 object NullAvPlayer : AvPlayer {
-  override val eventFlow: SharedFlow<MediaPlayerEvent> = MutableSharedFlow()
+  override val eventFlow: SharedFlow<AvPlayerEvent> = MutableSharedFlow()
   override val isSeekable: Boolean = false
   override val isPausable: Boolean = false
-  override val isPrepared: Boolean = false
   override val isValid: Boolean = false
   override val equalizer: EqPreset = EqPreset.NONE
   override val duration: Millis = Millis.ZERO
   override val time: Millis = Millis.ZERO
   override val isPlaying: Boolean = false
   override val isPaused: Boolean = false
-  override val isShutdown: Boolean = true
+  override val isShutdown: Boolean = false
   override var volume: Volume = Volume.MAX
   override var isMuted: Boolean = false
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL
@@ -96,8 +155,8 @@ object NullAvPlayer : AvPlayer {
   override val isVideoPlayer: Boolean = false
   override val isAudioPlayer: Boolean = true
   override fun playStartPaused() = Unit
-  override fun play(immediate: Boolean) {}
-  override fun pause(immediate: Boolean) {}
+  override fun play(immediateTransition: Boolean) {}
+  override fun pause(immediateTransition: Boolean) {}
   override fun seek(position: Millis) {}
   override fun stop() {}
   override fun shutdown() {}

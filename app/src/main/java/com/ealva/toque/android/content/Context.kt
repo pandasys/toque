@@ -16,7 +16,19 @@
 
 package com.ealva.toque.android.content
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 
 inline fun <reified T : Any> Context.requireSystemService(): T = checkNotNull(getSystemService())
+fun Context.haveReadPermission() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+  ContextCompat.checkSelfPermission(
+    this,
+    Manifest.permission.READ_EXTERNAL_STORAGE
+  ) == PackageManager.PERMISSION_GRANTED
+} else true
+
+fun Context.doNotHaveReadPermission() = !haveReadPermission()

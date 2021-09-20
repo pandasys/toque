@@ -35,6 +35,7 @@ import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
+import com.ealva.toque.service.session.Metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -64,13 +65,19 @@ class PlayableAudioItemFake(
   override lateinit var location: Uri
   override lateinit var albumArt: Uri
   override lateinit var localAlbumArt: Uri
-  override suspend fun play(immediate: Boolean) = Unit
+  override val metadata: Metadata = Metadata.NullMetadata
+  override suspend fun play(immediateTransition: Boolean) = Unit
   override fun stop() = Unit
-  override fun pause(immediate: Boolean) = Unit
+  override fun pause(immediateTransition: Boolean) = Unit
   override suspend fun seekTo(position: Millis) = Unit
   override fun shutdown() = Unit
   override fun shutdown(shutdownTransition: PlayerTransition) = Unit
-  override suspend fun reset(presetSelector: EqPresetSelector, playNow: PlayNow, position: Millis) =
+  override suspend fun reset(
+    presetSelector: EqPresetSelector,
+    position: Millis,
+    immediateTransition: Boolean,
+    playNow: PlayNow
+  ) =
     Unit
 
   override suspend fun prepareSeekMaybePlay(
@@ -88,5 +95,7 @@ class PlayableAudioItemFake(
 
   override fun checkMarkSkipped() = Unit
   override suspend fun setRating(newRating: Rating) = Unit
+  override fun previousShouldRewind(): Boolean = false
+
   override val artist: ArtistName = ArtistName.UNKNOWN
 }

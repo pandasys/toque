@@ -39,12 +39,12 @@ class ShutdownFadeOutTransition(
   override fun maybeNotifyPaused(player: TransitionPlayer) = Unit
 
   override fun finishTransition(player: TransitionPlayer) {
-    player.shutdown()
+    player.shutdownPlayer()
     setComplete()
   }
 
   override fun cancelTransition(player: TransitionPlayer) {
-    player.shutdown()
+    player.shutdownPlayer()
   }
 
   override fun toString(): String {

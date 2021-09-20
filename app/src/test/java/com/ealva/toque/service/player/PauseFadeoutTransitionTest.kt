@@ -27,6 +27,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PauseFadeoutTransitionTest {

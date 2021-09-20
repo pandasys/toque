@@ -46,8 +46,6 @@ interface MediaPlayerServiceConnection {
 
 /**
  * Encapsulates binding to the media player service
- *
- * Created by eric on 7/31/16.
  */
 private class MediaPlayerServiceConnectionImpl(
   private val context: Context
@@ -58,8 +56,10 @@ private class MediaPlayerServiceConnectionImpl(
   override val mediaController = MutableStateFlow<ToqueMediaController>(NullMediaController)
 
   override fun bind(): Boolean {
-    serviceConnection = bindToService(context, context.javaClass.name)
-    isBound = serviceConnection != null
+    if (!isBound) {
+      serviceConnection = bindToService(context, context.javaClass.name)
+      isBound = serviceConnection != null
+    }
     return isBound
   }
 

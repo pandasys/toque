@@ -87,7 +87,7 @@ class ShutdownFadeoutTransitionTest {
     expect(player._volumeGetCalled).toBe(1)
     expect(player._shouldContinueCalled).toBeGreaterThan(0)
     expect(player._remainingTimeCalled).toBe(1)
-    expect(player._volumeSetCalled).toBeGreaterThan(20)
+    expect(player._volumeSetCalled).toBeGreaterThan(19)
     expect(player._volume).toBe(Volume.NONE)
     expect(transition.isCancelled).toBe(false)
     expect(transition.isFinished).toBe(true)

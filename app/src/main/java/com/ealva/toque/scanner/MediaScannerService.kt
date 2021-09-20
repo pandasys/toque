@@ -34,6 +34,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
 import com.ealva.toque.R
+import com.ealva.toque.android.content.doNotHaveReadPermission
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
@@ -92,11 +93,15 @@ class MediaScannerService : LifecycleService() {
     requireNotNull(getSystemService())
   }
   private lateinit var notificationChannel: NotificationChannel
-  private lateinit var job: Job
-  private lateinit var workEnqueuer: WorkEnqueuer
+  private var job: Job? = null
+  private var workEnqueuer: WorkEnqueuer? = null
 
   override fun onCreate() {
     super.onCreate()
+    if (doNotHaveReadPermission()) {
+      stopSelf()
+      return
+    }
     workEnqueuer = WorkEnqueuer.getWorkEnqueuer(this)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       notificationManager.createNotificationChannel(
@@ -115,10 +120,10 @@ class MediaScannerService : LifecycleService() {
           if (cause != null && cause !is CancellationException) {
             LOG.e(cause) { it("workFlow completed with cause=%s", cause) }
           }
-          workEnqueuer.serviceProcessingFinished()
+          workEnqueuer?.serviceProcessingFinished()
         }
         .collect { work ->
-          workEnqueuer.serviceProcessingStarted()
+          workEnqueuer?.serviceProcessingStarted()
           if (work.intent != null) onHandleWork(work.intent)
           stopSelf(work.startId)
         }
@@ -127,7 +132,10 @@ class MediaScannerService : LifecycleService() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     super.onStartCommand(intent, flags, startId)
-    workEnqueuer.serviceStartReceived()
+    if (doNotHaveReadPermission()) {
+      return START_NOT_STICKY
+    }
+    workEnqueuer?.serviceStartReceived()
     LOG.i { it("onStartCommand id=%d action=%s", startId, intent?.action ?: "null") }
     val work = Work(intent, startId)
     lifecycleScope.launch {
@@ -139,9 +147,9 @@ class MediaScannerService : LifecycleService() {
   override fun onDestroy() {
     super.onDestroy()
     _isScanning.value = false
-    workEnqueuer.serviceProcessingFinished()
+    workEnqueuer?.serviceProcessingFinished()
     stopNotification()
-    job.cancel()
+    job?.cancel()
   }
 
   private fun startNotification() {
@@ -261,12 +269,16 @@ class MediaScannerService : LifecycleService() {
 
     fun startScanner(context: Context, reason: String, rescan: RescanType) {
       LOG.i { it("reason=%s rescan=%s", reason, rescan) }
-      val intent = Intent(context, MediaScannerService::class.java).apply {
-        action = ACTION_FULL_RESCAN
-        scanReason = reason
-        rescanType = rescan
+      if (context.doNotHaveReadPermission()) {
+        LOG.e { it("Don't have read external permission. Not starting media scanner.") }
+      } else {
+        val intent = Intent(context, MediaScannerService::class.java).apply {
+          action = ACTION_FULL_RESCAN
+          scanReason = reason
+          rescanType = rescan
+        }
+        WorkEnqueuer.getWorkEnqueuer(context).enqueueWork(intent)
       }
-      WorkEnqueuer.getWorkEnqueuer(context).enqueueWork(intent)
     }
   }
 }

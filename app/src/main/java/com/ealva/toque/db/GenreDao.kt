@@ -16,6 +16,7 @@
 
 package com.ealva.toque.db
 
+import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -28,6 +29,7 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
@@ -59,7 +61,7 @@ sealed class GenreDaoEvent {
   data class GenresCreatedOrUpdated(val genreIdList: GenreIdList) : GenreDaoEvent()
 }
 
-data class GenreIdName(val genreId: GenreId, val genreName: String)
+data class GenreIdName(val genreId: GenreId, val genreName: GenreName)
 
 /**
  * If a function receives a transaction parameter it is not suspending, whereas suspend functions
@@ -85,6 +87,7 @@ interface GenreDao {
   fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long
 
   suspend fun getAllGenreNames(limit: Long): Result<List<GenreIdName>, DaoMessage>
+  suspend fun getNextGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
 
   companion object {
     operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
@@ -135,9 +138,30 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .all()
     .orderByAsc { genre }
     .limit(limit)
-    .sequence { GenreIdName(it[id].toGenreId(), it[genre]) }
+    .sequence { GenreIdName(it[id].toGenreId(), GenreName(it[genre])) }
     .toList()
 
+  override suspend fun getNextGenre(
+    genreName: GenreName
+  ): Result<GenreIdName, DaoMessage> = db.query {
+    runCatching {
+      LOG.i { it("getNextGenre after %s", genreName) }
+      doGetNextGenre(genreName)
+    }.mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no genre name > greater than [previousGenre]
+   */
+  private fun Queryable.doGetNextGenre(
+    previousGenre: GenreName
+  ): GenreIdName = GenreTable
+    .selects { listOf(id, genre) }
+    .where { genre greater previousGenre.value }
+    .orderByAsc { genre }
+    .limit(1)
+    .sequence { GenreIdName(GenreId(it[id]), GenreName(it[genre])) }
+    .single()
   /**
    * Could be a race condition if two threads are trying to insert the same genre at the same time,
    * so use a pattern similar to double check locking. Try the query, if result is null obtain a

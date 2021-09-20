@@ -122,9 +122,7 @@ fun buildErrorState(
   setErrorMessage(code(), fetch(res))
 }
 
-val EMPTY_PLAYBACK_STATE: PlaybackStateCompat = buildPlaybackState {
-  setState(PlaybackStateCompat.STATE_NONE, 0, 0f)
-}
+val EMPTY_PLAYBACK_STATE: PlaybackStateCompat = PlaybackStateCompat.Builder().build()
 
 /*
  private fun publishState(position: Long? = null) {

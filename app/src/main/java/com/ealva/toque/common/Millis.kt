@@ -19,6 +19,7 @@
 package com.ealva.toque.common
 
 import java.util.Date
+import kotlin.math.abs
 
 typealias MillisRange = ClosedRange<Millis>
 
@@ -29,8 +30,6 @@ value class Millis(val value: Long) : Comparable<Millis> {
   inline operator fun invoke(): Long = value
 
   override fun toString(): String = value.toString()
-
-  inline fun toDouble(): Double = value.toDouble()
 
   fun toFloatSeconds(): Float = value / MILLIS_PER_SECOND
 
@@ -49,6 +48,8 @@ value class Millis(val value: Long) : Comparable<Millis> {
   inline operator fun compareTo(rhs: Long): Int = value.compareTo(rhs)
   inline operator fun compareTo(rhs: Int): Int = value.compareTo(rhs)
 
+  fun asPercentageOf(total: Millis): Double = value.toDouble() / total.value
+
   inline fun toDate(): Date = Date(value)
 
   companion object {
@@ -63,5 +64,6 @@ value class Millis(val value: Long) : Comparable<Millis> {
     val FIVE_SECONDS = Millis(5000)
     val TEN_SECONDS = Millis(10000)
     val ONE_MINUTE = Millis(60000)
+    val FOUR_MINUTES = Millis(240000)
   }
 }

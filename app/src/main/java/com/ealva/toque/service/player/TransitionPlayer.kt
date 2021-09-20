@@ -20,14 +20,24 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 
+/**
+ * TransitionPlayer is the interface PlayerTransition implementations see. The TransitionPlayer
+ * implementation is generally closer to the AvPlayer's underlying media player and will emit events
+ * at times an AvPlayer would not. For example, if the user pauses and there is a fade out
+ * transition, the transition will emit a Paused event while the player is still actually playing
+ * and the volume is fading. Visually the user sees the pause button take effect as expected but the
+ * audio is still fading, albeit very briefly. Also, during a cross fade, we don't want the user
+ * to see the play/pause button react, so the transitions control if the overall state is
+ * considered playing or paused.
+ */
 interface TransitionPlayer {
   val isPlaying: Boolean
 
   val isPaused: Boolean
 
-  val isShutdown: Boolean
+  val playerIsShutdown: Boolean
 
-  var volume: Volume
+  var playerVolume: Volume
 
   val volumeRange: VolumeRange
 
@@ -41,7 +51,7 @@ interface TransitionPlayer {
 
   fun play()
 
-  fun shutdown()
+  fun shutdownPlayer()
 
   fun shouldContinue(): Boolean
 }
@@ -53,10 +63,10 @@ object NullTransitionPlayer : TransitionPlayer {
   override val isPaused: Boolean
     get() = false
 
-  override val isShutdown: Boolean
+  override val playerIsShutdown: Boolean
     get() = false
 
-  override var volume: Volume
+  override var playerVolume: Volume
     get() = Volume.NONE
     set(@Suppress("UNUSED_PARAMETER") volume) {
     }
@@ -68,6 +78,6 @@ object NullTransitionPlayer : TransitionPlayer {
   override val remainingTime: Millis = Millis(0)
   override fun pause() = Unit
   override fun play() = Unit
-  override fun shutdown() = Unit
+  override fun shutdownPlayer() = Unit
   override fun shouldContinue() = false
 }

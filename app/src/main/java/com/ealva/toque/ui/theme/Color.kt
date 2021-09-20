@@ -31,3 +31,5 @@ val blue500 = Color(0xFF2196F3)
 val blue700 = Color(0xFF1976D2)
 val cyan200 = Color(0xFF80CBC4)
 val cyan700 = Color(0xFF0097A7)
+
+val toque = Color(0xFF3399FF)

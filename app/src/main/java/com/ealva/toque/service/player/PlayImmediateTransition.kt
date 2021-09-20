@@ -25,7 +25,7 @@ import com.ealva.toque.service.audio.PlayerTransition.Type
 class PlayImmediateTransition : BasePlayerTransition(Type.Play) {
   override suspend fun doExecute(player: TransitionPlayer) {
     player.play()
-    player.volume = Volume.MAX
+    player.playerVolume = Volume.MAX
     player.notifyPlaying()
     setComplete()
   }

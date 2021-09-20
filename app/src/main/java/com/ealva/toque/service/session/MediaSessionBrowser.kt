@@ -16,14 +16,12 @@
 
 package com.ealva.toque.service.session
 
-import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import androidx.core.net.toUri
-import androidx.core.text.isDigitsOnly
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.MediaBrowserServiceCompat.BrowserRoot
 import com.ealva.ealvalog.e
@@ -31,6 +29,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
 import com.ealva.toque.R
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.ArtistDao
 import com.ealva.toque.db.AudioDescription
@@ -56,7 +55,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 
 private val LOG by lazyLogger(MediaSessionBrowser::class)
 
@@ -92,9 +90,11 @@ interface MediaSessionBrowser {
 
     operator fun invoke(
       recentMediaProvider: RecentMediaProvider,
+      audioMediaDao: AudioMediaDao,
       scope: CoroutineScope,
       dispatcher: CoroutineDispatcher = Dispatchers.IO
     ): MediaSessionBrowser = MediaSessionBrowserImpl(
+      audioMediaDao,
       recentMediaProvider,
       scope,
       dispatcher
@@ -105,7 +105,7 @@ interface MediaSessionBrowser {
       extras: Bundle,
       onMediaType: OnMediaType<T>
     ): T {
-      return when (val id = mediaId.toPersistentId()) {
+      return when (val id = mediaId.trim().toPersistentId()) {
         is MediaId -> onMediaType.onMedia(id, extras)
         is ArtistId -> onMediaType.onArtist(id, extras)
         is AlbumId -> onMediaType.onAlbum(id, extras)
@@ -115,41 +115,28 @@ interface MediaSessionBrowser {
         else -> throw IllegalArgumentException("Unrecognized media ID")
       }
     }
-
-    object NullMediaSessionBrowser : MediaSessionBrowser {
-      override fun onGetRoot(
-        clientPackageName: String,
-        clientUid: Int,
-        rootHints: Bundle
-      ): BrowserRoot? = null
-
-      override fun onLoadChildren(parentId: String, result: BrowserResult) =
-        result.sendResult(emptyList())
-
-      override fun onSearch(query: String, extras: Bundle, result: BrowserResult) =
-        result.sendResult(emptyList())
-    }
   }
 }
 
 private typealias ItemListResult = Result<List<MediaItem>, DaoMessage>
 
 private class MediaSessionBrowserImpl(
+  private val audioMediaDao: AudioMediaDao,
   private val recentMediaProvider: RecentMediaProvider,
   private val scope: CoroutineScope,
   private val dispatcher: CoroutineDispatcher
 ) : MediaSessionBrowser, KoinComponent {
-  private val context: Context by inject()
-  private val artistDao: ArtistDao by inject()
-  private val albumDao: AlbumDao by inject()
-  private val genreDao: GenreDao by inject()
-  private val audioMediaDao: AudioMediaDao by inject()
+  private val artistDao: ArtistDao = audioMediaDao.artistDao
+  private val albumDao: AlbumDao = audioMediaDao.albumDao
+  private val genreDao: GenreDao = audioMediaDao.genreDao
 
   override fun onGetRoot(
     clientPackageName: String,
     clientUid: Int,
     rootHints: Bundle
-  ) = makeBrowserRoot(rootHints)
+  ): BrowserRoot = makeBrowserRoot(rootHints).also { root ->
+    LOG._e { it("root=%s", root.rootId) }
+  }
 
   private fun makeBrowserRoot(rootHints: Bundle): BrowserRoot {
     val rootExtras = Bundle().apply {
@@ -252,11 +239,11 @@ private class MediaSessionBrowserImpl(
   )
 
   private fun makeLibraryItemDesc() =
-    makeItemDesc(ID_LIBRARY, context.getString(R.string.Library), LIBRARY_ICON)
+    makeItemDesc(ID_LIBRARY, fetch(R.string.Library), LIBRARY_ICON)
 
   private fun makePlaylistItemDesc() = makeItemDesc(
     ID_PLAYLISTS,
-    context.getString(R.string.Playlists),
+    fetch(R.string.Playlists),
     PLAYLIST_ICON,
     extras = getContentStyle(CONTENT_STYLE_GRID, CONTENT_STYLE_GRID)
   )
@@ -277,11 +264,11 @@ private class MediaSessionBrowserImpl(
   }
 
   private fun makeArtistListItemDesc(): MediaDescriptionCompat =
-    makeItemDesc(ID_ARTISTS, context.getString(R.string.Artists), ARTIST_ICON)
+    makeItemDesc(ID_ARTISTS, fetch(R.string.Artists), ARTIST_ICON)
 
   private fun makeAlbumListItemDesc(): MediaDescriptionCompat = makeItemDesc(
     ID_ALBUMS,
-    context.getString(R.string.Albums),
+    fetch(R.string.Albums),
     ALBUM_ICON,
     extras = getContentStyle(CONTENT_STYLE_GRID, CONTENT_STYLE_LIST)
   )
@@ -364,14 +351,14 @@ private class MediaSessionBrowserImpl(
       .mapAll {
         Ok(
           MediaItem(
-            makeItemDesc(it.genreId, it.genreName, GENRE_ICON),
+            makeItemDesc(it.genreId, it.genreName.value, GENRE_ICON),
             MediaItemFlags.Browsable
           )
         )
       }
 
   private fun makeGenreListItemDesc(): MediaDescriptionCompat =
-    makeItemDesc(ID_GENRES, context.getString(R.string.Genres), GENRE_ICON)
+    makeItemDesc(ID_GENRES, fetch(R.string.Genres), GENRE_ICON)
 
   private suspend fun makeTrackList(): Result<List<MediaItem>, DaoMessage> =
     audioMediaDao
@@ -379,7 +366,7 @@ private class MediaSessionBrowserImpl(
       .mapToMediaList()
 
   private fun makeTrackListItemDesc(): MediaDescriptionCompat =
-    makeItemDesc(ID_TRACKS, context.getString(R.string.Tracks), TRACK_ICON)
+    makeItemDesc(ID_TRACKS, fetch(R.string.Tracks), TRACK_ICON)
 
 //  private suspend fun makeArtistTracksList(
 //    artistId: ArtistId
@@ -416,7 +403,7 @@ private class MediaSessionBrowserImpl(
   private fun makeEmptyMediaDesc(parentId: String) = MediaDescriptionCompat.Builder()
     .setMediaId(MediaSessionBrowser.ID_NO_MEDIA)
     .setIconUri(TRACK_ICON)
-    .setTitle(context.getString(R.string.No_media_found))
+    .setTitle(fetch(R.string.No_media_found))
     .apply {
       when (parentId) {
         ID_ARTISTS -> setIconUri(ARTIST_ICON)
@@ -424,7 +411,7 @@ private class MediaSessionBrowserImpl(
         ID_GENRES -> setIconUri(null)
         ID_PLAYLISTS -> {
           setMediaId(MediaSessionBrowser.ID_NO_PLAYLIST)
-          setTitle(context.getString(R.string.No_playlist_found))
+          setTitle(fetch(R.string.No_playlist_found))
         }
         // ID_STREAMS -> emptyMediaDesc.setIconUri(DEFAULT_STREAM_ICON)
       }
@@ -516,7 +503,7 @@ private class MediaSessionBrowserImpl(
       "android.resource://${BuildConfig.APPLICATION_ID}/drawable"
     private val ALBUM_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_album}".toUri()
     private val ARTIST_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_artist}".toUri()
-    private val STREAM_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_stream}".toUri()
+    //private val STREAM_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_stream}".toUri()
     private val PLAYLIST_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_playlist}".toUri()
     private val GENRE_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_drama_masks}".toUri()
     private val TRACK_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_audio}".toUri()
@@ -536,10 +523,16 @@ fun Bundle.isFocusedSearch(): Boolean {
   return this !== Bundle.EMPTY && containsKey(MediaStore.EXTRA_MEDIA_FOCUS)
 }
 
+/**
+ * Seems Android auto doesn't support an item being both playable and browsable. So need to add
+ * media items like "Shuffle All" and "Play All" in the contents of browsable items such as
+ * Album, Artist, Genre...
+ */
 enum class MediaItemFlags(private val flags: Int) {
   Playable(MediaItem.FLAG_PLAYABLE),
   Browsable(MediaItem.FLAG_BROWSABLE),
-  PlayAndBrowse(MediaItem.FLAG_PLAYABLE or MediaItem.FLAG_BROWSABLE);
+  /** Not usable until clients actually support it */
+  @Suppress("unused") PlayAndBrowse(MediaItem.FLAG_PLAYABLE or MediaItem.FLAG_BROWSABLE);
 
   val asCompat: Int
     get() = flags
@@ -564,19 +557,20 @@ const val CONTENT_STYLE_LIST = 1
 /** Specifies that the corresponding items should be presented as grids. */
 const val CONTENT_STYLE_GRID = 2
 
-/**
- * Specifies that the corresponding items should be presented as lists and are represented by a
- * vector icon. This adds a small margin around the icons instead of filling the full available
- * area.
- */
-const val CONTENT_STYLE_CATEGORY_LIST = 3
-
-/**
- * Specifies that the corresponding items should be presented as grids and are represented by a
- * vector icon. This adds a small margin around the icons instead of filling the full available
- * area.
- */
-const val CONTENT_STYLE_CATEGORY_GRID = 4
+//
+///**
+// * Specifies that the corresponding items should be presented as lists and are represented by a
+// * vector icon. This adds a small margin around the icons instead of filling the full available
+// * area.
+// */
+//const val CONTENT_STYLE_CATEGORY_LIST = 3
+//
+///**
+// * Specifies that the corresponding items should be presented as grids and are represented by a
+// * vector icon. This adds a small margin around the icons instead of filling the full available
+// * area.
+// */
+//const val CONTENT_STYLE_CATEGORY_GRID = 4
 
 const val MEDIA_SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
 
@@ -614,21 +608,22 @@ fun PersistentId.toCompatMediaId(): String {
 fun String?.toPersistentId(): PersistentId {
   if (this == null) return PersistentId.INVALID
   val list = split('_')
-  return if (list.size > 1) {
-    val id = list[1].toLongOrNull() ?: -1
-    when (list[0]) {
-      MediaSessionBrowser.MEDIA_PREFIX -> MediaId(id)
-      MediaSessionBrowser.ARTIST_PREFIX -> ArtistId(id)
-      MediaSessionBrowser.ALBUM_PREFIX -> AlbumId(id)
-      MediaSessionBrowser.GENRE_PREFIX -> GenreId(id)
-      MediaSessionBrowser.COMPOSER_PREFIX -> ComposerId(id)
-      MediaSessionBrowser.PLAYLIST_PREFIX -> PlaylistId(id)
-      else -> throw IllegalArgumentException("Unrecognized MediaId:$this")
+  return when {
+    list.size == 2 -> {
+      val id = list[1].toLongOrNull() ?: -1
+      when (list[0]) {
+        MediaSessionBrowser.MEDIA_PREFIX -> MediaId(id)
+        MediaSessionBrowser.ARTIST_PREFIX -> ArtistId(id)
+        MediaSessionBrowser.ALBUM_PREFIX -> AlbumId(id)
+        MediaSessionBrowser.GENRE_PREFIX -> GenreId(id)
+        MediaSessionBrowser.COMPOSER_PREFIX -> ComposerId(id)
+        MediaSessionBrowser.PLAYLIST_PREFIX -> PlaylistId(id)
+        else -> throw IllegalArgumentException("Unrecognized MediaId:$this")
+      }
     }
-  } else {
-    // In test app such as Media Controller Tester we can directly enter the media ID
-    if (isDigitsOnly()) {
-      MediaId(toLong())
-    } else throw IllegalArgumentException("Unrecognized MediaId:$this")
+    isNumeric() -> MediaId(toLong())
+    else -> throw IllegalArgumentException("Unrecognized MediaId:$this")
   }
 }
+
+fun String?.isNumeric(): Boolean = if (!isNullOrEmpty()) all { c -> c.isDigit() } else false

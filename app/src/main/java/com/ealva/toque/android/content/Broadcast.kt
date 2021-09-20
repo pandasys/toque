@@ -25,7 +25,9 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -79,5 +81,27 @@ private class LifecycleAwareBroadcastReceiver(
 
   override fun onDestroy(@Suppress("UNUSED_PARAMETER") lifecycleOwner: LifecycleOwner) {
     context.unregisterReceiver(this)
+  }
+}
+
+/**
+ * For when you need a scope in a [BroadcastReceiver]. This is not a license for long running
+ * operations - still need to get out ASAP.
+ *
+ * @see BroadcastReceiver.goAsync
+ */
+@OptIn(DelicateCoroutinesApi::class)
+fun BroadcastReceiver.goAsync(
+  coroutineScope: CoroutineScope = GlobalScope,
+  block: suspend () -> Unit
+) {
+  val result = goAsync()
+  coroutineScope.launch {
+    try {
+      block()
+    } finally {
+      // Always call finish(), even if the coroutineScope was cancelled
+      result.finish()
+    }
   }
 }

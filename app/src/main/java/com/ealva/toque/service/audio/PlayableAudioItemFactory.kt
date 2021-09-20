@@ -24,6 +24,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.player.WakeLockFactory
+import com.ealva.toque.service.session.Metadata
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.service.vlc.VlcAudioItem
@@ -84,20 +85,22 @@ private class PlayableAudioItemFactoryImpl(
         result.value.forEach { itemData ->
           add(
             VlcAudioItem(
-              libVlc,
-              itemData.id,
-              itemData.location,
-              itemData.title,
-              itemData.albumTitle,
+              Metadata(
+                itemData.id,
+                itemData.title,
+                itemData.albumTitle,
+                itemData.albumArtist,
+                ArtistName(itemData.artists.joinToString { name -> name.value.trim(',') }),
+                itemData.duration,
+                itemData.trackNumber,
+                itemData.localAlbumArt,
+                itemData.albumArt,
+                itemData.rating,
+                itemData.location,
+              ),
               itemData.albumId,
-              itemData.albumArtist,
-              ArtistName(itemData.artists.joinToString { name -> name.value.trim(',') }),
               itemData.artists,
-              itemData.rating,
-              itemData.duration,
-              itemData.trackNumber,
-              itemData.localAlbumArt,
-              itemData.albumArt,
+              libVlc,
               mediaFileStore,
               eqPresetSelector,
               appPrefs,
@@ -126,20 +129,22 @@ private class PlayableAudioItemFactoryImpl(
         result.value.forEach { itemData ->
           add(
             VlcAudioItem(
-              libVlc,
-              itemData.id,
-              itemData.location,
-              itemData.title,
-              itemData.albumTitle,
+              Metadata(
+                itemData.id,
+                itemData.title,
+                itemData.albumTitle,
+                itemData.albumArtist,
+                ArtistName(itemData.artists.joinToString { name -> name.value.trim(',') }),
+                itemData.duration,
+                itemData.trackNumber,
+                itemData.localAlbumArt,
+                itemData.albumArt,
+                itemData.rating,
+                itemData.location,
+              ),
               itemData.albumId,
-              itemData.albumArtist,
-              ArtistName(itemData.artists.joinToString { name -> name.value.trim(',') }),
               itemData.artists,
-              itemData.rating,
-              itemData.duration,
-              itemData.trackNumber,
-              itemData.localAlbumArt,
-              itemData.albumArt,
+              libVlc,
               mediaFileStore,
               eqPresetSelector,
               appPrefs,

@@ -178,6 +178,7 @@ private class NowPlayingViewModelImpl(
   override fun onServiceRegistered() {
     scope.launch {
       appPrefs = appPrefsSingleton.instance()
+      serviceConnection.mediaController.value.currentQueue
       serviceConnection.mediaController.collect { controller ->
         mediaController = controller
         connectedToService = controller !== NullMediaController

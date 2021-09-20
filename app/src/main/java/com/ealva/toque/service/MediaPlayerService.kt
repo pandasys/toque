@@ -38,8 +38,10 @@ import androidx.media.MediaBrowserServiceCompat
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.android.content.doNotHaveReadPermission
 import com.ealva.toque.android.content.orNullObject
 import com.ealva.toque.app.Toque
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.log.logExecTime
@@ -72,6 +74,7 @@ class MediaPlayerService :
   private inline val scope: LifecycleCoroutineScope get() = lifecycleScope
   private lateinit var servicePrefs: PlayerServicePrefs
   private val queueFactory: PlayableQueueFactory by inject()
+  private val audioMediaDao: AudioMediaDao by inject()
   private var inForeground = false
   private var isStarted = false
   private lateinit var mediaSession: MediaSession
@@ -84,6 +87,7 @@ class MediaPlayerService :
     super.onCreate()
     mediaSession = MediaSession(
       context = this,
+      audioMediaDao = audioMediaDao,
       notificationListener = NotificationListener(),
       lifecycleOwner = this,
       active = true
@@ -115,10 +119,15 @@ class MediaPlayerService :
 
   private val binder = MediaServiceBinder()
   override fun onBind(intent: Intent): IBinder? {
-    dispatcher.onServicePreSuperOnBind()
-    return when (intent.action) {
-      SERVICE_INTERFACE -> super.onBind(intent)
-      else -> binder
+    return if (doNotHaveReadPermission()) {
+      LOG._e { it("Don't have read external permission. Bind disallowed.") }
+      null
+    } else {
+      dispatcher.onServicePreSuperOnBind()
+      when (intent.action) {
+        SERVICE_INTERFACE -> super.onBind(intent)
+        else -> binder
+      }
     }
   }
 

@@ -93,7 +93,7 @@ data class GetReadExternalPermissionScreen(
       }
       Denied -> {
         RepeatRationale(
-          if (goToSettings) stringResource(R.string.SettingsRepeatRequiredToScanRationale) else
+          if (goToSettings) stringResource(R.string.SettingsScanRationale) else
             stringResource(R.string.RepeatRequiredToScanRationale),
           if (goToSettings) stringResource(R.string.Settings) else
             stringResource(R.string.RequestPermission),

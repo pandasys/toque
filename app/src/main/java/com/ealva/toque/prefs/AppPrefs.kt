@@ -17,7 +17,7 @@
 package com.ealva.toque.prefs
 
 import com.ealva.prefstore.store.BoolPref
-import com.ealva.prefstore.store.IntPref
+import com.ealva.prefstore.store.DoublePref
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
@@ -70,20 +70,26 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val endOfQueueAction: StorePref<Int, EndOfQueueAction>
   val selectMediaAction: StorePref<Int, SelectMediaAction>
   val audioOutputModule: StorePref<Int, AudioOutputModule>
-  val markPlayedPercentage: IntPref
+
+  /**
+   * This represents a percentage of media which needs to be played before it is marked as played.
+   * The range of this value is 0.0..1.0. eg. 0.5 is 50% and 1.0 is 100%
+   */
+  val markPlayedPercentage: DoublePref
   val rewindThenPrevious: BoolPref
+  val scanAfterMediaScanner: BoolPref
 
   companion object {
     val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
     const val DEFAULT_GO_TO_NOW_PLAYING = true
     const val DEFAULT_IGNORE_SMALL_FILES = false
-    const val DEFAULT_PLAY_PAUSE_FADE = false
+    const val DEFAULT_PLAY_PAUSE_FADE = true
     val PLAY_PAUSE_FADE_RANGE: ClosedRange<Millis> = Millis(500)..Millis(2000)
     val DEFAULT_PLAY_PAUSE_FADE_LENGTH = Millis.ONE_SECOND.coerceIn(PLAY_PAUSE_FADE_RANGE)
     val MEDIA_FADE_RANGE: ClosedRange<Millis> = Millis(2000)..Millis(10000)
-    const val DEFAULT_AUTO_ADVANCE_FADE = false
+    const val DEFAULT_AUTO_ADVANCE_FADE = true
     val DEFAULT_AUTO_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
-    const val DEFAULT_MANUAL_ADVANCE_FADE = false
+    const val DEFAULT_MANUAL_ADVANCE_FADE = true
     val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
     val DEFAULT_SCROBBLER_PACKAGE = ScrobblerPackage.None
     val DEFAULT_PLAY_UP_NEXT_ACTION = PlayUpNextAction.Prompt
@@ -92,14 +98,13 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
     val DEFAULT_DUCK_ACTION = DuckAction.Duck
     val DUCK_VOLUME_RANGE: ClosedRange<Volume> = Volume.NONE..Volume.MAX
     val DEFAULT_DUCK_VOLUME: Volume = DUCK_VOLUME_RANGE.endInclusive / 2
-    const val DEFAULT_MARK_PLAYED_PERCENTAGE: Int = 50
+    const val DEFAULT_MARK_PLAYED_PERCENTAGE: Double = 0.5
 
     fun make(storage: Storage): AppPrefs = AppPrefsImpl(storage)
   }
 }
 
-@Suppress("MagicNumber")
-private val MARK_PLAYED_PERCENTAGE_RANGE = 1..100
+private val MARK_PLAYED_PERCENTAGE_RANGE = 0.0..1.0
 
 private class AppPrefsImpl(
   storage: Storage
@@ -135,4 +140,5 @@ private class AppPrefsImpl(
     percentage.coerceIn(MARK_PLAYED_PERCENTAGE_RANGE)
   }
   override val rewindThenPrevious: BoolPref by preference(true)
+  override val scanAfterMediaScanner: BoolPref by preference(true)
 }

@@ -17,30 +17,44 @@
 package com.ealva.toque.ui.main
 
 import android.Manifest.permission.READ_EXTERNAL_STORAGE
-import android.content.pm.PackageManager.PERMISSION_GRANTED
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import com.ealva.ealvalog.e
-import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
+import com.ealva.toque.R.string.AccessExternalStorage
+import com.ealva.toque.R.string.RepeatRequiredToScanRationale
+import com.ealva.toque.R.string.RequestPermission
+import com.ealva.toque.R.string.RequiredToScanRationale
+import com.ealva.toque.R.string.SettingsScanRationale
+import com.ealva.toque.android.content.haveReadPermission
 import com.ealva.toque.app.Toque
-import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.MediaPlayerServiceConnection
+import com.ealva.toque.service.controller.NullMediaController
+import com.ealva.toque.service.controller.ToqueMediaController
+import com.ealva.toque.service.queue.NullPlayableMediaQueue
+import com.ealva.toque.service.queue.PlayableMediaQueue
+import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.ealva.toque.ui.theme.ToqueTheme
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
 import com.zhuinden.simplestack.AsyncStateChanger
+import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.GlobalServices
 import com.zhuinden.simplestack.History
 import com.zhuinden.simplestack.StateChange.REPLACE
@@ -48,62 +62,55 @@ import com.zhuinden.simplestack.navigator.Navigator
 import com.zhuinden.simplestackcomposeintegration.core.BackstackProvider
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
-import com.zhuinden.simplestackextensions.navigatorktx.backstack
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import com.zhuinden.simplestackextensions.servicesktx.add
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission as RequestPerm
 
 private val LOG by lazyLogger(MainActivity::class)
 
 class MainActivity : AppCompatActivity() {
+  private lateinit var scope: CoroutineScope
   private val composeStateChanger = ComposeStateChanger()
-  private var haveReadExternalPermission = false
+  private lateinit var backstack: Backstack
+  private var launcher: ActivityResultLauncher<String> = makeRequestReadExternalLauncher()
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
+  private var mediaController: ToqueMediaController = NullMediaController
+  private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
+  private var currentQueueJob: Job? = null
   private val appPrefsSingleton: AppPrefsSingleton by inject(named("AppPrefs"))
-  private val audioMediaDao: AudioMediaDao by inject()
+//  private val audioMediaDao: AudioMediaDao by inject()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-
-    lifecycleScope.launch {
-      when (val result = audioMediaDao.getCountAllAudio()) {
-        is Ok -> LOG.i { it("Audio count=%d", result.value) }
-        is Err -> LOG.e { it("Failed to get count of all audio") }
-      }
-    }
+    scope = lifecycleScope
 
     WindowCompat.setDecorFitsSystemWindows(window, false) // we'll handle the system insets
-    haveReadExternalPermission = havePermission(READ_EXTERNAL_STORAGE)
 
-    val backstack = Navigator.configure()
+    backstack = Navigator.configure()
       .setGlobalServices(getGlobalServicesBuilder().build())
       .setScopedServices(DefaultServiceProvider())
       .setStateChanger(AsyncStateChanger(composeStateChanger))
-      .install(this, androidContentFrame, makeInitialHistory(haveReadExternalPermission))
+      .install(this, androidContentFrame, makeInitialHistory())
 
     setContent {
-      BackstackProvider(backstack) {
-        ToqueTheme {
+      ToqueTheme {
+        BackstackProvider(backstack) {
           Box(Modifier.fillMaxSize()) {
             composeStateChanger.RenderScreen()
           }
         }
       }
     }
-  }
-
-  override fun onResume() {
-    super.onResume()
-    // If user goes to settings and enables permission we'll react to that here
-    if (!haveReadExternalPermission) {
-      if (havePermission(READ_EXTERNAL_STORAGE)) {
-        playerServiceConnection.bind()
-        haveReadExternalPermission = true
-        backstack.setHistory(History.of(NowPlayingScreen()), REPLACE)
-      }
-    }
+    if (haveReadPermission()) gainedReadExternalPermission() else requestReadExternalPermission()
   }
 
   override fun onDestroy() {
@@ -111,10 +118,98 @@ class MainActivity : AppCompatActivity() {
     playerServiceConnection.unbind()
   }
 
-  private fun getGlobalServicesBuilder(): GlobalServices.Builder = globalServices.apply {
-    if (doNotHavePermission(READ_EXTERNAL_STORAGE)) {
-      add(CheckPermission(this@MainActivity))
+  private fun makeRequestReadExternalLauncher() =
+    registerForActivityResult(RequestPerm()) { isGranted: Boolean ->
+      if (isGranted) {
+        gainedReadExternalPermission()
+      } else {
+        if (showReadRationale()) {
+          AlertDialog.Builder(this)
+            .setTitle(AccessExternalStorage)
+            .setMessage(RequiredToScanRationale)
+            .setPositiveButton(R.string.OK) { _, _ ->
+              requestReadExternalPermission()
+            }
+            .create()
+            .show()
+        } else {
+          val goSettings = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+          AlertDialog.Builder(this)
+            .setTitle(AccessExternalStorage)
+            .setMessage(if (goSettings) SettingsScanRationale else RepeatRequiredToScanRationale)
+            .setPositiveButton(if (goSettings) R.string.Settings else RequestPermission) { _, _ ->
+              if (goSettings) {
+                startActivity(
+                  Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                  }
+                )
+              } else {
+                requestReadExternalPermission()
+              }
+            }
+            .setNegativeButton(R.string.Exit) { _, _ ->
+              finishAfterTransition()
+            }
+            .create()
+            .show()
+        }
+      }
     }
+
+  private fun requestReadExternalPermission() {
+    launcher.launch(READ_EXTERNAL_STORAGE)
+  }
+
+  private fun gainedReadExternalPermission() {
+    scope.launch {
+      playerServiceConnection.mediaController
+        .onStart { playerServiceConnection.bind() }
+        .onEach { controller -> handleControllerChange(controller) }
+        .onCompletion { cause -> LOG._i(cause) { it("mediaController flow completed") } }
+        .collect()
+    }
+  }
+
+  private fun handleControllerChange(controller: ToqueMediaController) {
+    mediaController = controller
+    if (controller !== NullMediaController) {
+      currentQueueJob = scope.launch {
+        controller.currentQueue
+          .onStart { LOG._i { it("start currentQueue flow") } }
+          .onEach { queue -> handleQueueChange(queue) }
+          .onCompletion { cause -> LOG._i(cause) { it("currentQueue flow completed") } }
+          .collect()
+      }
+    } else {
+      currentQueueJob?.cancel()
+      handleQueueChange(NullPlayableMediaQueue)
+    }
+  }
+
+  private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
+    val currentType = currentQueue.queueType
+    val newType = queue.queueType
+    if (haveReadPermission() && currentType != newType) {
+      when (newType) {
+        QueueType.Audio -> handleAudioQueue()
+        QueueType.NullQueue -> handleNullQueue()
+        QueueType.Video -> TODO()
+        QueueType.Radio -> TODO()
+        QueueType.AudioCast -> TODO()
+      }
+    }
+  }
+
+  private fun handleAudioQueue() {
+    backstack.setHistory(History.of(NowPlayingScreen()), REPLACE)
+  }
+
+  private fun handleNullQueue() {
+    backstack.setHistory(History.of(SplashScreen()), REPLACE)
+  }
+
+  private fun getGlobalServicesBuilder(): GlobalServices.Builder = globalServices.apply {
     add(appPrefsSingleton)
     add(playerServiceConnection)
   }
@@ -127,27 +222,13 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  private fun makeInitialHistory(
-    haveReadExternalPermission: Boolean
-  ): History<ComposeKey> = if (haveReadExternalPermission) {
-    History.of(NowPlayingScreen())
-  } else {
-    History.of(GetReadExternalPermissionScreen(showRationale()))
-  }
+  private fun makeInitialHistory(): History<ComposeKey> = History.of(SplashScreen())
 
-  private fun showRationale(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+  private fun showReadRationale(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
     shouldShowRequestPermissionRationale(READ_EXTERNAL_STORAGE)
   } else {
     false
   }
-
-  @Suppress("SameParameterValue")
-  private fun havePermission(
-    permission: String
-  ) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-    checkSelfPermission(permission) == PERMISSION_GRANTED
-  } else true
-
-  @Suppress("SameParameterValue")
-  private fun doNotHavePermission(permission: String) = !havePermission(permission)
 }
+
+

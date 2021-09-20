@@ -33,9 +33,12 @@ import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import com.ealva.toque.service.session.Metadata
 
 interface PlayableAudioItem : AudioItem, HasId {
   val eventFlow: Flow<PlayableAudioItemEvent>
+
+  val metadata: Metadata
 
   val albumId: AlbumId
   val artistSet: Set<ArtistName>
@@ -51,39 +54,49 @@ interface PlayableAudioItem : AudioItem, HasId {
 
   val supportsFade: Boolean
 
-  override val duration: Millis
-
   var volume: Volume
 
   var isMuted: Boolean
 
   /**
    * Directly set an Eq preset for this media regardless of any association the user has made. This
-   * is useful for both editing of presets and is also currently possible from Now Playing
+   * is useful for both editing of presets and user selection
    */
   var equalizer: EqPreset
 
   var playbackRate: PlaybackRate
 
-  suspend fun play(immediate: Boolean = false)
+  suspend fun play(immediateTransition: Boolean = false)
 
   fun stop()
 
-  fun pause(immediate: Boolean = false)
+  fun pause(immediateTransition: Boolean = false)
 
+  /**
+   * Seek to a position within the valid playback range, which is [Metadata.playbackRange]. If
+   * [position] falls outside that range this call is a NoOp.
+   */
   suspend fun seekTo(position: Millis)
 
   fun shutdown()
 
-  suspend fun reset(presetSelector: EqPresetSelector, playNow: PlayNow, position: Millis)
+  suspend fun reset(
+    presetSelector: EqPresetSelector,
+    position: Millis,
+    immediateTransition: Boolean,
+    playNow: PlayNow
+  )
 
   /**
    * Prepare the player, seek to [position] and when the player is "prepared", apply the
-   * [onPreparedTransition]. If [playNow] is true, when the player has buffered sufficient media is
+   * [onPreparedTransition]. If [playNow] is true, when the player has buffered sufficient media it
    * will auto play.
    *
    * If [startPaused] is true, which currently is always the case, the media and player are set so
-   * that an immediate play happens which fill buffers, but doesn't begin actual playback.
+   * that an immediate play happens which fills buffers, but doesn't begin actual playback. I think
+   * this may have caused some audio glitches in the past - a small "blip" can be heard which causes
+   * an apparent glitch in playback. May need to rethink this and only start paused when
+   * transition is not immediate
    */
   suspend fun prepareSeekMaybePlay(
     position: Millis,
@@ -105,6 +118,8 @@ interface PlayableAudioItem : AudioItem, HasId {
   fun checkMarkSkipped()
 
   suspend fun setRating(newRating: Rating)
+
+  fun previousShouldRewind(): Boolean
 }
 
 inline val PlayableAudioItem.isNotValid: Boolean
@@ -148,13 +163,14 @@ sealed interface PlayableAudioItemEvent {
 
 object NullPlayableAudioItem : PlayableAudioItem {
   override val eventFlow: Flow<PlayableAudioItemEvent> = emptyFlow()
+  override val metadata: Metadata = Metadata.NullMetadata
   override val isValid: Boolean = false
   override val isPlaying: Boolean = false
   override val isPausable: Boolean = false
   override val supportsFade: Boolean = false
-  override suspend fun play(immediate: Boolean) = Unit
+  override suspend fun play(immediateTransition: Boolean) = Unit
   override fun stop() = Unit
-  override fun pause(immediate: Boolean) = Unit
+  override fun pause(immediateTransition: Boolean) = Unit
   override val isSeekable: Boolean = false
   override suspend fun seekTo(position: Millis) = Unit
   override val position: Millis = Millis.ZERO
@@ -167,8 +183,9 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override fun shutdown(shutdownTransition: PlayerTransition) = Unit
   override suspend fun reset(
     presetSelector: EqPresetSelector,
-    playNow: PlayNow,
-    position: Millis
+    position: Millis,
+    immediateTransition: Boolean,
+    playNow: PlayNow
   ) = Unit
 
   override suspend fun prepareSeekMaybePlay(
@@ -186,6 +203,8 @@ object NullPlayableAudioItem : PlayableAudioItem {
 
   override fun checkMarkSkipped() = Unit
   override suspend fun setRating(newRating: Rating): Unit = Unit
+  override fun previousShouldRewind(): Boolean = false
+
   override val id: MediaId = MediaId.INVALID
   override val location: Uri
     get() = Uri.EMPTY

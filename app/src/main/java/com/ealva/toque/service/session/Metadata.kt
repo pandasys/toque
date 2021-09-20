@@ -32,6 +32,7 @@ import com.ealva.toque.service.media.toStarRating
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -65,6 +66,13 @@ data class Metadata(
   @Serializable(with = UriAsStringSerializer::class)
   val location: Uri
 ) {
+
+  /**
+   * Indices is the Closed range of position values. Playback position occur outside this range
+   */
+  @Transient
+  val playbackRange: ClosedRange<Millis> = Millis(0)..duration
+
   fun toCompat(): MediaMetadataCompat {
     if (this === NullMetadata) return MediaMetadataCompat.Builder().build()
 

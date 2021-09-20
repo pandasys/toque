@@ -43,7 +43,7 @@ class TransitionPlayerStub : TransitionPlayer {
 
   var _isShutdown = false
   var _isShutdownCalled = 0
-  override val isShutdown: Boolean
+  override val playerIsShutdown: Boolean
     get() {
       _isShutdownCalled++
       return _isShutdown
@@ -52,7 +52,7 @@ class TransitionPlayerStub : TransitionPlayer {
   var _volume = Volume.NONE
   var _volumeGetCalled = 0
   var _volumeSetCalled = 0
-  override var volume: Volume
+  override var playerVolume: Volume
     get() {
       _volumeGetCalled++
       return _volume
@@ -99,7 +99,7 @@ class TransitionPlayerStub : TransitionPlayer {
   }
 
   var _shutdownCalled = 0
-  override fun shutdown() {
+  override fun shutdownPlayer() {
     _shutdownCalled++
   }
 

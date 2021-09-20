@@ -19,9 +19,10 @@ package com.ealva.toque.service.controller
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface ToqueMediaController {
-  val currentQueue: Flow<PlayableMediaQueue<*>>
+  val currentQueue: StateFlow<PlayableMediaQueue<*>>
 
   val mediaIsLoaded: Boolean
 

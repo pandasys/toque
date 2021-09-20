@@ -95,6 +95,15 @@
       </intent-filter>
     </service>
 
+    <receiver
+      android:name=".scanner.AndroidMediaScannerReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MEDIA_SCANNER_FINISHED" />
+        <data android:scheme="file" />
+      </intent-filter>
+    </receiver>
+
   </application>
 
 </manifest>

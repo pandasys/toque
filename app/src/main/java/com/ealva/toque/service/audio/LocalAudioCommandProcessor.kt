@@ -112,11 +112,11 @@ class LocalAudioCommandProcessor(
     LOG.e(e) { it("Error playFromId %s", id) }
   }
 
-  override suspend fun play(immediate: Boolean) =
-    commandFlow.emit(LocalAudioCommand.Play(immediate))
+  override suspend fun play(immediateTransition: Boolean) =
+    commandFlow.emit(LocalAudioCommand.Play(immediateTransition))
 
-  override suspend fun pause(immediate: Boolean) =
-    commandFlow.emit(LocalAudioCommand.Pause(immediate))
+  override suspend fun pause(immediateTransition: Boolean) =
+    commandFlow.emit(LocalAudioCommand.Pause(immediateTransition))
 
   override suspend fun stop() {
     commandFlow.emit(LocalAudioCommand.Stop)
@@ -174,14 +174,8 @@ class LocalAudioCommandProcessor(
         .audioDaoEvents
         .onStart { startMediaScannerModifiedSinceLastScan() }
         .takeWhile { addToQueueCount > 0 }
-        .onEach { event ->
-          LOG._e { it("addToQueueCount=%d", addToQueueCount) }
-          addToQueueCount = handleScannerEvent(addToQueueCount, event)
-        }
-        .onCompletion {
-          appPrefs.edit { it[firstRun] = false }
-          LOG._e { it("audioDaoEvents flow completed addToQueueCount=%d", addToQueueCount) }
-        }
+        .onEach { event -> addToQueueCount = handleScannerEvent(addToQueueCount, event) }
+        .onCompletion { appPrefs.edit { it[firstRun] = false } }
         .collect()
     }
   }
@@ -193,7 +187,7 @@ class LocalAudioCommandProcessor(
   )
 
   private suspend fun handleSessionEvent(event: MediaSessionEvent) {
-    LOG._e { it("-->handleMediaSessionEvent %s", event) }
+//    LOG._e { it("-->handleMediaSessionEvent %s", event) }
     when (event) {
       is MediaSessionEvent.AddItemAt -> addItemAt(event.item, event.pos, event.addToEnd)
       is MediaSessionEvent.CustomAction -> customAction(event.action, event.extras)
@@ -221,7 +215,6 @@ class LocalAudioCommandProcessor(
       MediaSessionEvent.Duck -> duck()
       MediaSessionEvent.EndDuck -> endDuck()
     }
-    LOG._e { it("<--handleMediaSessionEvent %s", event) }
   }
 
   private suspend fun addItemAt(item: MediaDescriptionCompat, pos: Int, addToEnd: Boolean) {
@@ -338,14 +331,14 @@ class LocalAudioCommandProcessor(
 private sealed interface LocalAudioCommand {
   suspend fun process(localAudioQueue: LocalAudioQueue)
 
-  data class Play(val immediate: Boolean = false) : LocalAudioCommand {
+  data class Play(val immediateTransition: Boolean = false) : LocalAudioCommand {
     override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.play(immediate)
+      localAudioQueue.play(immediateTransition)
   }
 
-  data class Pause(val immediate: Boolean = false) : LocalAudioCommand {
+  data class Pause(val immediateTransition: Boolean = false) : LocalAudioCommand {
     override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.pause(immediate)
+      localAudioQueue.pause(immediateTransition)
   }
 
   data class SeekTo(val position: Millis) : LocalAudioCommand {

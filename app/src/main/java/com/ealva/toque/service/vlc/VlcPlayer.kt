@@ -25,13 +25,13 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
-import com.ealva.toque.log._e
 import com.ealva.toque.log._w
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.MediaPlayerEvent
 import com.ealva.toque.service.player.AvPlayer
+import com.ealva.toque.service.player.AvPlayer.Companion.OFFSET_CONSIDERED_END
+import com.ealva.toque.service.player.AvPlayerEvent
 import com.ealva.toque.service.player.FadeInTransition
 import com.ealva.toque.service.player.NoOpPlayerTransition
 import com.ealva.toque.service.player.PauseFadeOutTransition
@@ -78,9 +78,20 @@ interface VlcPlayer : AvPlayer {
   }
 }
 
+/**
+ * To understand a few parts of this implementation it's important to understand that this Player
+ * will delegate some operations to [PlayerTransition]s and PlayerTransitions also use a
+ * [TransitionPlayer] interface instead of calling this implementation directly. This provides such
+ * functionality as the user pressing pause, immediately seeing the play/pause button change state
+ * due to an emitted event, yet the underlying player is still fading out the audio. Another
+ * scenario is cross fading from one song into another - the user sees the new song start playing in
+ * the UI yet another song is fading out at the same time. The TransitionPlayer implementation is an
+ * inner class that bypasses some code other clients would use and may report some state to the
+ * PlayerTransition implementation which is different than what other clients would see.
+ */
 private class VlcPlayerImpl(
   vlcMedia: IMedia,
-  private val title: Title,
+  @Suppress("unused") private val title: Title,
   private var eqPreset: VlcEqPreset,
   override var duration: Millis,
   onPreparedTransition: PlayerTransition,
@@ -95,9 +106,10 @@ private class VlcPlayerImpl(
   private var shutdownOnPrepared = false
   private var unmutedVolume = Volume.NONE
   private var firstStart: Boolean = true
+  private var allowPositionUpdate = true
   private val mediaPlayer: MediaPlayer = vlcMedia.makePlayer()
 
-  override val eventFlow = MutableSharedFlow<MediaPlayerEvent>(extraBufferCapacity = 30)
+  override val eventFlow = MutableSharedFlow<AvPlayerEvent>(extraBufferCapacity = 30)
 
   private var seekable = false
   override val isSeekable: Boolean
@@ -108,8 +120,6 @@ private class VlcPlayerImpl(
     get() = pausable
 
   private var prepared = false
-  override val isPrepared: Boolean
-    get() = prepared
 
   override val isValid: Boolean
     get() = prepared && !isShutdown
@@ -120,10 +130,10 @@ private class VlcPlayerImpl(
     get() = Millis(mediaPlayer.time)
 
   override val isPlaying: Boolean
-    get() = if (isPrepared) transition.isPlaying else onPrepared.isPlaying
+    get() = if (prepared) transition.isPlaying else onPrepared.isPlaying
 
   override val isPaused: Boolean
-    get() = if (isPrepared) transition.isPaused else onPrepared.isPaused
+    get() = if (prepared) transition.isPaused else onPrepared.isPaused
 
   override var isShutdown = false
 
@@ -134,9 +144,7 @@ private class VlcPlayerImpl(
       realVolume = value.coerceIn(AvPlayer.DEFAULT_VOLUME_RANGE)
       muted = false
       unmutedVolume = realVolume // MediaPlayer get volume not working
-      if (isValid) {
-        mediaPlayer.volume = realVolume()
-      }
+      if (isValid) mediaPlayer.setMappedVolume(realVolume)
     }
 
   private var muted = false
@@ -145,7 +153,8 @@ private class VlcPlayerImpl(
     set(mute) {
       if (isValid) {
         muted = mute
-        if (mute) mediaPlayer.volume = 0 else mediaPlayer.volume = unmutedVolume()
+        if (mute)
+          mediaPlayer.setMappedVolume(Volume.NONE) else mediaPlayer.setMappedVolume(unmutedVolume)
       }
     }
 
@@ -185,21 +194,26 @@ private class VlcPlayerImpl(
     mediaPlayer.play()
   }
 
-  override fun play(immediate: Boolean) {
-    LOG._e { it("play isValid=%s", isValid) }
-    if (isValid) startTransition(getPlayTransition { immediate }, false)
+  override fun play(immediateTransition: Boolean) {
+    if (isValid) startTransition(getPlayTransition { immediateTransition }, false)
   }
 
-  override fun pause(immediate: Boolean) {
-    LOG._e { it("pause isValid=%s", isValid) }
-    if (isValid) startTransition(getPauseTransition { immediate }, false)
+  override fun pause(immediateTransition: Boolean) {
+    if (isValid) startTransition(getPauseTransition { immediateTransition }, false)
   }
 
   override fun seek(position: Millis) {
     if (isValid && mediaPlayer.isSeekable) {
+       /*
+       if media is playing it will update position and we can't control order of updates given
+       async nature. So we'll stop allowing position update events, send one for the seek, and then
+       allow position updates again. If the media player is paused it doesn't send position
+       updates so disallowing updates is only for scenario where media is playing.
+       */
+      allowPositionUpdate = false
       mediaPlayer.time = position()
-      // when the player is stopped it doesn't send position notifications
-      if (!mediaPlayer.isPlaying) emit(MediaPlayerEvent.PositionUpdate(position, duration, false))
+      emit(AvPlayerEvent.PositionUpdate(Millis(mediaPlayer.time), duration, false))
+      allowPositionUpdate = true
     }
   }
 
@@ -212,11 +226,7 @@ private class VlcPlayerImpl(
       transition.setCancelled()
       seekable = false
       isShutdown = true
-      if (prepared) {
-        secondStageShutdown()
-      } else {
-        shutdownOnPrepared = true
-      }
+      if (prepared) secondStageShutdown() else shutdownOnPrepared = true
     }
   }
 
@@ -260,56 +270,65 @@ private class VlcPlayerImpl(
     wakeLock.release()
   }
 
-  private fun emit(event: MediaPlayerEvent) {
+  private fun emit(event: AvPlayerEvent) {
     scope.launch { eventFlow.emit(event) }
   }
 
   private fun makeEventListener() = MediaPlayer.EventListener { event ->
 //    LOG._e { it("%s %s", title(), event.asString()) }
-    when (event.type) {
-      MediaPlayer.Event.Opening -> mediaPlayer.volume = realVolume()
-      MediaPlayer.Event.Buffering -> if (!prepared && event.bufferedEnoughForPrepare()) {
-        prepared = true
-        startTransition(onPrepared, notifyPrepared = true)
-      }
-      MediaPlayer.Event.Playing -> if (prepared) wakeLock.acquire()
-      MediaPlayer.Event.Paused -> if (prepared) wakeLock.release()
-      MediaPlayer.Event.Stopped -> {
-        wakeLock.release()
-        seekable = false
-        emit(MediaPlayerEvent.Stopped(time))
-      }
-      MediaPlayer.Event.EndReached -> {
-        shutdown()
-        emit(MediaPlayerEvent.PlaybackComplete)
-      }
-      MediaPlayer.Event.EncounteredError -> {
-        prepared = false
-        shutdown()
-        emit(MediaPlayerEvent.Error)
-      }
-      MediaPlayer.Event.TimeChanged -> {
-        emit(MediaPlayerEvent.PositionUpdate(Millis(event.timeChanged), duration, true))
-      }
-      MediaPlayer.Event.PositionChanged -> {
-        event.positionChanged
-      }
-      MediaPlayer.Event.SeekableChanged -> seekable = event.seekable
-      MediaPlayer.Event.PausableChanged -> {
-        pausable = event.pausable
-        val reportedLength = mediaPlayer.length
-        if (reportedLength > 0) {
-          duration = Millis(reportedLength)
+    if (!isShutdown) {
+      when (event.type) {
+        MediaPlayer.Event.Opening -> mediaPlayer.setMappedVolume(realVolume)
+        MediaPlayer.Event.Buffering -> if (!prepared && event.bufferedEnoughForPrepare()) {
+          prepared = true
+          startTransition(onPrepared, notifyPrepared = true)
+        }
+        MediaPlayer.Event.Playing -> if (prepared) wakeLock.acquire()
+        MediaPlayer.Event.Paused -> if (prepared) wakeLock.release()
+        MediaPlayer.Event.Stopped -> {
+          wakeLock.release()
+          seekable = false
+          emit(AvPlayerEvent.Stopped(time))
+        }
+        MediaPlayer.Event.EndReached -> {
+          shutdown()
+          emit(AvPlayerEvent.PlaybackComplete)
+        }
+        MediaPlayer.Event.EncounteredError -> {
+          prepared = false
+          shutdown()
+          emit(AvPlayerEvent.Error)
+        }
+        MediaPlayer.Event.TimeChanged -> {
+          if (allowPositionUpdate) {
+            emit(AvPlayerEvent.PositionUpdate(Millis(event.timeChanged), duration, true))
+          }
+        }
+        MediaPlayer.Event.PositionChanged -> {
+          event.positionChanged
+        }
+        MediaPlayer.Event.SeekableChanged -> seekable = event.seekable
+        MediaPlayer.Event.PausableChanged -> {
+          pausable = event.pausable
+          val reportedLength = mediaPlayer.length
+          if (reportedLength > 0) {
+            duration = Millis(reportedLength)
+          }
+        }
+        MediaPlayer.Event.LengthChanged -> {
+
         }
       }
-      MediaPlayer.Event.LengthChanged -> {
-
+    } else {
+      if (!prepared &&
+        shutdownOnPrepared &&
+        event.type == MediaPlayer.Event.Buffering &&
+        event.bufferedEnoughForPrepare()
+      ) {
+        secondStageShutdown()
       }
     }
   }
-
-  private fun MediaPlayer.Event.bufferedEnoughForPrepare() =
-    buffering > BUFFERING_PERCENT_TRIGGER_PREPARED
 
   private fun getOnPrepared(transition: PlayerTransition) = transition.apply {
     setPlayer(transitionPlayer)
@@ -324,66 +343,64 @@ private class VlcPlayerImpl(
       transition.setCancelled()
       newTransition.setPlayer(transitionPlayer)
       transition = newTransition
-      if (notifyPrepared) emit(MediaPlayerEvent.Prepared(Millis(mediaPlayer.time), duration))
+      if (notifyPrepared) emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration))
       scope.launch { newTransition.execute() }
     }
   }
 
   private inner class TheTransitionPlayer : TransitionPlayer {
-    override val isPaused: Boolean
-      get() = isValid && !mediaPlayer.isPlaying
+    override val isPaused: Boolean get() = isValid && !mediaPlayer.isPlaying
+    override val isPlaying: Boolean get() = isValid && mediaPlayer.isPlaying
+    override val playerIsShutdown: Boolean get() = isShutdown
 
-    override val isPlaying: Boolean
-      get() = isValid && mediaPlayer.isPlaying
-
-    override val isShutdown: Boolean
-      get() = this@VlcPlayerImpl.isShutdown
-
-    override fun play() {
-      if (isValid) {
-        mediaPlayer.play()
-      }
-    }
-
-    override fun pause() {
-      if (isValid) {
-        mediaPlayer.pause()
-      }
-    }
-
-    override var volume: Volume
-      get() = this@VlcPlayerImpl.volume
+    override var playerVolume: Volume
+      get() = volume
       set(value) {
-        this@VlcPlayerImpl.volume = value
+        volume = value
       }
-
-    override val volumeRange: VolumeRange
-      get() = AvPlayer.DEFAULT_VOLUME_RANGE
+    override val volumeRange: VolumeRange get() = AvPlayer.DEFAULT_VOLUME_RANGE
 
     override val remainingTime: Millis
       get() = if (isValid) duration - mediaPlayer.time else Millis.ZERO
 
+    override fun notifyPaused() = emit(AvPlayerEvent.Paused(time))
+
     override fun notifyPlaying() {
-      emit(MediaPlayerEvent.Start(firstStart))
+      emit(AvPlayerEvent.Start(firstStart))
       firstStart = false
     }
 
-    override fun notifyPaused() = emit(MediaPlayerEvent.Paused(time))
+    override fun pause() {
+      if (isValid) mediaPlayer.pause()
+    }
 
-    override fun shutdown() = this@VlcPlayerImpl.shutdown()
+    override fun play() {
+      if (isValid) mediaPlayer.play()
+    }
 
-    override fun shouldContinue(): Boolean = !this@VlcPlayerImpl.isShutdown &&
-      duration > 0 &&
-      duration - mediaPlayer.time > AvPlayer.OFFSET_CONSIDERED_END
+    override fun shutdownPlayer() = shutdown()
+
+    override fun shouldContinue(): Boolean =
+      !playerIsShutdown && duration > 0 && duration - mediaPlayer.time > OFFSET_CONSIDERED_END
   }
 
+  /**
+   * The [fifoPlayerQueue] is used to hold VlcPlayer implementations and to limit the number of
+   * active players. We also want to ensure players release underlying resources as quickly as
+   * possible. If there are rapid transitions between players which are playing, it's important to
+   * shut them down fast so that there are no audible artifacts, regardless of any transitions (fade
+   * in/fade out) which may be occurring.
+   *
+   * One scenario is where the user has selected cross fading and one song is fading out while
+   * another is fading in. This cross fade lasts seconds and during this time the user could
+   * press next song again. The user could do this rapidly. We want to ensure audio is quickly
+   * stopped when a particular player is no longer in use.
+   */
   companion object {
     private val fifoPlayerQueue = ArrayDeque<VlcPlayer>(3)
-    private const val BUFFERING_PERCENT_TRIGGER_PREPARED = 90.0
     private val queueLock = ReentrantLock(true)
 
     fun addToQueue(player: VlcPlayer) = queueLock.withLock {
-      // We can have at most 2 active players in the queue.
       while (fifoPlayerQueue.size > 1) {
         fifoPlayerQueue.removeLast().shutdown()
       }
@@ -397,29 +414,5 @@ private class VlcPlayerImpl(
         LOG._w { it("removeFromQueue queue size > 1") }
       }
     }
-  }
-}
-
-private fun MediaPlayer.Event.asString(): String {
-  return when (type) {
-    MediaPlayer.Event.MediaChanged -> "Event.MediaChanged"
-    MediaPlayer.Event.Opening -> "Event.Opening"
-    MediaPlayer.Event.Buffering -> "Event.Buffering $buffering"
-    MediaPlayer.Event.Playing -> "Event.Playing"
-    MediaPlayer.Event.Paused -> "Event.Paused"
-    MediaPlayer.Event.Stopped -> "Event.Stopped"
-    MediaPlayer.Event.EndReached -> "Event.EndReached"
-    MediaPlayer.Event.EncounteredError -> "Event.EncounteredError"
-    MediaPlayer.Event.TimeChanged -> "Event.TimeChanged $timeChanged"
-    MediaPlayer.Event.PositionChanged -> "Event.PositionChanged $positionChanged"
-    MediaPlayer.Event.SeekableChanged -> "Event.SeekableChanged $seekable"
-    MediaPlayer.Event.PausableChanged -> "Event.PausableChanged $pausable"
-    MediaPlayer.Event.LengthChanged -> "Event.LengthChanged $lengthChanged"
-    MediaPlayer.Event.Vout -> "Event.Vout $voutCount"
-    MediaPlayer.Event.ESAdded -> "Event.ESAdded"
-    MediaPlayer.Event.ESDeleted -> "Event.ESDeleted"
-    MediaPlayer.Event.ESSelected -> "Event.ESSelected"
-    MediaPlayer.Event.RecordChanged -> "Event.RecordChanged"
-    else -> "Event.UNKNOWN"
   }
 }

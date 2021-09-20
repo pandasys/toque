@@ -25,6 +25,7 @@ import com.ealva.ealvabrainz.brainz.data.isValidMbid
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.ComposerName
+import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.ealvabrainz.common.toAlbumTitle
 import com.ealva.ealvabrainz.common.toArtistName
 import com.ealva.ealvalog.e
@@ -42,6 +43,7 @@ import com.ealva.toque.db.MediaTable.title
 import com.ealva.toque.db.MediaTable.trackNumber
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -87,7 +89,6 @@ import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.ordersBy
 import com.ealva.welite.db.table.select
-import com.ealva.welite.db.table.selectAll
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
@@ -137,11 +138,11 @@ data class AudioDescription(
 
 data class AudioQueueItemData(
   val id: MediaId,
-  val location: Uri,
   val title: Title,
   val albumTitle: AlbumTitle,
-  val albumId: AlbumId,
   val albumArtist: ArtistName,
+  val location: Uri,
+  val albumId: AlbumId,
   val artists: Set<ArtistName>,
   val rating: Rating,
   val duration: Millis,
@@ -159,6 +160,10 @@ typealias AudioItemListResult = Result<List<AudioQueueItemData>, DaoMessage>
  */
 interface AudioMediaDao {
   val audioDaoEvents: Flow<AudioDaoEvent>
+
+  val albumDao: AlbumDao
+  val artistDao: ArtistDao
+  val genreDao: GenreDao
 
   /**
    * Insert or update a list of audio media. This function begins a transaction which will
@@ -208,6 +213,8 @@ interface AudioMediaDao {
   suspend fun getNextArtistList(artistName: ArtistName): Result<AudioIdList, DaoMessage>
 
   suspend fun getNextComposerList(composerName: ComposerName): Result<AudioIdList, DaoMessage>
+
+  suspend fun getNextGenreList(genreName: GenreName): Result<AudioIdList, DaoMessage>
 
   fun incrementPlayedCount(id: MediaId)
 
@@ -283,9 +290,9 @@ private const val CANT_UPDATE_DURATION = "Unable to update duration=%s for media
 private class AudioMediaDaoImpl(
   private val db: Database,
   private val artistParserFactory: ArtistParserFactory,
-  private val genreDao: GenreDao,
-  private val artistDao: ArtistDao,
-  private val albumDao: AlbumDao,
+  override val genreDao: GenreDao,
+  override val artistDao: ArtistDao,
+  override val albumDao: AlbumDao,
   private val artistAlbumDao: ArtistAlbumDao,
   private val composerDao: ComposerDao,
   private val artistMediaDao: ArtistMediaDao,
@@ -430,6 +437,7 @@ private class AudioMediaDaoImpl(
     val mediaArtistsSort = fileTagInfo.artistsSort
     return ArtistIdList().also { idList ->
       mediaArtists.forEachIndexed { index, artist ->
+        if (index > 0) LOG._e { it("multiple artists") }
         val insertMbid = index == 0 && mediaArtists.size == 1 && artist != SongTag.UNKNOWN
         idList += artistDao.upsertArtist(
           this@upsertMediaArtists,
@@ -637,11 +645,11 @@ private class AudioMediaDaoImpl(
         val albumTitle = cursor[AlbumTable.albumTitle]
         AudioQueueItemData(
           MediaId(id),
-          cursor[MediaTable.location].toUriOrEmpty(),
           cursor[MediaTable.title].toTitle(),
           albumTitle.toAlbumTitle(),
-          AlbumId(cursor[AlbumTable.id]),
           cursor[AlbumArtistTable[ArtistTable.artistName]].toArtistName(),
+          cursor[MediaTable.location].toUriOrEmpty(),
+          AlbumId(cursor[AlbumTable.id]),
           setOf(cursor[SongArtistTable[ArtistTable.artistName]].toArtistName()),
           cursor[MediaTable.rating].toRating(),
           Millis(cursor[MediaTable.duration]),
@@ -694,6 +702,7 @@ private class AudioMediaDaoImpl(
 
   private fun Queryable.doGetAudioItemsForQueue(idList: LongList): List<AudioQueueItemData> {
     if (idList.isEmpty()) return emptyList()
+    var lastId: Long = -1L
     return try {
       // An IN query doesn't return results in the order of the in list, so we create a map and
       // iterate the idList and map using the Long2ObjectMap
@@ -720,15 +729,19 @@ private class AudioMediaDaoImpl(
         .where { MediaTable.id inList idList }
         .sequence { cursor ->
           val id = cursor[MediaTable.id]
-          val albumTitle = cursor[AlbumTable.albumTitle]
+          val anArtist = cursor[SongArtistTable[ArtistTable.artistName]]
+          if (lastId == id) {
+            LOG._e { it("---same ID---") }
+          }
+          lastId = id
           AudioQueueItemData(
             MediaId(id),
-            cursor[MediaTable.location].toUriOrEmpty(),
             cursor[MediaTable.title].toTitle(),
-            albumTitle.toAlbumTitle(),
-            AlbumId(cursor[AlbumTable.id]),
+            cursor[AlbumTable.albumTitle].toAlbumTitle(),
             cursor[AlbumArtistTable[ArtistTable.artistName]].toArtistName(),
-            setOf(cursor[SongArtistTable[ArtistTable.artistName]].toArtistName()),
+            cursor[MediaTable.location].toUriOrEmpty(),
+            AlbumId(cursor[AlbumTable.id]),
+            setOf(anArtist.toArtistName()),
             cursor[MediaTable.rating].toRating(),
             Millis(cursor[MediaTable.duration]),
             cursor[MediaTable.trackNumber],
@@ -747,11 +760,11 @@ private class AudioMediaDaoImpl(
           .sequence({ it[MediaTable.id] = id }) { cursor ->
             AudioQueueItemData(
               MediaId(cursor[AudioViewQueueData.mediaId]),
-              cursor[AudioViewQueueData.mediaLocation].toUriOrEmpty(),
               cursor[AudioViewQueueData.mediaTitle].toTitle(),
               cursor[AudioViewQueueData.albumTitle].toAlbumTitle(),
-              AlbumId(cursor[AudioViewQueueData.albumId]),
               cursor[AudioViewQueueData.albumArtistName].toArtistName(),
+              cursor[AudioViewQueueData.mediaLocation].toUriOrEmpty(),
+              AlbumId(cursor[AudioViewQueueData.albumId]),
               setOf(cursor[AudioViewQueueData.songArtistName].toArtistName()),
               cursor[AudioViewQueueData.rating].toRating(),
               Millis(cursor[AudioViewQueueData.duration]),
@@ -804,6 +817,20 @@ private class AudioMediaDaoImpl(
           Ok(AudioIdList(idList, SongListType.Composer, idName.composerName.value))
         }
         is Err -> Err(DaoNotFound(composerName.value))
+      }
+    }
+
+  override suspend fun getNextGenreList(
+    genreName: GenreName
+  ): Result<AudioIdList, DaoMessage>  = genreDao.getNextGenre(genreName)
+    .flatMap { idName ->
+      when (val genreAudio = getAllAudioFor(idName.genreId, Long.MAX_VALUE)) {
+        is Ok -> {
+          val list: List<AudioDescription> = genreAudio.value
+          val idList = MediaIdList(list.mapTo(LongArrayList(list.size)) { it.mediaId.value })
+          Ok(AudioIdList(idList, SongListType.Genre, idName.genreName.value))
+        }
+        is Err -> Err(DaoNotFound(genreName.value))
       }
     }
 

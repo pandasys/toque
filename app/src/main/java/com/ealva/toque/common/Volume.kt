@@ -48,3 +48,5 @@ value class Volume(val value: Int) : Comparable<Volume> {
     val RANGE: VolumeRange = NONE..MAX
   }
 }
+
+fun abs(volume: Volume): Volume = Volume(kotlin.math.abs(volume.value))

@@ -19,6 +19,7 @@ package com.ealva.toque.db
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.ComposerName
+import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.prefs.AppPrefs
 import com.github.michaelbull.result.Err
@@ -521,7 +522,7 @@ suspend fun SongListType.getNextList(
     SongListType.Album -> getNextAlbumList(audioMediaDao, name, appPrefs)
     SongListType.Artist -> getNextArtistList(audioMediaDao, name, appPrefs)
     SongListType.Composer -> getNextComposerList(audioMediaDao, name, appPrefs)
-    SongListType.Genre -> EMPTY_MEDIA_ID_LIST
+    SongListType.Genre -> getNextGenreList(audioMediaDao, name, appPrefs)
     SongListType.Folder -> EMPTY_MEDIA_ID_LIST
     SongListType.PlayList -> EMPTY_MEDIA_ID_LIST
     SongListType.SmartPlaylist -> EMPTY_MEDIA_ID_LIST
@@ -553,5 +554,14 @@ private suspend fun getNextComposerList(
   appPrefs: AppPrefs
 ): AudioIdList = when (val result = audioMediaDao.getNextComposerList(ComposerName(name))) {
   is Ok -> result.value
-  is Err -> SongListType.Genre.getNextList(audioMediaDao, "", appPrefs)
+  is Err -> getNextGenreList(audioMediaDao, "", appPrefs)
+}
+
+private suspend fun getNextGenreList(
+  audioMediaDao: AudioMediaDao,
+  name: String,
+  appPrefs: AppPrefs
+): AudioIdList = when (val result = audioMediaDao.getNextGenreList(GenreName(name))) {
+  is Ok -> result.value
+  is Err -> SongListType.Folder.getNextList(audioMediaDao, "", appPrefs)
 }

@@ -67,6 +67,7 @@ class AppPrefsStub : AppPrefs {
   override val endOfQueueAction = PrefStub<Int, EndOfQueueAction>()
   override val selectMediaAction = PrefStub<Int, SelectMediaAction>()
   override val audioOutputModule = PrefStub<Int, AudioOutputModule>()
-  override val markPlayedPercentage = PrefStub<Int, Int>()
+  override val markPlayedPercentage = PrefStub<Double, Double>()
   override val rewindThenPrevious: BoolPref = BoolPrefStub()
+  override val scanAfterMediaScanner: BoolPref = BoolPrefStub()
 }

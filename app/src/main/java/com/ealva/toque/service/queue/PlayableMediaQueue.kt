@@ -51,9 +51,9 @@ interface PlayableMediaQueue<T : Any> {
 
   suspend fun getNextMediaTitle(): Title
 
-  suspend fun play(immediate: Boolean = false)
+  suspend fun play(immediateTransition: Boolean = false)
 
-  suspend fun pause(immediate: Boolean = false)
+  suspend fun pause(immediateTransition: Boolean = false)
 
   suspend fun stop()
 
@@ -91,8 +91,8 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
   override val currentItem: NullQueueMediaItem = NullQueueMediaItem
   override val currentItemIndex: Int = -1
   override suspend fun getNextMediaTitle(): Title = Title.UNKNOWN
-  override suspend fun play(immediate: Boolean) = Unit
-  override suspend fun pause(immediate: Boolean) = Unit
+  override suspend fun play(immediateTransition: Boolean) = Unit
+  override suspend fun pause(immediateTransition: Boolean) = Unit
   override suspend fun stop() = Unit
 //  override fun togglePlayPause() = Unit
   override suspend fun next() = Unit

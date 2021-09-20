@@ -19,6 +19,7 @@ package com.ealva.toque.service.player
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.SuspendingThrottle
 import com.ealva.toque.common.Volume
+import com.ealva.toque.common.abs
 import com.ealva.toque.service.audio.PlayerTransition.Type
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -57,14 +58,14 @@ abstract class FadeOutTransition(
           val cancelVolume = player.volumeRange.start - 1
           maybeNotifyPaused(player)
           val steps: Millis = length / MIN_FADE_LENGTH
-
-          val startVolume = player.volume
+          val startVolume = player.playerVolume
           val endVolume = player.volumeRange.start
-          val volumeChange = ((endVolume - startVolume) / steps).coerceAtLeast(MIN_VOLUME_STEP)
+          val volumeChange = (abs((endVolume - startVolume)) / steps).coerceAtLeast(MIN_VOLUME_STEP)
           var newVolume = startVolume
+
           while (newVolume > cancelVolume) {
             newVolume = (newVolume - volumeChange).coerceAtLeast(Volume.NONE)
-            player.volume = newVolume
+            player.playerVolume = newVolume
             if (shouldContinueTransition(player)) {
               if (newVolume <= Volume.NONE) {
                 finishTransition(player)

@@ -25,6 +25,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import androidx.annotation.RequiresApi
+import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.log._i
@@ -133,12 +134,14 @@ abstract class BaseAudioFocusManager(
   private var playbackDelayed = false
   private var resumeOnFocusGain = false
   private var endDuckOnFocusGain = false
+  private var released = false
 
   private val receiver = AudioBecomingNoisyReceiver().apply {
     context.registerReceiver(this, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
   }
 
   override fun release() {
+    released = true
     context.unregisterReceiver(receiver)
   }
 
@@ -153,24 +156,31 @@ abstract class BaseAudioFocusManager(
 
   override fun requestFocus(
     contentType: AudioFocusManager.ContentType
-  ): Boolean = if (haveAudioFocus) true else {
-    val res = doRequestFocus(contentType)
-    focusLock.withLock {
-      when (res) {
-        AudioManager.AUDIOFOCUS_REQUEST_FAILED -> {
-          haveAudioFocus = false
-          false
+  ): Boolean = when {
+    released -> {
+      LOG.e { it("Requested focus after release") }
+      false
+    }
+    haveAudioFocus -> true
+    else -> {
+      val res = doRequestFocus(contentType)
+      focusLock.withLock {
+        when (res) {
+          AudioManager.AUDIOFOCUS_REQUEST_FAILED -> {
+            haveAudioFocus = false
+            false
+          }
+          AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
+            haveAudioFocus = true
+            true
+          }
+          AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
+            haveAudioFocus = false
+            playbackDelayed = true
+            false
+          }
+          else -> false
         }
-        AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
-          haveAudioFocus = true
-          true
-        }
-        AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
-          haveAudioFocus = false
-          playbackDelayed = true
-          false
-        }
-        else -> false
       }
     }
   }

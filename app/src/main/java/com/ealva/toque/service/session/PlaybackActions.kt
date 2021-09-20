@@ -22,8 +22,6 @@ import android.support.v4.media.session.PlaybackStateCompat
 import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap
 
-private inline fun Long.addFlag(action: PlaybackActions.Action): Long = this or action.value
-
 private val DEFAULT_ACTION_FLAGS = PlaybackActions.Action.Stop.value or
   PlaybackActions.Action.SetRating.value or
   PlaybackActions.Action.PlayFromMediaId.value or
@@ -32,19 +30,7 @@ private val DEFAULT_ACTION_FLAGS = PlaybackActions.Action.Stop.value or
   PlaybackActions.Action.SetRepeatMode.value or
   PlaybackActions.Action.SetShuffleMode.value
 
-class PlaybackActions(hasMedia: Boolean, isPlaying: Boolean, hasPrev: Boolean, hasNext: Boolean) {
-  private var actionFlags: Long = DEFAULT_ACTION_FLAGS
-
-  init {
-    if (hasMedia) addAll(Action.SkipToQueueItem, Action.PlayPause)
-    if (hasPrev) add(Action.SkipToPrevious)
-    if (hasNext) add(Action.SkipToNext)
-    if (isPlaying) {
-      addAll(Action.Pause, Action.Rewind, Action.FastForward, Action.SeekTo)
-    } else if (hasMedia) {
-      addAll(Action.Play, Action.Rewind, Action.FastForward, Action.SeekTo)
-    }
-  }
+data class PlaybackActions(private val actionFlags: Long) {
 
   @Suppress("unused")
   enum class Action(val value: Long) {
@@ -77,12 +63,6 @@ class PlaybackActions(hasMedia: Boolean, isPlaying: Boolean, hasPrev: Boolean, h
   val hasSkipToPrevious: Boolean
     get() = (actionFlags and Action.SkipToPrevious.value) != 0L
 
-  private inline fun add(action: Action) {
-    actionFlags = actionFlags.addFlag(action)
-  }
-
-  private inline fun addAll(vararg actions: Action) = actions.forEach { action -> add(action) }
-
   /** Suitable to pass to [PlaybackStateCompat.Builder.setActions] */
   val asCompat: Long
     get() = actionFlags
@@ -103,13 +83,33 @@ class PlaybackActions(hasMedia: Boolean, isPlaying: Boolean, hasPrev: Boolean, h
   }
 
   companion object {
+    operator fun invoke(hasMedia: Boolean, isPlaying: Boolean, hasPrev: Boolean): PlaybackActions {
+      var flags: Long = DEFAULT_ACTION_FLAGS
+      if (hasMedia) flags = flags.addAll(Action.SkipToQueueItem, Action.PlayPause)
+      if (hasPrev) flags = flags.add(Action.SkipToPrevious)
+      if (hasMedia) flags = flags.add(Action.SkipToNext)
+      if (isPlaying) {
+        flags = flags.addAll(Action.Pause, Action.Rewind, Action.FastForward, Action.SeekTo)
+      } else if (hasMedia) {
+        flags = flags.addAll(Action.Play, Action.Rewind, Action.FastForward, Action.SeekTo)
+      }
+      return PlaybackActions(flags)
+    }
+
     val DEFAULT = PlaybackActions(
       hasMedia = false,
       isPlaying = false,
-      hasPrev = false,
-      hasNext = false
+      hasPrev = false
     )
   }
+}
+
+private inline fun Long.add(action: PlaybackActions.Action): Long = this or action.value
+
+private inline fun Long.addAll(vararg actions: PlaybackActions.Action): Long {
+  var flags = this
+  actions.forEach { action -> flags = flags.add(action) }
+  return flags
 }
 
 private fun Long.flagsToString() = actionNameMap

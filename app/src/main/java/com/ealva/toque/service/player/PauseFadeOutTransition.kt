@@ -35,7 +35,7 @@ class PauseFadeOutTransition(
 
   override fun finishTransition(player: TransitionPlayer) {
     player.pause()
-    player.volume = player.volumeRange.start
+    player.playerVolume = player.volumeRange.start
     setComplete()
   }
 

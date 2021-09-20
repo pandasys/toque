@@ -61,7 +61,7 @@ class FadeInTransition(
         val startVolume: Volume = player.getStartVolume()
         val endVolume: Volume = player.volumeRange.endInclusive
         if (shouldContinueTransition(player)) {
-          player.volume = startVolume
+          player.playerVolume = startVolume
           if (!player.isPlaying) {
             player.play()
             // VLC HACK START
@@ -69,10 +69,10 @@ class FadeInTransition(
             // start and this nasty hack seems to fix it on my device. Who knows about other
             // devices?? This is necessary, and works most of the time, to properly set the volume.
             // Also, unsure if this is dependent on OpenSl ES vs Audio Track
-            player.volume = startVolume
+            player.playerVolume = startVolume
             delay(VOLUME_HACK_DELAY)
           }
-          player.volume = startVolume
+          player.playerVolume = startVolume
           // VLC HACK END
 
           val remaining: Millis =
@@ -86,7 +86,7 @@ class FadeInTransition(
             var currentVolume = startVolume
             while (currentVolume <= endVolume) {
               currentVolume = (currentVolume + volumeChange).coerceAtMost(endVolume)
-              player.volume = currentVolume
+              player.playerVolume = currentVolume
               if (shouldContinueTransition(player)) {
                 if (currentVolume >= endVolume) {
                   setComplete()
@@ -102,7 +102,7 @@ class FadeInTransition(
             }
           } else {
             setComplete()
-            player.volume = endVolume
+            player.playerVolume = endVolume
           }
         }
       }
@@ -110,7 +110,7 @@ class FadeInTransition(
   }
 
   private fun TransitionPlayer.getStartVolume(): Volume {
-    return if (forceStartVolumeZero) Volume.NONE else volume
+    return if (forceStartVolumeZero) Volume.NONE else playerVolume
   }
 
   override fun toString(): String = buildString {

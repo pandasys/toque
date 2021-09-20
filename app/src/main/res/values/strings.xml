@@ -79,15 +79,6 @@
   <string name="RepeatOff">Repeat Off</string>
   <string name="RepeatQueue">Repeat Queue</string>
   <string name="RepeatCurrent">Repeat Current</string>
-
-
-  <string name="allowed_caller_log">
-        Caller has a valid certificate, but its package doesn\'t match any expected package for the
-        given certificate. To allow this caller, add the following to the allowed callers list:\n
-        <![CDATA[
-        <signature name=\"%1$s\" package=\"%2$s\">\n\t<key>%3$s</key>\n</signature>\n
-        ]]>
-    </string>
   <string name="No_media_found">No media found</string>
   <string name="No_playlist_found">No playlist found</string>
   <string name="Library">Library</string>
@@ -97,10 +88,10 @@
   <string name="Genres">Genres</string>
   <string name="Tracks">Tracks</string>
   <string name="Searching_for_artwork">Searching for artwork</string>
-  <string name="RequiredToScanRationale">Permission is required to scan for media. Toque will be unable to function without this permission.</string>
+  <string name="RequiredToScanRationale">Permission is required to access media. Toque will be unable to function without this permission.</string>
   <string name="RepeatRequiredToScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.</string>
-  <string name="SettingsRepeatRequiredToScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.\n\nSettings->Permissions->Storage->Allow</string>
-  <string name="AccessExternalStorage">Access External Storage</string>
+  <string name="SettingsScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.\n\nSettings -> Permissions -> Storage -> Allow</string>
+  <string name="AccessExternalStorage">Access Media</string>
   <string name="RequestPermission">Request Permission</string>
   <string name="Exit">Exit</string>
   <string name="OK">OK</string>

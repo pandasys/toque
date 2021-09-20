@@ -26,7 +26,16 @@ interface MediaFileTagInfo : AutoCloseable {
   val duration: Millis
   val title: String
   val titleSort: String
+  /**
+   * An artist in a file Tag can be a comma delimited list of some sort. There can also be multiple
+   * artist fields in a tag. This is all of the tag fields, which also may be further parsed into
+   * separate strings.  TODO - clarify implementation
+   */
   val artists: List<String>
+  /**
+   * This field is very much like [artists] in it's construction. If any artist does not have a
+   * sort, one is created from the artist itself. TODO - clarify implementation
+   */
   val artistsSort: List<String>
   val album: String
   val albumSort: String
