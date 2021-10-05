@@ -14,26 +14,29 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.NotificationManager.IMPORTANCE_LOW
 import android.app.PendingIntent
-import android.content.BroadcastReceiver
+import android.app.UiModeManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
+import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.support.v4.media.MediaDescriptionCompat
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.RatingCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -43,7 +46,10 @@ import android.support.v4.media.session.MediaSessionCompat.FLAG_HANDLES_TRANSPOR
 import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING
 import android.support.v4.media.session.PlaybackStateCompat.STATE_STOPPED
+import android.util.TypedValue
 import android.view.KeyEvent
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
@@ -51,9 +57,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.OnLifecycleEvent
 import androidx.media.session.MediaButtonReceiver
 import androidx.media.session.MediaButtonReceiver.buildMediaButtonPendingIntent
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.RequestOptions
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
@@ -64,17 +69,24 @@ import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
 import com.ealva.toque.R
-import com.ealva.toque.android.content.orNullObject
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.app.Toque
+import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.audio.QueueAudioItem
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.asCompat
 import com.ealva.toque.common.fetch
+import com.ealva.toque.common.windowOf15
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
-import com.ealva.toque.service.controller.MediaSessionEvent
-import com.ealva.toque.service.session.PlaybackState.Companion.NullPlaybackState
+import com.ealva.toque.service.controller.SessionControlEvent
+import com.ealva.toque.service.media.toStarRating
+import com.ealva.toque.service.session.common.Metadata
+import com.ealva.toque.service.session.common.PlaybackState
+import com.ealva.toque.service.session.common.PlaybackState.Companion.NullPlaybackState
+import com.ealva.toque.service.session.common.toCompat
+import com.ealva.toque.service.session.common.toCompatMediaId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -91,6 +103,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.ArrayList
+import kotlin.math.roundToInt
 import androidx.core.app.NotificationCompat.Builder as NotificationBuilder
 
 typealias MediaButtonHandler = (KeyEvent, Int, Intent, MediaSessionCompat.Callback) -> Boolean
@@ -104,9 +118,9 @@ private val LOG by lazyLogger(MediaSession::class)
 interface MediaSessionControl {
   /**
    * Calls from transport controls, media buttons, and commands from controllers and the system,
-   * flow through here as [MediaSessionEvent]s
+   * flow through here as [SessionControlEvent]s
    */
-  val eventFlow: Flow<MediaSessionEvent>
+  val eventFlow: Flow<SessionControlEvent>
 
   /**
    * We want replay at startup so we don't lose anything during initial activation, but subsequently
@@ -148,22 +162,29 @@ interface MediaSessionState {
   suspend fun setState(state: PlaybackState)
 
   /**
-   * Updates the current metadata clients can display. New metadata can be created using
-   * MediaMetadataCompat.Builder
+   * Updates the current metadata clients can display.
    */
   suspend fun setMetadata(metadata: Metadata)
 
-  /** Send queue info to clients for display */
-  suspend fun setQueue(queue: () -> List<MediaSessionCompat.QueueItem>)
+  /**
+   * Send [queue] info to clients for display. Because we may need to limit the actual amount of
+   * data sent to the session include the [currentItemIndex] which allows a moving window to be
+   * created.
+   *
+   * If [indexChange] is true it indicates this call is being made because the current item in the
+   * queue changed and not because the queue contents changes. This is checked so that if the entire
+   * queue is being sent, and not just a window, we don't need to send the queue again
+   */
+  fun setQueue(queue: List<QueueAudioItem>, currentItemIndex: Int, indexChange: Boolean = false)
 
   /** Sets the title of the play queue, eg. "Now Playing" */
-  suspend fun setQueueTitle(title: String)
+  fun setQueueTitle(title: String)
 
   /** Send shuffle mode info to clients */
-  suspend fun setShuffle(shuffleMode: ShuffleMode)
+  fun setShuffle(shuffleMode: ShuffleMode)
 
   /** Send repeat mode info to clients */
-  suspend fun setRepeat(repeatMode: RepeatMode)
+  fun setRepeat(repeatMode: RepeatMode)
 }
 
 private const val NOW_PLAYING_NOTIFICATION_ID = 1010
@@ -176,7 +197,7 @@ private val sessionPrefsSingleton: MediaSessionPrefsSingleton = MediaSessionPref
 )
 
 private val notificationPrefsSingleton: NotificationPrefsSingleton = NotificationPrefsSingleton(
-  NotificationPrefs::make,
+  NotificationPrefs.Companion::make,
   Toque.appContext,
   "NotificationPrefs"
 )
@@ -266,9 +287,8 @@ private const val METADATA_ARTWORK_WIDTH = 144
 private const val METADATA_ARTWORK_HEIGHT = 144
 private const val MSG_START_OR_UPDATE_NOTIFICATION = 0
 private const val MSG_UPDATE_NOTIFICATION_BITMAP = 1
-private const val ACTION_DISMISS = "com.ealva.toque.service.session.dismiss"
-private val Context.mediaSessionTag: String
-  get() = "${getString(R.string.app_name)}MediaSession"
+
+private val Context.mediaSessionTag: String get() = "${getString(R.string.app_name)}MediaSession"
 
 private class MediaSessionImpl(
   private val ctx: Context,
@@ -287,12 +307,10 @@ private class MediaSessionImpl(
   private val focusManager = AudioFocusManager(ctx, audioManager, this, scope)
   private var msgHandler = makeHandler()
   private var isNotificationStarted = false
-  private val notificationBroadcastReceiver = NotificationBroadcastReceiver()
-  private val intentFilter = IntentFilter(ACTION_DISMISS)
   private var lastState: PlaybackState = NullPlaybackState
   private val playbackStateFlow = MutableStateFlow(NullPlaybackState)
 
-  override val eventFlow: MutableSharedFlow<MediaSessionEvent> = MutableSharedFlow(replay = 4)
+  override val eventFlow: MutableSharedFlow<SessionControlEvent> = MutableSharedFlow(replay = 4)
   private val sessionCallback = SessionCallback(scope, eventFlow, focusManager)
 
   override val token: MediaSessionCompat.Token = session.sessionToken
@@ -395,26 +413,40 @@ private class MediaSessionImpl(
     if (notificationPrefs == null) notificationPrefs = notificationPrefsSingleton.instance()
   }
 
-  override suspend fun setQueue(queue: () -> List<MediaSessionCompat.QueueItem>) {
-    session.setQueue(queue())
+  private var lastWindow: List<QueueAudioItem> = emptyList()
+  override fun setQueue(queue: List<QueueAudioItem>, currentItemIndex: Int, indexChange: Boolean) {
+    if (ctx.isCarMode()) {
+      // Don't set same queue again. Not really an optimization because this is very fast, but
+      // let's not unnecessarily give the client new lists
+      val windowOf15 = queue.windowOf15(currentItemIndex)
+      if (windowOf15 != lastWindow) {
+        lastWindow = windowOf15
+        session.setQueue(windowOf15.toCompat())
+      }
+    } else if (!indexChange) {
+      // we currently don't limit the queue size so it might be very large. Let's copy it and
+      // launch the building of the compat version. Likely not called in very fast succession
+      val queueCopy = queue.toList()
+      scope.launch {
+        session.setQueue(queueCopy.toCompat())
+      }
+    }
   }
 
-  override suspend fun setQueueTitle(title: String) {
+  override fun setQueueTitle(title: String) {
     session.setQueueTitle(title)
   }
 
-  override suspend fun setShuffle(shuffleMode: ShuffleMode) {
+  override fun setShuffle(shuffleMode: ShuffleMode) {
     session.setShuffleMode(shuffleMode.asCompat)
   }
 
-  override suspend fun setRepeat(repeatMode: RepeatMode) {
+  override fun setRepeat(repeatMode: RepeatMode) {
     session.setRepeatMode(repeatMode.asCompat)
   }
 
   override suspend fun getRecentMedia(): MediaDescriptionCompat? {
-    LOG._e { it("getRecentMedia") }
     if (lastMetadata === Metadata.NullMetadata) {
-      LOG._e { it("lastMetadata was NullMetadata") }
       lastMetadata = sessionPrefsSingleton.instance().lastMetadata()
     }
     return if (lastMetadata === Metadata.NullMetadata) null else lastMetadata.toCompat().description
@@ -425,19 +457,8 @@ private class MediaSessionImpl(
   @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
   fun onDestroy() {
     session.setCallback(null)
-    scope.cancel()
     session.release()
-  }
-
-  private inner class NotificationBroadcastReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent?) {
-      val theIntent = intent.orNullObject()
-      LOG._e { it("NotificationBroadcastReceiver action=%s", theIntent.action.orEmpty()) }
-      when (val action = theIntent.action.orEmpty()) {
-        ACTION_DISMISS -> stopNotificationIfStarted()
-        else -> LOG.e { it("NotificationBroadcastReceiver unrecognized action='%s'", action) }
-      }
-    }
+    scope.cancel()
   }
 
   private fun showPrevAction(): Boolean =
@@ -473,24 +494,41 @@ private class MediaSessionImpl(
     }
   }
 
+  fun Dp.toPx() = TypedValue.applyDimension(
+    TypedValue.COMPLEX_UNIT_DIP,
+    value,
+    ctx.resources.displayMetrics
+  ).roundToInt()
+
   @Suppress("BlockingMethodInNonBlockingContext")
   private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
     try {
-      if (uri !== Uri.EMPTY) {
-        Glide.with(ctx)
-          .applyDefaultRequestOptions(glideOptions)
-          .asBitmap()
-          .load(uri)
-          .submit(METADATA_ARTWORK_WIDTH, METADATA_ARTWORK_HEIGHT)
-          .get()
+      val request = if (uri !== Uri.EMPTY) {
+        ImageRequest.Builder(ctx)
+          .data(uri)
+          .allowHardware(false)
+          .size(METADATA_ARTWORK_WIDTH.dp.toPx(), METADATA_ARTWORK_HEIGHT.dp.toPx())
+          .build()
+        //Glide.with(ctx)
+        //  .applyDefaultRequestOptions(glideOptions)
+        //  .asBitmap()
+        //  .load(uri)
+        //  .submit(METADATA_ARTWORK_WIDTH, METADATA_ARTWORK_HEIGHT)
+        //  .get()
       } else {
-        Glide.with(ctx)
-          .applyDefaultRequestOptions(glideOptions)
-          .asBitmap()
-          .load(R.drawable.ic_big_album)
-          .submit(METADATA_ARTWORK_WIDTH, METADATA_ARTWORK_HEIGHT)
-          .get()
+        ImageRequest.Builder(ctx)
+          .data(R.drawable.ic_big_album)
+          .allowHardware(false)
+          .size(METADATA_ARTWORK_WIDTH.dp.toPx(), METADATA_ARTWORK_HEIGHT.dp.toPx())
+          .build()
+        //Glide.with(ctx)
+        //  .applyDefaultRequestOptions(glideOptions)
+        //  .asBitmap()
+        //  .load(R.drawable.ic_big_album)
+        //  .submit(METADATA_ARTWORK_WIDTH, METADATA_ARTWORK_HEIGHT)
+        //  .get()
       }
+      (ctx.imageLoader.execute(request).drawable as BitmapDrawable).bitmap
     } catch (e: Exception) {
       null
     }
@@ -567,14 +605,14 @@ private class MediaSessionImpl(
         true
       }
       MSG_UPDATE_NOTIFICATION_BITMAP -> {
-//        LOG._e {
-//          it(
-//            "updateBitmap started=%s currentTag=%s msg.arg1=%s",
-//            isNotificationStarted,
-//            notificationArg,
-//            msg.arg1
-//          )
-//        }
+        LOG._e {
+          it(
+            "updateBitmap started=%s currentTag=%s msg.arg1=%s",
+            isNotificationStarted,
+            notificationArg,
+            msg.arg1
+          )
+        }
         if (isNotificationStarted && notificationArg == msg.arg1) {
           startOrUpdateNotification(msg.obj as Bitmap)
         }
@@ -589,7 +627,6 @@ private class MediaSessionImpl(
     notificationManager.notify(NOW_PLAYING_NOTIFICATION_ID, notification)
     if (!isNotificationStarted) {
       isNotificationStarted = true
-      ctx.registerReceiver(notificationBroadcastReceiver, intentFilter)
     }
     notificationListener.onPosted(NOW_PLAYING_NOTIFICATION_ID, notification)
   } ?: stopNotificationIfStarted()
@@ -600,7 +637,6 @@ private class MediaSessionImpl(
       msgHandler.removeMessages(MSG_START_OR_UPDATE_NOTIFICATION)
       msgHandler.removeMessages(MSG_UPDATE_NOTIFICATION_BITMAP)
       notificationListener.onCanceled()
-      ctx.unregisterReceiver(notificationBroadcastReceiver)
       notificationManager.cancel(NOW_PLAYING_NOTIFICATION_ID)
     }
   }
@@ -649,19 +685,70 @@ private class MediaSessionImpl(
     priority = NotificationCompat.PRIORITY_LOW
     color = NotificationCompat.COLOR_DEFAULT
   }
-
-  companion object {
-    const val MEDIA_DESCRIPTION_EXTRAS_START_PLAYBACK_POSITION_MS = "playback_start_position_ms"
-  }
 }
+
+fun Context.isCarMode(): Boolean {
+  val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+  return uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_CAR
+}
+
+fun Metadata.toCompat(): MediaMetadataCompat {
+  if (this === Metadata.NullMetadata) return MediaMetadataCompat.Builder().build()
+
+  return MediaMetadataCompat.Builder()
+    .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, id.toCompatMediaId())
+    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistName.value)
+    .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, albumArtist.value)
+    .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumTitle.value)
+    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title())
+    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration())
+    .putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, trackNumber.toLong())
+    .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, location.toString())
+    .apply {
+      /*
+        Preferred order of artwork URI is:
+          METADATA_KEY_DISPLAY_ICON_URI,
+          METADATA_KEY_ART_URI,
+          METADATA_KEY_ALBUM_ART_URI
+       */
+      val artwork = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
+      if (artwork !== Uri.EMPTY) {
+        putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, localAlbumArt.toString())
+      }
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+        putRating(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())
+      }
+    }
+    .build()
+}
+
+private fun List<QueueAudioItem>.toCompat(): List<MediaSessionCompat.QueueItem> =
+  ArrayList<MediaSessionCompat.QueueItem>(size).apply {
+    this@toCompat.forEach { audioItem ->
+      add(MediaSessionCompat.QueueItem(audioItem.toDescriptionCompat(), audioItem.instanceId))
+    }
+  }
+
+private fun AudioItem.toDescriptionCompat() = MediaDescriptionCompat.Builder()
+  .setMediaId(id.toCompatMediaId())
+  .setTitle(title())
+  .setSubtitle(artist.value)
+  .setDescription(albumTitle.value)
+  .setIconUri(if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt)
+  .setMediaUri(location)
+  .setExtras(
+    Bundle().apply {
+      putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration())
+      putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, trackNumber.toLong())
+      if (albumArt !== Uri.EMPTY)
+        putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, albumArt.toString())
+      putParcelable(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())
+    }
+  )
+  .build()
 
 private inline val PlaybackStateCompat.isPlaying: Boolean
   get() = state == STATE_PLAYING
-
-private val glideOptions = RequestOptions()
-  .fallback(R.drawable.ic_big_album)
-  .error(R.drawable.ic_big_album)
-  .diskCacheStrategy(DiskCacheStrategy.DATA)
 
 private typealias MediaSessionPrefsSingleton = PreferenceStoreSingleton<MediaSessionPrefs>
 private typealias MetadataPref = PreferenceStore.Preference<String, Metadata>
@@ -683,4 +770,3 @@ private class MediaSessionPrefs(
 
   val lastMetadata: StorePref<String, Metadata> by metadataPref(Metadata.NullMetadata)
 }
-

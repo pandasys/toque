@@ -16,7 +16,7 @@
 
 @file:Suppress("unused")
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -27,6 +27,8 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.fetch
 import com.ealva.toque.service.media.PlayState
+import com.ealva.toque.service.session.common.PlaybackActions
+import com.ealva.toque.service.session.common.PlaybackState
 
 private val LOG by lazyLogger(PlayState::class)
 

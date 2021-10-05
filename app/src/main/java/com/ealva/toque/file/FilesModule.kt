@@ -16,12 +16,15 @@
 
 package com.ealva.toque.file
 
+import com.ealva.toque.service.audio.MediaFileStore
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 object FilesModule {
 
   val koinModule = module {
-    single { MediaStorage(androidContext()) }
+    single { MediaStorage(androidContext(), get(named("AppPrefs"))) }
+    single { MediaFileStore(androidContext(), get()) }
   }
 }

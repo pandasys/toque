@@ -24,8 +24,19 @@ import android.net.Uri
 import com.ealva.toque.service.media.FileExtensions
 import com.ealva.toque.service.media.MediaFormat
 
-private val supportedSet = setOf(SCHEME_FILE, "smb", "ssh", "nfs", "ftp", "ftps", SCHEME_CONTENT)
-private val networkSet = setOf("smb", "ssh", "nfs", "ftp", "ftps")
+private val supportedSet = setOf(
+  "http",
+  "https",
+  SCHEME_FILE,
+  "smb",
+  "ssh",
+  "nfs",
+  "ftp",
+  "ftps",
+  SCHEME_CONTENT
+)
+
+private val networkSet = setOf("http", "https", "smb", "ssh", "nfs", "ftp", "ftps")
 
 inline fun String?.toUriOrEmpty(): Uri = if (isNullOrEmpty()) Uri.EMPTY else Uri.parse(this)
 
@@ -36,6 +47,8 @@ fun Uri.isNetworkScheme(): Boolean = networkSet.contains(scheme)
 fun Uri.isFileScheme(): Boolean = SCHEME_FILE == scheme
 
 fun Uri.isContentScheme(): Boolean = SCHEME_CONTENT == scheme
+
+fun Uri.isLocalScheme(): Boolean = isContentScheme() || isFileScheme()
 
 val Uri.fileExtension: String
   get() = lastPathSegment?.substringAfterLast('.') ?: ""

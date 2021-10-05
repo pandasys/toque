@@ -22,6 +22,7 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.Rating
 
@@ -37,4 +38,7 @@ interface AudioItem {
   val albumArt: Uri
   val rating: Rating
   val location: Uri
+  val fileUri: Uri
 }
+
+interface QueueAudioItem : AudioItem, HasId

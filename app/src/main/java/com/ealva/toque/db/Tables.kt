@@ -19,7 +19,6 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.db.MediaTable.contentId
 import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.db.QueueStateTable.id
 import com.ealva.welite.db.table.ForeignKeyAction
@@ -108,31 +107,32 @@ object ArtistAlbumTable : Table() {
 }
 
 /**
- * Table of all media, both video and audio. Don't have separate tables for audio/video because
- * some video may be played as audio. To use the [contentId] in querying the MediaStore, the
- * [mediaType] must be known to generate the correct uri. A lot of the metadata stored in this
- * table is specific to the [mediaType]. When video is played as audio some substitutions will
- * need to be made for display purposes and some metadata will be unavailable as it doesn't exist
- * for video.
+ * Table of all media, both video and audio. Don't have separate tables for audio/video because some
+ * video may be played as audio. A lot of the metadata stored in this table is specific to the
+ * [mediaType]. When video is played as audio some substitutions will need to be made for display
+ * purposes and some metadata will be unavailable as it doesn't exist for video.
  */
 @Suppress("unused")
 object MediaTable : Table() {
   val id = long("MediaId") { primaryKey() }
 
-  /**
-   * Location of the media - need not be local to the device. If [contentId] is null then
-   * this will be a network Uri
-   */
+  /** Location of the media - need not be local to the device. */
   val location = text("MediaUri")
 
   /**
-   * If the media came from the MediaStore, this is it's MediaStore ID. If the value is not null
-   * it must be unique. SQLite docs say, "For the purposes of unique indices, all NULL values are
-   * considered different from all other NULL values and are thus unique." So, we don't need a
-   * trigger to ensure uniqueness.
-   * [SQLite CREATE INDEX](https://sqlite.org/lang_createindex.html)
+   * If media is a local file and MediaStore returns the MediaStore.MediaColumns.DATA column, it
+   * is stored here.
    */
-  val contentId = optLong("MediaContentId")
+  val fileUri = text("MediaFile")
+
+  /**
+   * Name of the file as returned by the MediaStore. Does NOT have path information. Can be
+   * displayed to the user or used to check the file extension:
+   * ```displayName.substringAfterLast('.', "")```
+   * returns the file extension without the dot '.' or an empty string if there is no file
+   * extension.
+   */
+  val displayName = text("MediaDisplayName")
 
   /**
    * The type of media, [com.ealva.toque.service.media.MediaType] - audio or video
@@ -185,7 +185,6 @@ object MediaTable : Table() {
   init {
     // several of these indices exist for faster smart playlist functionality
     uniqueIndex(location) // media may appear only once
-    uniqueIndex(contentId) // content may appear only once and need to find quickly
     /*
      * Note: Adding all of the following indices resulted in a worst case cost of approx 3-4%
      * inserting over 2500 during initial scanning, which includes parsing all metadata (on a Galaxy
@@ -366,7 +365,9 @@ object EqPresetAssociationTable : Table() {
  */
 object QueueStateTable : Table() {
   val id = integer("QueueId") { primaryKey() }
-  val mediaId = long("ServiceState_MediaId") { default(-1) }
-  val queueIndex = integer("ServiceState_QueueIndex") { default(0) }
-  val playbackPosition = long("ServiceState_PlaybackPosition") { default(0) }
+  val mediaId = long("QueueState_MediaId") { default(-1) }
+  val queueIndex = integer("QueueState_QueueIndex") { default(0) }
+  val playbackPosition = long("QueueState_PlaybackPosition") { default(0) }
+  val timePlayed = long("QueueState_TimePlayed") { default(0) }
+  val countingFrom = long("QueueState_CountingFrom") { default(0) }
 }

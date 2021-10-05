@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE", "MagicNumber")
+@file:Suppress("NOTHING_TO_INLINE")
 
 package com.ealva.toque.math
 
@@ -51,6 +51,7 @@ inline fun Double.isNotZero(epsilon: Double): Boolean {
 /**
  * This must be in the range 0.0..1.0 and is multiplied by 100.0 and converted to Int
  */
+@Suppress("unused")
 inline fun Double.percentageToInt(): Int {
   debug { require(this in 0.0..1.0) }
   return (this * 100.0).coerceIn(0.0, 100.0).toInt()
@@ -61,6 +62,7 @@ inline fun Float.isEqualTo(rhs: Float, epsilon: Float): Boolean {
   return abs(this - rhs) < epsilon
 }
 
+@Suppress("unused")
 inline fun Float.isNotEqualTo(rhs: Float, epsilon: Float): Boolean {
   return !isEqualTo(rhs, epsilon)
 }

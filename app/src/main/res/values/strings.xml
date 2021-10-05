@@ -90,7 +90,7 @@
   <string name="Searching_for_artwork">Searching for artwork</string>
   <string name="RequiredToScanRationale">Permission is required to access media. Toque will be unable to function without this permission.</string>
   <string name="RepeatRequiredToScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.</string>
-  <string name="SettingsScanRationale">Toque reads media from public directories via Android MediaStore and requires read access to process media file Tag information. Toque will be unable to function without this permission.\n\nSettings -> Permissions -> Storage -> Allow</string>
+  <string name="SettingsScanRationale">Toque reads media from public directories via Android MediaStore. Read access is required to find media. Toque will be unable to function without this permission.\n\nNavigate to: Permissions | Storage | Allow</string>
   <string name="AccessExternalStorage">Access Media</string>
   <string name="RequestPermission">Request Permission</string>
   <string name="Exit">Exit</string>
@@ -103,5 +103,6 @@
   <string name="NowPlayingChannelDescription">Shows what media Toque is playing now</string>
   <string name="Stop">Stop</string>
   <string name="LocalAudio">Local Audio</string>
-
+  <string name="OpenSettings">Open Settings</string>
+  <string name="MediaAlbumCoverArt">"%s Album Cover Art"</string>
 </resources>

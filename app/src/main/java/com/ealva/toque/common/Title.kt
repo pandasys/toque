@@ -19,7 +19,7 @@
 package com.ealva.toque.common
 
 inline fun String?.toTitle(): Title {
-  return this?.let { Title(trim()) } ?: Title.UNKNOWN
+  return this?.let { Title(trim()) } ?: Title.EMPTY
 }
 
 @JvmInline

@@ -19,7 +19,6 @@ package com.ealva.toque.db
 import com.ealva.ealvabrainz.brainz.data.ArtistMbid
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
-import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
@@ -29,19 +28,27 @@ import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.compound.union
+import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.greater
+import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.literal
+import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.statements.DeleteStatement
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Query
+import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.inSubQuery
+import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
+import com.ealva.welite.db.table.orderByRandom
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
@@ -92,10 +99,11 @@ interface ArtistDao {
 
   fun deleteAll(txn: TransactionInProgress): Long
   fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
-
   suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage>
-
-  suspend fun getNextArtist(artistName: ArtistName): Result<ArtistIdName, DaoMessage>
+  suspend fun getNextArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
+  suspend fun getPreviousArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
+  suspend fun getRandomArtist(): Result<ArtistIdName, DaoMessage>
+  suspend fun getArtistName(id: ArtistId): Result<ArtistName, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -202,12 +210,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     DELETE_ARTISTS_WITH_NO_MEDIA.delete()
   }
 
-  override suspend fun getAllArtists(
-    limit: Long
-  ): Result<List<ArtistIdName>, DaoMessage> = db.query {
-    runCatching { doGetArtistNames(limit) }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage> =
+    db.query { runCatching { doGetArtistNames(limit) }.mapError { DaoExceptionMessage(it) } }
 
   private fun Queryable.doGetArtistNames(limit: Long): List<ArtistIdName> = ArtistTable
     .selects { listOf(id, artistName) }
@@ -218,12 +222,9 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     .toList()
 
   override suspend fun getNextArtist(
-    artistName: ArtistName
+    name: ArtistName
   ): Result<ArtistIdName, DaoMessage> = db.query {
-    runCatching {
-      LOG.i { it("getNextArtist after %s", artistName) }
-      doGetNextArtist(artistName)
-    }.mapError { DaoExceptionMessage(it) }
+    runCatching { doGetNextArtist(name) }.mapError { DaoExceptionMessage(it) }
   }
 
   /**
@@ -234,6 +235,53 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     .where { artistName greater previousArtist.value }
     .orderByAsc { artistName }
     .limit(1)
+    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+    .single()
+
+  override suspend fun getPreviousArtist(name: ArtistName) = db.query {
+    runCatching { if (name.isEmpty()) doGetMaxArtist() else doGetPreviousArtist(name) }
+      .mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
+   */
+  private fun Queryable.doGetPreviousArtist(previousArtist: ArtistName): ArtistIdName = ArtistTable
+    .selects { listOf(id, artistName) }
+    .where { artistName less previousArtist.value }
+    .orderBy { artistName by Order.DESC }
+    .limit(1)
+    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+    .single()
+
+  private val artistMax by lazy { ArtistTable.artistName.max().alias("artist_max_alias") }
+  private fun Queryable.doGetMaxArtist(): ArtistIdName = ArtistTable
+    .selects { listOf(id, artistMax) }
+    .all()
+    .limit(1)
+    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistMax])) }
+    .single()
+
+  override suspend fun getArtistName(id: ArtistId): Result<ArtistName, DaoMessage> = db.query {
+    runCatching { doGetArtistName(id) }.mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetArtistName(artistId: ArtistId) = ArtistTable
+    .select { artistName }
+    .where { id eq artistId.value }
+    .sequence { ArtistName(it[artistName]) }
+    .single()
+
+  override suspend fun getRandomArtist(
+  ): Result<ArtistIdName, DaoMessage> = db.query {
+    runCatching { doGetRandomArtist() }.mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetRandomArtist(): ArtistIdName = ArtistTable
+    .selects { listOf(id, artistName) }
+    .where {
+      id inSubQuery ArtistTable.select(id).all().orderByRandom().limit(1)
+    }
     .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
     .single()
 }
@@ -269,3 +317,5 @@ private val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistT
       }
     ).selectCount().asExpression()
 }
+
+fun ArtistName.isEmpty(): Boolean = value.isEmpty()

@@ -17,15 +17,11 @@
 package com.ealva.toque.service.controller
 
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
-import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOf
 
 object NullMediaController : ToqueMediaController {
-  override val currentQueue: StateFlow<PlayableMediaQueue<*>> = MutableStateFlow(NullPlayableMediaQueue)
+  override val currentQueue = MutableStateFlow(NullPlayableMediaQueue)
   override val mediaIsLoaded: Boolean = false
   override suspend fun setCurrentQueue(type: QueueType, resume: Boolean) = Unit
 }

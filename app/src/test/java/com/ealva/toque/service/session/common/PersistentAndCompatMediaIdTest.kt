@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.common
 
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -22,19 +22,25 @@ import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PlaylistId
+import com.ealva.toque.service.session.common.IdPrefixes.ALBUM_PREFIX
+import com.ealva.toque.service.session.common.IdPrefixes.ARTIST_PREFIX
+import com.ealva.toque.service.session.common.IdPrefixes.COMPOSER_PREFIX
+import com.ealva.toque.service.session.common.IdPrefixes.GENRE_PREFIX
+import com.ealva.toque.service.session.common.IdPrefixes.MEDIA_PREFIX
+import com.ealva.toque.service.session.common.IdPrefixes.PLAYLIST_PREFIX
 import com.nhaarman.expect.expect
 import org.junit.Test
 
-class MediaSessionBrowserTest {
+class PersistentAndCompatMediaIdTest {
   @Test
   fun `test make ID`() {
     listOf(
-      Pair(MediaId(1000), MediaSessionBrowser.MEDIA_PREFIX),
-      Pair(ArtistId(100), MediaSessionBrowser.ARTIST_PREFIX),
-      Pair(AlbumId(200), MediaSessionBrowser.ALBUM_PREFIX),
-      Pair(GenreId(300), MediaSessionBrowser.GENRE_PREFIX),
-      Pair(ComposerId(400), MediaSessionBrowser.COMPOSER_PREFIX),
-      Pair(PlaylistId(500), MediaSessionBrowser.PLAYLIST_PREFIX)
+      Pair(MediaId(1000), MEDIA_PREFIX),
+      Pair(ArtistId(100), ARTIST_PREFIX),
+      Pair(AlbumId(200), ALBUM_PREFIX),
+      Pair(GenreId(300), GENRE_PREFIX),
+      Pair(ComposerId(400), COMPOSER_PREFIX),
+      Pair(PlaylistId(500), PLAYLIST_PREFIX)
     ).forEach { pair ->
       val id = pair.first
       val prefix = pair.second
@@ -53,12 +59,12 @@ class MediaSessionBrowserTest {
 
   @Test
   fun `test string to PersistentId`() {
-    expect("${MediaSessionBrowser.MEDIA_PREFIX}_1000".toPersistentId()).toBe(MediaId(1000))
+    expect("${MEDIA_PREFIX}_1000".toPersistentId()).toBe(MediaId(1000))
     expect("1000".toPersistentId()).toBe(MediaId(1000))
-    expect("${MediaSessionBrowser.ARTIST_PREFIX}_1".toPersistentId()).toBe(ArtistId(1))
-    expect("${MediaSessionBrowser.ALBUM_PREFIX}_20000".toPersistentId()).toBe(AlbumId(20000))
-    expect("${MediaSessionBrowser.GENRE_PREFIX}_2".toPersistentId()).toBe(GenreId(2))
-    expect("${MediaSessionBrowser.COMPOSER_PREFIX}_3".toPersistentId()).toBe(ComposerId(3))
-    expect("${MediaSessionBrowser.PLAYLIST_PREFIX}_4".toPersistentId()).toBe(PlaylistId(4))
+    expect("${ARTIST_PREFIX}_1".toPersistentId()).toBe(ArtistId(1))
+    expect("${ALBUM_PREFIX}_20000".toPersistentId()).toBe(AlbumId(20000))
+    expect("${GENRE_PREFIX}_2".toPersistentId()).toBe(GenreId(2))
+    expect("${COMPOSER_PREFIX}_3".toPersistentId()).toBe(ComposerId(3))
+    expect("${PLAYLIST_PREFIX}_4".toPersistentId()).toBe(PlaylistId(4))
   }
 }

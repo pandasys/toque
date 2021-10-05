@@ -17,10 +17,12 @@
 package com.ealva.toque.service.audio
 
 import android.os.Bundle
+import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.SongListType
 import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
@@ -30,7 +32,11 @@ import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
-import com.ealva.toque.service.session.OnMediaType
+import com.ealva.toque.service.session.server.OnMediaType
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.coroutines.binding.binding
+import it.unimi.dsi.fastutil.longs.LongArrayList
 
 private val LOG by lazyLogger(PrepareMediaFromId::class)
 
@@ -38,29 +44,37 @@ class PrepareMediaFromId(
   private val localAudioQueue: LocalAudioQueue,
   private val audioMediaDao: AudioMediaDao
 ) : OnMediaType<Unit> {
-  override suspend fun onMedia(mediaId: MediaId, extras: Bundle) {
-    LOG._e { it("onMedia id=%s extras=%s", mediaId, extras) }
+  override suspend fun onMedia(mediaId: MediaId, extras: Bundle, maxListSize: Long) =
     localAudioQueue.prepareNext(AudioIdList(MediaIdList(mediaId()), SongListType.All, "None"))
+
+  override suspend fun onArtist(artistId: ArtistId, extras: Bundle, maxListSize: Long) {
+    when (val result = binding<AudioIdList, DaoMessage> {
+      val artistName = audioMediaDao.artistDao.getArtistName(artistId).bind()
+      val list = audioMediaDao.getAllAudioFor(artistId, maxListSize).bind()
+      AudioIdList(
+        MediaIdList(list.mapTo(LongArrayList(list.size)) { it.mediaId.value }),
+        SongListType.Artist,
+        artistName.value
+      )
+    }) {
+      is Ok -> localAudioQueue.prepareNext(result.value)
+      is Err -> LOG.e { it(result.toString()) }
+    }
   }
 
-  override suspend fun onArtist(artistId: ArtistId, extras: Bundle) {
-    LOG._e { it("onArtist id=%s extras=%s", artistId, extras) }
-    audioMediaDao.getAllAudioFor(artistId, 100)
+  override suspend fun onAlbum(albumId: AlbumId, extras: Bundle, maxListSize: Long) {
+    audioMediaDao.getAllAudioFor(albumId, maxListSize)
   }
 
-  override suspend fun onAlbum(albumId: AlbumId, extras: Bundle) {
-    LOG._e { it("onAlbum id=%s extras=%s", albumId, extras) }
+  override suspend fun onGenre(genreId: GenreId, extras: Bundle, maxListSize: Long) {
+    audioMediaDao.getAllAudioFor(genreId, maxListSize)
   }
 
-  override suspend fun onGenre(genreId: GenreId, extras: Bundle) {
-    LOG._e { it("onGenre id=%s extras=%s", genreId, extras) }
+  override suspend fun onComposer(composerId: ComposerId, extras: Bundle, maxListSize: Long) {
+    audioMediaDao.getAllAudioFor(composerId, maxListSize)
   }
 
-  override suspend fun onComposer(composerId: ComposerId, extras: Bundle) {
-    LOG._e { it("onComposer id=%s extras=%s", composerId, extras) }
-  }
-
-  override suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle) {
+  override suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle, maxListSize: Long) {
     LOG._e { it("onPlaylist id=%s extras=%s", playlistId, extras) }
   }
 }

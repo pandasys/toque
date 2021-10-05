@@ -54,12 +54,10 @@ value class Millis(val value: Long) : Comparable<Millis> {
 
   companion object {
     operator fun invoke(value: Int): Millis = Millis(value.toLong())
+    operator fun invoke(value: Float): Millis = Millis(value.toLong())
 
-    // Some commonly used Millis
-    val ZERO = Millis(0)
-    val ONE_HUNDRED = Millis(100)
-    val TWO_HUNDRED = Millis(200)
     val ONE_SECOND = Millis(1000)
+    val TWO_SECONDS = Millis(2000)
     val THREE_SECONDS = Millis(3000)
     val FIVE_SECONDS = Millis(5000)
     val TEN_SECONDS = Millis(10000)

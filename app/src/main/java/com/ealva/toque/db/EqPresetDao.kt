@@ -122,9 +122,9 @@ private class EqPresetDaoImpl(
     runCatching { doInsertPreset(name, preAmpAndBands) }
       .mapError { DaoExceptionMessage(it) }
       .andThen { if (it > 0) Ok(it) else Err(DaoFailedToInsert("$name $preAmpAndBands")) }
+      .onFailure { rollback() }
   }
 
-  @Suppress("MagicNumber")
   private fun TransactionInProgress.doInsertPreset(
     name: String,
     preAmpAndBands: PreAmpAndBands
@@ -187,7 +187,6 @@ private class EqPresetDaoImpl(
       .onFailure { rollback() }
   }
 
-  @Suppress("MagicNumber")
   private fun TransactionInProgress.doUpdatePreset(presetData: EqPresetData) = UPDATE_ALL.update {
     it[BIND_PRESET_ID] = presetData.id
     it[updatedTime] = System.currentTimeMillis()
@@ -222,6 +221,8 @@ private class EqPresetDaoImpl(
       DaoExceptionMessage(it)
     }.andThen {
       if (it > 0) Ok(true) else selectUpdateError(presetId, "PresetId:$presetId preamp:$amplitude")
+    }.onFailure {
+      rollback()
     }
   }
 
@@ -244,6 +245,8 @@ private class EqPresetDaoImpl(
     }.andThen {
       if (it > 0) Ok(true)
       else selectUpdateError(presetId, "PresetId:$presetId band:$index value:$amplitude")
+    }.onFailure {
+      rollback()
     }
   }
 
@@ -261,6 +264,8 @@ private class EqPresetDaoImpl(
           DaoNotFound("PresetId:$presetId")
         )
       }
+    }.onFailure {
+      rollback()
     }
   }
 

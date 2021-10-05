@@ -46,7 +46,9 @@ import com.ealva.toque.service.player.PlayImmediateTransition
 import com.ealva.toque.service.player.WakeLock
 import com.ealva.toque.service.player.WakeLockFactory
 import com.ealva.toque.service.queue.PlayNow
-import com.ealva.toque.service.session.Metadata
+import com.ealva.toque.service.session.common.Metadata
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +60,7 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
+import org.videolan.libvlc.interfaces.IMedia
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -69,16 +72,16 @@ private val WAKE_LOCK_TIMEOUT = Millis(TimeUnit.MINUTES.toMillis(WAKE_LOCK_TIMEO
 private const val LOCK_TAG_PREFIX = "toque:VlcAudioItem"
 
 /**
- * When use selects previous, if position is > than this value, seek to 0, else go to previous song
+ * When user selects previous, if position is > than this value, seek to 0, else go to previous song
  */
 private const val SEEK_TO_ZERO_MIN_POSITION = 5000
 
 /** If position is within this range when checked for skip, item should be marked skipped */
-@Suppress("MagicNumber")
 private val SKIP_RANGE = Millis(3)..Millis(10)
 
 class VlcAudioItem(
   override var metadata: Metadata,
+  private val displayName: String,
   override val albumId: AlbumId,
   override val artistSet: Set<ArtistName>,
   private val libVlc: LibVlc,
@@ -118,21 +121,23 @@ class VlcAudioItem(
   override val duration: Millis
     get() = metadata.duration
 
-  override suspend fun play(immediateTransition: Boolean) {
-    if (isStopped) reset(
-      eqPresetSelector,
-      position,
-      true,
-      PlayNow(true),
-    ) else avPlayer.play(immediateTransition)
+  override fun play(immediate: Boolean) {
+    if (isStopped)
+      scope.launch { reset(immediateTransition = immediate, playNow = PlayNow(true)) }
+    else
+      avPlayer.play(immediate)
   }
 
   override fun stop() {
     if (!isStopped) avPlayer.stop()
   }
 
-  override fun pause(immediateTransition: Boolean) {
-    avPlayer.pause(immediateTransition)
+  override suspend fun togglePlayPause() {
+    if (avPlayer.isPlaying) avPlayer.pause(false) else play(false)
+  }
+
+  override fun pause(immediate: Boolean) {
+    avPlayer.pause(immediate)
   }
 
   override val isSeekable: Boolean
@@ -141,7 +146,7 @@ class VlcAudioItem(
   override suspend fun seekTo(position: Millis) {
     if (position in metadata.playbackRange) {
       if (isStopped)
-        reset(eqPresetSelector, position, true, PlayNow(false))
+        scope.launch { reset(immediateTransition = false, playNow = PlayNow(false)) }
       else
         avPlayer.seek(position)
     } else {
@@ -157,9 +162,8 @@ class VlcAudioItem(
     }
   }
 
-  private var _position = Millis.ZERO
-  override val position: Millis
-    get() = _position
+  private var _position = Millis(0)
+  override val position: Millis get() = _position
 
   override var volume: Volume
     get() = avPlayer.volume
@@ -195,24 +199,20 @@ class VlcAudioItem(
     }
   }
 
-  override fun shutdown(shutdownTransition: PlayerTransition) {
+  override fun shutdown(shutdownTransition: PlayerTransition) =
     avPlayer.transitionTo(shutdownTransition)
-  }
 
-  override suspend fun reset(
-    presetSelector: EqPresetSelector,
-    position: Millis,
-    immediateTransition: Boolean,
-    playNow: PlayNow
-  ) {
+  override suspend fun reset(immediateTransition: Boolean, playNow: PlayNow) {
     val shouldPlayNow = PlayNow(playNow() || isPlaying)
-    val currentTime = position
+    val currentTime = _position
     avPlayer.shutdown()
     avPlayer = NullAvPlayer
     prepareSeekMaybePlay(
       currentTime,
       if (immediateTransition) PlayImmediateTransition() else NoOpPlayerTransition,
-      shouldPlayNow
+      shouldPlayNow,
+      previousTimePlayed,
+      countTimeFrom
     )
   }
 
@@ -220,6 +220,8 @@ class VlcAudioItem(
     position: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
+    timePlayed: Millis,
+    countFrom: Millis,
     startPaused: StartPaused
   ) {
     isPreparing = true
@@ -229,18 +231,20 @@ class VlcAudioItem(
     startOnPrepared = playNow()
     isShutdown = false
     isStopped = false
-    val media = libVlc.makeAudioMedia(location, position, startPaused, libVlcPrefs)
-    avPlayer = VlcPlayer(
-      media,
-      title,
-      duration,
-      eqPresetSelector.getPreferredEqPreset(id, albumId) as VlcEqPreset,
-      onPreparedTransition,
-      appPrefs,
-      wakeLock,
-      dispatcher
-    )
-    media.release()
+    previousTimePlayed = timePlayed
+    countTimeFrom = countFrom
+    avPlayer = libVlc.makeAudioMedia(fileUri, position, startPaused, libVlcPrefs).use { media ->
+      VlcPlayer(
+        media,
+        title,
+        duration,
+        eqPresetSelector.getPreferredEqPreset(id, albumId) as VlcEqPreset,
+        onPreparedTransition,
+        appPrefs,
+        wakeLock,
+        dispatcher
+      )
+    }
     scope.launch {
       avPlayer.eventFlow
         .onSubscription { if (startPaused()) avPlayer.playStartPaused() }
@@ -251,23 +255,23 @@ class VlcAudioItem(
     }
   }
 
-  private suspend fun handleAvPlayerEvent(event: AvPlayerEvent) {
-    when (event) {
-      is AvPlayerEvent.Prepared -> onPrepared(event)
-      is AvPlayerEvent.Start -> onStart(event)
-      is AvPlayerEvent.PositionUpdate -> onPositionUpdate(event)
-      is AvPlayerEvent.Paused -> onPaused(event)
-      is AvPlayerEvent.Stopped -> onStopped(event)
-      is AvPlayerEvent.PlaybackComplete -> onPlaybackComplete()
-      is AvPlayerEvent.Error -> onError()
-      is AvPlayerEvent.None -> {
-      }
+  private suspend fun handleAvPlayerEvent(event: AvPlayerEvent) = when (event) {
+    is AvPlayerEvent.Prepared -> onPrepared(event)
+    is AvPlayerEvent.Start -> onStart(event)
+    is AvPlayerEvent.PositionUpdate -> onPositionUpdate(event)
+    is AvPlayerEvent.Paused -> onPaused(event)
+    is AvPlayerEvent.Stopped -> onStopped(event)
+    is AvPlayerEvent.PlaybackComplete -> onPlaybackComplete()
+    is AvPlayerEvent.Error -> onError()
+    is AvPlayerEvent.None -> {
     }
   }
 
   private suspend fun onPrepared(event: AvPlayerEvent.Prepared) {
-    _position = event.position
-    countTimeFrom = event.position // establish where we will start counting percentage played
+    // Can get a 0 before we start actual playback, but we set this during prepareSeekMaybePlay
+    if (_position == Millis(0)) _position = event.position
+    // establish where we will start counting percentage played if not already set
+    if (countTimeFrom == Millis(0)) countTimeFrom = event.position
     isPreparing = false
     if (event.duration > 0 && duration != event.duration) {
       metadata = metadata.copy(duration = event.duration)
@@ -285,12 +289,6 @@ class VlcAudioItem(
   /**
    * If the total play time of media exceeds what the user specifies as the minimum percentage
    * required, or total time exceeds 4 minutes, the media is marked played.
-   *
-   * TODO: If the player service is destroyed we lose the "count time from" position and "previous
-   * time played" we have established. We should probably save this number in the queue state. We
-   * already save media id, queue index, and position so we can restore playback - storing one more
-   * long value may not be too bad. PlayableAudioItemEvent.Prepared and
-   * PlayableAudioItemEvent.PositionUpdate could carry this value.
    */
   private suspend fun onPositionUpdate(event: AvPlayerEvent.PositionUpdate) {
     if (!hasBeenMarkedPlayed) {
@@ -316,7 +314,15 @@ class VlcAudioItem(
       }
     }
     _position = event.position
-    eventFlow.emit(PlayableAudioItemEvent.PositionUpdate(this, event.position, event.duration))
+    eventFlow.emit(
+      PlayableAudioItemEvent.PositionUpdate(
+        this,
+        event.position,
+        event.duration,
+        previousTimePlayed,
+        countTimeFrom
+      )
+    )
   }
 
   private suspend fun onPaused(event: AvPlayerEvent.Paused) {
@@ -338,12 +344,11 @@ class VlcAudioItem(
     eventFlow.emit(PlayableAudioItemEvent.PlaybackComplete(this))
   }
 
-  private suspend fun onError() {
-    eventFlow.emit(PlayableAudioItemEvent.Error(this))
-  }
+  private suspend fun onError() = eventFlow.emit(PlayableAudioItemEvent.Error(this))
 
   override fun cloneItem(): PlayableAudioItem = VlcAudioItem(
     metadata,
+    displayName,
     albumId,
     artistSet,
     libVlc,
@@ -364,13 +369,25 @@ class VlcAudioItem(
     if (position in SKIP_RANGE) mediaFileStore.incrementSkippedCountAsync(id)
   }
 
-  override suspend fun setRating(newRating: Rating) {
-    metadata = metadata.copy(rating = mediaFileStore.setRating(id, newRating))
+  override suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean) {
+    val wasPlaying = isPlaying
+    return when (
+      val result = mediaFileStore.setRating(
+        id = id,
+        fileLocation = metadata.location,
+        fileExt = displayName.substringAfterLast('.', ""),
+        newRating = newRating,
+        writeToFile = allowFileUpdate && appPrefs.saveRatingToFile(),
+        beforeFileWrite = { if (wasPlaying) pause(immediate = true) }
+      ) { if (wasPlaying) play(immediate = true) }
+    ) {
+      is Ok -> metadata = metadata.copy(rating = result.value)
+      is Err -> LOG.e { it("Error setting rating. %s", result.error) }
+    }
   }
 
-  override fun previousShouldRewind(): Boolean {
-    return appPrefs.rewindThenPrevious() && position >= SEEK_TO_ZERO_MIN_POSITION
-  }
+  override fun previousShouldRewind(): Boolean =
+    appPrefs.rewindThenPrevious() && position >= SEEK_TO_ZERO_MIN_POSITION
 
   override val id: MediaId
     get() = metadata.id
@@ -392,6 +409,8 @@ class VlcAudioItem(
     get() = metadata.rating
   override val location: Uri
     get() = metadata.location
+  override val fileUri: Uri
+    get() = metadata.fileUri
 
 //  override fun getArtist(preferAlbumArtist: Boolean): ArtistName {
 //    return if (preferAlbumArtist) {
@@ -403,8 +422,30 @@ class VlcAudioItem(
 
 //  private fun joinToArtistName(): ArtistName = ArtistName(artistSet.joinToString { it.value })
 //
-//  private fun fallbackIfEmptyOrUnknown(artist: ArtistName, fallback: () -> ArtistName): ArtistName =
+//private fun fallbackIfEmptyOrUnknown(artist: ArtistName, fallback: () -> ArtistName): ArtistName =
 //    if (artist.value.isNotEmpty() && artist != ArtistName.UNKNOWN) artist else fallback()
 
   override val instanceId: Long = nextId.getAndIncrement()
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is VlcAudioItem) return false
+
+    if (id != other.id) return false
+    if (instanceId != other.instanceId) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int {
+    return instanceId.hashCode()
+  }
+}
+
+inline fun <T : IMedia, R> T.use(block: (T) -> R): R {
+  try {
+    return block(this)
+  } finally {
+    release()
+  }
 }

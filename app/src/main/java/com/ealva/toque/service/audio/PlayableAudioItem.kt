@@ -19,23 +19,22 @@ package com.ealva.toque.service.audio
 import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.audio.QueueAudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.persist.AlbumId
-import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
+import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import com.ealva.toque.service.session.Metadata
 
-interface PlayableAudioItem : AudioItem, HasId {
+interface PlayableAudioItem : QueueAudioItem {
   val eventFlow: Flow<PlayableAudioItemEvent>
 
   val metadata: Metadata
@@ -66,11 +65,13 @@ interface PlayableAudioItem : AudioItem, HasId {
 
   var playbackRate: PlaybackRate
 
-  suspend fun play(immediateTransition: Boolean = false)
+  fun play(immediate: Boolean = false)
 
   fun stop()
 
-  fun pause(immediateTransition: Boolean = false)
+  suspend fun togglePlayPause()
+
+  fun pause(immediate: Boolean = false)
 
   /**
    * Seek to a position within the valid playback range, which is [Metadata.playbackRange]. If
@@ -81,8 +82,6 @@ interface PlayableAudioItem : AudioItem, HasId {
   fun shutdown()
 
   suspend fun reset(
-    presetSelector: EqPresetSelector,
-    position: Millis,
     immediateTransition: Boolean,
     playNow: PlayNow
   )
@@ -102,6 +101,8 @@ interface PlayableAudioItem : AudioItem, HasId {
     position: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
+    timePlayed: Millis = Millis(0),
+    countFrom: Millis = Millis(0),
     startPaused: StartPaused = StartPaused(true)
   )
 
@@ -117,7 +118,11 @@ interface PlayableAudioItem : AudioItem, HasId {
    */
   fun checkMarkSkipped()
 
-  suspend fun setRating(newRating: Rating)
+  /**
+   * If rating is coming from an external source (not our app), allowFileUpdate should be false
+   * because we may need to ask the user for permission (>=Android 11/SDK R)
+   */
+  suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean = false)
 
   fun previousShouldRewind(): Boolean
 }
@@ -128,30 +133,32 @@ inline val PlayableAudioItem.isNotValid: Boolean
 sealed interface PlayableAudioItemEvent {
   data class Prepared(
     val audioItem: PlayableAudioItem,
-    val currentPosition: Millis,
+    val position: Millis,
     val duration: Millis
   ) : PlayableAudioItemEvent
 
   data class PositionUpdate(
     val audioItem: PlayableAudioItem,
-    val currentPosition: Millis,
-    val duration: Millis
+    val position: Millis,
+    val duration: Millis,
+    val timePlayed: Millis,
+    val countingFrom: Millis
   ) : PlayableAudioItemEvent
 
   data class Start(
     val audioItem: PlayableAudioItem,
     val firstStart: Boolean,
-    val currentPosition: Millis,
+    val position: Millis,
   ) : PlayableAudioItemEvent
 
   data class Paused(
     val audioItem: PlayableAudioItem,
-    val currentPosition: Millis
+    val position: Millis
   ) : PlayableAudioItemEvent
 
   data class Stopped(
     val audioItem: PlayableAudioItem,
-    val currentPosition: Millis
+    val position: Millis
   ) : PlayableAudioItemEvent
 
   data class PlaybackComplete(val audioItem: PlayableAudioItem) : PlayableAudioItemEvent
@@ -168,13 +175,14 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override val isPlaying: Boolean = false
   override val isPausable: Boolean = false
   override val supportsFade: Boolean = false
-  override suspend fun play(immediateTransition: Boolean) = Unit
+  override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
-  override fun pause(immediateTransition: Boolean) = Unit
+  override suspend fun togglePlayPause() = Unit
+  override fun pause(immediate: Boolean) = Unit
   override val isSeekable: Boolean = false
   override suspend fun seekTo(position: Millis) = Unit
-  override val position: Millis = Millis.ZERO
-  override val duration: Millis = Millis.ZERO
+  override val position: Millis = Millis(0)
+  override val duration: Millis = Millis(0)
   override var volume: Volume = Volume.MAX
   override var isMuted: Boolean = false
   override var equalizer: EqPreset = EqPreset.NONE
@@ -182,8 +190,6 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override fun shutdown() = Unit
   override fun shutdown(shutdownTransition: PlayerTransition) = Unit
   override suspend fun reset(
-    presetSelector: EqPresetSelector,
-    position: Millis,
     immediateTransition: Boolean,
     playNow: PlayNow
   ) = Unit
@@ -192,6 +198,8 @@ object NullPlayableAudioItem : PlayableAudioItem {
     position: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
+    timePlayed: Millis,
+    countFrom: Millis,
     startPaused: StartPaused
   ) = Unit
 
@@ -202,11 +210,13 @@ object NullPlayableAudioItem : PlayableAudioItem {
   ) = Unit
 
   override fun checkMarkSkipped() = Unit
-  override suspend fun setRating(newRating: Rating): Unit = Unit
+  override suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean): Unit = Unit
   override fun previousShouldRewind(): Boolean = false
 
   override val id: MediaId = MediaId.INVALID
   override val location: Uri
+    get() = Uri.EMPTY
+  override val fileUri: Uri
     get() = Uri.EMPTY
   override val title: Title = Title.UNKNOWN
   override val albumTitle: AlbumTitle = AlbumTitle.UNKNOWN

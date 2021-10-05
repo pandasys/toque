@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.common
 
 import android.net.Uri
-import android.os.Build
-import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.RatingCompat
 import androidx.core.net.toUri
 import com.ealva.ealvabrainz.common.AlbumTitle
@@ -28,7 +26,6 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.media.toStarRating
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -64,7 +61,9 @@ data class Metadata(
   @Serializable(with = RatingAsIntSerializer::class)
   val rating: Rating,
   @Serializable(with = UriAsStringSerializer::class)
-  val location: Uri
+  val location: Uri,
+  @Serializable(with = UriAsStringSerializer::class)
+  val fileUri: Uri
 ) {
 
   /**
@@ -72,31 +71,6 @@ data class Metadata(
    */
   @Transient
   val playbackRange: ClosedRange<Millis> = Millis(0)..duration
-
-  fun toCompat(): MediaMetadataCompat {
-    if (this === NullMetadata) return MediaMetadataCompat.Builder().build()
-
-    val artwork = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
-
-    return MediaMetadataCompat.Builder()
-      .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, id.toString())
-      .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistName.value)
-      .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, albumArtist.value)
-      .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumTitle.value)
-      .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title())
-      .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration())
-      .putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, trackNumber.toLong())
-      .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, location.toString())
-      .apply {
-        if (artwork !== Uri.EMPTY) {
-          putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, artwork.toString())
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-          putRating(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())
-        }
-      }
-      .build()
-  }
 
   @OptIn(ExperimentalSerializationApi::class)
   fun toJsonString(): String {
@@ -115,11 +89,12 @@ data class Metadata(
       AlbumTitle(""),
       ArtistName(""),
       ArtistName(""),
-      Millis.ZERO,
+      Millis(0),
       -1,
       Uri.EMPTY,
       Uri.EMPTY,
       Rating.RATING_NONE,
+      Uri.EMPTY,
       Uri.EMPTY
     )
   }

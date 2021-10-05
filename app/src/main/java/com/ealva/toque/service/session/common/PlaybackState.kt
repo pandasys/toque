@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.common
 
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
@@ -30,7 +30,7 @@ data class PlaybackState(
   companion object {
     val NullPlaybackState = PlaybackState(
       playState = PlayState.None,
-      position = Millis.ZERO,
+      position = Millis(0),
       playbackRate = PlaybackRate.NORMAL,
       itemInstanceId = 0L,
       actions = PlaybackActions.DEFAULT

@@ -18,6 +18,8 @@
 
 package com.ealva.toque.prefs
 
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.prefstore.store.BasePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.Storage
@@ -26,8 +28,11 @@ import com.ealva.toque.common.Amp
 import com.ealva.toque.common.BooleanValue
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reify
+
+val B_LOG by lazyLogger(BasePreferenceStore::class)
 
 typealias MillisStorePref = PreferenceStore.Preference<Long, Millis>
 typealias VolumeStorePref = PreferenceStore.Preference<Int, Volume>
@@ -65,6 +70,6 @@ open class BaseToquePreferenceStore<T : PreferenceStore<T>>(
     default: T,
     customName: String? = null
   ): StorePref<Int, T> where T : Enum<T>, T : HasConstId {
-    return asTypePref(default, { default.javaClass.reify(it, default) }, { it.id }, customName)
+    return asTypePref(default, { default::class.reify(it, default) }, { it.id }, customName)
   }
 }

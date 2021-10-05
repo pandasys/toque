@@ -27,8 +27,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,11 +63,11 @@ class PauseFadeoutTransitionTest {
   @Test
   fun accept() {
     expect(transition.accept(PlayImmediateTransition())).toBe(true)
-    expect(transition.accept(FadeInTransition(Millis.ZERO, false))).toBe(true)
-    expect(transition.accept(ShutdownFadeOutTransition(Millis.ZERO))).toBe(false)
+    expect(transition.accept(FadeInTransition(Millis(0), false))).toBe(true)
+    expect(transition.accept(ShutdownFadeOutTransition(Millis(0)))).toBe(false)
     expect(transition.accept(ShutdownImmediateTransition())).toBe(true)
     expect(transition.accept(PauseImmediateTransition())).toBe(false)
-    expect(transition.accept(PauseFadeOutTransition(Millis.ZERO))).toBe(false)
+    expect(transition.accept(PauseFadeOutTransition(Millis(0)))).toBe(false)
   }
 
   @Test

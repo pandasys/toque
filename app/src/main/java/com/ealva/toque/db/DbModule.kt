@@ -53,7 +53,7 @@ object DbModule {
         eqPresetAssociationDao = get()
       )
     }
-    single { QueueStateDaoFactory(db = get()) }
+    single { QueuePositionStateDaoFactory(db = get()) }
     single { QueueDao(db = get()) }
   }
 

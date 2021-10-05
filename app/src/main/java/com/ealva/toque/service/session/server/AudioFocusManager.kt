@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -29,7 +29,7 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.log._i
-import com.ealva.toque.service.session.AudioFocusManager.FocusReaction
+import com.ealva.toque.service.session.server.AudioFocusManager.FocusReaction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow

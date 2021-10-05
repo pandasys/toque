@@ -29,6 +29,7 @@ import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindInt
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.statements.UpdateStatement
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
@@ -36,6 +37,7 @@ import com.github.michaelbull.result.mapError
 import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -50,48 +52,50 @@ private val LOG by lazyLogger(QueueStateTable::class)
 @JvmInline
 value class QueueId(val value: Int)
 
-data class QueueState(
+data class QueuePositionState(
   val mediaId: MediaId,
   val queueIndex: Int,
-  val playbackPosition: Millis
+  val playbackPosition: Millis,
+  val timePlayed: Millis = Millis(0),
+  val countingFrom: Millis = Millis(0)
 ) {
   companion object {
-    val INACTIVE_QUEUE_STATE = QueueState(MediaId.INVALID, -1, Millis.ZERO)
+    val INACTIVE_QUEUE_STATE = QueuePositionState(MediaId.INVALID, -1, Millis(0))
   }
 }
 
-interface QueueStateDaoFactory {
-  fun makeQueueStateDao(queueId: QueueId): QueueStateDao
+interface QueuePositionStateDaoFactory {
+  fun makeStateDao(queueId: QueueId): QueuePositionStateDao
 
   companion object {
     operator fun invoke(
       db: Database,
-      dispatcher: CoroutineDispatcher? = null
-    ): QueueStateDaoFactory = QueueStateDaoFactoryImpl(db, dispatcher)
+      dispatcher: CoroutineDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    ): QueuePositionStateDaoFactory = QueuePositionStateDaoFactoryImpl(db, dispatcher)
   }
 }
 
-private class QueueStateDaoFactoryImpl(
+private class QueuePositionStateDaoFactoryImpl(
   private val db: Database,
-  val dispatcher: CoroutineDispatcher?
-) : QueueStateDaoFactory {
-  override fun makeQueueStateDao(queueId: QueueId): QueueStateDao {
-    return QueueStateDao(queueId, db, dispatcher)
+  private val dispatcher: CoroutineDispatcher
+) : QueuePositionStateDaoFactory {
+  override fun makeStateDao(queueId: QueueId): QueuePositionStateDao {
+    return QueuePositionStateDao(queueId, db, dispatcher)
   }
 }
 
-interface QueueStateDao {
+interface QueuePositionStateDao {
 
   /**
    * Get the persisted state. It's expected this will be called once at startup
    */
-  suspend fun getState(): DaoResult<QueueState>
+  suspend fun getState(): DaoResult<QueuePositionState>
 
   /**
    * Persist the state. Hands off the state ASAP and if invoked quickly enough only the last value
    * is persisted (conflated)
    */
-  fun persistState(state: QueueState): QueueState
+  fun persistState(state: QueuePositionState): QueuePositionState
 
   /**
    * Cancels the underlying state flow collector job and no further values will be persisted.
@@ -108,7 +112,7 @@ interface QueueStateDao {
     /**
      * If no state has been persisted this is the value returned [getState]
      */
-    val UNINITIALIZED_STATE = QueueState.INACTIVE_QUEUE_STATE
+    val UNINITIALIZED_STATE = QueuePositionState.INACTIVE_QUEUE_STATE
 
     /**
      * Default dispatcher should only be changed for tests
@@ -116,20 +120,27 @@ interface QueueStateDao {
     operator fun invoke(
       queueId: QueueId,
       db: Database,
-      dispatcher: CoroutineDispatcher? = null
-    ): QueueStateDao = QueueStateDaoImpl(queueId, db, dispatcher)
+      dispatcher: CoroutineDispatcher
+    ): QueuePositionStateDao = QueuePositionStateDaoImpl(queueId, db, dispatcher)
   }
 }
 
-private class QueueStateDaoImpl(
+private class QueuePositionStateDaoImpl(
   private val queueId: QueueId,
   private val db: Database,
-  dispatcher: CoroutineDispatcher?
-) : QueueStateDao {
+  dispatcher: CoroutineDispatcher
+) : QueuePositionStateDao {
   private var closed = false
-  private val scope =
-    CoroutineScope(dispatcher ?: Executors.newSingleThreadExecutor().asCoroutineDispatcher())
-  private val stateFlow = MutableStateFlow(QueueState.INACTIVE_QUEUE_STATE)
+  // State is persisted at a usual rate of 3 times per second on average. A burst would be 4.
+  // We create our own thread to reduce latency and get our flow, which persists, off of the UI
+  // thread as quickly as possible. There should be only 1 queue (queueId) active at a time. The
+  // Dao layer will do a withContext(IO). Using a state flow so we get conflation as default
+  // behavior (though I bet we rarely, if ever, miss one). Missing one at the end of a piece of
+  // media playing means restore will be off by milliseconds. Not all queues need to use
+  // time played and count from as they may not restore the same way, eg. radio station queue won't
+  // restore to a position, only a stream.
+  private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val stateFlow = MutableStateFlow(QueuePositionState.INACTIVE_QUEUE_STATE)
   private val collectJob = scope.launch {
     stateFlow
       .onEach { state -> handleNewQueueState(state) }
@@ -138,7 +149,7 @@ private class QueueStateDaoImpl(
       .collect()
   }
 
-  private suspend fun handleNewQueueState(state: QueueState) {
+  private suspend fun handleNewQueueState(state: QueuePositionState) {
     if (state.mediaId.isValid) {
       db.transaction {
         val updateResult = UPDATE.update {
@@ -146,6 +157,8 @@ private class QueueStateDaoImpl(
           it[BIND_MEDIA_ID] = state.mediaId.value
           it[BIND_QUEUE_INDEX] = state.queueIndex
           it[BIND_POSITION] = state.playbackPosition()
+          it[BIND_TIME_PLAYED] = state.timePlayed()
+          it[BIND_COUNT_FROM] = state.countingFrom()
         }
         if (updateResult < 1) {
           LOG.w { it("MediaServiceStateTable queueId:$queueId not initialized, inserting row") }
@@ -154,6 +167,8 @@ private class QueueStateDaoImpl(
             it[mediaId] = state.mediaId.value
             it[queueIndex] = state.queueIndex
             it[playbackPosition] = state.playbackPosition()
+            it[timePlayed] = state.timePlayed()
+            it[countingFrom] = state.countingFrom()
           }
           if (insertResult < 1) {
             LOG.e { it("Update and insert fail, service state not persisted") }
@@ -163,22 +178,30 @@ private class QueueStateDaoImpl(
     }
   }
 
-  override suspend fun getState(): DaoResult<QueueState> = db.transaction {
+  override suspend fun getState(): DaoResult<QueuePositionState> = db.transaction {
     check(!closed)
     runCatching { doGetState() }
       .mapError { DaoExceptionMessage(it) }
   }
 
-  private fun TransactionInProgress.doGetState(): QueueState {
+  private fun TransactionInProgress.doGetState(): QueuePositionState {
     return QueueStateTable
-      .selects { listOf(mediaId, queueIndex, playbackPosition) }
+      .selects { listOf(mediaId, queueIndex, playbackPosition, timePlayed, countingFrom) }
       .where { id eq queueId.value }
-      .sequence { QueueState(MediaId(it[mediaId]), it[queueIndex], Millis(it[playbackPosition])) }
+      .sequence {
+        QueuePositionState(
+          MediaId(it[mediaId]),
+          it[queueIndex],
+          Millis(it[playbackPosition]),
+          Millis(it[timePlayed]),
+          Millis(it[countingFrom])
+        )
+      }
       .singleOrNull()
-      ?: QueueState.INACTIVE_QUEUE_STATE
+      ?: QueuePositionState.INACTIVE_QUEUE_STATE
   }
 
-  override fun persistState(state: QueueState): QueueState {
+  override fun persistState(state: QueuePositionState): QueuePositionState {
     check(!closed) { "" }
     stateFlow.value = state
     return state
@@ -197,8 +220,12 @@ private val BIND_QUEUE_ID = bindInt()
 private val BIND_MEDIA_ID = bindLong()
 private val BIND_QUEUE_INDEX = bindInt()
 private val BIND_POSITION = bindLong()
-private val UPDATE = QueueStateTable.updateColumns {
+private val BIND_TIME_PLAYED = bindLong()
+private val BIND_COUNT_FROM = bindLong()
+private val UPDATE: UpdateStatement<QueueStateTable> = QueueStateTable.updateColumns {
   it[mediaId] = BIND_MEDIA_ID
   it[queueIndex] = BIND_QUEUE_INDEX
   it[playbackPosition] = BIND_POSITION
+  it[timePlayed] = BIND_TIME_PLAYED
+  it[countingFrom] = BIND_COUNT_FROM
 }.where { id eq BIND_QUEUE_ID }

@@ -140,11 +140,12 @@ private class LibVlcImpl(
     if (startPaused()) {
       addMediaOption { ":start-paused" }
     }
-    if (initialSeek > Millis.ZERO) {
+    if (initialSeek > Millis(0)) {
       addMediaOption { """:start-time=${initialSeek.toFloatSeconds()}""" }
     }
     addMediaOption { ":no-video" }
     addMediaOption { ":no-volume-save" }
+    addMediaOption { ":no-sub-autodetect-file" }
     maybeSetReplayGain { prefs }
     setMediaHardwareAcceleration { prefs }
 //    val bufferSize = prefs.bufferSize

@@ -28,8 +28,8 @@ import kotlinx.coroutines.supervisorScope
 
 private const val PERMITS_PER_SECOND = 10.0
 
-private val ADJUST_FROM_END = Millis.TWO_HUNDRED
-private val MIN_FADE_LENGTH = Millis.ONE_HUNDRED
+private val ADJUST_FROM_END = Millis(200)
+private val MIN_FADE_LENGTH = Millis(100)
 private val MIN_VOLUME_STEP = Volume.ONE
 
 /**

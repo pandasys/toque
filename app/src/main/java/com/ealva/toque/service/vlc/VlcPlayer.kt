@@ -194,12 +194,12 @@ private class VlcPlayerImpl(
     mediaPlayer.play()
   }
 
-  override fun play(immediateTransition: Boolean) {
-    if (isValid) startTransition(getPlayTransition { immediateTransition }, false)
+  override fun play(immediate: Boolean) {
+    if (isValid) startTransition(getPlayTransition { immediate }, false)
   }
 
-  override fun pause(immediateTransition: Boolean) {
-    if (isValid) startTransition(getPauseTransition { immediateTransition }, false)
+  override fun pause(immediate: Boolean) {
+    if (isValid) startTransition(getPauseTransition { immediate }, false)
   }
 
   override fun seek(position: Millis) {
@@ -361,7 +361,7 @@ private class VlcPlayerImpl(
     override val volumeRange: VolumeRange get() = AvPlayer.DEFAULT_VOLUME_RANGE
 
     override val remainingTime: Millis
-      get() = if (isValid) duration - mediaPlayer.time else Millis.ZERO
+      get() = if (isValid) duration - mediaPlayer.time else Millis(0)
 
     override fun notifyPaused() = emit(AvPlayerEvent.Paused(time))
 

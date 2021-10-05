@@ -16,30 +16,41 @@
 
 package com.ealva.toque.ui.main
 
-import android.Manifest.permission.READ_EXTERNAL_STORAGE
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultLauncher
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.IconButton
+import androidx.compose.material.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import coil.annotation.ExperimentalCoilApi
+import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.R.string.AccessExternalStorage
-import com.ealva.toque.R.string.RepeatRequiredToScanRationale
-import com.ealva.toque.R.string.RequestPermission
-import com.ealva.toque.R.string.RequiredToScanRationale
-import com.ealva.toque.R.string.SettingsScanRationale
 import com.ealva.toque.android.content.haveReadPermission
+import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.app.Toque
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
@@ -53,6 +64,8 @@ import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.ealva.toque.ui.theme.ToqueTheme
+import com.google.accompanist.insets.ProvideWindowInsets
+import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.AsyncStateChanger
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.GlobalServices
@@ -73,21 +86,20 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
-import androidx.activity.result.contract.ActivityResultContracts.RequestPermission as RequestPerm
 
 private val LOG by lazyLogger(MainActivity::class)
 
-class MainActivity : AppCompatActivity() {
+private val backstackKeyFlow = mutableStateOf<ComposeKey>(SplashScreen())
+
+class MainActivity : ComponentActivity() {
   private lateinit var scope: CoroutineScope
   private val composeStateChanger = ComposeStateChanger()
   private lateinit var backstack: Backstack
-  private var launcher: ActivityResultLauncher<String> = makeRequestReadExternalLauncher()
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
   private var mediaController: ToqueMediaController = NullMediaController
   private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
   private var currentQueueJob: Job? = null
   private val appPrefsSingleton: AppPrefsSingleton by inject(named("AppPrefs"))
-//  private val audioMediaDao: AudioMediaDao by inject()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -96,6 +108,11 @@ class MainActivity : AppCompatActivity() {
     WindowCompat.setDecorFitsSystemWindows(window, false) // we'll handle the system insets
 
     backstack = Navigator.configure()
+      .addStateChangeCompletionListener { stateChange ->
+        val composeKey = stateChange.topNewKey<ComposeKey>()
+        LOG._e { it("ComposeKey=%s", composeKey) }
+        backstackKeyFlow.value = composeKey
+      }
       .setGlobalServices(getGlobalServicesBuilder().build())
       .setScopedServices(DefaultServiceProvider())
       .setStateChanger(AsyncStateChanger(composeStateChanger))
@@ -103,14 +120,14 @@ class MainActivity : AppCompatActivity() {
 
     setContent {
       ToqueTheme {
-        BackstackProvider(backstack) {
-          Box(Modifier.fillMaxSize()) {
-            composeStateChanger.RenderScreen()
+        ProvideWindowInsets(windowInsetsAnimationsEnabled = true) {
+          BackstackProvider(backstack) {
+            MainScreen(composeStateChanger = composeStateChanger)
           }
         }
       }
     }
-    if (haveReadPermission()) gainedReadExternalPermission() else requestReadExternalPermission()
+    //if (haveReadPermission()) gainedReadExternalPermission() else requestReadExternalPermission()
   }
 
   override fun onDestroy() {
@@ -118,50 +135,7 @@ class MainActivity : AppCompatActivity() {
     playerServiceConnection.unbind()
   }
 
-  private fun makeRequestReadExternalLauncher() =
-    registerForActivityResult(RequestPerm()) { isGranted: Boolean ->
-      if (isGranted) {
-        gainedReadExternalPermission()
-      } else {
-        if (showReadRationale()) {
-          AlertDialog.Builder(this)
-            .setTitle(AccessExternalStorage)
-            .setMessage(RequiredToScanRationale)
-            .setPositiveButton(R.string.OK) { _, _ ->
-              requestReadExternalPermission()
-            }
-            .create()
-            .show()
-        } else {
-          val goSettings = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-          AlertDialog.Builder(this)
-            .setTitle(AccessExternalStorage)
-            .setMessage(if (goSettings) SettingsScanRationale else RepeatRequiredToScanRationale)
-            .setPositiveButton(if (goSettings) R.string.Settings else RequestPermission) { _, _ ->
-              if (goSettings) {
-                startActivity(
-                  Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                  }
-                )
-              } else {
-                requestReadExternalPermission()
-              }
-            }
-            .setNegativeButton(R.string.Exit) { _, _ ->
-              finishAfterTransition()
-            }
-            .create()
-            .show()
-        }
-      }
-    }
-
-  private fun requestReadExternalPermission() {
-    launcher.launch(READ_EXTERNAL_STORAGE)
-  }
-
-  private fun gainedReadExternalPermission() {
+  fun gainedReadExternalPermission() {
     scope.launch {
       playerServiceConnection.mediaController
         .onStart { playerServiceConnection.bind() }
@@ -210,6 +184,7 @@ class MainActivity : AppCompatActivity() {
   }
 
   private fun getGlobalServicesBuilder(): GlobalServices.Builder = globalServices.apply {
+    add(this@MainActivity)
     add(appPrefsSingleton)
     add(playerServiceConnection)
   }
@@ -217,18 +192,87 @@ class MainActivity : AppCompatActivity() {
   private val globalServices get() = (application as Toque).globalServicesBuilder
 
   override fun onBackPressed() {
-    if (!Navigator.onBackPressed(this)) {
-      super.onBackPressed()
-    }
+    if (!Navigator.onBackPressed(this)) super.onBackPressed()
   }
 
   private fun makeInitialHistory(): History<ComposeKey> = History.of(SplashScreen())
+}
 
-  private fun showReadRationale(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-    shouldShowRequestPermissionRationale(READ_EXTERNAL_STORAGE)
-  } else {
-    false
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+fun MainScreen(composeStateChanger: ComposeStateChanger) {
+  Surface(modifier = Modifier.fillMaxSize()) {
+
+    val topOfStack by remember { backstackKeyFlow }
+
+    ConstraintLayout(modifier = Modifier.fillMaxSize()) {
+      val (content, bottomSheet) = createRefs()
+      composeStateChanger.RenderScreen(
+        modifier = Modifier
+          .constrainAs(content) {
+            start.linkTo(parent.start)
+            top.linkTo(parent.top)
+            end.linkTo(parent.end)
+            bottom.linkTo(parent.bottom)
+          }
+          .zIndex(0F)
+      )
+      if (topOfStack !is SplashScreen) {
+        //val screenConfig = makeScreenConfig(
+        //  LocalConfiguration.current,
+        //  LocalDensity.current,
+        //  LocalWindowInsets.current
+        //)
+
+        val config = LocalConfiguration.current
+        MainBottomSheet(
+          modifier = if (config.inPortrait) {
+            Modifier
+              .constrainAs(bottomSheet) {
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+                bottom.linkTo(parent.bottom)
+                width = Dimension.fillToConstraints
+              }
+              .navigationBarsPadding()
+              .padding(horizontal = 16.dp)
+              .zIndex(1F)
+          } else {
+            Modifier
+              .constrainAs(bottomSheet) {
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+                bottom.linkTo(parent.bottom)
+                width = Dimension.wrapContent
+              }
+              .padding(horizontal = 8.dp)
+              .zIndex(1F)
+          }
+        )
+      }
+    }
   }
 }
 
+@OptIn(ExperimentalCoilApi::class)
+@Composable
+fun MainBottomSheet(modifier: Modifier) {
+  Row(
+    modifier = modifier
+      .background(
+        color = Color(0x88151515),
+        shape = RoundedCornerShape(8.dp)
+      )
+      .height(48.dp),
+    horizontalArrangement = Arrangement.SpaceEvenly
+  ) {
+    IconButton(onClick = {}, modifier = Modifier.size(50.dp)) {
+      Image(
+        painter = rememberImagePainter(data = R.drawable.ic_menu),
+        contentDescription = "Settings",
+        modifier = Modifier.size(44.dp)
+      )
+    }
 
+  }
+}

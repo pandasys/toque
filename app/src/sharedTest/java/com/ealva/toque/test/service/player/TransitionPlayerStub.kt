@@ -70,7 +70,7 @@ class TransitionPlayerStub : TransitionPlayer {
       return _volumeRange
     }
 
-  var _remainingTime = Millis.ZERO
+  var _remainingTime = Millis(0)
   var _remainingTimeCalled = 0
   override val remainingTime: Millis
     get() {

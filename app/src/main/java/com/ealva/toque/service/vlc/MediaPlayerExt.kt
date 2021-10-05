@@ -21,7 +21,7 @@ import org.videolan.libvlc.MediaPlayer
 
 const val BUFFERING_PERCENT_TRIGGER_PREPARED = 90.0
 @Suppress("NOTHING_TO_INLINE")
-inline fun MediaPlayer.Event.bufferedEnoughForPrepare() =
+inline fun MediaPlayer.Event.bufferedEnoughForPrepare(): Boolean =
   buffering > BUFFERING_PERCENT_TRIGGER_PREPARED
 
 /**

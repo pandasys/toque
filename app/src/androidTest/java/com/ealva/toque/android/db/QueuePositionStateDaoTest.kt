@@ -30,7 +30,7 @@ import com.ealva.toque.test.db.CommonQueueStateDaoTest as Common
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
-class QueueStateDaoTest {
+class QueuePositionStateDaoTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 

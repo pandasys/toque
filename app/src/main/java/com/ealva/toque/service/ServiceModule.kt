@@ -31,6 +31,7 @@ object ServiceModule {
       PlayableAudioItemFactory(
         audioMediaDao = get(),
         eqPresetSelector = get(),
+        mediaFileStore = get(),
         libVlcSingleton = get(),
         libVlcPrefsSingleton = get(named("LibVlcPrefs")),
         appPrefsSingleton = get(named("AppPrefs")),
@@ -39,7 +40,7 @@ object ServiceModule {
     }
     single {
       PlayableQueueFactory(
-        queueStateDaoFactory = get(),
+        queuePositionStateDaoFactory = get(),
         playableAudioItemFactory = get(),
         audioManager = get(),
         appPrefsSingleton = get(named("AppPrefs")),

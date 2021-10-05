@@ -23,7 +23,6 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.toAlbumTitle
 import com.ealva.ealvalog.e
-import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
@@ -34,17 +33,27 @@ import com.ealva.toque.persist.toAlbumId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.greater
+import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.literal
+import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
+import com.ealva.welite.db.table.alias
+import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.inSubQuery
+import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
+import com.ealva.welite.db.table.orderByRandom
+import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
@@ -77,7 +86,7 @@ data class AlbumDescription(
   val artistName: ArtistName
 )
 
-data class AlbumNameId(
+data class AlbumIdName(
   val albumId: AlbumId,
   val albumTitle: AlbumTitle
 )
@@ -117,7 +126,9 @@ interface AlbumDao {
     limit: Long
   ): Result<List<AlbumDescription>, DaoMessage>
 
-  suspend fun getNextAlbum(albumTitle: AlbumTitle): Result<AlbumNameId, DaoMessage>
+  suspend fun getNextAlbum(title: AlbumTitle): Result<AlbumIdName, DaoMessage>
+  suspend fun getPreviousAlbum(title: AlbumTitle): Result<AlbumIdName, DaoMessage>
+  suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -221,23 +232,54 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .toList()
 
   override suspend fun getNextAlbum(
-    albumTitle: AlbumTitle
-  ): Result<AlbumNameId, DaoMessage> = db.query {
-    runCatching {
-      LOG.i { it("getNextAlbum after %s", albumTitle) }
-      doGetNextAlbum(albumTitle)
-    }.mapError { DaoExceptionMessage(it) }
+    title: AlbumTitle
+  ): Result<AlbumIdName, DaoMessage> = db.query {
+    runCatching { doGetNextAlbum(title) }.mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no album title > greater than [title]
+   */
+  private fun Queryable.doGetNextAlbum(title: AlbumTitle): AlbumIdName = AlbumTable
+    .selects { listOf(id, albumTitle) }
+    .where { albumTitle greater title.value }
+    .orderByAsc { albumTitle }
+    .limit(1)
+    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+    .single()
+
+  override suspend fun getPreviousAlbum(title: AlbumTitle) = db.query {
+    runCatching { if (title.isEmpty()) doGetMaxAlbum() else doGetPreviousAlbum(title) }
+      .mapError { DaoExceptionMessage(it) }
   }
 
   /**
    * Throws NoSuchElementException if there is no album title > greater than [previousTitle]
    */
-  private fun Queryable.doGetNextAlbum(previousTitle: AlbumTitle): AlbumNameId = AlbumTable
+  private fun Queryable.doGetPreviousAlbum(previousTitle: AlbumTitle): AlbumIdName = AlbumTable
     .selects { listOf(id, albumTitle) }
-    .where { albumTitle greater previousTitle.value }
-    .orderByAsc { albumTitle }
+    .where { albumTitle less previousTitle.value }
+    .orderBy { albumTitle by Order.DESC }
     .limit(1)
-    .sequence { AlbumNameId(it[id].toAlbumId(), it[albumTitle].toAlbumTitle()) }
+    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+    .single()
+
+  private val albumMax by lazy { AlbumTable.albumTitle.max().alias("album_max_alias") }
+  private fun Queryable.doGetMaxAlbum(): AlbumIdName = AlbumTable
+    .selects { listOf(id, albumMax) }
+    .all()
+    .limit(1)
+    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumMax])) }
+    .single()
+
+  override suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage> = db.query {
+    runCatching { doGetRandomAlbum() }.mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetRandomAlbum(): AlbumIdName = AlbumTable
+    .selects { listOf(id, albumTitle) }
+    .where { id inSubQuery AlbumTable.select(id).all().orderByRandom().limit(1) }
+    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
     .single()
 
   private fun TransactionInProgress.doUpsertAlbum(
@@ -346,3 +388,5 @@ private data class AlbumInfo(
   val releaseMbid: ReleaseMbid,
   val releaseGroupMbid: ReleaseGroupMbid,
 )
+
+fun AlbumTitle.isEmpty(): Boolean = value.isEmpty()

@@ -90,11 +90,11 @@ class ArtworkSearchService : JobIntentService() {
 
   override fun onHandleWork(intent: Intent) {
     startNotification()
-    try {
-
-    } finally {
-      stopNotification()
-    }
+    //try {
+    //
+    //} finally {
+    //  stopNotification()
+    //}
   }
 
   companion object {

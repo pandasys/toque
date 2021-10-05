@@ -26,15 +26,24 @@ import com.ealva.toque.persist.toComposerId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.greater
+import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.literal
+import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Query
+import com.ealva.welite.db.table.alias
+import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
+import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.inSubQuery
+import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
+import com.ealva.welite.db.table.orderByRandom
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
@@ -85,7 +94,9 @@ interface ComposerDao {
 
   fun deleteAll(txn: TransactionInProgress)
   fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
-  suspend fun getNextComposer(composerName: ComposerName): Result<ComposerIdName, DaoMessage>
+  suspend fun getNextComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
+  suspend fun getPreviousComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
+  suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -137,24 +148,55 @@ private class ComposerDaoImpl(
   }
 
   override suspend fun getNextComposer(
-    composerName: ComposerName
+    name: ComposerName
   ): Result<ComposerIdName, DaoMessage> = db.query {
-    runCatching {
-      LOG.i { it("getNextComposer after %s", composerName) }
-      doGetNextComposer(composerName)
-    }.mapError { DaoExceptionMessage(it) }
+    runCatching { doGetNextComposer(name) }.mapError { DaoExceptionMessage(it) }
   }
 
   /**
-   * Throws NoSuchElementException if there is no composer name > greater than [previousComposer]
+   * Throws NoSuchElementException if there is no composer name > greater than [name]
    */
-  private fun Queryable.doGetNextComposer(
-    previousComposer: ComposerName
-  ): ComposerIdName = ComposerTable
+  private fun Queryable.doGetNextComposer(name: ComposerName): ComposerIdName = ComposerTable
     .selects { listOf(id, composer) }
-    .where { composer greater previousComposer.value }
+    .where { composer greater name.value }
     .orderByAsc { composer }
     .limit(1)
+    .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
+    .single()
+
+  override suspend fun getPreviousComposer(
+    name: ComposerName
+  ): Result<ComposerIdName, DaoMessage> = db.query {
+    runCatching { if (name.isEmpty()) doGetMaxComposer() else doGetPreviousComposer(name) }
+      .mapError { DaoExceptionMessage(it) }
+  }
+
+  /**
+   * Throws NoSuchElementException if there is no genre name < greater than [name]
+   */
+  private fun Queryable.doGetPreviousComposer(name: ComposerName): ComposerIdName = ComposerTable
+    .selects { listOf(id, composer) }
+    .where { composer less name.value }
+    .orderBy { composer by Order.DESC }
+    .limit(1)
+    .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
+    .single()
+
+  private val composerMax by lazy { ComposerTable.composer.max().alias("composer_max_alias") }
+  private fun Queryable.doGetMaxComposer(): ComposerIdName = ComposerTable
+    .selects { listOf(id, composerMax) }
+    .all()
+    .limit(1)
+    .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composerMax])) }
+    .single()
+
+  override suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage> = db.query {
+    runCatching { doGetRandomComposer() }.mapError { DaoExceptionMessage(it) }
+  }
+
+  private fun Queryable.doGetRandomComposer(): ComposerIdName = ComposerTable
+    .selects { listOf(id, composer) }
+    .where { id inSubQuery ComposerTable.select(id).all().orderByRandom().limit(1) }
     .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
     .single()
 
@@ -192,3 +234,5 @@ private class ComposerDaoImpl(
     }.toComposerId().also { id -> emit(ComposerDaoEvent.ComposerCreated(id)) }
   }
 }
+
+fun ComposerName.isEmpty(): Boolean = value.isEmpty()

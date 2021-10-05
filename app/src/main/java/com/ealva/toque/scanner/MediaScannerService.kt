@@ -195,7 +195,6 @@ class MediaScannerService : LifecycleService() {
     }
   }
 
-  @Suppress("MagicNumber")
   private suspend fun doFullRescanWithPermission(rescan: RescanType) {
     val prefs = appPrefsSingleton.instance()
     LOG._i { it("Start scan stopwatch") }
@@ -205,7 +204,7 @@ class MediaScannerService : LifecycleService() {
     val minimumDuration = if (BuildConfig.DEBUG) {
       Millis(30000)
     } else {
-      if (prefs.ignoreSmallFiles()) prefs.ignoreThreshold() else Millis.ZERO
+      if (prefs.ignoreSmallFiles()) prefs.ignoreThreshold() else Millis(0)
     }
     scanAllAudioAfter(
       if (rescan.forceUpdate) Date(0) else prefs.lastScanTime().toDate(),
@@ -247,9 +246,12 @@ class MediaScannerService : LifecycleService() {
     parser: MediaMetadataParser,
     minimumDuration: Millis,
     createUpdateTime: Millis
-  ): Boolean {
+  ): Boolean = try {
     audioMediaDao.upsertAudioList(audioList, parser, minimumDuration, createUpdateTime)
-    return true
+    true
+  } catch (e: Exception) {
+    LOG.e(e) { it("Error persisting %s", audioList) }
+    false
   }
 
   enum class RescanType(

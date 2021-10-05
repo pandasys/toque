@@ -62,11 +62,17 @@ class ShutdownFadeoutTransitionTest {
   @Test
   fun accept() {
     expect(transition.accept(PlayImmediateTransition())).toBe(true)
-    expect(transition.accept(FadeInTransition(Millis.ZERO, false))).toBe(true)
-    expect(transition.accept(ShutdownFadeOutTransition(Millis.ZERO))).toBe(false)
+    expect(transition.accept(
+      FadeInTransition(
+        Millis(0), false
+      ))).toBe(true)
+    expect(transition.accept(
+      ShutdownFadeOutTransition(
+        Millis(0)
+      ))).toBe(false)
     expect(transition.accept(ShutdownImmediateTransition())).toBe(true)
     expect(transition.accept(PauseImmediateTransition())).toBe(false)
-    expect(transition.accept(PauseFadeOutTransition(Millis.ZERO))).toBe(false)
+    expect(transition.accept(PauseFadeOutTransition(Millis(0)))).toBe(false)
   }
 
   @Test

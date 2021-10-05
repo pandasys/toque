@@ -47,9 +47,8 @@ interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
   val hardwareAcceleration: StorePref<Int, HardwareAcceleration>
 
   companion object {
-    val NETWORK_CACHING_RANGE: MillisRange = Millis.ZERO..Millis.ONE_MINUTE
+    val NETWORK_CACHING_RANGE: MillisRange = Millis(0)..Millis.ONE_MINUTE
     const val SUB_AUTODETECT_PATHS = "./Subtitles, ./subtitles, ./Subs, ./subs"
-
     fun make(storage: Storage): LibVlcPrefs = LibVlcPrefsImpl(storage)
   }
 }
@@ -65,14 +64,8 @@ private class LibVlcPrefsImpl(
   }
   override val subtitleEncoding by enumPref(SubtitleEncoding.DEFAULT)
   override val replayGainMode by enumPref(ReplayGainMode.DEFAULT)
-  override val replayPreamp by ampPref(Amp.NONE) {
-    it.coerceIn(Amp.RANGE)
-  }
-
-  @Suppress("MagicNumber")
-  override val defaultReplayGain by ampPref(Amp(-7F)) {
-    it.coerceIn(Amp.RANGE)
-  }
+  override val replayPreamp by ampPref(Amp.NONE) { it.coerceIn(Amp.RANGE) }
+  override val defaultReplayGain by ampPref(Amp(-7F)) { it.coerceIn(Amp.RANGE) }
   override val enableFrameSkip by preference(false)
   override val skipLoopFilter by enumPref(SkipLoopFilter.DEFAULT)
   override val allowTimeStretchAudio by preference(true)

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.client
 
 import android.net.Uri
 import android.os.Bundle
@@ -24,6 +24,7 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.asCompat
 import com.ealva.toque.service.media.StarRating
+import com.ealva.toque.service.session.common.toRatingCompat
 
 interface SessionControl {
   /**

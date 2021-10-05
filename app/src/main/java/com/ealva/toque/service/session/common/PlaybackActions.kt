@@ -16,7 +16,7 @@
 
 @file:Suppress("NOTHING_TO_INLINE")
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.common
 
 import android.support.v4.media.session.PlaybackStateCompat
 import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap

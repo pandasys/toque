@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import com.ealva.prefstore.store.BasePreferenceStore
 import com.ealva.prefstore.store.BoolPref

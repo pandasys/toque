@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+@file:Suppress("unused")
 
-import android.support.v4.media.MediaDescriptionCompat
+package com.ealva.toque.android.content
 
-interface RecentMediaProvider {
-  suspend fun getRecentMedia(): MediaDescriptionCompat?
-}
+import android.content.res.Configuration
+
+inline val Configuration.inPortrait: Boolean
+  get() = orientation == Configuration.ORIENTATION_PORTRAIT
+
+inline val Configuration.inLandscape: Boolean
+  get() = orientation == Configuration.ORIENTATION_LANDSCAPE

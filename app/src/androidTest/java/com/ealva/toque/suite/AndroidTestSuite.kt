@@ -19,7 +19,7 @@ package com.ealva.toque.suite
 import com.ealva.toque.android.db.DbModuleTest
 import com.ealva.toque.android.db.EqPresetAssociationDaoTest
 import com.ealva.toque.android.db.EqPresetDaoTest
-import com.ealva.toque.android.db.QueueStateDaoTest
+import com.ealva.toque.android.db.QueuePositionStateDaoTest
 import com.ealva.toque.android.file.MediaFormatTest
 import com.ealva.toque.android.file.UrisTest
 import com.ealva.toque.android.prefs.AppPreferencesTest
@@ -44,6 +44,6 @@ import org.junit.runners.Suite
   VlcMediaTest::class,
   EqPresetAssociationDaoTest::class,
   EqPresetDaoTest::class,
-  QueueStateDaoTest::class
+  QueuePositionStateDaoTest::class
 )
 class AndroidTestSuite

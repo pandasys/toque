@@ -35,7 +35,7 @@ import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
-import com.ealva.toque.service.session.Metadata
+import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -45,7 +45,7 @@ class PlayableAudioItemFake(
   override val instanceId: Long = 1,
   override var title: Title = Title.UNKNOWN,
   override var trackNumber: Int = 1,
-  override var duration: Millis = Millis.ONE_HUNDRED,
+  override var duration: Millis = Millis(100),
   override val albumTitle: AlbumTitle = AlbumTitle.UNKNOWN,
   override val albumId: AlbumId = AlbumId.INVALID,
   override val albumArtist: ArtistName = ArtistName.UNKNOWN,
@@ -56,25 +56,25 @@ class PlayableAudioItemFake(
   override val isPausable: Boolean = true,
   override val supportsFade: Boolean = false,
   override val isSeekable: Boolean = true,
-  override val position: Millis = Millis.ZERO,
+  override val position: Millis = Millis(0),
   override var volume: Volume = Volume.MAX,
   override var isMuted: Boolean = false,
   override var equalizer: EqPreset = EqPreset.NONE,
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL,
+  override var fileUri: Uri = Uri.EMPTY
 ) : PlayableAudioItem {
   override lateinit var location: Uri
   override lateinit var albumArt: Uri
   override lateinit var localAlbumArt: Uri
   override val metadata: Metadata = Metadata.NullMetadata
-  override suspend fun play(immediateTransition: Boolean) = Unit
+  override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
-  override fun pause(immediateTransition: Boolean) = Unit
+  override suspend fun togglePlayPause() = Unit
+  override fun pause(immediate: Boolean) = Unit
   override suspend fun seekTo(position: Millis) = Unit
   override fun shutdown() = Unit
   override fun shutdown(shutdownTransition: PlayerTransition) = Unit
   override suspend fun reset(
-    presetSelector: EqPresetSelector,
-    position: Millis,
     immediateTransition: Boolean,
     playNow: PlayNow
   ) =
@@ -84,6 +84,8 @@ class PlayableAudioItemFake(
     position: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
+    timePlayed: Millis,
+    countFrom: Millis,
     startPaused: StartPaused
   ) = Unit
 
@@ -94,7 +96,7 @@ class PlayableAudioItemFake(
   ) = Unit
 
   override fun checkMarkSkipped() = Unit
-  override suspend fun setRating(newRating: Rating) = Unit
+  override suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean) = Unit
   override fun previousShouldRewind(): Boolean = false
 
   override val artist: ArtistName = ArtistName.UNKNOWN

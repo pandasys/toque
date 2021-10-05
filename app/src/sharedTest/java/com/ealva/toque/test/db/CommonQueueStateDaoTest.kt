@@ -19,9 +19,9 @@ package com.ealva.toque.test.db
 import android.content.Context
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.QueueId
-import com.ealva.toque.db.QueueState
-import com.ealva.toque.db.QueueStateDao
-import com.ealva.toque.db.QueueStateDaoFactory
+import com.ealva.toque.db.QueuePositionState
+import com.ealva.toque.db.QueuePositionStateDao
+import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.QueueStateTable
 import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.test.shared.withTestDatabase
@@ -36,51 +36,51 @@ private val SECOND_QUEUE = QueueId(2)
 object CommonQueueStateDaoTest {
   suspend fun testGetBeforePersist(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(QueueStateTable), testDispatcher) {
-      val dao = QueueStateDao(FIRST_QUEUE, this, testDispatcher)
+      val dao = QueuePositionStateDao(FIRST_QUEUE, this, testDispatcher)
       val result = dao.getState()
-      expect(result.get()).toBe(QueueStateDao.UNINITIALIZED_STATE)
+      expect(result.get()).toBe(QueuePositionStateDao.UNINITIALIZED_STATE)
     }
   }
 
   suspend fun testPersistState(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(QueueStateTable), testDispatcher) {
-      val dao = QueueStateDao(FIRST_QUEUE, this, testDispatcher)
+      val dao = QueuePositionStateDao(FIRST_QUEUE, this, testDispatcher)
       val mediaId = 1.toMediaId()
       val queueIndex = 5
       val playbackPosition = Millis(5000)
-      val state = QueueState(mediaId, queueIndex, playbackPosition)
+      val state = QueuePositionState(mediaId, queueIndex, playbackPosition)
       dao.persistState(state)
       dao.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
         expect(result.get()).toBe(state)
       }
       for (i in 1..10) {
-        dao.persistState(QueueState(mediaId, queueIndex + i, playbackPosition))
+        dao.persistState(QueuePositionState(mediaId, queueIndex + i, playbackPosition))
       }
       dao.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
-        expect(result.get()).toBe(QueueState(mediaId, queueIndex + 10, playbackPosition))
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
+        expect(result.get()).toBe(QueuePositionState(mediaId, queueIndex + 10, playbackPosition))
       }
     }
   }
 
   suspend fun testFactory(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(QueueStateTable), testDispatcher) {
-      val factory = QueueStateDaoFactory(this, testDispatcher)
+      val factory = QueuePositionStateDaoFactory(this, testDispatcher)
 
-      val daoOne = factory.makeQueueStateDao(FIRST_QUEUE)
-      val state = QueueState(1.toMediaId(), 0, Millis(1000))
+      val daoOne = factory.makeStateDao(FIRST_QUEUE)
+      val state = QueuePositionState(1.toMediaId(), 0, Millis(1000))
       daoOne.persistState(state)
       daoOne.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
         expect(result.get()).toBe(state)
       }
 
-      val daoTwo = factory.makeQueueStateDao(SECOND_QUEUE)
-      val state2 = QueueState(100.toMediaId(), 100, Millis(5000))
+      val daoTwo = factory.makeStateDao(SECOND_QUEUE)
+      val state2 = QueuePositionState(100.toMediaId(), 100, Millis(5000))
       daoTwo.persistState(state2)
       daoTwo.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
         expect(result.get()).toBe(state2)
       }
     }
@@ -88,20 +88,20 @@ object CommonQueueStateDaoTest {
 
   suspend fun testCloseDaoAndRemake(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(QueueStateTable), testDispatcher) {
-      val factory = QueueStateDaoFactory(this, testDispatcher)
+      val factory = QueuePositionStateDaoFactory(this, testDispatcher)
 
-      val dao = factory.makeQueueStateDao(FIRST_QUEUE)
-      val state = QueueState(1.toMediaId(), 0, Millis(1000))
+      val dao = factory.makeStateDao(FIRST_QUEUE)
+      val state = QueuePositionState(1.toMediaId(), 0, Millis(1000))
       dao.persistState(state)
       dao.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
         expect(result.get()).toBe(state)
       }
       dao.close()
 
-      val daoAgain = factory.makeQueueStateDao(FIRST_QUEUE)
+      val daoAgain = factory.makeStateDao(FIRST_QUEUE)
       daoAgain.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
         expect(result.get()).toBe(state)
       }
     }
@@ -109,13 +109,13 @@ object CommonQueueStateDaoTest {
 
   suspend fun testClosedDaoThrows(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(QueueStateTable), testDispatcher) {
-      val factory = QueueStateDaoFactory(this, testDispatcher)
+      val factory = QueuePositionStateDaoFactory(this, testDispatcher)
 
-      val dao = factory.makeQueueStateDao(FIRST_QUEUE)
-      val state = QueueState(1.toMediaId(), 0, Millis(1000))
+      val dao = factory.makeStateDao(FIRST_QUEUE)
+      val state = QueuePositionState(1.toMediaId(), 0, Millis(1000))
       dao.persistState(state)
       dao.getState().let { result ->
-        expect(result).toBeInstanceOf<Ok<QueueState>>()
+        expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
         expect(result.get()).toBe(state)
       }
 

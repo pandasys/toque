@@ -31,21 +31,17 @@ private val ENUM_VALUES_MAP: MutableMap<Class<*>, ConstIdValues<*>> = Reference2
  * Return the enum with [id] or [defaultValue] if the enum with [id] could not be found
  */
 @Suppress("NOTHING_TO_INLINE")
-inline fun <T> KClass<T>.reify(id: Int, defaultValue: T): T where T : Enum<T>, T : HasConstId {
-  return java.reify(id, defaultValue)
-}
+inline fun <T> KClass<out T>.reify(id: Int, defaultValue: T): T where T : Enum<T>, T : HasConstId =
+  java.reify(id, defaultValue)
 
 /**
  * Return the enum with [id] or null if the enum with [id] could not be found
  */
 @Suppress("NOTHING_TO_INLINE")
-inline fun <T> KClass<T>.reify(id: Int): T? where T : Enum<T>, T : HasConstId {
-  return java.reify(id)
-}
+inline fun <T> KClass<T>.reify(id: Int): T? where T : Enum<T>, T : HasConstId = java.reify(id)
 
-inline fun <reified T> Int?.toEnum(defaultValue: T): T where T : Enum<T>, T : HasConstId {
-  return if (this == null) defaultValue else defaultValue.javaClass.reify(this, defaultValue)
-}
+inline fun <reified T> Int?.toEnum(defaultValue: T): T where T : Enum<T>, T : HasConstId =
+  if (this == null) defaultValue else defaultValue.javaClass.reify(this, defaultValue)
 
 /**
  * Return the enum with [id]. If not found an [IllegalArgumentException] is thrown
@@ -58,13 +54,11 @@ inline fun <T> KClass<T>.reifyRequire(id: Int): T where T : Enum<T>, T : HasCons
 /**
  * Return the enum with [id] or [defaultValue] if the enum with [id] could not be found
  */
-fun <T> Class<T>.reify(id: Int, defaultValue: T): T where T : Enum<T>, T : HasConstId {
-  return try {
-    getEnumValues().fromId(id) ?: defaultValue
-  } catch (e: Exception) {
-    LOG.e(e) { it("Class=%s", this) }
-    defaultValue
-  }
+fun <T> Class<out T>.reify(id: Int, defaultValue: T): T where T : Enum<T>, T : HasConstId = try {
+  defaultValue.declaringClass.getEnumValues().fromId(id) ?: defaultValue
+} catch (e: Exception) {
+  LOG.e(e) { it("Class=%s", this) }
+  defaultValue
 }
 
 /**
@@ -83,9 +77,8 @@ fun <T> Class<T>.reifyRequire(id: Int): T where T : Enum<T>, T : HasConstId =
  * Map doesn't have computeIfAbsent() hence this dirty version
  */
 @Suppress("UNCHECKED_CAST")
-private fun <T> Class<T>.getEnumValues(): ConstIdValues<T> where T : Enum<T>, T : HasConstId {
-  return (ENUM_VALUES_MAP[this] ?: makeConstIdValues()) as ConstIdValues<T>
-}
+private fun <T> Class<T>.getEnumValues(): ConstIdValues<T> where T : Enum<T>, T : HasConstId =
+  (ENUM_VALUES_MAP[this] ?: makeConstIdValues()) as ConstIdValues<T>
 
 private fun <T> Class<T>.makeConstIdValues() where T : Enum<T>, T : HasConstId =
   ConstIdValues(enumConstants).also { enumValues -> ENUM_VALUES_MAP[this] = enumValues }
@@ -96,8 +89,7 @@ private inline fun <T : HasConstId> Array<T>?.requireNotEmptyAndDistinct(msg: ()
     returns() implies (this@requireNotEmptyAndDistinct != null)
   }
 
-  if (this == null) throw IllegalArgumentException("Is null, ${msg()}")
-  if (isEmpty()) throw IllegalArgumentException("Is empty, ${msg()}")
+  if (this == null || isEmpty()) throw IllegalArgumentException("Is null or empty, ${msg()}")
   if (distinctBy { it.id }.size != size) throw IllegalArgumentException("IDs not unique, ${msg()}")
   return this
 }

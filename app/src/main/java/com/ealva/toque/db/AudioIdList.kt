@@ -54,12 +54,10 @@ data class AudioIdList(
   /**
    * @return If [idList] size is > 1 returns a copy of this list shuffled, else returns this
    */
-  fun shuffled(): AudioIdList {
-    return if (idList.size > 1) {
-      this.copy(idList = MediaIdList(LongLists.shuffle(LongArrayList(idList.value), random)))
-    } else {
-      this
-    }
+  fun shuffled(): AudioIdList = if (idList.size > 1) {
+    copy(idList = MediaIdList(LongLists.shuffle(LongArrayList(idList.value), random)))
+  } else {
+    this
   }
 
   inline val list: LongList

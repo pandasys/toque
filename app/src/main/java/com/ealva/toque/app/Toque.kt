@@ -26,6 +26,9 @@ import android.media.AudioManager
 import android.os.PowerManager
 import android.telephony.TelephonyManager
 import android.view.WindowManager
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.util.CoilUtils
 import com.ealva.ealvalog.LogLevel
 import com.ealva.ealvalog.Loggers
 import com.ealva.ealvalog.Marker
@@ -33,20 +36,21 @@ import com.ealva.ealvalog.Markers
 import com.ealva.ealvalog.android.AndroidLogger
 import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.logger
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.audioout.AudioModule
+import com.ealva.toque.common.debug
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
-import com.ealva.toque.log._e
 import com.ealva.toque.prefs.PrefsModule
 import com.ealva.toque.service.ServiceModule
 import com.ealva.toque.service.vlc.LibVlcModule
 import com.ealva.toque.tag.TagModule
+import com.ealva.welite.db.log.WeLiteLog
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.zhuinden.simplestack.GlobalServices
 import ealvatag.logging.EalvaTagLog
+import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
@@ -63,7 +67,7 @@ interface Toque {
   }
 }
 
-class ToqueImpl : Application(), Toque {
+class ToqueImpl : Application(), Toque, ImageLoaderFactory {
   /**
    * Get the DB check (early create) off of Main as it's busy during start up. Simple, crude
    * timing tests show more than twice as fast to completion on new install moving DB creation
@@ -91,11 +95,11 @@ class ToqueImpl : Application(), Toque {
     _globalServicesBuilder = GlobalServices.builder()
 
     setupLogging()
-
-//    debug {
-//      WeLiteLog.logQueryPlans = true
-//      WeLiteLog.logSql = true
-//    }
+    val logger = logger(ToqueImpl::class)
+    debug {
+      WeLiteLog.logQueryPlans = true
+      WeLiteLog.logSql = true
+    }
 
 //    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 //      StrictMode.VmPolicy.Builder()
@@ -110,7 +114,7 @@ class ToqueImpl : Application(), Toque {
 //    }
 //    StrictMode.setVmPolicy(policy)
 
-    startKoin {
+    val koinApp = startKoin {
 //      androidLogger(Level.NONE)
       androidContext(androidContext = this@ToqueImpl)
 
@@ -129,6 +133,15 @@ class ToqueImpl : Application(), Toque {
 //        artModule,
       )
     }
+
+    //val libVlcPrefsSingleton: LibVlcPrefsSingleton = koinApp.koin.get(named("LibVlcPrefs"))
+    //val libVlcSingleton: LibVlcSingleton = koinApp.koin.get()
+    //runBlocking {
+    //  val libVlcPrefs = libVlcPrefsSingleton.instance()
+    //  libVlcPrefs.enableVerboseMode.set(true)
+    //  val libVlc = libVlcSingleton.instance()
+    //  logger.i { it("LibVLC version: %s", libVlc.libVlcVersion()) }
+    //}
   }
 
   private fun setupLogging() {
@@ -140,6 +153,17 @@ class ToqueImpl : Application(), Toque {
   override fun restartApp(intent: Intent, context: Context) {
 //    fileHandler?.close()
     ProcessPhoenix.triggerRebirth(context, intent)
+  }
+
+  override fun newImageLoader(): ImageLoader {
+    return ImageLoader.Builder(applicationContext)
+      .crossfade(true)
+      .okHttpClient {
+        OkHttpClient.Builder()
+          .cache(CoilUtils.createDefaultCache(applicationContext))
+          .build()
+      }
+      .build()
   }
 
   companion object {

@@ -78,6 +78,9 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val markPlayedPercentage: DoublePref
   val rewindThenPrevious: BoolPref
   val scanAfterMediaScanner: BoolPref
+  val saveRatingToFile: BoolPref
+  val scanInternalVolume: BoolPref
+  val showTimeRemaining: BoolPref
 
   companion object {
     val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
@@ -86,11 +89,11 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
     const val DEFAULT_PLAY_PAUSE_FADE = true
     val PLAY_PAUSE_FADE_RANGE: ClosedRange<Millis> = Millis(500)..Millis(2000)
     val DEFAULT_PLAY_PAUSE_FADE_LENGTH = Millis.ONE_SECOND.coerceIn(PLAY_PAUSE_FADE_RANGE)
-    val MEDIA_FADE_RANGE: ClosedRange<Millis> = Millis(2000)..Millis(10000)
+    val MEDIA_FADE_RANGE: ClosedRange<Millis> = Millis.ONE_SECOND..Millis.TEN_SECONDS
     const val DEFAULT_AUTO_ADVANCE_FADE = true
     val DEFAULT_AUTO_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
     const val DEFAULT_MANUAL_ADVANCE_FADE = true
-    val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
+    val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.TWO_SECONDS.coerceIn(MEDIA_FADE_RANGE)
     val DEFAULT_SCROBBLER_PACKAGE = ScrobblerPackage.None
     val DEFAULT_PLAY_UP_NEXT_ACTION = PlayUpNextAction.Prompt
     val DEFAULT_END_OF_QUEUE_ACTION = EndOfQueueAction.PlayNextList
@@ -113,8 +116,8 @@ private class AppPrefsImpl(
   override val allowDuplicates by booleanValuePref(DEFAULT_ALLOW_DUPLICATES, ::AllowDuplicates)
   override val goToNowPlaying by preference(DEFAULT_GO_TO_NOW_PLAYING)
   override val ignoreSmallFiles by preference(DEFAULT_IGNORE_SMALL_FILES)
-  override val ignoreThreshold by millisPref(Millis.ZERO)
-  override val lastScanTime by millisPref(Millis.ZERO)
+  override val ignoreThreshold by millisPref(Millis(0))
+  override val lastScanTime by millisPref(Millis(0))
   override val playPauseFade by preference(DEFAULT_PLAY_PAUSE_FADE)
   override val playPauseFadeLength by millisPref(DEFAULT_PLAY_PAUSE_FADE_LENGTH) { millis ->
     millis.coerceIn(PLAY_PAUSE_FADE_RANGE)
@@ -141,4 +144,7 @@ private class AppPrefsImpl(
   }
   override val rewindThenPrevious: BoolPref by preference(true)
   override val scanAfterMediaScanner: BoolPref by preference(true)
+  override val saveRatingToFile: BoolPref by preference(true)
+  override val scanInternalVolume: BoolPref by preference(true)
+  override val showTimeRemaining: BoolPref by preference(false)
 }

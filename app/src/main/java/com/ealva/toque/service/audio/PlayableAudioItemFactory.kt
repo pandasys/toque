@@ -24,7 +24,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.player.WakeLockFactory
-import com.ealva.toque.service.session.Metadata
+import com.ealva.toque.service.session.common.Metadata
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.service.vlc.VlcAudioItem
@@ -51,6 +51,7 @@ interface PlayableAudioItemFactory {
     operator fun invoke(
       audioMediaDao: AudioMediaDao,
       eqPresetSelector: EqPresetSelector,
+      mediaFileStore: MediaFileStore,
       libVlcSingleton: LibVlcSingleton,
       libVlcPrefsSingleton: LibVlcPrefsSingleton,
       appPrefsSingleton: AppPrefsSingleton,
@@ -58,7 +59,7 @@ interface PlayableAudioItemFactory {
     ): PlayableAudioItemFactory = PlayableAudioItemFactoryImpl(
       audioMediaDao,
       eqPresetSelector,
-      MediaFileStore(audioMediaDao),
+      mediaFileStore,
       libVlcSingleton,
       libVlcPrefsSingleton,
       appPrefsSingleton,
@@ -97,7 +98,9 @@ private class PlayableAudioItemFactoryImpl(
                 itemData.albumArt,
                 itemData.rating,
                 itemData.location,
+                itemData.fileUri
               ),
+              itemData.displayName,
               itemData.albumId,
               itemData.artists,
               libVlc,
@@ -141,7 +144,9 @@ private class PlayableAudioItemFactoryImpl(
                 itemData.albumArt,
                 itemData.rating,
                 itemData.location,
+                itemData.fileUri
               ),
+              itemData.displayName,
               itemData.albumId,
               itemData.artists,
               libVlc,

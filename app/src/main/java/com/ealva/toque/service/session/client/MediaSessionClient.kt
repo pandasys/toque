@@ -14,28 +14,43 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.client
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.RatingCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.OnLifecycleEvent
+import com.ealva.ealvabrainz.common.AlbumTitle
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
+import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.audio.QueueAudioItem
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.Title
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
-import com.ealva.toque.log._i
+import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
+import com.ealva.toque.persist.MediaId
+import com.ealva.toque.service.media.Rating
+import com.ealva.toque.service.media.StarRating
+import com.ealva.toque.service.media.toRating
+import com.ealva.toque.service.media.toStarRating
+import com.ealva.toque.service.session.common.Metadata
+import com.ealva.toque.service.session.common.PlaybackState
+import com.ealva.toque.service.session.common.toPersistentId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.onFailure
@@ -44,6 +59,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(MediaSessionClient::class)
 
@@ -59,12 +76,29 @@ sealed class LoadEvent {
 
 private typealias ChildList = MutableList<MediaBrowserCompat.MediaItem>
 
+class MediaSessionClientProvider(
+  private val context: Context,
+  private val componentName: ComponentName,
+  private val lifecycleOwner: LifecycleOwner
+) {
+  @Volatile
+  private var instance: MediaSessionClient? = null
+  private val lock = ReentrantLock()
+  fun getSessionClient(): MediaSessionClient {
+    return instance ?: lock.withLock {
+      instance ?: MediaSessionClientImpl(context, componentName).apply {
+        lifecycleOwner.lifecycle.addObserver(this)
+      }.also { instance = it }
+    }
+  }
+}
+
 interface MediaSessionClient {
   val isConnected: StateFlow<Boolean>
   val networkError: StateFlow<Boolean>
-  val playbackState: StateFlow<PlaybackStateCompat>
-  val nowPlaying: StateFlow<MediaMetadataCompat>
-  val queue: StateFlow<List<MediaSessionCompat.QueueItem>>
+  val playbackState: StateFlow<PlaybackState>
+  val nowPlaying: StateFlow<Metadata>
+  val queue: StateFlow<List<AudioItem>>
   val queueTitle: StateFlow<String>
   val extras: StateFlow<Bundle>
   val captioningEnabled: StateFlow<Boolean>
@@ -75,27 +109,17 @@ interface MediaSessionClient {
   val sessionControl: StateFlow<SessionControl>
 
   fun loadChildren(parentId: String, options: Bundle = Bundle.EMPTY): Flow<LoadEvent>
-
-  companion object {
-    operator fun invoke(
-      context: Context,
-      serviceComponent: ComponentName,
-      lifecycleOwner: LifecycleOwner
-    ): MediaSessionClient = MediaSessionClientImpl(context, serviceComponent).apply {
-      lifecycleOwner.lifecycle.addObserver(this)
-    }
-  }
 }
 
 private class MediaSessionClientImpl(
   ctx: Context,
   name: ComponentName
-) : MediaSessionClient, LifecycleObserver {
+) : MediaSessionClient, DefaultLifecycleObserver {
   override val isConnected = MutableStateFlow(false)
   override val networkError = MutableStateFlow(false)
-  override val playbackState = MutableStateFlow(EMPTY_PLAYBACK_STATE)
-  override val nowPlaying = MutableStateFlow(NOTHING_PLAYING)
-  override val queue = MutableStateFlow<List<MediaSessionCompat.QueueItem>>(emptyList())
+  override val playbackState = MutableStateFlow(PlaybackState.NullPlaybackState)
+  override val nowPlaying = MutableStateFlow(Metadata.NullMetadata)
+  override val queue = MutableStateFlow<List<AudioItem>>(emptyList())
   override val queueTitle = MutableStateFlow("")
   override val extras = MutableStateFlow(Bundle.EMPTY)
   override val captioningEnabled = MutableStateFlow(false)
@@ -112,10 +136,10 @@ private class MediaSessionClientImpl(
   private var controllerCallback = ControllerCallback()
   private val mediaBrowser = MediaBrowserCompat(ctx, name, connectionCallback, null).apply {
     connect()
+    LOG._e { it("connecting to %s", name) }
   }
 
-  @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-  fun onDestroy() {
+  override fun onDestroy(owner: LifecycleOwner) {
     mediaBrowser.disconnect()
   }
 
@@ -156,7 +180,7 @@ private class MediaSessionClientImpl(
     private val context: Context
   ) : MediaBrowserCompat.ConnectionCallback() {
     override fun onConnected() {
-      LOG._i { it("browser onConnected") }
+      LOG._e { it("browser onConnected") }
       mediaBrowser.sessionToken.also { token ->
         mediaController = MediaControllerCompat(context, token)
         mediaController.registerCallback(controllerCallback)
@@ -166,13 +190,13 @@ private class MediaSessionClientImpl(
     }
 
     override fun onConnectionSuspended() {
-      LOG.w { it("onConnectionSuspended") }
+      LOG._e { it("onConnectionSuspended") }
       sessionControl.value = NullSessionControl
       isConnected.value = false
     }
 
     override fun onConnectionFailed() {
-      LOG.w { it("onConnectFailed") }
+      LOG._e { it("onConnectFailed") }
       sessionControl.value = NullSessionControl
       isConnected.value = false
     }
@@ -193,24 +217,30 @@ private class MediaSessionClientImpl(
       connectionCallback.onConnectionSuspended()
     }
 
+    override fun onSessionEvent(event: String?, extras: Bundle?) {
+      val eventName = event.orEmpty()
+      val bundle = extras ?: Bundle.EMPTY
+    }
+
     override fun onPlaybackStateChanged(state: PlaybackStateCompat?) {
-      playbackState.value = state ?: EMPTY_PLAYBACK_STATE
+
+      //playbackState.value =
     }
 
     override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
-      nowPlaying.value = if (metadata?.id == null) NOTHING_PLAYING else metadata
+      //nowPlaying.value =
     }
 
-    override fun onQueueChanged(queue: MutableList<MediaSessionCompat.QueueItem>) {
-      this@MediaSessionClientImpl.queue.value = queue
+    override fun onQueueChanged(queue: List<MediaSessionCompat.QueueItem>?) {
+      this@MediaSessionClientImpl.queue.value = queue.toAudioQueueItemList()
     }
 
-    override fun onQueueTitleChanged(title: CharSequence) {
-      queueTitle.value = title.toString()
+    override fun onQueueTitleChanged(title: CharSequence?) {
+      queueTitle.value = title?.toString() ?: ""
     }
 
-    override fun onExtrasChanged(extras: Bundle) {
-      this@MediaSessionClientImpl.extras.value = extras
+    override fun onExtrasChanged(extras: Bundle?) {
+      this@MediaSessionClientImpl.extras.value = extras ?: Bundle.EMPTY
     }
 
     override fun onCaptioningEnabledChanged(enabled: Boolean) {
@@ -225,4 +255,78 @@ private class MediaSessionClientImpl(
       this@MediaSessionClientImpl.shuffleMode.value = shuffleMode.compatToShuffleMode()
     }
   }
+}
+
+private fun List<MediaSessionCompat.QueueItem>?.toAudioQueueItemList(): List<AudioItem> {
+  if (this == null) return emptyList()
+  return List(size) { index -> get(index).toAudioItem() }
+}
+
+private fun MediaSessionCompat.QueueItem.toAudioItem(): AudioItem {
+  return description.run {
+    val extras = extras ?: Bundle.EMPTY
+    QueueAudioItemImpl(
+      id = mediaId.toPersistentId() as MediaId,
+      title = Title(title.toString()),
+      albumTitle = AlbumTitle(description.toString()),
+      albumArtist = ArtistName(subtitle.toString()),
+      artist = ArtistName(subtitle.toString()),
+      duration = Millis(extras.getLong(MediaMetadataCompat.METADATA_KEY_DURATION)),
+      trackNumber = extras.getLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER).toInt(),
+      localAlbumArt = iconUri ?: Uri.EMPTY,
+      albumArt = extras.getString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI).toUriOrEmpty(),
+      rating = extras.getParcelable<RatingCompat>(MediaMetadataCompat.METADATA_KEY_RATING)
+        ?.toStarRating()
+        ?.toRating()
+        ?: Rating.RATING_NONE,
+      location = mediaUri ?: Uri.EMPTY,
+      fileUri = Uri.EMPTY,
+      instanceId = queueId
+    )
+  }
+}
+
+private data class QueueAudioItemImpl(
+  override val id: MediaId,
+  override val title: Title,
+  override val albumTitle: AlbumTitle,
+  override val albumArtist: ArtistName,
+  override val artist: ArtistName,
+  override val duration: Millis,
+  override val trackNumber: Int,
+  override val localAlbumArt: Uri,
+  override val albumArt: Uri,
+  override val rating: Rating,
+  override val location: Uri,
+  override val fileUri: Uri,
+  override val instanceId: Long
+) : QueueAudioItem
+
+const val MAX_3_STAR = 3f
+const val MAX_4_STAR = 4f
+const val MAX_5_STAR = 5f
+const val MAX_PERCENTAGE = 100
+val STAR_3_RANGE = 0f..MAX_3_STAR
+val STAR_4_RANGE = 0f..MAX_4_STAR
+val STAR_5_RANGE = 0f..MAX_5_STAR
+val PERCENT_RANGE = 0..MAX_PERCENTAGE
+fun RatingCompat.toStarRating(): StarRating {
+  if (!isRated) StarRating.STAR_NONE
+  return when (ratingStyle) {
+    RatingCompat.RATING_HEART -> if (hasHeart()) StarRating.STAR_5 else StarRating.STAR_NONE
+    RatingCompat.RATING_THUMB_UP_DOWN -> if (isThumbUp) StarRating.STAR_5 else StarRating.STAR_NONE
+    RatingCompat.RATING_3_STARS -> STAR_3_RANGE.convert(starRating.coerceIn(STAR_3_RANGE))
+    RatingCompat.RATING_4_STARS -> STAR_4_RANGE.convert(starRating.coerceIn(STAR_4_RANGE))
+    RatingCompat.RATING_5_STARS -> StarRating(starRating.coerceIn(STAR_5_RANGE))
+    RatingCompat.RATING_PERCENTAGE ->
+      Rating(percentRating.toInt().coerceIn(PERCENT_RANGE)).toStarRating()
+    else -> StarRating.STAR_NONE
+  }
+}
+
+private fun ClosedFloatingPointRange<Float>.convert(number: Float): StarRating {
+  val ratio = number / (endInclusive - start)
+  return StarRating(
+    (ratio * (STAR_5_RANGE.endInclusive - STAR_5_RANGE.start)).coerceIn(STAR_5_RANGE)
+  )
 }

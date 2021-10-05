@@ -40,7 +40,7 @@ import com.ealva.toque.db.GenreMediaDao
 import com.ealva.toque.db.GenreMediaTable
 import com.ealva.toque.db.GenreTable
 import com.ealva.toque.db.MediaTable
-import com.ealva.toque.db.QueueStateDaoFactory
+import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.QueueStateTable
 import com.ealva.welite.db.Database
 import com.nhaarman.expect.expect
@@ -96,6 +96,6 @@ class DbModuleTest : KoinTest {
     expect(get<EqPresetDao>()).toNotBeNull()
     expect(get<EqPresetAssociationDao>()).toNotBeNull()
     expect(get<AudioMediaDao>()).toNotBeNull()
-    expect(get<QueueStateDaoFactory>()).toNotBeNull()
+    expect(get<QueuePositionStateDaoFactory>()).toNotBeNull()
   }
 }

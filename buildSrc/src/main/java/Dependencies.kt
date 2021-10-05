@@ -37,9 +37,10 @@ object Libs {
 
   object Accompanist {
     private const val VERSION = "0.18.0"
-    const val GLIDE = "com.google.accompanist:accompanist-glide:0.15.0"
     const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
     const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
+    const val PERMISSIONS = "com.google.accompanist:accompanist-permissions:$VERSION"
+    const val PAGER = "com.google.accompanist:accompanist-pager:$VERSION"
   }
 
   object Android {
@@ -59,7 +60,7 @@ object Libs {
     }
 
     object Constraint {
-      const val LAYOUT_COMPOSE = "androidx.constraintlayout:constraintlayout-compose:1.0.0-alpha07"
+      const val LAYOUT_COMPOSE = "androidx.constraintlayout:constraintlayout-compose:1.0.0-beta02"
     }
 
     object Compose {
@@ -100,6 +101,11 @@ object Libs {
     }
   }
 
+  object Coil {
+    const val COIL = "io.coil-kt:coil:1.3.2"
+    const val COIL_COMPOSE = "io.coil-kt:coil-compose:1.3.2"
+  }
+
   object Datastore {
     const val PREFERENCES = "androidx.datastore:datastore-preferences:1.0.0"
   }
@@ -129,6 +135,10 @@ object Libs {
     const val FASTUTIL = "it.unimi.dsi:fastutil:7.2.1"
   }
 
+  object Gowtham {
+    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.1.1"
+  }
+
   object JUnit {
     private const val VERSION = "4.12"
     const val JUNIT = "junit:junit:$VERSION"
@@ -148,6 +158,7 @@ object Libs {
   object Kotlin {
     private const val VERSION = "1.5.21"
     const val KGP = "org.jetbrains.kotlin:kotlin-gradle-plugin:$VERSION"
+    const val REFLECT = "org.jetbrains.kotlin:kotlin-reflect:$VERSION"
 
     // const val STDLIB = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$VERSION"
     // const val EXTENSIONS = "org.jetbrains.kotlin:kotlin-android-extensions:$VERSION"
@@ -201,7 +212,11 @@ object Libs {
     const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.1"
   }
 
+  object Square {
+    const val OKIO = "com.squareup.okio:okio:2.10.0"
+  }
+
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.2.1-0"
+    const val CORE = "com.ealva:welite-core:0.2.3-SNAPSHOT"
   }
 }

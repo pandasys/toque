@@ -48,8 +48,8 @@ interface AvPlayer {
   val isAudioPlayer: Boolean
 
   fun playStartPaused()
-  fun play(immediateTransition: Boolean = false)
-  fun pause(immediateTransition: Boolean = false)
+  fun play(immediate: Boolean = false)
+  fun pause(immediate: Boolean = false)
   fun seek(position: Millis)
   fun stop()
   fun shutdown()
@@ -142,8 +142,8 @@ object NullAvPlayer : AvPlayer {
   override val isPausable: Boolean = false
   override val isValid: Boolean = false
   override val equalizer: EqPreset = EqPreset.NONE
-  override val duration: Millis = Millis.ZERO
-  override val time: Millis = Millis.ZERO
+  override val duration: Millis = Millis(0)
+  override val time: Millis = Millis(0)
   override val isPlaying: Boolean = false
   override val isPaused: Boolean = false
   override val isShutdown: Boolean = false
@@ -155,8 +155,8 @@ object NullAvPlayer : AvPlayer {
   override val isVideoPlayer: Boolean = false
   override val isAudioPlayer: Boolean = true
   override fun playStartPaused() = Unit
-  override fun play(immediateTransition: Boolean) {}
-  override fun pause(immediateTransition: Boolean) {}
+  override fun play(immediate: Boolean) {}
+  override fun pause(immediate: Boolean) {}
   override fun seek(position: Millis) {}
   override fun stop() {}
   override fun shutdown() {}

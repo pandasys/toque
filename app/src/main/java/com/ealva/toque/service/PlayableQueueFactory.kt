@@ -21,14 +21,14 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
-import com.ealva.toque.db.QueueStateDaoFactory
+import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.PlayableAudioItemFactory
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
-import com.ealva.toque.service.session.MediaSessionControl
-import com.ealva.toque.service.session.MediaSessionState
+import com.ealva.toque.service.session.server.MediaSessionControl
+import com.ealva.toque.service.session.server.MediaSessionState
 
 interface PlayableQueueFactory {
   suspend fun make(
@@ -39,12 +39,12 @@ interface PlayableQueueFactory {
 
   companion object {
     operator fun invoke(
-      queueStateDaoFactory: QueueStateDaoFactory,
+      queuePositionStateDaoFactory: QueuePositionStateDaoFactory,
       playableAudioItemFactory: PlayableAudioItemFactory,
       audioManager: AudioManager,
       appPrefsSingleton: AppPrefsSingleton
     ): PlayableQueueFactory = PlayableQueueFactoryImpl(
-      queueStateDaoFactory,
+      queuePositionStateDaoFactory,
       playableAudioItemFactory,
       audioManager,
       appPrefsSingleton
@@ -55,7 +55,7 @@ interface PlayableQueueFactory {
 private val LOG by lazyLogger(PlayableQueueFactory::class)
 
 private class PlayableQueueFactoryImpl(
-  private val queueStateDaoFactory: QueueStateDaoFactory,
+  private val queuePositionStateDaoFactory: QueuePositionStateDaoFactory,
   private val playableAudioItemFactory: PlayableAudioItemFactory,
   private val audioManager: AudioManager,
   private val appPrefsSingleton: AppPrefsSingleton
@@ -81,10 +81,10 @@ private class PlayableQueueFactoryImpl(
     return LocalAudioQueue.make(
       sessionControl,
       sessionState,
-      queueStateDaoFactory,
+      queuePositionStateDaoFactory,
       playableAudioItemFactory,
       audioManager,
-      appPrefsSingleton.instance()
+      appPrefsSingleton
     )
   }
 }

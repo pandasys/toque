@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import android.net.Uri
 import android.os.Bundle
@@ -45,7 +45,8 @@ import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
-import com.ealva.toque.service.session.MediaSessionBrowser.Companion.MAX_LIST_SIZE
+import com.ealva.toque.service.session.common.toCompatMediaId
+import com.ealva.toque.service.session.common.toPersistentId
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -57,16 +58,17 @@ import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 
 private val LOG by lazyLogger(MediaSessionBrowser::class)
+private const val MAX_LIST_SIZE = 1000L
 
 typealias BrowserResult = MediaBrowserServiceCompat.Result<List<MediaItem>>
 
 interface OnMediaType<T> {
-  suspend fun onMedia(mediaId: MediaId, extras: Bundle): T
-  suspend fun onArtist(artistId: ArtistId, extras: Bundle): T
-  suspend fun onAlbum(albumId: AlbumId, extras: Bundle): T
-  suspend fun onGenre(genreId: GenreId, extras: Bundle): T
-  suspend fun onComposer(composerId: ComposerId, extras: Bundle): T
-  suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle): T
+  suspend fun onMedia(mediaId: MediaId, extras: Bundle, maxListSize: Long): T
+  suspend fun onArtist(artistId: ArtistId, extras: Bundle, maxListSize: Long): T
+  suspend fun onAlbum(albumId: AlbumId, extras: Bundle, maxListSize: Long): T
+  suspend fun onGenre(genreId: GenreId, extras: Bundle, maxListSize: Long): T
+  suspend fun onComposer(composerId: ComposerId, extras: Bundle, maxListSize: Long): T
+  suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle, maxListSize: Long): T
 }
 
 interface MediaSessionBrowser {
@@ -75,16 +77,8 @@ interface MediaSessionBrowser {
   fun onSearch(query: String, extras: Bundle, result: BrowserResult)
 
   companion object {
-    const val MAX_LIST_SIZE = 1000L
-
     const val ID_ROOT = "ROOT_ID"
     const val ID_RECENT_ROOT = "RECENTS_ROOT_ID"
-    const val MEDIA_PREFIX = "media"
-    const val ALBUM_PREFIX = "album"
-    const val ARTIST_PREFIX = "artist"
-    const val GENRE_PREFIX = "genre"
-    const val PLAYLIST_PREFIX = "playlist"
-    const val COMPOSER_PREFIX = "composer"
     const val ID_NO_MEDIA = "NO_MEDIA_ID"
     const val ID_NO_PLAYLIST = "NO_PLAYLIST_ID"
 
@@ -106,12 +100,12 @@ interface MediaSessionBrowser {
       onMediaType: OnMediaType<T>
     ): T {
       return when (val id = mediaId.trim().toPersistentId()) {
-        is MediaId -> onMediaType.onMedia(id, extras)
-        is ArtistId -> onMediaType.onArtist(id, extras)
-        is AlbumId -> onMediaType.onAlbum(id, extras)
-        is GenreId -> onMediaType.onGenre(id, extras)
-        is ComposerId -> onMediaType.onComposer(id, extras)
-        is PlaylistId -> onMediaType.onPlaylist(id, extras)
+        is MediaId -> onMediaType.onMedia(id, extras, MAX_LIST_SIZE)
+        is ArtistId -> onMediaType.onArtist(id, extras, MAX_LIST_SIZE)
+        is AlbumId -> onMediaType.onAlbum(id, extras, MAX_LIST_SIZE)
+        is GenreId -> onMediaType.onGenre(id, extras, MAX_LIST_SIZE)
+        is ComposerId -> onMediaType.onComposer(id, extras, MAX_LIST_SIZE)
+        is PlaylistId -> onMediaType.onPlaylist(id, extras, MAX_LIST_SIZE)
         else -> throw IllegalArgumentException("Unrecognized media ID")
       }
     }
@@ -189,35 +183,41 @@ private class MediaSessionBrowserImpl(
               // Media have no children
               override suspend fun onMedia(
                 mediaId: MediaId,
-                extras: Bundle
+                extras: Bundle,
+                maxListSize: Long
               ): List<MediaItem> = emptyList()
 
               override suspend fun onArtist(
                 artistId: ArtistId,
-                extras: Bundle
+                extras: Bundle,
+                maxListSize: Long
               ): List<MediaItem> =
                 valueFromList { makeArtistAlbumList(artistId) }
 
               override suspend fun onAlbum(
                 albumId: AlbumId,
-                extras: Bundle
+                extras: Bundle,
+                maxListSize: Long
               ): List<MediaItem> = valueFromList { makeAlbumTracksList(albumId) }
 
               override suspend fun onGenre(
                 genreId: GenreId,
-                extras: Bundle
+                extras: Bundle,
+                maxListSize: Long
               ): List<MediaItem> = valueFromList { makeGenreTracksList(genreId) }
 
               override suspend fun onComposer(
                 composerId: ComposerId,
-                extras: Bundle
+                extras: Bundle,
+                maxListSize: Long
               ): List<MediaItem> {
                 TODO("Not yet implemented")
               }
 
               override suspend fun onPlaylist(
                 playlistId: PlaylistId,
-                extras: Bundle
+                extras: Bundle,
+                maxListSize: Long
               ): List<MediaItem> {
                 TODO("Not yet implemented")
               }
@@ -574,56 +574,6 @@ const val CONTENT_STYLE_GRID = 2
 
 const val MEDIA_SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
 
-/**
- * Converts the specific PersistentId type to a string or throws [IllegalArgumentException] if
- * a new PersistentId type has been introduced and this function has not been updated.
- *
- * Note: calling this function causes boxing
- */
-fun PersistentId.toCompatMediaId(): String {
-  val prefix = when (this) {
-    is MediaId -> MediaSessionBrowser.MEDIA_PREFIX
-    is AlbumId -> MediaSessionBrowser.ALBUM_PREFIX
-    is ArtistId -> MediaSessionBrowser.ARTIST_PREFIX
-    is GenreId -> MediaSessionBrowser.GENRE_PREFIX
-    is PlaylistId -> MediaSessionBrowser.PLAYLIST_PREFIX
-    is ComposerId -> MediaSessionBrowser.COMPOSER_PREFIX
-    else -> throw IllegalArgumentException("Unrecognized PersistentId type for $this")
-  }
-  return "${prefix}_$value"
-}
-
-/**
- * Converts this String to a specific PersistentId type if the prefix is recognized or to a MediaId
- * if it's all digits. If this String is null returns [PersistentId.INVALID].
- *
- * It's expected that the String will have a prefix indicating it's type followed by an underscore
- * '_' character and end in a number which may be parsed as a long. If no prefix and all digits,
- * returns a [MediaId]. Throws an [IllegalArgumentException] if the prefix unrecognized. If the
- * number part after the underscore is missing or cannot be parsed as a long, the returned
- * persistent ID will have a value of -1.
- *
- * Note: This function causes boxing as it returns the base interface
- */
-fun String?.toPersistentId(): PersistentId {
-  if (this == null) return PersistentId.INVALID
-  val list = split('_')
-  return when {
-    list.size == 2 -> {
-      val id = list[1].toLongOrNull() ?: -1
-      when (list[0]) {
-        MediaSessionBrowser.MEDIA_PREFIX -> MediaId(id)
-        MediaSessionBrowser.ARTIST_PREFIX -> ArtistId(id)
-        MediaSessionBrowser.ALBUM_PREFIX -> AlbumId(id)
-        MediaSessionBrowser.GENRE_PREFIX -> GenreId(id)
-        MediaSessionBrowser.COMPOSER_PREFIX -> ComposerId(id)
-        MediaSessionBrowser.PLAYLIST_PREFIX -> PlaylistId(id)
-        else -> throw IllegalArgumentException("Unrecognized MediaId:$this")
-      }
-    }
-    isNumeric() -> MediaId(toLong())
-    else -> throw IllegalArgumentException("Unrecognized MediaId:$this")
-  }
-}
-
-fun String?.isNumeric(): Boolean = if (!isNullOrEmpty()) all { c -> c.isDigit() } else false
+inline fun buildDescription(
+  builderAction: MediaDescriptionCompat.Builder.() -> Unit
+): MediaDescriptionCompat = MediaDescriptionCompat.Builder().apply(builderAction).build()

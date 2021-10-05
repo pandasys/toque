@@ -17,11 +17,6 @@
 package com.ealva.toque.service.audio
 
 import android.media.AudioManager
-import android.net.Uri
-import android.os.Bundle
-import android.support.v4.media.MediaDescriptionCompat
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -29,7 +24,6 @@ import com.ealva.toque.R
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.AllowDuplicates
-import com.ealva.toque.common.LoggingCoroutineExceptionHandler
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
@@ -43,20 +37,21 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.QueueDao
-import com.ealva.toque.db.QueueState
-import com.ealva.toque.db.QueueStateDaoFactory
+import com.ealva.toque.db.QueuePositionState
+import com.ealva.toque.db.QueuePositionStateDao
+import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.SongListType
-import com.ealva.toque.db.getNextList
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
-import com.ealva.toque.log.logExecTime
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.DuckAction
+import com.ealva.toque.service.media.EqMode
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.media.toRating
-import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.player.AvPlayer.Companion.OFFSET_CONSIDERED_END
 import com.ealva.toque.service.player.CrossFadeTransition
 import com.ealva.toque.service.player.DirectTransition
@@ -75,12 +70,11 @@ import com.ealva.toque.service.scrobble.NullScrobbler
 import com.ealva.toque.service.scrobble.Scrobbler
 import com.ealva.toque.service.scrobble.ScrobblerFacade
 import com.ealva.toque.service.scrobble.ScrobblerFactory
-import com.ealva.toque.service.session.AudioFocusManager
-import com.ealva.toque.service.session.MediaSessionControl
-import com.ealva.toque.service.session.MediaSessionState
-import com.ealva.toque.service.session.PlaybackActions
-import com.ealva.toque.service.session.PlaybackState
-import com.ealva.toque.service.session.toCompat
+import com.ealva.toque.service.session.common.PlaybackActions
+import com.ealva.toque.service.session.common.PlaybackState
+import com.ealva.toque.service.session.server.AudioFocusManager
+import com.ealva.toque.service.session.server.MediaSessionControl
+import com.ealva.toque.service.session.server.MediaSessionState
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import it.unimi.dsi.fastutil.longs.LongCollection
@@ -91,9 +85,11 @@ import it.unimi.dsi.fastutil.longs.LongSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.launchIn
@@ -106,12 +102,50 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 typealias QueueList = List<PlayableAudioItem>
-typealias QueueItemList = List<MediaSessionCompat.QueueItem>
-typealias QueueItemArrayList = ArrayList<MediaSessionCompat.QueueItem>
+
+data class LocalAudioQueueState(
+  val queue: List<AudioItem>,
+  val queueIndex: Int,
+  val position: Millis,
+  val duration: Millis,
+  val playingState: PlayState,
+  val repeatMode: RepeatMode,
+  val shuffleMode: ShuffleMode,
+  val eqMode: EqMode,
+  val currentPreset: EqPreset,
+  val extraMediaInfo: String
+) {
+  override fun toString(): String {
+    return """
+      |LocalAudioQueueState(
+      |  queue.size=${queue.size},
+      |  index=$queueIndex,
+      |  position=$position,
+      |  duration=$duration,
+      |  playState=$playingState,
+      |  repeat=$repeatMode,
+      |  shuffle=$shuffleMode,
+      |)
+    """.trimMargin()
+  }
+
+  companion object {
+    val NONE = LocalAudioQueueState(
+      queue = emptyList(),
+      queueIndex = -1,
+      position = Millis(0),
+      duration = Millis(0),
+      playingState = PlayState.Stopped,
+      repeatMode = RepeatMode.None,
+      shuffleMode = ShuffleMode.None,
+      eqMode = EqMode.Off,
+      currentPreset = EqPreset.NONE,
+      extraMediaInfo = ""
+    )
+  }
+}
 
 private val LOG by lazyLogger(LocalAudioQueue::class)
-private val LOGGING_HANDLER = LoggingCoroutineExceptionHandler(LOG)
-private val MAIN_WITH_HANDLER = Dispatchers.Main + LOGGING_HANDLER
 private const val MAX_QUEUE_RETRIES = 5
 
 typealias QueueInfo = Pair<QueueList, Int>
@@ -136,19 +170,7 @@ open class ListShuffler {
 val LIST_SHUFFLER = ListShuffler()
 
 interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
-  /*
-    internal val queue: List<AudioItem>,
-  val queueIndex: Int,
-  val position: Millis,
-  val duration: Millis,
-  val playingState: PlayState,
-  val repeatMode: RepeatMode,
-  val shuffleMode: ShuffleMode,
-  val eqMode: EqMode,
-  val presets: List<EqPreset>,
-  val currentPreset: EqPreset,
-  val extraMediaInfo: String
-   */
+  val queueState: StateFlow<LocalAudioQueueState>
 
   override val queueType: QueueType
     get() = QueueType.Audio
@@ -159,13 +181,10 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   val manualTransition: PlayerTransitionPair
   val autoAdvanceTransition: PlayerTransitionPair
 
-  val repeatMode: RepeatMode
-  val shuffleMode: ShuffleMode
-
   suspend fun setRepeatMode(mode: RepeatMode)
   suspend fun setShuffleMode(mode: ShuffleMode)
 
-  suspend fun setRating(rating: StarRating)
+  suspend fun setRating(rating: StarRating, allowFileUpdate: Boolean = false)
 
   suspend fun addToUpNext(audioIdList: AudioIdList)
 
@@ -180,77 +199,108 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   suspend fun prepareNext(audioIdList: AudioIdList)
 
   companion object {
-    fun make(
+    suspend fun make(
       sessionControl: MediaSessionControl,
       sessionState: MediaSessionState,
-      queueStateDaoFactory: QueueStateDaoFactory,
+      queuePositionStateDaoFactory: QueuePositionStateDaoFactory,
       playableAudioItemFactory: PlayableAudioItemFactory,
       audioManager: AudioManager,
-      appPrefs: AppPrefs
-    ): LocalAudioQueue = LocalAudioCommandProcessor(
-      LocalAudioQueueImpl(
-        sessionState,
-        queueStateDaoFactory,
-        playableAudioItemFactory,
-        MusicStreamVolume(audioManager),
-        appPrefs
-      ),
-      appPrefs,
-      sessionControl
-    )
+      appPrefsSingleton: AppPrefsSingleton
+    ): LocalAudioQueue {
+      val appPrefs = appPrefsSingleton.instance()
+      val dao = queuePositionStateDaoFactory.makeStateDao(AudioMediaDao.QUEUE_ID)
+      val positionState = when (val result = dao.getState()) {
+        is Ok -> result.value
+        is Err -> QueuePositionState.INACTIVE_QUEUE_STATE.also {
+          LOG.e { it("Can't read queue state %s", result.error) }
+        }
+      }
+      return LocalAudioCommandProcessor(
+        LocalAudioQueueImpl(
+          queuePrefsSingleton.instance(),
+          sessionState,
+          positionState,
+          dao,
+          playableAudioItemFactory,
+          MusicStreamVolume(audioManager),
+          appPrefs
+        ),
+        appPrefs,
+        sessionControl
+      )
+    }
   }
 }
 
 @Suppress("SameParameterValue", "LargeClass")
 private class LocalAudioQueueImpl(
+  private val prefs: QueuePrefs,
   private val sessionState: MediaSessionState,
-  queueStateDaoFactory: QueueStateDaoFactory,
+  initialState: QueuePositionState,
+  private val queuePositionStateDao: QueuePositionStateDao,
   private val itemFactory: PlayableAudioItemFactory,
   override val streamVolume: StreamVolume,
   private val appPrefs: AppPrefs
 ) : LocalAudioQueue, KoinComponent {
-  private val scope = CoroutineScope(Dispatchers.Main + Job())
-  private val queueStateDao = queueStateDaoFactory.makeQueueStateDao(AudioMediaDao.QUEUE_ID)
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-  private var prefs: QueuePrefs = QueuePrefs.NULL
-  private var queueState: QueueState = QueueState.INACTIVE_QUEUE_STATE
   private val audioMediaDao: AudioMediaDao by inject()
   private val queueDao: QueueDao by inject()
   private val scrobblerFactory: ScrobblerFactory by inject()
   private var scrobbler: Scrobbler = NullScrobbler
   private var currentItemFlowJob: Job? = null
   private var playState: PlayState = PlayState.None
+  private var positionState = initialState
+
+  override val queueState = MutableStateFlow(makeInitialState())
+
+  private fun makeInitialState(): LocalAudioQueueState {
+    return LocalAudioQueueState(
+      emptyList(),
+      -1,
+      Millis(0),
+      Millis(0),
+      PlayState.None,
+      prefs.repeatMode(),
+      prefs.shuffleMode(),
+      EqMode.Off,
+      EqPreset.NONE,
+      ""
+    )
+  }
+
+  private fun updateQueueState(state: LocalAudioQueueState) {
+    queueState.value = state
+  }
 
   override var seeking = false
   override val isSeekable: Boolean
     get() = currentItem.isSeekable
 
-  override val repeatMode: RepeatMode
+  private val repeat: RepeatMode
     get() = prefs.repeatMode()
-  inline val repeatCurrent: Boolean
-    get() = repeatMode.current
-  inline val repeatQueue: Boolean
-    get() = repeatMode.queue
 
-  suspend fun nextRepeatMode() = setRepeatMode(repeatMode.getNext())
+  suspend fun nextRepeatMode() = setRepeatMode(repeat.getNext())
   override suspend fun setRepeatMode(mode: RepeatMode) = prefs.repeatMode.set(mode)
 
-  override val shuffleMode: ShuffleMode
+  val shuffle: ShuffleMode
     get() = prefs.shuffleMode()
+
+  suspend fun nextShuffleMode() = prefs.shuffleMode.set(shuffle.getNext())
 
   override suspend fun setShuffleMode(mode: ShuffleMode) = prefs.shuffleMode.set(mode)
 
-  override suspend fun setRating(rating: StarRating) {
-    currentItem.setRating(rating.toRating())
+  override suspend fun setRating(rating: StarRating, allowFileUpdate: Boolean) {
+    currentItem.setRating(rating.toRating(), allowFileUpdate)
     updateMetadata()
   }
 
-  override val queue: List<PlayableAudioItem>
-    get() = if (shuffleMode.shuffleMedia) upNextShuffled else upNextQueue
-  override val currentItem: PlayableAudioItem
+  private val queue: List<PlayableAudioItem>
+    get() = if (shuffle.shuffleMedia) upNextShuffled else upNextQueue
+  private val currentItem: PlayableAudioItem
     get() = getItemFromIndex(currentItemIndex)
-  override val currentItemIndex: Int
-    get() = queueState.queueIndex
+  private val currentItemIndex: Int
+    get() = positionState.queueIndex
   private val nextItem: PlayableAudioItem
     get() = getItemFromIndex(currentItemIndex + 1)
 
@@ -278,52 +328,53 @@ private class LocalAudioQueueImpl(
     }
 
   override val isActive = MutableStateFlow(false)
-  override var enabledActions: PlaybackActions = PlaybackActions.DEFAULT
 
   /**
    * Note: [resume] probably only true for casting (not this Queue)
    */
   override suspend fun activate(resume: Boolean, playNow: PlayNow) {
-    prefs = queuePrefsSingleton.instance()
     reactToShuffleChanges()
     reactToRepeatModeChanges()
     sessionState.contentType = AudioFocusManager.ContentType.Audio
     sessionState.setQueueTitle(fetch(R.string.LocalAudio))
-    queueState = when (val result = queueStateDao.getState()) {
-      is Ok -> result.value
-      is Err -> QueueState.INACTIVE_QUEUE_STATE.also {
-        LOG.e { it("Can't read queue state %s", result.error) }
-      }
-    }
     scrobbler = ScrobblerFacade(appPrefs, scrobblerFactory)
     upNextQueue = itemFactory.makeUpNextQueue(false)
-    LOG._e { it("activate upNextQueue.size=%d", upNextQueue.size) }
     upNextShuffled = itemFactory.makeUpNextQueue(true)
     val currentQueue = queue
-    setSessionQueue(currentQueue, sessionState)
     if (currentQueue.isNotEmpty()) {
       var startingIndex = 0
-      var startingPosition: Millis = Millis.ZERO
-      if (queueState.queueIndex in currentQueue.indices) {
-        startingIndex = queueState.queueIndex
-        startingPosition = queueState.playbackPosition
+      var startingPosition = Millis(0)
+      if (positionState.queueIndex in currentQueue.indices) {
+        startingIndex = positionState.queueIndex
+        startingPosition = positionState.playbackPosition
       }
       var item = try {
         currentQueue[startingIndex]
       } catch (e: Throwable) {
         NullPlayableAudioItem
       }
-      if (!item.isValid || item.id != queueState.mediaId) {
-        item = currentQueue[0]
-        updateQueueState(QueueState(item.id, 0, Millis.ZERO))
+      if (!item.isValid || item.id != positionState.mediaId) {
+        startingIndex = 0
+        item = currentQueue[startingIndex]
+        updatePositionState(QueuePositionState(item.id, startingIndex, Millis(0)))
       }
+      updateQueueState(
+        queueState.value.copy(
+          queue = queue,
+          queueIndex = startingIndex,
+          position = startingPosition
+        )
+      )
+      setSessionQueue(currentQueue)
       if (!resume) {
         transitionToNext(
           NullPlayableAudioItem,
           item,
           if (playNow()) DirectTransition() else NoOpMediaTransition,
           playNow,
-          startingPosition
+          startingPosition,
+          positionState.timePlayed,
+          positionState.countingFrom
         )
       }
     } else {
@@ -331,31 +382,37 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  private fun setSessionQueue(queue: List<PlayableAudioItem>, sessionState: MediaSessionState) {
-    scope.launch {
-      logExecTime({ time -> LOG._e { it("sessionState.setQueue %d", time) } }) {
-        sessionState.setQueue { queue.toCompat() }
-      }
-    }
+  /**
+   * Should call this function any time the [queue] or currentItemIndex changes. [indexChange]
+   * should only be true if this is called only do the the current item index changing.
+   */
+  private fun setSessionQueue(queue: List<PlayableAudioItem>, indexChange: Boolean = false) {
+    sessionState.setQueue(queue, currentItemIndex, indexChange)
   }
 
   private fun reactToRepeatModeChanges() {
     prefs.repeatMode
       .asFlow()
-      .onEach { mode -> sessionState.setRepeat(mode) }
+      .onEach { mode ->
+        sessionState.setRepeat(mode)
+        updateQueueState(queueState.value.copy(repeatMode = mode))
+      }
       .launchIn(scope)
   }
 
   private fun reactToShuffleChanges() {
     prefs.shuffleMode
       .asFlow()
-      .onEach { mode -> sessionState.setShuffle(mode) }
+      .onEach { mode ->
+        sessionState.setShuffle(mode)
+        updateQueueState(queueState.value.copy(shuffleMode = mode))
+      }
       .launchIn(scope)
   }
 
   override fun deactivate() {
     scope.cancel()
-    queueState = QueueState.INACTIVE_QUEUE_STATE
+    positionState = QueuePositionState.INACTIVE_QUEUE_STATE
   }
 
   private fun getItemFromIndex(index: Int): PlayableAudioItem {
@@ -363,7 +420,7 @@ private class LocalAudioQueueImpl(
     return if (index in activeQueue.indices) activeQueue[index] else NullPlayableAudioItem
   }
 
-  override suspend fun getNextMediaTitle(): Title = if (isActive.value) {
+  private suspend fun getNextMediaTitle(): Title = if (isActive.value) {
     val item = nextItem
     when {
       nextItem.isValid -> item.title
@@ -385,7 +442,7 @@ private class LocalAudioQueueImpl(
     Title.EMPTY
   }
 
-  override suspend fun play(immediateTransition: Boolean) {
+  override fun play(immediateTransition: Boolean) {
     currentItem.play(immediateTransition)
   }
 
@@ -397,27 +454,77 @@ private class LocalAudioQueueImpl(
     currentItem.stop()
   }
 
-  //  override fun togglePlayPause() {
-//    TODO("Not yet implemented")
-//  }
-
-  override suspend fun next() {
-    nextSong(PlayNow(currentItem.isPlaying), manualTransition)
+  override suspend fun togglePlayPause() {
+    currentItem.togglePlayPause()
   }
 
+  /**
+   * Using [playState] to determine if next song should play as it better represents current
+   * "desired" state better than what an item/player is currently doing. eg. when rapidly switching
+   * between songs we want to maintain the state of "playing", even though the various items/players
+   * will be moving through various states.
+   */
+  override suspend fun next() {
+    nextSong(PlayNow(playState.isPlaying), manualTransition)
+  }
+
+  /**
+   * Using [playState] to determine if next song should play as it better represents current
+   * "desired" state better than what an item/player is currently doing. eg. when rapidly switching
+   * between songs we want to maintain the state of "playing", even though the various items/players
+   * will be moving through various states.
+   */
   override suspend fun previous() {
     if (queueContainsMedia()) {
       val current = currentItem
       if (current.previousShouldRewind()) {
         current.seekTo(Millis(0))
       } else {
-        val newIndex = queueState.queueIndex - 1
+        val newIndex = positionState.queueIndex - 1
         if (newIndex < 0) {
           // start of queue
         } else {
-          doGoToIndex(newIndex, PlayNow(current.isPlaying), manualTransition)
+          doGoToIndex(newIndex, PlayNow(playState.isPlaying), manualTransition)
         }
       }
+    }
+  }
+
+  override suspend fun nextList() {
+    LOG._e {
+      it(
+        "nextList lastType=%s lastName=%s",
+        prefs.lastListType(),
+        prefs.lastListName()
+      )
+    }
+    val nextList = getNextList(prefs.lastListType(), prefs.lastListName())
+    LOG._e { it("nextType=%s nextName=%s", nextList.listType, nextList.listName) }
+    if (nextList.isNotEmpty) {
+      playNext(
+        if (shuffle.shuffleMedia) nextList.shuffled() else nextList,
+        ClearQueue(true),
+        PlayNow(playState.isPlaying)
+      )
+    }
+  }
+
+  override suspend fun previousList() {
+    LOG._e {
+      it(
+        "previousList lastType=%s lastName=%s",
+        prefs.lastListType(),
+        prefs.lastListName()
+      )
+    }
+    val prevList = getPreviousList(prefs.lastListType(), prefs.lastListName())
+    LOG._e { it("nextType=%s nextName=%s", prevList.listType, prevList.listName) }
+    if (prevList.isNotEmpty) {
+      playNext(
+        if (shuffle.shuffleMedia) prevList.shuffled() else prevList,
+        ClearQueue(true),
+        PlayNow(playState.isPlaying)
+      )
     }
   }
 
@@ -434,11 +541,13 @@ private class LocalAudioQueueImpl(
 
   override suspend fun rewind() {
     val current = currentItem
-    current.seekTo((current.position - Millis.TEN_SECONDS).coerceAtLeast(Millis.ZERO))
+    current.seekTo((current.position - Millis.TEN_SECONDS).coerceAtLeast(Millis(0)))
   }
 
   override suspend fun goToIndexMaybePlay(index: Int) {
-    doGoToIndex(index, PlayNow(currentItem.isPlaying), manualTransition)
+    if (index != currentItemIndex) {
+      doGoToIndex(index, PlayNow(currentItem.isPlaying), manualTransition)
+    }
   }
 
   override suspend fun duck() {
@@ -463,26 +572,24 @@ private class LocalAudioQueueImpl(
     if (upNextQueue.isEmpty()) {
       playNext(audioIdList, ClearQueue(true), PlayNow(false), transition = manualTransition)
     } else {
-      withContext(MAIN_WITH_HANDLER) {
-        retryQueueChange {
-          val prevCurrentIndex = currentItemIndex
-          val prevCurrent = currentItem
-          val idList = makeIdListLessCurrent(audioIdList, prevCurrent)
+      retryQueueChange {
+        val prevCurrentIndex = currentItemIndex
+        val prevCurrent = currentItem
+        val idList = makeIdListLessCurrent(audioIdList, prevCurrent)
 
-          if (idList.isNotEmpty()) {
-            val (newQueue, newShuffled, newIndex) = addItemsToQueues(
-              upNextQueue,
-              upNextShuffled,
-              prevCurrent,
-              prevCurrentIndex,
-              idList,
-              shuffleMode,
-              AddAt.AtEnd,
-              clearAndRemakeQueues = false
-            )
-            persistIfCurrentUnchanged(newQueue, newShuffled, prevCurrent, prevCurrentIndex)
-            establishNewQueues(newQueue, newShuffled, newIndex)
-          }
+        if (idList.isNotEmpty()) {
+          val (newQueue, newShuffled, newIndex) = addItemsToQueues(
+            upNextQueue,
+            upNextShuffled,
+            prevCurrent,
+            prevCurrentIndex,
+            idList,
+            shuffle,
+            AddAt.AtEnd,
+            clearAndRemakeQueues = false
+          )
+          persistIfCurrentUnchanged(newQueue, newShuffled, prevCurrent, prevCurrentIndex)
+          establishNewQueues(newQueue, newShuffled, newIndex)
         }
       }
     }
@@ -502,55 +609,53 @@ private class LocalAudioQueueImpl(
     // information and only swap if the new queue "current" matches the old. If doesn't match the
     // current item changed while we were creating the new queue, need to loop and try again.
     // Retry because the queue changed should be very rare (such as auto advance while playing)
-    withContext(MAIN_WITH_HANDLER) {
-      retryQueueChange {
-        val prevCurrentIndex = currentItemIndex
-        val prevCurrent = currentItem
-        val firstIsCurrent = audioIdList.isNotEmpty && audioIdList.idList[0] == prevCurrent.id
-        val idList = makeIdListLessCurrent(audioIdList, prevCurrent)
+    retryQueueChange {
+      val prevCurrentIndex = currentItemIndex
+      val prevCurrent = currentItem
+      val firstIsCurrent = audioIdList.isNotEmpty && audioIdList.idList[0] == prevCurrent.id
+      val idList = makeIdListLessCurrent(audioIdList, prevCurrent)
 
-        if (idList.isNotEmpty()) {
-          val upNextEmptyOrCleared = upNextQueue.isEmpty() || clearUpNext() || !prevCurrent.isValid
-          val prevLast = getLastQueueItem()
+      if (idList.isNotEmpty()) {
+        val upNextEmptyOrCleared = upNextQueue.isEmpty() || clearUpNext() || !prevCurrent.isValid
+        val prevLast = getLastQueueItem()
 
-          val (newQueue, newShuffled, newIndex) = addItemsToQueues(
-            upNextQueue,
-            upNextShuffled,
-            prevCurrent,
-            prevCurrentIndex,
-            idList,
-            shuffleMode,
-            AddAt.AfterCurrent,
-            upNextEmptyOrCleared
-          )
+        val (newQueue, newShuffled, newIndex) = addItemsToQueues(
+          upNextQueue,
+          upNextShuffled,
+          prevCurrent,
+          prevCurrentIndex,
+          idList,
+          shuffle,
+          AddAt.AfterCurrent,
+          upNextEmptyOrCleared
+        )
 
-          persistIfCurrentUnchanged(
-            newQueue,
-            newShuffled,
-            prevCurrent,
-            prevCurrentIndex,
-            skipUnchangedCheck = upNextEmptyOrCleared
-          )
+        persistIfCurrentUnchanged(
+          newQueue,
+          newShuffled,
+          prevCurrent,
+          prevCurrentIndex,
+          skipUnchangedCheck = upNextEmptyOrCleared
+        )
 
-          establishNewQueues(
-            newQueue,
-            newShuffled,
-            newIndex,
-            upNextEmptyOrCleared
-          )
+        establishNewQueues(
+          newQueue,
+          newShuffled,
+          newIndex,
+          upNextEmptyOrCleared
+        )
 
-          if (upNextEmptyOrCleared || lastQueueItemIsNot(prevLast)) {
-            setLastList(audioIdList)
-          }
-
-          if (upNextEmptyOrCleared || firstIsCurrent) {
-            transitionToNext(prevCurrent, currentItem, transition, playNow, Millis.ZERO)
-          } else if (playNow()) {
-            nextSong(PlayNow(true), transition)
-          }
-        } else if (firstIsCurrent) {
-          transitionToNext(prevCurrent, currentItem, transition, playNow, Millis.ZERO)
+        if (upNextEmptyOrCleared || lastQueueItemIsNot(prevLast)) {
+          setLastList(audioIdList)
         }
+
+        if (upNextEmptyOrCleared || firstIsCurrent) {
+          transitionToNext(prevCurrent, currentItem, transition, playNow, Millis(0))
+        } else if (playNow()) {
+          nextSong(PlayNow(true), transition)
+        }
+      } else if (firstIsCurrent) {
+        transitionToNext(prevCurrent, currentItem, transition, playNow, Millis(0))
       }
     }
   }
@@ -575,7 +680,7 @@ private class LocalAudioQueueImpl(
         doGoToIndex(currentItemIndex + 1, playNow, transitionPair)
         success = true
       } else {
-        if (repeatQueue) {
+        if (repeat.queue) {
           doGoToIndex(0, playNow, transitionPair)
           success = true
         } else {
@@ -610,9 +715,38 @@ private class LocalAudioQueueImpl(
   ): AudioIdList {
     val countResult = audioMediaDao.getCountAllAudio()
     return if (countResult is Ok && countResult.value > 0) {
-      var nextList = currentListType.getNextList(audioMediaDao, currentListName, appPrefs)
+      var nextList = if (shuffle.shuffleLists) {
+        SongListType.getRandomType().getRandomList(audioMediaDao)
+      } else {
+        currentListType.getNextList(audioMediaDao, currentListName)
+      }
       while (nextList.isEmpty) {
-        nextList = nextList.listType.getNextList(audioMediaDao, nextList.listName, appPrefs)
+        nextList = nextList.listType.getNextList(audioMediaDao, nextList.listName)
+        if (currentListType == nextList.listType && currentListName == nextList.listName) {
+          // looped around and didn't find anything, quit and return an empty list
+          nextList = nextList.copy(idList = MediaIdList.EMPTY_LIST)
+          break
+        }
+      }
+      nextList
+    } else {
+      AudioIdList(MediaIdList.EMPTY_LIST, SongListType.All, "")
+    }
+  }
+
+  private suspend fun getPreviousList(
+    currentListType: SongListType,
+    currentListName: String
+  ): AudioIdList {
+    val countResult = audioMediaDao.getCountAllAudio()
+    return if (countResult is Ok && countResult.value > 0) {
+      var nextList = if (shuffle.shuffleLists) {
+        SongListType.getRandomType().getRandomList(audioMediaDao)
+      } else {
+        currentListType.getPreviousList(audioMediaDao, currentListName)
+      }
+      while (nextList.isEmpty) {
+        nextList = nextList.listType.getPreviousList(audioMediaDao, nextList.listName)
         if (currentListType == nextList.listType && currentListName == nextList.listName) {
           // looped around and didn't find anything, quit and return an empty list
           nextList = nextList.copy(idList = MediaIdList.EMPTY_LIST)
@@ -630,6 +764,7 @@ private class LocalAudioQueueImpl(
     ensureSongPlays: PlayNow,
     transition: PlayerTransitionPair
   ) {
+    LOG._e { it("doGoTo index=%d ensurePlays=%s", goToIndex, ensureSongPlays.value) }
     debug { ensureUiThread() }
     val currentIndex = currentItemIndex
     val current = currentItem
@@ -655,13 +790,14 @@ private class LocalAudioQueueImpl(
       } else {
         nextItem = activeQueue[goToIndex]
         if (nextItem.isValid) {
-          updateQueueState(QueueState(nextItem.id, goToIndex, Millis.ZERO))
+          updatePositionState(QueuePositionState(nextItem.id, goToIndex, Millis(0)))
+          setSessionQueue(activeQueue, indexChange = true)
         }
       }
     }
     if (nextItem.isValid) {
       if (checkIfSkipped) current.checkMarkSkipped()
-      transitionToNext(current, nextItem, transition, ensureSongPlays, Millis.ZERO)
+      transitionToNext(current, nextItem, transition, ensureSongPlays, Millis(0))
     } else {
       updateMetadata()
     }
@@ -672,7 +808,7 @@ private class LocalAudioQueueImpl(
     item: PlayableAudioItem,
     replacement: PlayableAudioItem
   ) {
-    if (shuffleMode.shuffleMedia) {
+    if (shuffle.shuffleMedia) {
       debugCheck(upNextShuffled[index].instanceId == item.instanceId) {
         "index does not match item"
       }
@@ -695,7 +831,9 @@ private class LocalAudioQueueImpl(
     nextItem: PlayableAudioItem,
     transition: PlayerTransitionPair,
     playNow: PlayNow,
-    position: Millis
+    position: Millis,
+    timePlayed: Millis = Millis(0),
+    countFrom: Millis = Millis(0)
   ) {
     if (currentItem.isValid) {
       currentItemFlowJob?.cancel()
@@ -714,6 +852,8 @@ private class LocalAudioQueueImpl(
         position,
         if (playNow()) transition.enterTransition else NoOpPlayerTransition,
         playNow,
+        timePlayed,
+        countFrom
       )
     }
   }
@@ -746,8 +886,7 @@ private class LocalAudioQueueImpl(
     isActive.value = true
     val item = event.audioItem
     val duration = event.duration
-    LOG._e { it("onPrepared  position=%d", event.currentPosition()) }
-    updateQueueState(queueState.copy(mediaId = item.id, playbackPosition = event.currentPosition))
+    updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = event.position))
     updateMetadata()
     updatePlaybackState(
       item,
@@ -755,7 +894,8 @@ private class LocalAudioQueueImpl(
       queue,
       if (item.isPlaying) PlayState.Playing else PlayState.Paused
     )
-    scope.launch(MAIN_WITH_HANDLER) {
+
+    scope.launch {
       val nextTitle = getNextMediaTitle()
 //      getNotifier().postNextMediaTitleChanged(NextMediaTitleChangedEvent(nextTitle)) TODO
     }
@@ -763,10 +903,9 @@ private class LocalAudioQueueImpl(
 
   private suspend fun onPositionUpdate(event: PlayableAudioItemEvent.PositionUpdate) {
     val item = event.audioItem
-    updateQueueState(queueState.copy(mediaId = item.id, playbackPosition = event.currentPosition))
     val current = currentItem
     if (item.isPlaying) {
-      if (item.supportsFade && shouldAutoAdvanceFrom(event.currentPosition, event.duration)) {
+      if (item.supportsFade && shouldAutoAdvanceFrom(event.position, event.duration)) {
         doNextOrRepeat()
       } else {
         updatePlaybackState(current, currentItemIndex, queue, PlayState.Playing)
@@ -779,7 +918,7 @@ private class LocalAudioQueueImpl(
   private suspend fun onStart(event: PlayableAudioItemEvent.Start) {
     playState = PlayState.Playing
     val item = event.audioItem
-    updateQueueState(queueState.copy(mediaId = item.id, playbackPosition = event.currentPosition))
+    updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = event.position))
     //    getNotifier().onStart(item, firstStart) TODO
     if (event.firstStart) {
       scrobbler.start(item)
@@ -792,8 +931,8 @@ private class LocalAudioQueueImpl(
   private suspend fun onPaused(event: PlayableAudioItemEvent.Paused) {
     playState = PlayState.Paused
     val item = event.audioItem
-    val position = event.currentPosition
-    updateQueueState(queueState.copy(mediaId = item.id, playbackPosition = position))
+    val position = event.position
+    updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = position))
 //    getNotifier().onPaused(item, position) TODO
     scrobbler.pause(item)
     updatePlaybackState(currentItem, currentItemIndex, queue, PlayState.Paused)
@@ -833,6 +972,15 @@ private class LocalAudioQueueImpl(
     queue: List<PlayableAudioItem>,
     playState: PlayState
   ) {
+    updateQueueState(
+      queueState.value.copy(
+        queue = queue,
+        queueIndex = index,
+        position = item.position,
+        duration = item.duration,
+        playingState = playState
+      )
+    )
     sessionState.setState(
       PlaybackState(
         playState,
@@ -850,11 +998,11 @@ private class LocalAudioQueueImpl(
 
   private suspend fun updateMetadata() = sessionState.setMetadata(currentItem.metadata)
 
-  private fun updateQueueState(newState: QueueState) {
-    queueState = queueStateDao.persistState(newState)
+  private fun updatePositionState(newState: QueuePositionState) {
+    positionState = queuePositionStateDao.persistState(newState)
   }
 
-  private suspend fun doNextOrRepeat(): Boolean = if (repeatCurrent) {
+  private suspend fun doNextOrRepeat(): Boolean = if (repeat.current) {
     doGoToIndex(currentItemIndex, PlayNow(true), autoAdvanceTransition)
     true
   } else {
@@ -897,20 +1045,34 @@ private class LocalAudioQueueImpl(
   ) {
     // Never change the underlying queues except on the UI thread
     debug { ensureUiThread() }
+    var index = newIndex
+    var item: PlayableAudioItem = NullPlayableAudioItem
     upNextQueue = newQueue
     upNextShuffled = newShuffled
     val activeQueue = queue
-    LOG._e { it("establishNewQueues activeQueue.size=%d", activeQueue.size) }
-    setSessionQueue(activeQueue, sessionState)
     if (activeQueue.isNotEmpty()) {
       if (clearUpNext) {
-        updateQueueState(QueueState(activeQueue[0].id, 0, Millis.ZERO))
+        index = 0
+        item = activeQueue[index]
+        updatePositionState(QueuePositionState(item.id, index, item.position))
       } else {
-        val item = activeQueue[newIndex]
-        updateQueueState(QueueState(item.id, newIndex, item.position))
+        item = activeQueue[index]
+        updatePositionState(QueuePositionState(item.id, index, item.position))
       }
-    } else queueStateDao.persistState(QueueState.INACTIVE_QUEUE_STATE)
-//    postUpNextChangedEvent()  TODO
+    } else {
+      index = -1
+      queuePositionStateDao.persistState(QueuePositionState.INACTIVE_QUEUE_STATE)
+    }
+    updateQueueState(
+      queueState.value.copy(
+        queue = activeQueue,
+        queueIndex = index,
+        position = item.position,
+        duration = item.duration,
+        playingState = playState,
+      )
+    )
+    setSessionQueue(activeQueue)
   }
 
   private suspend fun setLastList(audioIdList: AudioIdList) {
@@ -962,7 +1124,7 @@ private class LocalAudioQueueImpl(
           idSet,
           allowDuplicates,
           addAt,
-          shuffleMode
+          shuffle
         )
         newQueue = queueInfo.queue
         newIndex = queueInfo.index
@@ -982,6 +1144,7 @@ private class LocalAudioQueueImpl(
     prevCurrentIndex: Int,
     skipUnchangedCheck: Boolean = false
   ) {
+    // TODO this can silently fail and the queues are updated to items not persisted
     if (skipUnchangedCheck) {
       queueDao.replaceQueueItems(AudioMediaDao.QUEUE_ID, newQueue, newShuffled)
     } else if (currentItemIsStill(prevCurrent, prevCurrentIndex)) {
@@ -1003,7 +1166,7 @@ private class LocalAudioQueueImpl(
    */
   private suspend fun <T> retryQueueChange(
     times: Int = MAX_QUEUE_RETRIES,
-    initialDelay: Millis = Millis.ONE_HUNDRED,
+    initialDelay: Millis = Millis(100),
     maxDelay: Millis = Millis.ONE_SECOND,
     factor: Long = 2,
     block: suspend () -> T
@@ -1090,24 +1253,3 @@ fun <E> List<E>.sublistToEndFrom(fromIndex: Int): List<E> =
 private fun MutableList<PlayableAudioItem>.removeWithInstanceId(queueMediaItem: PlayableAudioItem) {
   removeAt(indexOfFirst { it.instanceId == queueMediaItem.instanceId })
 }
-
-private fun List<PlayableAudioItem>.toCompat(): QueueItemList = QueueItemArrayList(size).apply {
-  this@toCompat.forEach { audioItem ->
-    add(MediaSessionCompat.QueueItem(audioItem.toDescriptionCompat(), audioItem.instanceId))
-  }
-}
-
-private fun PlayableAudioItem.toDescriptionCompat() = MediaDescriptionCompat.Builder()
-  .setMediaId(id.toString())
-  .setTitle(title())
-  .setSubtitle(artist.value)
-  .setDescription(albumTitle.value)
-  .setIconUri(if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt)
-  .setMediaUri(location)
-  .setExtras(
-    Bundle().apply {
-      putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration())
-      putParcelable(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())
-    }
-  )
-  .build()

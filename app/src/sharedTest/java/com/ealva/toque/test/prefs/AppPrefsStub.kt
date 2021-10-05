@@ -70,4 +70,7 @@ class AppPrefsStub : AppPrefs {
   override val markPlayedPercentage = PrefStub<Double, Double>()
   override val rewindThenPrevious: BoolPref = BoolPrefStub()
   override val scanAfterMediaScanner: BoolPref = BoolPrefStub()
+  override val saveRatingToFile: BoolPref = BoolPrefStub()
+  override val scanInternalVolume: BoolPref = BoolPrefStub()
+  override val showTimeRemaining: BoolPref = BoolPrefStub()
 }

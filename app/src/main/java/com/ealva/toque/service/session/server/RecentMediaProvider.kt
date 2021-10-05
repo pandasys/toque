@@ -14,15 +14,10 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import android.support.v4.media.MediaDescriptionCompat
-import com.ealva.toque.persist.PersistentId
 
-inline fun buildDescription(
-  builderAction: MediaDescriptionCompat.Builder.() -> Unit
-): MediaDescriptionCompat = MediaDescriptionCompat.Builder().apply(builderAction).build()
-
-inline fun MediaDescriptionCompat.Builder.setMediaItemId(mediaId: () -> PersistentId) {
-  setMediaId(mediaId().toCompatMediaId())
+interface RecentMediaProvider {
+  suspend fun getRecentMedia(): MediaDescriptionCompat?
 }

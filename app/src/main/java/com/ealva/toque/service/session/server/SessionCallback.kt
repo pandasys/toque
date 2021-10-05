@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.session
+package com.ealva.toque.service.session.server
 
 import android.content.Intent
 import android.net.Uri
@@ -29,9 +29,9 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
-import com.ealva.toque.service.controller.MediaSessionEvent
+import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.media.toStarRating
-import com.ealva.toque.service.session.AudioFocusManager.ContentType
+import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -40,14 +40,14 @@ private val LOG by lazyLogger(SessionCallback::class)
 
 internal class SessionCallback(
   private val scope: CoroutineScope,
-  private val flow: MutableSharedFlow<MediaSessionEvent>,
+  private val flow: MutableSharedFlow<SessionControlEvent>,
   private val focusManager: AudioFocusManager,
   var contentType: ContentType = ContentType.Audio,
   var mediaButtonHandler: MediaButtonHandler? = null
 ) : MediaSessionCompat.Callback() {
   private var inMediaButtonEvent = false
 
-  fun emit(event: MediaSessionEvent) {
+  fun emit(event: SessionControlEvent) {
     scope.launch { flow.emit(event) }
   }
 
@@ -68,33 +68,33 @@ internal class SessionCallback(
   }
 
   override fun onPrepare() {
-    emit(MediaSessionEvent.Prepare)
+    emit(SessionControlEvent.Prepare)
   }
 
   override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
-    mediaId?.let { emit(MediaSessionEvent.PrepareFromId(it, extras ?: Bundle.EMPTY)) }
+    mediaId?.let { emit(SessionControlEvent.PrepareFromId(it, extras ?: Bundle.EMPTY)) }
       ?: LOG.e { it("onPrepareFromMediaId null mediaId") }
   }
 
   override fun onPrepareFromSearch(query: String?, extras: Bundle?) {
-    query?.let { emit(MediaSessionEvent.PrepareFromSearch(it, extras ?: Bundle.EMPTY)) }
+    query?.let { emit(SessionControlEvent.PrepareFromSearch(it, extras ?: Bundle.EMPTY)) }
       ?: LOG.e { it("onPrepareFromSearch null query") }
   }
 
   override fun onPrepareFromUri(uri: Uri?, extras: Bundle?) {
-    uri?.let { emit(MediaSessionEvent.PrepareFromUri(it, extras ?: Bundle.EMPTY)) }
+    uri?.let { emit(SessionControlEvent.PrepareFromUri(it, extras ?: Bundle.EMPTY)) }
       ?: LOG.e { it("onPrepareFromUri null uri") }
   }
 
   override fun onPlay() {
-    if (focusManager.requestFocus(contentType)) emit(MediaSessionEvent.Play)
+    if (focusManager.requestFocus(contentType)) emit(SessionControlEvent.Play)
   }
 
   override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
     // TODO split into prepare from and then play to move request focus to a
     // single place
     if (focusManager.requestFocus(contentType)) {
-      mediaId?.let { emit(MediaSessionEvent.PlayFromId(it, extras ?: Bundle.EMPTY)) }
+      mediaId?.let { emit(SessionControlEvent.PlayFromId(it, extras ?: Bundle.EMPTY)) }
         ?: LOG.e { it("onPlayFromMediaId null mediaId") }
     }
   }
@@ -103,7 +103,7 @@ internal class SessionCallback(
     // TODO split into prepare from and then play to move request focus to a
     // single place
     if (focusManager.requestFocus(contentType)) {
-      query?.let { emit(MediaSessionEvent.PlayFromSearch(it, extras ?: Bundle.EMPTY)) }
+      query?.let { emit(SessionControlEvent.PlayFromSearch(it, extras ?: Bundle.EMPTY)) }
         ?: LOG.e { it("onPrepareFromSearch null query") }
     }
   }
@@ -112,30 +112,30 @@ internal class SessionCallback(
     // TODO split into prepare from and then play to move request focus to a
     // single place
     if (focusManager.requestFocus(contentType)) {
-      uri?.let { emit(MediaSessionEvent.PlayFromUri(it, extras ?: Bundle.EMPTY)) }
+      uri?.let { emit(SessionControlEvent.PlayFromUri(it, extras ?: Bundle.EMPTY)) }
         ?: LOG.e { it("onPrepareFromUri null uri") }
     }
   }
 
-  override fun onSkipToQueueItem(id: Long) = emit(MediaSessionEvent.SkipToQueueItem(id))
-  override fun onPause() = emit(MediaSessionEvent.Pause)
-  override fun onSkipToNext() = emit(MediaSessionEvent.SkipToNext)
-  override fun onSkipToPrevious() = emit(MediaSessionEvent.SkipToPrevious)
-  override fun onFastForward() = emit(MediaSessionEvent.FastForward)
-  override fun onRewind() = emit(MediaSessionEvent.Rewind)
+  override fun onSkipToQueueItem(id: Long) = emit(SessionControlEvent.SkipToQueueItem(id))
+  override fun onPause() = emit(SessionControlEvent.Pause)
+  override fun onSkipToNext() = emit(SessionControlEvent.SkipToNext)
+  override fun onSkipToPrevious() = emit(SessionControlEvent.SkipToPrevious)
+  override fun onFastForward() = emit(SessionControlEvent.FastForward)
+  override fun onRewind() = emit(SessionControlEvent.Rewind)
   override fun onStop() {
-    emit(MediaSessionEvent.Stop)
+    emit(SessionControlEvent.Stop)
   }
 
-  override fun onSeekTo(pos: Long) = emit(MediaSessionEvent.SeekTo(Millis(pos)))
+  override fun onSeekTo(pos: Long) = emit(SessionControlEvent.SeekTo(Millis(pos)))
   override fun onSetRating(rating: RatingCompat?) =
-    rating?.let { emit(MediaSessionEvent.SetRating(it.starRating.toStarRating(), Bundle.EMPTY)) }
+    rating?.let { emit(SessionControlEvent.SetRating(it.starRating.toStarRating(), Bundle.EMPTY)) }
       ?: LOG.e { it("onSetRating null rating") }
 
   override fun onSetRating(rating: RatingCompat?, extras: Bundle?) =
     rating?.let {
       emit(
-        MediaSessionEvent.SetRating(
+        SessionControlEvent.SetRating(
           it.starRating.toStarRating(),
           extras ?: Bundle.EMPTY
         )
@@ -144,35 +144,35 @@ internal class SessionCallback(
       ?: LOG.e { it("onSetRating with extras, null rating") }
 
   override fun onSetCaptioningEnabled(enabled: Boolean) = emit(
-    MediaSessionEvent.EnableCaption(
+    SessionControlEvent.EnableCaption(
       enabled
     )
   )
 
   override fun onSetRepeatMode(repeatMode: Int) =
-    emit(MediaSessionEvent.Repeat(repeatMode.compatToRepeatMode()))
+    emit(SessionControlEvent.Repeat(repeatMode.compatToRepeatMode()))
 
   override fun onSetShuffleMode(shuffleMode: Int) =
-    emit(MediaSessionEvent.Shuffle(shuffleMode.compatToShuffleMode()))
+    emit(SessionControlEvent.Shuffle(shuffleMode.compatToShuffleMode()))
 
   override fun onCustomAction(action: String?, extras: Bundle?) =
-    action?.let { emit(MediaSessionEvent.CustomAction(it, extras ?: Bundle.EMPTY)) }
+    action?.let { emit(SessionControlEvent.CustomAction(it, extras ?: Bundle.EMPTY)) }
       ?: LOG.e { it("onCustomAction null action") }
 
   override fun onAddQueueItem(description: MediaDescriptionCompat?) =
-    description?.let { emit(MediaSessionEvent.AddItemAt(it)) }
+    description?.let { emit(SessionControlEvent.AddItemAt(it)) }
       ?: LOG.e { it("onAddQueueItem null description") }
 
   override fun onAddQueueItem(description: MediaDescriptionCompat?, index: Int) =
-    description?.let { emit(MediaSessionEvent.AddItemAt(it, index)) }
+    description?.let { emit(SessionControlEvent.AddItemAt(it, index)) }
       ?: LOG.e { it("onAddQueueItem at index null description") }
 
   override fun onRemoveQueueItem(description: MediaDescriptionCompat?) =
-    description?.let { emit(MediaSessionEvent.RemoveItem(it)) }
+    description?.let { emit(SessionControlEvent.RemoveItem(it)) }
       ?: LOG.e { it("onRemoveQueueItem null description") }
 
-  fun onDuck() = emit(MediaSessionEvent.Duck)
-  fun onEndDuck() = emit(MediaSessionEvent.EndDuck)
+  fun onDuck() = emit(SessionControlEvent.Duck)
+  fun onEndDuck() = emit(SessionControlEvent.EndDuck)
 }
 
 private val Intent.keyEvent: KeyEvent?

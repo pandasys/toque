@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:Suppress("MagicNumber")
-
 package com.ealva.toque.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape

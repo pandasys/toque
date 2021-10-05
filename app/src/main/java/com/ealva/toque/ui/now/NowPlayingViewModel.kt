@@ -16,36 +16,52 @@
 
 package com.ealva.toque.ui.now
 
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.toDurationString
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.MediaPlayerServiceConnection
+import com.ealva.toque.service.audio.LocalAudioQueue
+import com.ealva.toque.service.audio.LocalAudioQueueState
+import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.audio.NullPlayableAudioItem
-import com.ealva.toque.service.audio.PlayState
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.player.TransitionSelector
+import com.ealva.toque.service.queue.NullPlayableMediaQueue
+import com.ealva.toque.service.queue.PlayableMediaQueue
+import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.queue.StreamVolume
+import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
+import com.zhuinden.statebundle.StateBundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class NowPlayingState(
-  internal val queue: List<AudioItem>,
+  val queue: List<AudioItem>,
   val queueIndex: Int,
   val position: Millis,
   val duration: Millis,
@@ -53,26 +69,32 @@ data class NowPlayingState(
   val repeatMode: RepeatMode,
   val shuffleMode: ShuffleMode,
   val eqMode: EqMode,
-  val presets: List<EqPreset>,
   val currentPreset: EqPreset,
-  val extraMediaInfo: String
+  val extraMediaInfo: String,
+  val presets: List<EqPreset>,
+  val showTimeRemaining: Boolean = false
 ) {
   val currentItem: AudioItem
     get() = if (queueIndex in queue.indices) queue[queueIndex] else NullPlayableAudioItem
+
+  fun getDurationDisplay(): String =
+    (if (showTimeRemaining) position - duration else duration).toDurationString()
+
+  fun getPositionDisplay(): String = position.toDurationString()
 
   companion object {
     val NONE = NowPlayingState(
       queue = emptyList(),
       queueIndex = -1,
-      position = Millis.ZERO,
-      duration = Millis.ZERO,
+      position = Millis(0),
+      duration = Millis(0),
       playingState = PlayState.Stopped,
       repeatMode = RepeatMode.None,
       shuffleMode = ShuffleMode.None,
       eqMode = EqMode.Off,
-      presets = emptyList(),
       currentPreset = EqPreset.NONE,
-      extraMediaInfo = ""
+      extraMediaInfo = "",
+      presets = emptyList()
     )
   }
 }
@@ -84,12 +106,14 @@ interface NowPlayingViewModel {
   fun nextShuffleMode()
   fun nextMedia()
   fun previousMedia()
+  fun nextList()
+  fun previousList()
   fun togglePlayPause()
   fun play(selector: TransitionSelector)
   fun pause(selector: TransitionSelector)
   fun nextRepeatMode()
   fun toggleApplyEq()
-  fun seekTo(value: Long)
+  fun seekTo(position: Millis)
   fun beginUserSeek()
   fun endUserSeek(lastValue: Int)
   fun goToQueueIndexMaybePlay(index: Int)
@@ -104,7 +128,7 @@ interface NowPlayingViewModel {
    * before scheduling the new timer. If duration is Duration.ZERO_LENGTH or not greater than zero,
    * any currently scheduled timer is cancelled.
    *
-   * @param duration duration of the sleep timer, or [Millis.ZERO] to cancel an already scheduled
+   * @param duration duration of the sleep timer, or [Millis](0) to cancel an already scheduled
    * timer
    */
   fun scheduleSleepTimer(duration: Millis)
@@ -146,6 +170,8 @@ interface NowPlayingViewModel {
 
   fun addToUpNext(mediaIdList: MediaIdList)
 
+  fun toggleShowTimeRemaining()
+
 //  fun updatePlayStatusIfCurrent(mediaId: Long, playStatus: PlayStatus): Boolean
 
   companion object {
@@ -161,36 +187,120 @@ interface NowPlayingViewModel {
 
 private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
 
-// NOTE: Implement Bundleable to save and restore state
-
 @OptIn(ExperimentalCoroutinesApi::class)
 private class NowPlayingViewModelImpl(
   private val serviceConnection: MediaPlayerServiceConnection,
   private val appPrefsSingleton: AppPrefsSingleton
-) : NowPlayingViewModel, ScopedServices.Registered {
-  private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+) : NowPlayingViewModel, ScopedServices.Activated, ScopedServices.Registered, Bundleable {
+  private lateinit var scope: CoroutineScope
   private var mediaController: ToqueMediaController = NullMediaController
-  private lateinit var appPrefs: AppPrefs
-  private var connectedToService = false
+  private var appPrefs: AppPrefs? = null
+  private var controllerJob: Job? = null
+  private var currentQueueJob: Job? = null
+  private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
 
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
 
   override fun onServiceRegistered() {
+    LOG._e { it("onServiceRegistered") }
+    scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     scope.launch {
-      appPrefs = appPrefsSingleton.instance()
-      serviceConnection.mediaController.value.currentQueue
-      serviceConnection.mediaController.collect { controller ->
-        mediaController = controller
-        connectedToService = controller !== NullMediaController
-        if (connectedToService) {
-          mediaController = controller
-        }
+      val prefs = appPrefsSingleton.instance()
+      appPrefs = prefs
+      scope.launch {
+        prefs.showTimeRemaining
+          .asFlow()
+          .collect { showTimeRemaining ->
+            nowPlayingState.emit(nowPlayingState.value.copy(showTimeRemaining = showTimeRemaining))
+          }
       }
     }
   }
 
   override fun onServiceUnregistered() {
+    LOG._e { it("onServiceUnregistered") }
+    appPrefs = null
     scope.cancel()
+  }
+
+  override fun toBundle(): StateBundle {
+    LOG._e { it("toBundle") }
+    return StateBundle().putString("testKey", "AString")
+  }
+
+  override fun fromBundle(bundle: StateBundle?) {
+    val theBundle = bundle ?: StateBundle()
+    LOG._e { it("fromBundle %s", theBundle.getString("testKey") ?: "null") }
+  }
+
+  override fun onServiceActive() {
+    LOG._e { it("onServiceActive") }
+    controllerJob = scope.launch {
+      serviceConnection.mediaController
+        .onEach { controller -> handleControllerChange(controller) }
+        .onCompletion { handleControllerChange(NullMediaController) }
+        .collect()
+    }
+  }
+
+  override fun onServiceInactive() {
+    LOG._e { it("onServiceInactive") }
+    controllerJob?.cancel()
+  }
+
+  private fun handleControllerChange(controller: ToqueMediaController) {
+    LOG._e { it("handleControllerChange") }
+    mediaController = controller
+    if (controller !== NullMediaController) {
+      currentQueueJob = scope.launch {
+        controller.currentQueue
+          .onEach { queue -> handleQueueChange(queue) }
+          .collect()
+      }
+    } else {
+      currentQueueJob?.cancel()
+      handleQueueChange(NullPlayableMediaQueue)
+    }
+  }
+
+  private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
+    LOG._e { it("handleQueueChange") }
+    when (queue.queueType) {
+      QueueType.Audio -> queueActive(queue as LocalAudioQueue)
+      else -> queueInactive()
+    }
+  }
+
+  private fun queueActive(queue: LocalAudioQueue) {
+    LOG._e { it("queueActive") }
+    audioQueue = queue
+    scope.launch {
+      audioQueue.queueState
+        .onEach { state -> handleServiceState(state) }
+        .catch { cause -> LOG.e(cause) { it("") } }
+        .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
+        .collect()
+    }
+  }
+
+  private suspend fun handleServiceState(queueState: LocalAudioQueueState) {
+    val newState = nowPlayingState.value.copy(
+      queue = queueState.queue,
+      queueIndex = queueState.queueIndex,
+      position = queueState.position,
+      duration = queueState.duration,
+      playingState = queueState.playingState,
+      repeatMode = queueState.repeatMode,
+      shuffleMode = queueState.shuffleMode,
+      eqMode = queueState.eqMode,
+      currentPreset = queueState.currentPreset,
+      extraMediaInfo = queueState.extraMediaInfo
+    )
+    nowPlayingState.emit(newState)
+  }
+
+  private fun queueInactive() {
+    audioQueue = NullLocalAudioQueue
   }
 
   override fun nextShuffleMode() {
@@ -198,15 +308,24 @@ private class NowPlayingViewModelImpl(
   }
 
   override fun nextMedia() {
-    TODO("Not yet implemented")
+    scope.launch { audioQueue.next() }
   }
 
   override fun previousMedia() {
-    TODO("Not yet implemented")
+    scope.launch { audioQueue.previous() }
+  }
+
+  override fun nextList() {
+    scope.launch { audioQueue.nextList() }
+  }
+
+  override fun previousList() {
+    LOG._e { it("previousList") }
+    scope.launch { audioQueue.previousList() }
   }
 
   override fun togglePlayPause() {
-    TODO("Not yet implemented")
+    scope.launch { audioQueue.togglePlayPause() }
   }
 
   override fun play(selector: TransitionSelector) {
@@ -229,8 +348,8 @@ private class NowPlayingViewModelImpl(
     TODO("Not yet implemented")
   }
 
-  override fun seekTo(value: Long) {
-    TODO("Not yet implemented")
+  override fun seekTo(position: Millis) {
+    scope.launch { audioQueue.seekTo(position) }
   }
 
   override fun beginUserSeek() {
@@ -242,7 +361,7 @@ private class NowPlayingViewModelImpl(
   }
 
   override fun goToQueueIndexMaybePlay(index: Int) {
-    TODO("Not yet implemented")
+    scope.launch { audioQueue.goToIndexMaybePlay(index) }
   }
 
   override fun mediaIsLoaded(): Boolean {
@@ -297,5 +416,11 @@ private class NowPlayingViewModelImpl(
 
   override fun addToUpNext(mediaIdList: MediaIdList) {
     TODO("Not yet implemented")
+  }
+
+  override fun toggleShowTimeRemaining() {
+    appPrefs?.let { prefs ->
+      scope.launch { prefs.showTimeRemaining.set(!prefs.showTimeRemaining()) }
+    }
   }
 }

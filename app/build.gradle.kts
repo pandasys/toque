@@ -115,6 +115,7 @@ dependencies {
   implementation(Libs.AndroidX.Lifecycle.COMMON_JAVA8)
   implementation(Libs.Datastore.PREFERENCES)
 
+  //implementation(Libs.Kotlin.REFLECT)
   implementation(Libs.Kotlin.Serialization.CORE)
   implementation(Libs.Kotlin.Serialization.JSON)
 
@@ -126,6 +127,7 @@ dependencies {
   implementation(Libs.AndroidX.Compose.MATERIAL)
   implementation(Libs.AndroidX.Compose.TOOLING)
   implementation(Libs.AndroidX.Activity.COMPOSE)
+  implementation(Libs.AndroidX.Constraint.LAYOUT_COMPOSE)
 
   implementation(Libs.LibVLC.ALL)
   implementation(Libs.PreferenceStore.STORE)
@@ -138,10 +140,17 @@ dependencies {
   implementation(Libs.EAlvaBrainz.BRAINZ)
   implementation(Libs.EAlvaBrainz.BRAINZ_SERVICE)
 
-  kapt("com.github.bumptech.glide:compiler:4.12.0")
-  implementation(Libs.Accompanist.GLIDE)
+  implementation(Libs.Coil.COIL)
+  implementation(Libs.Coil.COIL_COMPOSE)
+
   implementation(Libs.Accompanist.INSETS)
   implementation(Libs.Accompanist.UI_CONTROLLER)
+  implementation(Libs.Accompanist.PERMISSIONS)
+  implementation(Libs.Accompanist.PAGER)
+
+  implementation(Libs.Gowtham.RATING_BAR)
+
+  implementation(Libs.Square.OKIO)
 
   implementation(Libs.FastUtil.FASTUTIL)
   implementation(Libs.Kotlin.Coroutines.CORE)

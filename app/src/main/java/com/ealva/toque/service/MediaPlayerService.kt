@@ -50,10 +50,11 @@ import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
-import com.ealva.toque.service.session.BrowserResult
-import com.ealva.toque.service.session.MediaSession
-import com.ealva.toque.service.session.MediaSessionState
+import com.ealva.toque.service.session.server.BrowserResult
+import com.ealva.toque.service.session.server.MediaSession
+import com.ealva.toque.service.session.server.MediaSessionState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -120,10 +121,11 @@ class MediaPlayerService :
   private val binder = MediaServiceBinder()
   override fun onBind(intent: Intent): IBinder? {
     return if (doNotHaveReadPermission()) {
-      LOG._e { it("Don't have read external permission. Bind disallowed.") }
+      LOG.e { it("Don't have read external permission. Bind disallowed.") }
       null
     } else {
       dispatcher.onServicePreSuperOnBind()
+      LOG._e { it("onBind %s", intent.action ?: "null") }
       when (intent.action) {
         SERVICE_INTERFACE -> super.onBind(intent)
         else -> binder
@@ -135,9 +137,6 @@ class MediaPlayerService :
     dispatcher.onServicePreSuperOnStart()
 
     val startIntent = intent.orNullObject()
-
-    LOG._e { it("onStartCommand intent=%s", intent ?: "null") }
-
     val action = startIntent.action.orEmpty()
 
     if (action.isNotEmpty()) {
@@ -219,22 +218,19 @@ class MediaPlayerService :
       }
       val newQueue = queueFactory.make(type, mediaSession, mediaSession)
       newQueue.activate(resume, PlayNow(false))
-      currentQueue.value = newQueue
+      newQueue.isActive.collect { isActive ->if (isActive) currentQueue.value = newQueue }
     }
   }
 
   private fun putInForeground(notificationId: Int, notification: Notification) {
     startForegroundService(this, Action.None)
-    LOG._e { it("startForeground notificationId=%d", notificationId) }
     startForeground(notificationId, notification)
     inForeground = true
   }
 
   private fun removeFromForegroundAndStopSelf() {
-    LOG._e { it("stopForeground inForeground=%s", inForeground) }
     stopForeground(false)
     inForeground = false
-    LOG._e { it("stopSelf") }
     stopSelf()
   }
 
