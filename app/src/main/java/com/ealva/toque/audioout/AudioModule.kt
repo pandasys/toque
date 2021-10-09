@@ -16,10 +16,13 @@
 
 package com.ealva.toque.audioout
 
+import com.ealva.toque.service.session.server.AudioFocusManager
+import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
 object AudioModule {
   val koinModule = module {
     single { AudioOutputState(audioManager = get()) }
+    single { AudioFocusManager(androidContext(), get()) }
   }
 }

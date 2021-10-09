@@ -79,11 +79,10 @@ import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import com.zhuinden.simplestackextensions.servicesktx.add
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
 
@@ -136,25 +135,21 @@ class MainActivity : ComponentActivity() {
   }
 
   fun gainedReadExternalPermission() {
-    scope.launch {
-      playerServiceConnection.mediaController
-        .onStart { playerServiceConnection.bind() }
-        .onEach { controller -> handleControllerChange(controller) }
-        .onCompletion { cause -> LOG._i(cause) { it("mediaController flow completed") } }
-        .collect()
-    }
+    playerServiceConnection.mediaController
+      .onStart { playerServiceConnection.bind() }
+      .onEach { controller -> handleControllerChange(controller) }
+      .onCompletion { cause -> LOG._i(cause) { it("mediaController flow completed") } }
+      .launchIn(scope)
   }
 
   private fun handleControllerChange(controller: ToqueMediaController) {
     mediaController = controller
     if (controller !== NullMediaController) {
-      currentQueueJob = scope.launch {
-        controller.currentQueue
-          .onStart { LOG._i { it("start currentQueue flow") } }
-          .onEach { queue -> handleQueueChange(queue) }
-          .onCompletion { cause -> LOG._i(cause) { it("currentQueue flow completed") } }
-          .collect()
-      }
+      currentQueueJob = controller.currentQueue
+        .onStart { LOG._i { it("start currentQueue flow") } }
+        .onEach { queue -> handleQueueChange(queue) }
+        .onCompletion { cause -> LOG._i(cause) { it("currentQueue flow completed") } }
+        .launchIn(scope)
     } else {
       currentQueueJob?.cancel()
       handleQueueChange(NullPlayableMediaQueue)
@@ -232,7 +227,7 @@ fun MainScreen(composeStateChanger: ComposeStateChanger) {
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
                 bottom.linkTo(parent.bottom)
-                width = Dimension.fillToConstraints
+                width = Dimension.wrapContent
               }
               .navigationBarsPadding()
               .padding(horizontal = 16.dp)
@@ -260,13 +255,13 @@ fun MainBottomSheet(modifier: Modifier) {
   Row(
     modifier = modifier
       .background(
-        color = Color(0x88151515),
+        color = Color(0xFF151515),
         shape = RoundedCornerShape(8.dp)
       )
-      .height(48.dp),
+      .height(50.dp),
     horizontalArrangement = Arrangement.SpaceEvenly
   ) {
-    IconButton(onClick = {}, modifier = Modifier.size(50.dp)) {
+    IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
       Image(
         painter = rememberImagePainter(data = R.drawable.ic_menu),
         contentDescription = "Settings",

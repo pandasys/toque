@@ -30,7 +30,6 @@ object ServiceModule {
     single {
       PlayableAudioItemFactory(
         audioMediaDao = get(),
-        eqPresetSelector = get(),
         mediaFileStore = get(),
         libVlcSingleton = get(),
         libVlcPrefsSingleton = get(named("LibVlcPrefs")),

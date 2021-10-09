@@ -41,10 +41,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 private val LOG by lazyLogger(QueueStateTable::class)
@@ -141,13 +140,11 @@ private class QueuePositionStateDaoImpl(
   // restore to a position, only a stream.
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private val stateFlow = MutableStateFlow(QueuePositionState.INACTIVE_QUEUE_STATE)
-  private val collectJob = scope.launch {
-    stateFlow
-      .onEach { state -> handleNewQueueState(state) }
-      .catch { cause -> LOG.e(cause) { it("Error processing QueueDao state flow") } }
-      .onCompletion { LOG.i { it("QueueStateDao $queueId completed") } }
-      .collect()
-  }
+  private val collectJob = stateFlow
+    .onEach { state -> handleNewQueueState(state) }
+    .catch { cause -> LOG.e(cause) { it("Error processing QueueDao state flow") } }
+    .onCompletion { LOG.i { it("QueueStateDao $queueId completed") } }
+    .launchIn(scope)
 
   private suspend fun handleNewQueueState(state: QueuePositionState) {
     if (state.mediaId.isValid) {
@@ -202,7 +199,7 @@ private class QueuePositionStateDaoImpl(
   }
 
   override fun persistState(state: QueuePositionState): QueuePositionState {
-    check(!closed) { "" }
+    check(!closed) { "Attempt to persist QueuePositionState after Dao closed" }
     stateFlow.value = state
     return state
   }

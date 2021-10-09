@@ -20,11 +20,19 @@ import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasTitle
 
+/**
+ * This is the action the user prefers when the audio manager asks us to duck and it is also the
+ * state of the player while ducked.
+ *
+ * The player is typically created in the [None] state, though could be in a ducked state, and
+ * then transitions to other states based on the the AudioFocusManager, combined with user
+ * preference, says is appropriate.
+ */
 enum class DuckAction(
   override val id: Int,
   override val titleRes: Int
 ) : HasConstId, HasTitle {
   Duck(1, R.string.Duck),
   Pause(2, R.string.Pause),
-  DoNothing(3, R.string.DoNothing);
+  None(3, R.string.DoNothing);
 }

@@ -41,6 +41,8 @@ interface TransitionPlayer {
 
   val volumeRange: VolumeRange
 
+  var allowVolumeChange: Boolean
+
   val remainingTime: Millis
 
   fun notifyPaused()
@@ -72,6 +74,10 @@ object NullTransitionPlayer : TransitionPlayer {
     }
   override val volumeRange: VolumeRange
     get() = AvPlayer.DEFAULT_VOLUME_RANGE
+
+  override var allowVolumeChange: Boolean
+    get() = false
+    set(@Suppress("UNUSED_PARAMETER") value) {}
 
   override fun notifyPaused() = Unit
   override fun notifyPlaying() = Unit

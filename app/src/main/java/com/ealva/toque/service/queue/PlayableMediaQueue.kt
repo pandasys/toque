@@ -31,26 +31,21 @@ interface PlayableMediaQueue<T : Any> {
    * Activate the queue, reestablishing index and position if [resume] is true, start playing if
    * [playNow] is true
    */
-  suspend fun activate(
-    resume: Boolean,
-    playNow: PlayNow
-  )
-
+  suspend fun activate(resume: Boolean, playNow: PlayNow)
   fun deactivate()
-  fun play(immediateTransition: Boolean = false)
-  suspend fun pause(immediateTransition: Boolean = false)
-  suspend fun stop()
-  suspend fun togglePlayPause()
-  suspend fun next()
-  suspend fun previous()
-  suspend fun nextList()
-  suspend fun previousList()
-  suspend fun seekTo(position: Millis)
-  suspend fun fastForward()
-  suspend fun rewind()
-  suspend fun goToIndexMaybePlay(index: Int)
-  suspend fun duck()
-  suspend fun endDuck()
+
+  fun play(immediate: Boolean = false)
+  fun pause(immediateTransition: Boolean = false)
+  fun stop()
+  fun togglePlayPause()
+  fun next()
+  fun previous()
+  fun nextList()
+  fun previousList()
+  fun seekTo(position: Millis)
+  fun fastForward()
+  fun rewind()
+  fun goToIndexMaybePlay(index: Int)
   val streamVolume: StreamVolume
 }
 
@@ -63,19 +58,17 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
 
   override fun deactivate() = Unit
   override val isActive = MutableStateFlow(false)
-  override fun play(immediateTransition: Boolean) = Unit
-  override suspend fun pause(immediateTransition: Boolean) = Unit
-  override suspend fun stop() = Unit
-  override suspend fun togglePlayPause() = Unit
-  override suspend fun next() = Unit
-  override suspend fun previous() = Unit
-  override suspend fun nextList() = Unit
-  override suspend fun previousList() = Unit
-  override suspend fun goToIndexMaybePlay(index: Int) = Unit
+  override fun play(immediate: Boolean) = Unit
+  override fun pause(immediateTransition: Boolean) = Unit
+  override fun stop() = Unit
+  override fun togglePlayPause() = Unit
+  override fun next() = Unit
+  override fun previous() = Unit
+  override fun nextList() = Unit
+  override fun previousList() = Unit
   override val streamVolume: StreamVolume = NullStreamVolume
-  override suspend fun fastForward() = Unit
-  override suspend fun rewind() = Unit
-  override suspend fun seekTo(position: Millis) = Unit
-  override suspend fun duck() = Unit
-  override suspend fun endDuck() = Unit
+  override fun fastForward() = Unit
+  override fun rewind() = Unit
+  override fun seekTo(position: Millis) = Unit
+  override fun goToIndexMaybePlay(index: Int) = Unit
 }

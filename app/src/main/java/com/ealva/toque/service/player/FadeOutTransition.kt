@@ -88,11 +88,7 @@ abstract class FadeOutTransition(
     }
   }
 
-  protected open fun maybeNotifyPaused(player: TransitionPlayer) {
-    player.notifyPaused()
-  }
-
+  protected open fun maybeNotifyPaused(player: TransitionPlayer) = player.notifyPaused()
   protected abstract fun cancelTransition(player: TransitionPlayer)
-
   protected abstract fun finishTransition(player: TransitionPlayer)
 }

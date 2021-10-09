@@ -28,7 +28,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
-import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -97,7 +96,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -164,7 +163,7 @@ interface MediaSessionState {
   /**
    * Updates the current metadata clients can display.
    */
-  suspend fun setMetadata(metadata: Metadata)
+  fun setMetadata(metadata: Metadata)
 
   /**
    * Send [queue] info to clients for display. Because we may need to limit the actual amount of
@@ -229,7 +228,7 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
   fun setSessionActivity(pi: PendingIntent)
 
   companion object {
-    operator fun invoke(
+    fun make(
       context: Context,
       audioMediaDao: AudioMediaDao,
       notificationListener: MediaSessionState.NotificationListener,
@@ -249,7 +248,6 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
           // restarted by the system.
           cancelAll()
         },
-        context.requireSystemService(),
         notificationListener,
         NOW_PLAYING_CHANNEL_ID,
         dispatcher
@@ -295,7 +293,6 @@ private class MediaSessionImpl(
   private val session: MediaSessionCompat,
   audioMediaDao: AudioMediaDao,
   private val notificationManager: NotificationManager,
-  audioManager: AudioManager,
   private val notificationListener: MediaSessionState.NotificationListener,
   private val channelId: String,
   dispatcher: CoroutineDispatcher
@@ -304,14 +301,13 @@ private class MediaSessionImpl(
   private var notificationPrefs: NotificationPrefs? = null
   private var allowNotifications = false
   private var lastMetadata: Metadata = Metadata.NullMetadata
-  private val focusManager = AudioFocusManager(ctx, audioManager, this, scope)
   private var msgHandler = makeHandler()
   private var isNotificationStarted = false
   private var lastState: PlaybackState = NullPlaybackState
   private val playbackStateFlow = MutableStateFlow(NullPlaybackState)
 
   override val eventFlow: MutableSharedFlow<SessionControlEvent> = MutableSharedFlow(replay = 4)
-  private val sessionCallback = SessionCallback(scope, eventFlow, focusManager)
+  private val sessionCallback = SessionCallback(scope, eventFlow)
 
   override val token: MediaSessionCompat.Token = session.sessionToken
 
@@ -330,40 +326,18 @@ private class MediaSessionImpl(
     }
 
   init {
+    scope.launch { notificationPrefs = notificationPrefsSingleton.instance() }
     session.setCallback(sessionCallback)
-    scope.launch {
-      playbackStateFlow
-        .onStart { LOG.i { it("PlaybackStateFlow started") } }
-        .onEach { state -> if (state !== NullPlaybackState) handleState(state) }
-        .catch { cause -> LOG.e(cause) { it("Error processing PlaybackStateFlow") } }
-        .onCompletion { cause -> LOG.i(cause) { it("PlaybackStateFlow completed") } }
-        .collect()
-    }
-    scope.launch {
-      focusManager.reactionFlow
-        .onStart { LOG.i { it("FocusReaction flow started") } }
-        .onEach { reaction -> handleAudioFocusReaction(reaction) }
-        .catch { cause -> LOG.e(cause) { it("Error processing FocusReaction flow") } }
-        .onCompletion { cause -> LOG.i(cause) { it("FocusReaction flow completed") } }
-        .collect()
-    }
+    playbackStateFlow
+      .onStart { LOG.i { it("PlaybackStateFlow started") } }
+      .onEach { state -> if (state !== NullPlaybackState) handleState(state) }
+      .catch { cause -> LOG.e(cause) { it("Error processing PlaybackStateFlow") } }
+      .onCompletion { cause -> LOG.i(cause) { it("PlaybackStateFlow completed") } }
+      .launchIn(scope)
     isActive = true
   }
 
-  private fun handleAudioFocusReaction(reaction: AudioFocusManager.FocusReaction) {
-    when (reaction) {
-      AudioFocusManager.FocusReaction.Play -> sessionCallback.onPlay()
-      AudioFocusManager.FocusReaction.Pause -> sessionCallback.onPause()
-      AudioFocusManager.FocusReaction.StopForeground -> sessionCallback.onStop()
-      AudioFocusManager.FocusReaction.Duck -> sessionCallback.onDuck()
-      AudioFocusManager.FocusReaction.EndDuck -> sessionCallback.onEndDuck()
-      AudioFocusManager.FocusReaction.None -> {
-      }
-    }
-  }
-
   override fun release() {
-    focusManager.release()
     session.release()
     scope.cancel()
   }
@@ -383,7 +357,6 @@ private class MediaSessionImpl(
   }
 
   override suspend fun setState(state: PlaybackState) {
-    ensurePrefs()
     playbackStateFlow.emit(state)
   }
 
@@ -399,8 +372,7 @@ private class MediaSessionImpl(
     }
   }
 
-  override suspend fun setMetadata(metadata: Metadata) {
-    ensurePrefs()
+  override fun setMetadata(metadata: Metadata) {
     lastMetadata = metadata
     scope.launch(Dispatchers.IO) {
       sessionPrefsSingleton.instance().lastMetadata.set(metadata) // save for getRecentMedia
@@ -409,18 +381,14 @@ private class MediaSessionImpl(
     postStartOrUpdateNotification()
   }
 
-  private suspend fun ensurePrefs() {
-    if (notificationPrefs == null) notificationPrefs = notificationPrefsSingleton.instance()
-  }
-
-  private var lastWindow: List<QueueAudioItem> = emptyList()
+  private var lastQueueWindow: List<QueueAudioItem> = emptyList()
   override fun setQueue(queue: List<QueueAudioItem>, currentItemIndex: Int, indexChange: Boolean) {
     if (ctx.isCarMode()) {
       // Don't set same queue again. Not really an optimization because this is very fast, but
       // let's not unnecessarily give the client new lists
       val windowOf15 = queue.windowOf15(currentItemIndex)
-      if (windowOf15 != lastWindow) {
-        lastWindow = windowOf15
+      if (windowOf15 != lastQueueWindow) {
+        lastQueueWindow = windowOf15
         session.setQueue(windowOf15.toCompat())
       }
     } else if (!indexChange) {
@@ -503,31 +471,11 @@ private class MediaSessionImpl(
   @Suppress("BlockingMethodInNonBlockingContext")
   private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
     try {
-      val request = if (uri !== Uri.EMPTY) {
-        ImageRequest.Builder(ctx)
-          .data(uri)
-          .allowHardware(false)
-          .size(METADATA_ARTWORK_WIDTH.dp.toPx(), METADATA_ARTWORK_HEIGHT.dp.toPx())
-          .build()
-        //Glide.with(ctx)
-        //  .applyDefaultRequestOptions(glideOptions)
-        //  .asBitmap()
-        //  .load(uri)
-        //  .submit(METADATA_ARTWORK_WIDTH, METADATA_ARTWORK_HEIGHT)
-        //  .get()
-      } else {
-        ImageRequest.Builder(ctx)
-          .data(R.drawable.ic_big_album)
-          .allowHardware(false)
-          .size(METADATA_ARTWORK_WIDTH.dp.toPx(), METADATA_ARTWORK_HEIGHT.dp.toPx())
-          .build()
-        //Glide.with(ctx)
-        //  .applyDefaultRequestOptions(glideOptions)
-        //  .asBitmap()
-        //  .load(R.drawable.ic_big_album)
-        //  .submit(METADATA_ARTWORK_WIDTH, METADATA_ARTWORK_HEIGHT)
-        //  .get()
-      }
+      val request = ImageRequest.Builder(ctx)
+        .data(if (uri !== Uri.EMPTY) uri else R.drawable.ic_big_album)
+        .allowHardware(false)
+        .size(METADATA_ARTWORK_WIDTH.dp.toPx(), METADATA_ARTWORK_HEIGHT.dp.toPx())
+        .build()
       (ctx.imageLoader.execute(request).drawable as BitmapDrawable).bitmap
     } catch (e: Exception) {
       null

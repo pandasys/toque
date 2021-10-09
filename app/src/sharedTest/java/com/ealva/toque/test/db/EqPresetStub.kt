@@ -17,10 +17,12 @@
 package com.ealva.toque.test.db
 
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.PreAmpAndBands
 
-class EqPresetStub(override var presetId: Long = 0) : EqPreset {
+class EqPresetStub(override var id: EqPresetId = EqPresetId(0)) : EqPreset {
+  override val isNullPreset: Boolean = false
   override var name: String = "EqPresetStub"
   override val displayName: String = name
   override var isSystemPreset: Boolean = false
@@ -58,4 +60,6 @@ class EqPresetStub(override var presetId: Long = 0) : EqPreset {
     preAmp = preAmpAndBands.preAmp
     bandValues = preAmpAndBands.bands
   }
+
+  override fun clone(): EqPreset = this
 }

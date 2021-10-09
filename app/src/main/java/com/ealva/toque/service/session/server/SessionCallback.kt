@@ -29,6 +29,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
+import com.ealva.toque.log._e
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
@@ -41,7 +42,6 @@ private val LOG by lazyLogger(SessionCallback::class)
 internal class SessionCallback(
   private val scope: CoroutineScope,
   private val flow: MutableSharedFlow<SessionControlEvent>,
-  private val focusManager: AudioFocusManager,
   var contentType: ContentType = ContentType.Audio,
   var mediaButtonHandler: MediaButtonHandler? = null
 ) : MediaSessionCompat.Callback() {
@@ -87,34 +87,23 @@ internal class SessionCallback(
   }
 
   override fun onPlay() {
-    if (focusManager.requestFocus(contentType)) emit(SessionControlEvent.Play)
+    LOG._e { it("onPlay") }
+    emit(SessionControlEvent.Play)
   }
 
   override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-    // TODO split into prepare from and then play to move request focus to a
-    // single place
-    if (focusManager.requestFocus(contentType)) {
-      mediaId?.let { emit(SessionControlEvent.PlayFromId(it, extras ?: Bundle.EMPTY)) }
-        ?: LOG.e { it("onPlayFromMediaId null mediaId") }
-    }
+    mediaId?.let { emit(SessionControlEvent.PlayFromId(it, extras ?: Bundle.EMPTY)) }
+      ?: LOG.e { it("onPlayFromMediaId null mediaId") }
   }
 
   override fun onPlayFromSearch(query: String?, extras: Bundle?) {
-    // TODO split into prepare from and then play to move request focus to a
-    // single place
-    if (focusManager.requestFocus(contentType)) {
-      query?.let { emit(SessionControlEvent.PlayFromSearch(it, extras ?: Bundle.EMPTY)) }
-        ?: LOG.e { it("onPrepareFromSearch null query") }
-    }
+    query?.let { emit(SessionControlEvent.PlayFromSearch(it, extras ?: Bundle.EMPTY)) }
+      ?: LOG.e { it("onPrepareFromSearch null query") }
   }
 
   override fun onPlayFromUri(uri: Uri?, extras: Bundle?) {
-    // TODO split into prepare from and then play to move request focus to a
-    // single place
-    if (focusManager.requestFocus(contentType)) {
-      uri?.let { emit(SessionControlEvent.PlayFromUri(it, extras ?: Bundle.EMPTY)) }
-        ?: LOG.e { it("onPrepareFromUri null uri") }
-    }
+    uri?.let { emit(SessionControlEvent.PlayFromUri(it, extras ?: Bundle.EMPTY)) }
+      ?: LOG.e { it("onPrepareFromUri null uri") }
   }
 
   override fun onSkipToQueueItem(id: Long) = emit(SessionControlEvent.SkipToQueueItem(id))
@@ -170,9 +159,6 @@ internal class SessionCallback(
   override fun onRemoveQueueItem(description: MediaDescriptionCompat?) =
     description?.let { emit(SessionControlEvent.RemoveItem(it)) }
       ?: LOG.e { it("onRemoveQueueItem null description") }
-
-  fun onDuck() = emit(SessionControlEvent.Duck)
-  fun onEndDuck() = emit(SessionControlEvent.EndDuck)
 }
 
 private val Intent.keyEvent: KeyEvent?

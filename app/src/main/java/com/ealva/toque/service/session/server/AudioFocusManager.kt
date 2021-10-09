@@ -28,9 +28,15 @@ import androidx.annotation.RequiresApi
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
+import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
 import com.ealva.toque.service.session.server.AudioFocusManager.FocusReaction
+import com.ealva.toque.service.session.server.AudioFocusManager.PlayState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -56,7 +62,13 @@ interface AudioFocusManager {
     Video;
   }
 
-  fun requestFocus(contentType: ContentType): Boolean
+  fun interface PlayState {
+    fun isPlaying(): Boolean
+  }
+
+  fun requestFocus(contentType: ContentType, playState: PlayState): Boolean
+
+  fun abandonFocus(contentType: ContentType)
 
   /** Releases resources and removes broadcast receivers. Not usable after release */
   fun release()
@@ -65,12 +77,11 @@ interface AudioFocusManager {
     operator fun invoke(
       context: Context,
       audioManager: AudioManager,
-      mediaSession: MediaSession,
-      scope: CoroutineScope
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): AudioFocusManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      AudioFocusManager28(context, audioManager, mediaSession, scope)
+      AudioFocusManager28(context, audioManager, dispatcher)
     } else {
-      AudioFocusManagerPre28(context, audioManager, mediaSession, scope)
+      AudioFocusManagerPre28(context, audioManager, dispatcher)
     }
   }
 }
@@ -78,33 +89,43 @@ interface AudioFocusManager {
 class AudioFocusManagerPre28(
   context: Context,
   audioManager: AudioManager,
-  sessionState: MediaSessionState,
-  scope: CoroutineScope
-) : BaseAudioFocusManager(context, audioManager, sessionState, scope) {
+  dispatcher: CoroutineDispatcher
+) : BaseAudioFocusManager(context, audioManager, dispatcher) {
   @Suppress("DEPRECATION")
   override fun doRequestFocus(
-    contentType: AudioFocusManager.ContentType
+    contentType: ContentType
   ): Int = audioManager.requestAudioFocus(
     this,
     AudioManager.STREAM_MUSIC,
     AudioManager.AUDIOFOCUS_GAIN
   )
+
+  @Suppress("DEPRECATION")
+  override fun doAbandonFocus(contentType: ContentType): Int {
+    return audioManager.abandonAudioFocus(this)
+  }
 }
 
 @RequiresApi(Build.VERSION_CODES.O)
 class AudioFocusManager28(
   context: Context,
   audioManager: AudioManager,
-  sessionState: MediaSessionState,
-  scope: CoroutineScope
-) : BaseAudioFocusManager(context, audioManager, sessionState, scope) {
+  dispatcher: CoroutineDispatcher
+) : BaseAudioFocusManager(context, audioManager, dispatcher) {
   private val musicRequest = makeFocusRequest(AudioAttributes.CONTENT_TYPE_MUSIC)
   private val movieRequest by lazy { makeFocusRequest(AudioAttributes.CONTENT_TYPE_MOVIE) }
 
-  override fun doRequestFocus(contentType: AudioFocusManager.ContentType): Int {
+  override fun doRequestFocus(contentType: ContentType): Int {
     return when (contentType) {
-      AudioFocusManager.ContentType.Audio -> audioManager.requestAudioFocus(musicRequest)
-      AudioFocusManager.ContentType.Video -> audioManager.requestAudioFocus(movieRequest)
+      ContentType.Audio -> audioManager.requestAudioFocus(musicRequest)
+      ContentType.Video -> audioManager.requestAudioFocus(movieRequest)
+    }
+  }
+
+  override fun doAbandonFocus(contentType: ContentType): Int {
+    return when (contentType) {
+      ContentType.Audio -> audioManager.abandonAudioFocusRequest(musicRequest)
+      ContentType.Video -> audioManager.abandonAudioFocusRequest(movieRequest)
     }
   }
 
@@ -124,25 +145,26 @@ class AudioFocusManager28(
 }
 
 abstract class BaseAudioFocusManager(
-  private val context: Context,
+  private val ctx: Context,
   protected val audioManager: AudioManager,
-  private val sessionState: MediaSessionState,
-  private val scope: CoroutineScope
+  dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : AudioFocusManager, AudioManager.OnAudioFocusChangeListener {
+  private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private val focusLock: ReentrantLock = ReentrantLock()
   private var haveAudioFocus = false
   private var playbackDelayed = false
   private var resumeOnFocusGain = false
   private var endDuckOnFocusGain = false
   private var released = false
+  private var playState: PlayState? = null
 
   private val receiver = AudioBecomingNoisyReceiver().apply {
-    context.registerReceiver(this, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+    ctx.registerReceiver(this, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
   }
 
   override fun release() {
     released = true
-    context.unregisterReceiver(receiver)
+    ctx.unregisterReceiver(receiver)
   }
 
   /**  */
@@ -152,40 +174,46 @@ abstract class BaseAudioFocusManager(
     scope.launch { reactionFlow.emit(reaction) }
   }
 
-  protected abstract fun doRequestFocus(contentType: AudioFocusManager.ContentType): Int
+  protected abstract fun doRequestFocus(contentType: ContentType): Int
+  protected abstract fun doAbandonFocus(contentType: ContentType): Int
 
-  override fun requestFocus(
-    contentType: AudioFocusManager.ContentType
-  ): Boolean = when {
-    released -> {
-      LOG.e { it("Requested focus after release") }
-      false
-    }
-    haveAudioFocus -> true
-    else -> {
-      val res = doRequestFocus(contentType)
-      focusLock.withLock {
-        when (res) {
-          AudioManager.AUDIOFOCUS_REQUEST_FAILED -> {
-            haveAudioFocus = false
-            false
+  override fun requestFocus(contentType: ContentType, playState: PlayState): Boolean {
+    return when {
+      released -> {
+        LOG.e { it("Requested focus after release") }
+        false
+      }
+      haveAudioFocus -> true
+      else -> {
+        val res = doRequestFocus(contentType)
+        focusLock.withLock {
+          when (res) {
+            AudioManager.AUDIOFOCUS_REQUEST_FAILED -> {
+              haveAudioFocus = false
+              false
+            }
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
+              haveAudioFocus = true
+              true
+            }
+            AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
+              haveAudioFocus = false
+              playbackDelayed = true
+              false
+            }
+            else -> false
           }
-          AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
-            haveAudioFocus = true
-            true
-          }
-          AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
-            haveAudioFocus = false
-            playbackDelayed = true
-            false
-          }
-          else -> false
         }
       }
     }
   }
 
+  override fun abandonFocus(contentType: ContentType) {
+    doAbandonFocus(contentType)
+  }
+
   override fun onAudioFocusChange(focusChange: Int) {
+    LOG._e { it("onAudioFocusChange %d", focusChange) }
     when (focusChange) {
       AudioManager.AUDIOFOCUS_GAIN -> {
         if (playbackDelayed || resumeOnFocusGain) {
@@ -212,7 +240,7 @@ abstract class BaseAudioFocusManager(
         emitReaction(FocusReaction.StopForeground)
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-        val isPlaying = sessionState.isPlaying
+        val isPlaying = playState?.isPlaying() ?: false
         focusLock.withLock {
           // only resume if playback is being interrupted
           resumeOnFocusGain = isPlaying
@@ -221,7 +249,7 @@ abstract class BaseAudioFocusManager(
         if (isPlaying) emitReaction(FocusReaction.Pause)
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-        val isPlaying = sessionState.isPlaying
+        val isPlaying = playState?.isPlaying() ?: false
         focusLock.withLock {
           endDuckOnFocusGain = isPlaying
         }

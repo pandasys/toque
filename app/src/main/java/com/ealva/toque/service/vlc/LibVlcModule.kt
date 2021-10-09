@@ -16,7 +16,7 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.toque.service.audio.EqPresetSelector
+import com.ealva.toque.service.media.EqPresetFactory
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
@@ -39,11 +39,9 @@ object LibVlcModule {
     }
     single {
       VlcPresetFactory(
-        androidContext(),
         eqPresetDao = get(),
-        eqPresetAssocDao = get(),
-        audioOutputState = get()
+        eqPresetAssocDao = get()
       )
-    } bind EqPresetSelector::class
+    } bind EqPresetFactory::class
   }
 }

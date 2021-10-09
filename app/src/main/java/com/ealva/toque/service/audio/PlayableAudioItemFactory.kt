@@ -23,6 +23,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.prefs.AppPrefsSingleton
+import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.WakeLockFactory
 import com.ealva.toque.service.session.common.Metadata
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
@@ -35,7 +36,12 @@ import it.unimi.dsi.fastutil.longs.LongList
 private val LOG by lazyLogger(PlayableAudioItemFactory::class)
 
 interface PlayableAudioItemFactory {
-  suspend fun makeUpNextQueue(shuffled: Boolean): MutableList<PlayableAudioItem>
+  suspend fun makeUpNextQueue(
+    shuffled: Boolean,
+    request: AvPlayer.FocusRequest,
+    duckedState: DuckedState,
+    activeEqPreset: ActiveEqPreset
+  ): MutableList<PlayableAudioItem>
 
   /**
    * We want to get all the shuffled IDs in correct order, then create a new list using the same
@@ -45,12 +51,16 @@ interface PlayableAudioItemFactory {
    */
   suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
 
-  suspend fun makeNewQueueItems(idList: LongList): QueueList
+  suspend fun makeNewQueueItems(
+    idList: LongList,
+    request: AvPlayer.FocusRequest,
+    duckedState: DuckedState,
+    activeEqPreset: ActiveEqPreset
+  ): QueueList
 
   companion object {
     operator fun invoke(
       audioMediaDao: AudioMediaDao,
-      eqPresetSelector: EqPresetSelector,
       mediaFileStore: MediaFileStore,
       libVlcSingleton: LibVlcSingleton,
       libVlcPrefsSingleton: LibVlcPrefsSingleton,
@@ -58,7 +68,6 @@ interface PlayableAudioItemFactory {
       wakeLockFactory: WakeLockFactory
     ): PlayableAudioItemFactory = PlayableAudioItemFactoryImpl(
       audioMediaDao,
-      eqPresetSelector,
       mediaFileStore,
       libVlcSingleton,
       libVlcPrefsSingleton,
@@ -70,14 +79,18 @@ interface PlayableAudioItemFactory {
 
 private class PlayableAudioItemFactoryImpl(
   private val audioMediaDao: AudioMediaDao,
-  private val eqPresetSelector: EqPresetSelector,
   private val mediaFileStore: MediaFileStore,
   private val libVlcSingleton: LibVlcSingleton,
   private val libVlcPrefsSingleton: LibVlcPrefsSingleton,
   private val appPrefsSingleton: AppPrefsSingleton,
   private val wakeLockFactory: WakeLockFactory
 ) : PlayableAudioItemFactory {
-  override suspend fun makeUpNextQueue(shuffled: Boolean): MutableList<PlayableAudioItem> {
+  override suspend fun makeUpNextQueue(
+    shuffled: Boolean,
+    request: AvPlayer.FocusRequest,
+    duckedState: DuckedState,
+    activeEqPreset: ActiveEqPreset
+  ): MutableList<PlayableAudioItem> {
     val libVlc = libVlcSingleton.instance()
     val appPrefs = appPrefsSingleton.instance()
     val libVlcPrefs = libVlcPrefsSingleton.instance()
@@ -105,10 +118,12 @@ private class PlayableAudioItemFactoryImpl(
               itemData.artists,
               libVlc,
               mediaFileStore,
-              eqPresetSelector,
+              activeEqPreset,
               appPrefs,
               libVlcPrefs,
-              wakeLockFactory
+              wakeLockFactory,
+              request,
+              duckedState,
             )
           )
         }
@@ -123,7 +138,12 @@ private class PlayableAudioItemFactoryImpl(
   override suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T> =
     audioMediaDao.makeShuffledQueue(upNextQueue)
 
-  override suspend fun makeNewQueueItems(idList: LongList): QueueList {
+  override suspend fun makeNewQueueItems(
+    idList: LongList,
+    request: AvPlayer.FocusRequest,
+    duckedState: DuckedState,
+    activeEqPreset: ActiveEqPreset
+  ): QueueList {
     val libVlc = libVlcSingleton.instance()
     val appPrefs = appPrefsSingleton.instance()
     val libVlcPrefs = libVlcPrefsSingleton.instance()
@@ -151,10 +171,12 @@ private class PlayableAudioItemFactoryImpl(
               itemData.artists,
               libVlc,
               mediaFileStore,
-              eqPresetSelector,
+              activeEqPreset,
               appPrefs,
               libVlcPrefs,
-              wakeLockFactory
+              wakeLockFactory,
+              request,
+              duckedState,
             )
           )
         }

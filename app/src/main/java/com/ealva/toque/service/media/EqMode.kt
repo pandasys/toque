@@ -19,6 +19,15 @@ package com.ealva.toque.service.media
 import com.ealva.toque.persist.HasConstId
 
 enum class EqMode(override val id: Int) : HasConstId {
-  Off(0),
-  On(1);
+  Off(0) {
+    override fun next() = On
+  },
+  On(1) {
+    override fun next() = Off
+  };
+
+  abstract fun next(): EqMode
+
+  fun isOff(): Boolean = this === Off
+  fun isOn(): Boolean = this === On
 }

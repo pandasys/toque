@@ -19,6 +19,7 @@ package com.ealva.toque.db
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.audioout.longId
 import com.ealva.toque.audioout.toAudioOutputRoute
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.MediaId
@@ -67,10 +68,7 @@ interface EqPresetAssociationDao {
    * Associate [preset] with the list of associations. If [Ok] and value is true, associations
    * were made, else if false the association list was empty. [Err] returned on exception
    */
-  suspend fun makeAssociations(
-    preset: EqPreset,
-    associations: List<PresetAssociation>
-  ): BoolResult
+  suspend fun makeAssociations(preset: EqPreset, associations: List<PresetAssociation>): BoolResult
 
   /**
    * Get the list of associations for [preset]
@@ -81,8 +79,8 @@ interface EqPresetAssociationDao {
     mediaId: MediaId,
     albumId: AlbumId,
     route: AudioOutputRoute,
-    defaultValue: () -> Long
-  ): LongResult
+    defaultValue: EqPresetId
+  ): DaoResult<EqPresetId>
 
   companion object {
     operator fun invoke(db: Database): EqPresetAssociationDao = EqPresetAssociationDaoImpl(db)
@@ -104,7 +102,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     preset: EqPreset,
     association: PresetAssociation
   ): Long = insertAssociation(
-    preset.presetId,
+    preset.id,
     preset.isSystemPreset,
     association.type.id,
     association.id
@@ -123,7 +121,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     preset: EqPreset,
     associations: List<PresetAssociation>
   ): Boolean = associations.isNotEmpty().also {
-    deletePresetAssociations(preset.presetId)
+    deletePresetAssociations(preset.id)
     associations.forEach { assoc ->
       if (insertAssociation(preset, assoc) < 1)
         throw DaoException("Could not insert $preset/$assoc")
@@ -139,38 +137,38 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     mediaId: MediaId,
     albumId: AlbumId,
     route: AudioOutputRoute,
-    defaultValue: () -> Long
-  ): LongResult = db.query {
+    defaultValue: EqPresetId
+  ): DaoResult<EqPresetId> = db.query {
     runCatching {
       QUERY_DEFAULT
         .sequence({
           it[BIND_MEDIA_ID] = mediaId.value
           it[BIND_ALBUM_ID] = albumId.value
           it[BIND_ROUTE_ID] = route.longId
-        }) { it[presetId] }
-        .singleOrNull() ?: defaultValue()
+        }) { EqPresetId(it[presetId]) }
+        .singleOrNull() ?: defaultValue
     }.mapError { DaoExceptionMessage(it) }
   }
 
   private fun Queryable.doGetAssociations(preset: EqPreset): List<PresetAssociation> =
     QUERY_ASSOCIATIONS
       .sequence({
-        it[BIND_PRESET_ID] = preset.presetId
+        it[BIND_PRESET_ID] = preset.id.value
         it[BIND_IS_SYSTEM] = preset.isSystemPreset
       }) { PresetAssociation.reify(it[associationType], it[associationId]) }
       .toList()
 
-  private fun Transaction.deletePresetAssociations(presetId: Long) =
-    DELETE_PRESET.delete { it[BIND_PRESET_ID] = presetId }
+  private fun Transaction.deletePresetAssociations(id: EqPresetId) =
+    DELETE_PRESET.delete { it[BIND_PRESET_ID] = id.value }
 
   private fun Transaction.insertAssociation(
-    assocPresetId: Long,
+    assocPresetId: EqPresetId,
     isSystem: Boolean,
     assocType: Int,
     assocId: Long
   ): Long = run {
     INSERT_STATEMENT.insert {
-      it[presetId] = assocPresetId
+      it[presetId] = assocPresetId.value
       it[isSystemPreset] = isSystem
       it[associationType] = assocType
       it[associationId] = assocId

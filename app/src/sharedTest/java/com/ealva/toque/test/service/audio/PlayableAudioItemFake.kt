@@ -27,12 +27,10 @@ import com.ealva.toque.common.Volume
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.toMediaId
-import com.ealva.toque.service.audio.EqPresetSelector
 import com.ealva.toque.service.audio.NullPlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
@@ -59,7 +57,6 @@ class PlayableAudioItemFake(
   override val position: Millis = Millis(0),
   override var volume: Volume = Volume.MAX,
   override var isMuted: Boolean = false,
-  override var equalizer: EqPreset = EqPreset.NONE,
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL,
   override var fileUri: Uri = Uri.EMPTY
 ) : PlayableAudioItem {
@@ -69,19 +66,14 @@ class PlayableAudioItemFake(
   override val metadata: Metadata = Metadata.NullMetadata
   override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
-  override suspend fun togglePlayPause() = Unit
   override fun pause(immediate: Boolean) = Unit
-  override suspend fun seekTo(position: Millis) = Unit
+  override fun seekTo(position: Millis) = Unit
   override fun shutdown() = Unit
+  override fun duck() = Unit
+  override fun endDuck() = Unit
   override fun shutdown(shutdownTransition: PlayerTransition) = Unit
-  override suspend fun reset(
-    immediateTransition: Boolean,
-    playNow: PlayNow
-  ) =
-    Unit
-
-  override suspend fun prepareSeekMaybePlay(
-    position: Millis,
+  override fun prepareSeekMaybePlay(
+    startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
     timePlayed: Millis,
@@ -90,13 +82,9 @@ class PlayableAudioItemFake(
   ) = Unit
 
   override fun cloneItem(): PlayableAudioItem = NullPlayableAudioItem
-  override suspend fun applyEqualization(
-    eqPresetSelector: EqPresetSelector,
-    applyEdits: Boolean
-  ) = Unit
 
   override fun checkMarkSkipped() = Unit
-  override suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean) = Unit
+  override fun setRating(newRating: Rating, allowFileUpdate: Boolean) = Unit
   override fun previousShouldRewind(): Boolean = false
 
   override val artist: ArtistName = ArtistName.UNKNOWN

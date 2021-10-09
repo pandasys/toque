@@ -39,8 +39,11 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.doNotHaveReadPermission
+import com.ealva.toque.android.content.onBroadcast
 import com.ealva.toque.android.content.orNullObject
 import com.ealva.toque.app.Toque
+import com.ealva.toque.audioout.AudioOutputState
+import com.ealva.toque.audioout.handleAudioOutputStateBroadcasts
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
@@ -54,7 +57,8 @@ import com.ealva.toque.service.session.server.BrowserResult
 import com.ealva.toque.service.session.server.MediaSession
 import com.ealva.toque.service.session.server.MediaSessionState
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -66,10 +70,7 @@ private val servicePrefsSingleton: PlayerServicePrefsSingleton = PlayerServicePr
   "PlayerServicePrefs"
 )
 
-class MediaPlayerService :
-  MediaBrowserServiceCompat(),
-  ToqueMediaController,
-  LifecycleOwner {
+class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, LifecycleOwner {
   // Because we inherit from MediaBrowserServiceCompat we need to maintain our own lifecycle
   private val dispatcher = ServiceLifecycleDispatcher(this)
   private inline val scope: LifecycleCoroutineScope get() = lifecycleScope
@@ -79,6 +80,7 @@ class MediaPlayerService :
   private var inForeground = false
   private var isStarted = false
   private lateinit var mediaSession: MediaSession
+  private val audioOutputState: AudioOutputState by inject()
 
   override fun getLifecycle(): Lifecycle = dispatcher.lifecycle
   override val currentQueue = MutableStateFlow<PlayableMediaQueue<*>>(NullPlayableMediaQueue)
@@ -86,7 +88,7 @@ class MediaPlayerService :
   override fun onCreate() {
     dispatcher.onServicePreSuperOnCreate()
     super.onCreate()
-    mediaSession = MediaSession(
+    mediaSession = MediaSession.make(
       context = this,
       audioMediaDao = audioMediaDao,
       notificationListener = NotificationListener(),
@@ -111,6 +113,8 @@ class MediaPlayerService :
         mediaSession.isActive = true
       }
     }
+    // This creates a lifecycle aware object, no unregister needed
+    handleAudioOutputStateBroadcasts(audioOutputState)
   }
 
   inner class MediaServiceBinder : Binder() {
@@ -218,7 +222,9 @@ class MediaPlayerService :
       }
       val newQueue = queueFactory.make(type, mediaSession, mediaSession)
       newQueue.activate(resume, PlayNow(false))
-      newQueue.isActive.collect { isActive ->if (isActive) currentQueue.value = newQueue }
+      newQueue.isActive
+        .onEach { isActive -> if (isActive) currentQueue.value = newQueue }
+        .launchIn(scope)
     }
   }
 

@@ -29,14 +29,17 @@ inline operator fun Volume.div(rhs: Millis): Volume = Volume(value / rhs().toInt
  * supporting that.
  */
 abstract class BasePlayerTransition(override val type: Type) : PlayerTransition {
-  final override var isCancelled: Boolean = false
-    private set
-
   private var complete: Boolean = false
   private var player: TransitionPlayer = NullTransitionPlayer
 
+  final override var isCancelled: Boolean = false
+
   override val isFinished: Boolean
     get() = isCancelled || complete
+
+  private var isExecuting = false
+  override val isActive: Boolean
+    get() = isExecuting && !isFinished
 
   override val isPaused: Boolean
     get() = player.isPaused
@@ -44,9 +47,8 @@ abstract class BasePlayerTransition(override val type: Type) : PlayerTransition 
   override val isPlaying: Boolean
     get() = player.isPlaying
 
-  override fun accept(nextTransition: PlayerTransition): Boolean {
-    return type.canTransitionTo(nextTransition.type)
-  }
+  override fun accept(nextTransition: PlayerTransition): Boolean =
+    type.canTransitionTo(nextTransition.type)
 
   override fun setPlayer(transitionPlayer: TransitionPlayer) {
     player = transitionPlayer
@@ -54,7 +56,11 @@ abstract class BasePlayerTransition(override val type: Type) : PlayerTransition 
 
   final override suspend fun execute() {
     if (!isFinished) {
+      isExecuting = true
       doExecute(player)
+      // setting isExecuting to false is likely redundant as all transitions should mark complete or
+      // canceled before doExecute ends. But isActive depends on this so we'll set it
+      isExecuting = false
     }
   }
 
@@ -78,7 +84,5 @@ abstract class BasePlayerTransition(override val type: Type) : PlayerTransition 
  * Does nothing (obviously)
  */
 object NoOpPlayerTransition : BasePlayerTransition(Type.NoOp) {
-  override suspend fun doExecute(player: TransitionPlayer) {
-    setComplete()
-  }
+  override suspend fun doExecute(player: TransitionPlayer) = setComplete()
 }

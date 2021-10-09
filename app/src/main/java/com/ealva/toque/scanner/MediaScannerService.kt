@@ -39,6 +39,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.MediaStorage
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -57,10 +58,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
@@ -114,20 +120,19 @@ class MediaScannerService : LifecycleService() {
       notificationChannel = notificationManager.getNotificationChannel(SCANNER_CHANNEL_ID)
     }
     startNotification()
-    job = lifecycleScope.launch(Dispatchers.IO) {
-      workFlow
-        .onCompletion { cause ->
-          if (cause != null && cause !is CancellationException) {
-            LOG.e(cause) { it("workFlow completed with cause=%s", cause) }
-          }
-          workEnqueuer?.serviceProcessingFinished()
-        }
-        .collect { work ->
+    job = workFlow
+        .onStart { LOG._i { it("Work flow started") } }
+        .onEach { work ->
           workEnqueuer?.serviceProcessingStarted()
           if (work.intent != null) onHandleWork(work.intent)
           stopSelf(work.startId)
         }
-    }
+        .catch { cause -> LOG.e(cause) { it("Error processing work flow") } }
+        .onCompletion {
+          LOG._e { it("Work flow completed") }
+          workEnqueuer?.serviceProcessingFinished()
+        }
+        .launchIn(lifecycleScope + Dispatchers.IO)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -233,10 +238,8 @@ class MediaScannerService : LifecycleService() {
         .map { async { persistAudioList(it, parser, minimumDuration, createUpdateTime) } }
         .buffer(PERSIST_WORKER_COUNT)
         .map { it.await() }
-        .onCompletion { cause ->
-          if (cause != null) LOG.e(cause) { it("Scan completed: %s", cause.message ?: "failed") }
-          onCompletion()
-        }
+        .catch { cause -> LOG.e(cause) { it("Scan completed: %s", cause.message ?: "failed") } }
+        .onCompletion { onCompletion() }
         .collect()
     }
   }

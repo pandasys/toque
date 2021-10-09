@@ -21,17 +21,19 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.media.EqPreset
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
 interface AvPlayer {
+  fun interface FocusRequest {
+    fun requestFocus(): Boolean
+  }
+
   val eventFlow: SharedFlow<AvPlayerEvent>
 
   val isSeekable: Boolean
   val isPausable: Boolean
   val isValid: Boolean
-  val equalizer: EqPreset
   val duration: Millis
   val time: Millis
   val isPlaying: Boolean
@@ -54,7 +56,9 @@ interface AvPlayer {
   fun stop()
   fun shutdown()
 
-  fun setEqualizer(newEq: EqPreset, applyEdits: Boolean)
+  fun duck()
+  fun endDuck()
+
   fun transitionTo(transition: PlayerTransition)
 
   //  val vlcVout: IVLCVout
@@ -136,12 +140,12 @@ sealed interface AvPlayerEvent {
     override fun toString(): String = "None"
   }
 }
+
 object NullAvPlayer : AvPlayer {
   override val eventFlow: SharedFlow<AvPlayerEvent> = MutableSharedFlow()
   override val isSeekable: Boolean = false
   override val isPausable: Boolean = false
   override val isValid: Boolean = false
-  override val equalizer: EqPreset = EqPreset.NONE
   override val duration: Millis = Millis(0)
   override val time: Millis = Millis(0)
   override val isPlaying: Boolean = false
@@ -155,11 +159,12 @@ object NullAvPlayer : AvPlayer {
   override val isVideoPlayer: Boolean = false
   override val isAudioPlayer: Boolean = true
   override fun playStartPaused() = Unit
-  override fun play(immediate: Boolean) {}
-  override fun pause(immediate: Boolean) {}
-  override fun seek(position: Millis) {}
-  override fun stop() {}
-  override fun shutdown() {}
-  override fun setEqualizer(newEq: EqPreset, applyEdits: Boolean) {}
-  override fun transitionTo(transition: PlayerTransition) {}
+  override fun play(immediate: Boolean) = Unit
+  override fun pause(immediate: Boolean) = Unit
+  override fun seek(position: Millis) = Unit
+  override fun stop() = Unit
+  override fun shutdown() = Unit
+  override fun duck() = Unit
+  override fun endDuck() = Unit
+  override fun transitionTo(transition: PlayerTransition) = Unit
 }

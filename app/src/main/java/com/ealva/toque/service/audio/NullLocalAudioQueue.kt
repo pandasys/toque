@@ -37,9 +37,8 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val isSeekable: Boolean = false
   override val manualTransition: PlayerTransitionPair = NoOpMediaTransition
   override val autoAdvanceTransition: PlayerTransitionPair = NoOpMediaTransition
-  override suspend fun setRepeatMode(mode: RepeatMode) = Unit
-  override suspend fun setShuffleMode(mode: ShuffleMode) = Unit
-  override suspend fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
+  override fun toggleEqMode() = Unit
+  override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
   override suspend fun addToUpNext(audioIdList: AudioIdList) = Unit
   override suspend fun playNext(
     audioIdList: AudioIdList,
@@ -48,24 +47,26 @@ object NullLocalAudioQueue : LocalAudioQueue {
     transition: PlayerTransitionPair
   ) = Unit
 
-  override suspend fun goToQueueItem(instanceId: Long) = Unit
+  override fun goToQueueItem(instanceId: Long) = Unit
   override suspend fun prepareNext(audioIdList: AudioIdList) = Unit
+  override fun nextRepeatMode() = Unit
+  override fun nextShuffleMode() = Unit
+  override fun setRepeatMode(mode: RepeatMode) = Unit
+  override fun setShuffleMode(mode: ShuffleMode) = Unit
   override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override suspend fun activate(resume: Boolean, playNow: PlayNow) = Unit
   override fun deactivate() = Unit
-  override fun play(immediateTransition: Boolean) = Unit
-  override suspend fun pause(immediateTransition: Boolean) = Unit
-  override suspend fun stop() = Unit
-  override suspend fun togglePlayPause() = Unit
-  override suspend fun next() = Unit
-  override suspend fun previous() = Unit
-  override suspend fun nextList() = Unit
-  override suspend fun previousList() = Unit
-  override suspend fun seekTo(position: Millis) = Unit
-  override suspend fun fastForward() = Unit
-  override suspend fun rewind() = Unit
-  override suspend fun goToIndexMaybePlay(index: Int) = Unit
-  override suspend fun duck() = Unit
-  override suspend fun endDuck() = Unit
+  override fun play(immediate: Boolean) = Unit
+  override fun pause(immediateTransition: Boolean) = Unit
+  override fun stop() = Unit
+  override fun togglePlayPause() = Unit
+  override fun next() = Unit
+  override fun previous() = Unit
+  override fun nextList() = Unit
+  override fun previousList() = Unit
+  override fun seekTo(position: Millis) = Unit
+  override fun fastForward() = Unit
+  override fun rewind() = Unit
+  override fun goToIndexMaybePlay(index: Int) = Unit
   override val streamVolume: StreamVolume = NullStreamVolume
 }

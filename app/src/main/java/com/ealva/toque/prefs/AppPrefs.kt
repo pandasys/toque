@@ -81,6 +81,8 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val saveRatingToFile: BoolPref
   val scanInternalVolume: BoolPref
   val showTimeRemaining: BoolPref
+  val playOnBluetoothConnection: BoolPref
+  val playOnWiredConnection: BoolPref
 
   companion object {
     val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
@@ -147,4 +149,6 @@ private class AppPrefsImpl(
   override val saveRatingToFile: BoolPref by preference(true)
   override val scanInternalVolume: BoolPref by preference(true)
   override val showTimeRemaining: BoolPref by preference(false)
+  override val playOnBluetoothConnection: BoolPref by preference(false)
+  override val playOnWiredConnection: BoolPref by preference(false)
 }

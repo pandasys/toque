@@ -93,12 +93,4 @@ sealed interface SessionControlEvent {
     @Suppress("unused")
     val addToEnd = pos < 0
   }
-
-  object Duck : SessionControlEvent {
-    override fun toString(): String = "Duck"
-  }
-
-  object EndDuck : SessionControlEvent {
-    override fun toString(): String = "EndDuck"
-  }
 }

@@ -16,15 +16,21 @@
 
 package com.ealva.toque.service.vlc
 
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.NullEqPresetDao
+import com.ealva.toque.log._e
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPreset.Companion.BAND_DEFAULT
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.github.michaelbull.result.onFailure
 import org.videolan.libvlc.MediaPlayer
+
+private val LOG by lazyLogger(VlcEqPreset::class)
 
 private val ZEROED_BANDS: Array<Amp> = Array(VlcEqPreset.BAND_COUNT) { Amp.NONE }
 
@@ -32,9 +38,11 @@ class VlcEqPreset private constructor(
   private val nativeEq: MediaPlayer.Equalizer?,
   override val name: String,
   override val isSystemPreset: Boolean,
-  override val presetId: Long,
+  override val id: EqPresetId,
   private val eqPresetDao: EqPresetDao
 ) : EqPreset {
+  override val isNullPreset: Boolean = nativeEq == null
+
   override val displayName: String = if (isSystemPreset) "*$name" else name
 
   override val bandCount: Int
@@ -42,8 +50,6 @@ class VlcEqPreset private constructor(
 
   override val bandIndices: IntRange
     get() = BAND_INDICES
-
-  fun setPreset(mediaPlayer: MediaPlayer): Boolean = mediaPlayer.setEqualizer(nativeEq)
 
   override fun getBandFrequency(index: Int): Float = MediaPlayer.Equalizer.getBandFrequency(index)
 
@@ -74,7 +80,7 @@ class VlcEqPreset private constructor(
       val currentValues = getAllValues()
       try {
         for (i in BAND_INDICES) native.setAmp(i, BAND_DEFAULT())
-        nativeEq.preAmp = Amp.DEFAULT_PREAMP()
+        native.preAmp = Amp.DEFAULT_PREAMP.value
       } catch (e: Exception) {
         native.setNativeEqValues(currentValues)
       }
@@ -96,7 +102,7 @@ class VlcEqPreset private constructor(
     checkNotSystemPreset()
     nativeEq?.let { native ->
       val currentValues: PreAmpAndBands = getAllValues()
-      eqPresetDao.updatePreset(EqPresetData(presetId, name, preAmpAndBands)) {
+      eqPresetDao.updatePreset(EqPresetData(id, name, preAmpAndBands)) {
         native.setNativeEqValues(preAmpAndBands)
       }.onFailure {
         native.setNativeEqValues(currentValues)
@@ -104,22 +110,23 @@ class VlcEqPreset private constructor(
     }
   }
 
-  fun applyToPlayer(nativePlayer: MediaPlayer) {
-    nativePlayer.setEqualizer(nativeEq)
+  override fun clone(): EqPreset = VlcEqPreset(nativeEq, name, isSystemPreset, id, eqPresetDao)
+
+  fun applyToPlayer(nativePlayer: MediaPlayer): Boolean {
+    LOG._e { it("setEqualizer %s", this) }
+    return nativePlayer.setEqualizer(nativeEq)
   }
 
-  override fun toString(): String {
-    return """Preset[name=$name, id=$presetId, isSystem=$isSystemPreset"""
-  }
+  override fun toString(): String = name
 
   companion object {
     operator fun invoke(
       nativeEq: MediaPlayer.Equalizer,
       name: String,
       isSystemPreset: Boolean,
-      presetId: Long,
+      id: EqPresetId,
       eqPresetDao: EqPresetDao
-    ): VlcEqPreset = VlcEqPreset(nativeEq, name, isSystemPreset, presetId, eqPresetDao)
+    ): VlcEqPreset = VlcEqPreset(nativeEq, name, isSystemPreset, id, eqPresetDao)
 
     fun MediaPlayer.Equalizer.setNativeEqValues(preAmpAndBands: PreAmpAndBands) = apply {
       require(preAmpAndBands.preAmp in Amp.RANGE)
@@ -135,7 +142,7 @@ class VlcEqPreset private constructor(
      * sets ```null``` into the media player, it is considered a system preset so can't be edited,
      * and returns default values of 0F for preAmp and amp
      */
-    val NONE = VlcEqPreset(null, "None", true, -1, NullEqPresetDao)
+    val NONE = VlcEqPreset(null, "None", true, EqPresetId(-1), NullEqPresetDao)
 
     val BAND_COUNT = MediaPlayer.Equalizer.getBandCount()
     val BAND_INDICES = 0 until BAND_COUNT
@@ -149,3 +156,5 @@ inline fun VlcEqPreset.checkNotSystemPreset(
     throw UnsupportedOperationException(lazyMessage())
   }
 }
+
+fun EqPreset.asVlcPreset(): VlcEqPreset = if (this is VlcEqPreset) this else VlcEqPreset.NONE

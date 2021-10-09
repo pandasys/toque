@@ -16,8 +16,10 @@
 
 package com.ealva.toque.service.media
 
+import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetInfo
 import com.ealva.toque.persist.MediaId
 import com.github.michaelbull.result.Result
@@ -31,17 +33,18 @@ interface EqPresetFactory {
 
   val bandIndices: IntRange
 
-  val allPresets: List<EqPresetInfo>
-
   val systemPresetCount: Int
 
-  suspend fun getPreset(presetId: Long): Result<EqPreset, DaoMessage>
+  suspend fun getAllPresets(): List<EqPresetInfo>
+
+  suspend fun getPreset(id: EqPresetId): Result<EqPreset, DaoMessage>
 
   suspend fun makeFrom(eqPreset: EqPreset, name: String): Result<EqPreset, DaoMessage>
 
   suspend fun getPreferred(
     mediaId: MediaId,
-    albumId: AlbumId
+    albumId: AlbumId,
+    outputRoute: AudioOutputRoute
   ): Result<EqPreset, DaoMessage>
 
   /**

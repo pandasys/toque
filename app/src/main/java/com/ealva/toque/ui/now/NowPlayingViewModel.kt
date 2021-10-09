@@ -38,7 +38,6 @@ import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.service.player.TransitionSelector
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
@@ -55,7 +54,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -109,10 +108,8 @@ interface NowPlayingViewModel {
   fun nextList()
   fun previousList()
   fun togglePlayPause()
-  fun play(selector: TransitionSelector)
-  fun pause(selector: TransitionSelector)
   fun nextRepeatMode()
-  fun toggleApplyEq()
+  fun toggleEqMode()
   fun seekTo(position: Millis)
   fun beginUserSeek()
   fun endUserSeek(lastValue: Int)
@@ -207,13 +204,12 @@ private class NowPlayingViewModelImpl(
     scope.launch {
       val prefs = appPrefsSingleton.instance()
       appPrefs = prefs
-      scope.launch {
-        prefs.showTimeRemaining
-          .asFlow()
-          .collect { showTimeRemaining ->
-            nowPlayingState.emit(nowPlayingState.value.copy(showTimeRemaining = showTimeRemaining))
-          }
-      }
+      prefs.showTimeRemaining
+        .asFlow()
+        .onEach { showTimeRemaining ->
+          nowPlayingState.emit(nowPlayingState.value.copy(showTimeRemaining = showTimeRemaining))
+        }
+        .launchIn(scope)
     }
   }
 
@@ -235,12 +231,10 @@ private class NowPlayingViewModelImpl(
 
   override fun onServiceActive() {
     LOG._e { it("onServiceActive") }
-    controllerJob = scope.launch {
-      serviceConnection.mediaController
-        .onEach { controller -> handleControllerChange(controller) }
-        .onCompletion { handleControllerChange(NullMediaController) }
-        .collect()
-    }
+    controllerJob = serviceConnection.mediaController
+      .onEach { controller -> handleControllerChange(controller) }
+      .onCompletion { handleControllerChange(NullMediaController) }
+      .launchIn(scope)
   }
 
   override fun onServiceInactive() {
@@ -252,11 +246,9 @@ private class NowPlayingViewModelImpl(
     LOG._e { it("handleControllerChange") }
     mediaController = controller
     if (controller !== NullMediaController) {
-      currentQueueJob = scope.launch {
-        controller.currentQueue
-          .onEach { queue -> handleQueueChange(queue) }
-          .collect()
-      }
+      currentQueueJob = controller.currentQueue
+        .onEach { queue -> handleQueueChange(queue) }
+        .launchIn(scope)
     } else {
       currentQueueJob?.cancel()
       handleQueueChange(NullPlayableMediaQueue)
@@ -274,13 +266,11 @@ private class NowPlayingViewModelImpl(
   private fun queueActive(queue: LocalAudioQueue) {
     LOG._e { it("queueActive") }
     audioQueue = queue
-    scope.launch {
-      audioQueue.queueState
-        .onEach { state -> handleServiceState(state) }
-        .catch { cause -> LOG.e(cause) { it("") } }
-        .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
-        .collect()
-    }
+    audioQueue.queueState
+      .onEach { state -> handleServiceState(state) }
+      .catch { cause -> LOG.e(cause) { it("") } }
+      .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
+      .launchIn(scope)
   }
 
   private suspend fun handleServiceState(queueState: LocalAudioQueueState) {
@@ -304,7 +294,7 @@ private class NowPlayingViewModelImpl(
   }
 
   override fun nextShuffleMode() {
-    TODO("Not yet implemented")
+    audioQueue.nextShuffleMode()
   }
 
   override fun nextMedia() {
@@ -328,24 +318,16 @@ private class NowPlayingViewModelImpl(
     scope.launch { audioQueue.togglePlayPause() }
   }
 
-  override fun play(selector: TransitionSelector) {
-    TODO("Not yet implemented")
-  }
-
   override fun play(mediaIdList: MediaIdList): Boolean {
     TODO("Not yet implemented")
   }
 
-  override fun pause(selector: TransitionSelector) {
-    TODO("Not yet implemented")
-  }
-
   override fun nextRepeatMode() {
-    TODO("Not yet implemented")
+    audioQueue.nextRepeatMode()
   }
 
-  override fun toggleApplyEq() {
-    TODO("Not yet implemented")
+  override fun toggleEqMode() {
+    audioQueue.toggleEqMode()
   }
 
   override fun seekTo(position: Millis) {

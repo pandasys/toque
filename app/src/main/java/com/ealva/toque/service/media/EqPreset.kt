@@ -17,6 +17,7 @@
 package com.ealva.toque.service.media
 
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqPresetId
 
 data class PreAmpAndBands(val preAmp: Amp, val bands: Array<Amp>) {
   override fun equals(other: Any?): Boolean {
@@ -47,10 +48,9 @@ interface EqPreset {
    * Id of the preset and should be treated as an opaque value (could be a system ID or an
    * internal persistent ID)
    */
-  val presetId: Long
+  val id: EqPresetId
 
   val isNullPreset: Boolean
-    get() = presetId < 0
 
   /**
    * Get the name of this equalizer preset, which is either a system preset or user assigned name.
@@ -128,13 +128,23 @@ interface EqPreset {
   @Throws(UnsupportedOperationException::class)
   suspend fun setAllValues(preAmpAndBands: PreAmpAndBands)
 
+  /**
+   * Return and exact clone, including any underlying native preset. This is used during editing.
+   * When a band value is changed a clone should be made because EqPreset instances use identity
+   * equals. A clone will not be equal to the original
+   */
+  fun clone(): EqPreset
+
   companion object {
     val BAND_DEFAULT = Amp.NONE
     private const val DEFAULT_BAND_COUNT = 10
 
+    const val NONE_EQ_PRESET_NAME = "EqPreset.NONE"
+
     val NONE = object : EqPreset {
-      override val presetId = -1L
-      override val name = "None"
+      override val id: EqPresetId = EqPresetId(-1L)
+      override val isNullPreset: Boolean = true
+      override val name = NONE_EQ_PRESET_NAME
       override val displayName = "None"
       override val isSystemPreset = true
       override val bandCount = DEFAULT_BAND_COUNT
@@ -146,10 +156,12 @@ interface EqPreset {
       override suspend fun setAmp(index: Int, amplitude: Amp) {}
       override suspend fun resetAllToDefault() {}
       override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {}
+      override fun clone(): EqPreset = this
       override fun getAllValues(): PreAmpAndBands = PreAmpAndBands(
         Amp.NONE,
         Array(bandCount) { Amp.NONE }
       )
+      override fun toString() = "NONE"
     }
   }
 }

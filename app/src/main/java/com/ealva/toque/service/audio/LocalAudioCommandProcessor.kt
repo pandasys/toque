@@ -33,6 +33,7 @@ import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.SongListType
 import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.scanner.MediaScannerService
 import com.ealva.toque.service.audio.LocalAudioCommand.AddToUpNext
@@ -50,12 +51,11 @@ import com.ealva.toque.service.session.server.MediaSessionBrowser
 import com.ealva.toque.service.session.server.MediaSessionControl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -79,52 +79,54 @@ class LocalAudioCommandProcessor(
   //private val uiModeManager: UiModeManager by inject()
 
   override suspend fun activate(resume: Boolean, playNow: PlayNow) {
-    realQueue.activate(resume, playNow)
+    LOG._e { it("activate") }
 //    sessionControl.onMediaButton(::handleMediaButton)
-    scope.launch {
-      realQueue.isActive
-        .onStart { LOG.i { it("LocalAudioQueue isActive flow started") } }
-        .onEach { isActive -> handleIsActive(isActive) }
-        .catch { cause -> LOG.e(cause) { it("LocalAudioQueue isActive flow error") } }
-        .onCompletion { LOG.i { it("LocalAudioQueue isActive flow complete") } }
-        .collect()
-    }
+    realQueue.isActive
+      .onStart {
+        LOG._e { it("LocalAudioQueue isActive flow started") }
+        realQueue.activate(resume, playNow)
+      }
+      .onEach { isActive -> handleIsActive(isActive) }
+      .catch { cause -> LOG.e(cause) { it("LocalAudioQueue isActive flow error") } }
+      .onCompletion { LOG._i { it("LocalAudioQueue isActive flow complete") } }
+      .launchIn(scope)
+    collectCommandFlow()
+    collectMediaSessionEventFlow(sessionControl)
   }
 
   private suspend fun handleIsActive(isActive: Boolean) {
+    LOG._e { it("handleIsActive %s", isActive) }
     if (isActive) {
-      collectCommandFlow()
-      collectMediaSessionEventFlow(sessionControl)
       if (appPrefs.firstRun()) collectAudioDaoEventsAndStartMediaScanner()
     }
   }
 
   override fun deactivate() {
+    LOG._e { it("deactivate") }
     scope.cancel()
     realQueue.deactivate()
   }
 
   private fun emitCommand(command: LocalAudioCommand) {
-    scope.launch { commandFlow.emit(command) }
+    scope.launch {
+      LOG._e { it("emit %s", command) }
+      commandFlow.emit(command)
+    }
   }
 
-  override suspend fun goToQueueItem(instanceId: Long) = emitCommand(GoToQueueItem(instanceId))
-  override suspend fun seekTo(position: Millis) = emitCommand(LocalAudioCommand.SeekTo(position))
-  override fun play(immediateTransition: Boolean) = emitCommand(Play(immediateTransition))
-  override suspend fun pause(immediateTransition: Boolean) = emitCommand(Pause(immediateTransition))
-  override suspend fun stop() = emitCommand(LocalAudioCommand.Stop)
-  override suspend fun togglePlayPause() = emitCommand(LocalAudioCommand.TogglePlayPause)
-  override suspend fun next() = emitCommand(LocalAudioCommand.Next)
-  override suspend fun previous() = emitCommand(LocalAudioCommand.Previous)
-  override suspend fun nextList() = emitCommand(LocalAudioCommand.NextList)
-  override suspend fun previousList() = emitCommand(LocalAudioCommand.PreviousList)
-  override suspend fun fastForward() = emitCommand(LocalAudioCommand.FastForward)
-  override suspend fun rewind() = emitCommand(LocalAudioCommand.Rewind)
-  override suspend fun setRepeatMode(mode: RepeatMode) = emitCommand(SetRepeatMode(mode))
-  override suspend fun setShuffleMode(mode: ShuffleMode) = emitCommand(SetShuffleMode(mode))
+  override fun goToQueueItem(instanceId: Long) = emitCommand(GoToQueueItem(instanceId))
+  override fun seekTo(position: Millis) = emitCommand(LocalAudioCommand.SeekTo(position))
+  override fun play(immediate: Boolean) = emitCommand(Play(immediate))
+  override fun pause(immediateTransition: Boolean) = emitCommand(Pause(immediateTransition))
+  override fun stop() = emitCommand(LocalAudioCommand.Stop)
+  override fun togglePlayPause() = emitCommand(LocalAudioCommand.TogglePlayPause)
+  override fun next() = emitCommand(LocalAudioCommand.Next)
+  override fun previous() = emitCommand(LocalAudioCommand.Previous)
+  override fun nextList() = emitCommand(LocalAudioCommand.NextList)
+  override fun previousList() = emitCommand(LocalAudioCommand.PreviousList)
+  override fun fastForward() = emitCommand(LocalAudioCommand.FastForward)
+  override fun rewind() = emitCommand(LocalAudioCommand.Rewind)
   override suspend fun addToUpNext(audioIdList: AudioIdList) = emitCommand(AddToUpNext(audioIdList))
-  override suspend fun duck() = emitCommand(LocalAudioCommand.Duck)
-  override suspend fun endDuck() = emitCommand(LocalAudioCommand.EndDuck)
   private suspend fun prepareFromId(id: String, extras: Bundle) = try {
     MediaSessionBrowser.handleMedia(id, extras, PrepareMediaFromId(this, audioMediaDao))
   } catch (e: Exception) {
@@ -137,10 +139,8 @@ class LocalAudioCommandProcessor(
     LOG.e(e) { it("Error playFromId %s", id) }
   }
 
-  override suspend fun setRating(
-    rating: StarRating,
-    allowFileUpdate: Boolean
-  ) = emitCommand(LocalAudioCommand.SetRating(rating, allowFileUpdate))
+  override fun setRating(rating: StarRating, allowFileUpdate: Boolean) =
+    emitCommand(LocalAudioCommand.SetRating(rating, allowFileUpdate))
 
   override suspend fun playNext(
     audioIdList: AudioIdList,
@@ -150,26 +150,22 @@ class LocalAudioCommandProcessor(
   ) = emitCommand(LocalAudioCommand.PlayNext(audioIdList, clearUpNext, playNow, transition))
 
   private fun collectMediaSessionEventFlow(mediaSession: MediaSessionControl) {
-    scope.launch {
-      mediaSession.eventFlow
-        .onEach { mediaSessionEvent -> handleSessionEvent(mediaSessionEvent) }
-        .catch { cause -> LOG.e(cause) { it("Error processing SessionEvent") } }
-        .onCompletion { cause -> LOG.i(cause) { it("SessionEvent end") } }
-        .collect()
-    }
+    mediaSession.eventFlow
+      .onEach { mediaSessionEvent -> handleSessionEvent(mediaSessionEvent) }
+      .catch { cause -> LOG.e(cause) { it("Error processing SessionEvent") } }
+      .onCompletion { cause -> LOG.i(cause) { it("SessionEvent end") } }
+      .launchIn(scope)
   }
 
   private suspend fun collectAudioDaoEventsAndStartMediaScanner() {
-    scope.launch {
-      var addToQueueCount = ADD_NEW_MEDIA_COUNT
-      audioMediaDao
-        .audioDaoEvents
-        .onStart { startMediaScannerModifiedSinceLastScan() }
-        .takeWhile { addToQueueCount > 0 }
-        .onEach { event -> addToQueueCount = handleScannerEvent(addToQueueCount, event) }
-        .onCompletion { appPrefs.edit { it[firstRun] = false } }
-        .collect()
-    }
+    var addToQueueCount = ADD_NEW_MEDIA_COUNT
+    audioMediaDao
+      .audioDaoEvents
+      .onStart { startMediaScannerModifiedSinceLastScan() }
+      .takeWhile { addToQueueCount > 0 }
+      .onEach { event -> addToQueueCount = handleScannerEvent(addToQueueCount, event) }
+      .onCompletion { appPrefs.edit { it[firstRun] = false } }
+      .launchIn(scope)
   }
 
   private fun startMediaScannerModifiedSinceLastScan() = MediaScannerService.startScanner(
@@ -179,7 +175,7 @@ class LocalAudioCommandProcessor(
   )
 
   private suspend fun handleSessionEvent(event: SessionControlEvent) {
-//    LOG._e { it("-->handleMediaSessionEvent %s", event) }
+    LOG._e { it("-->handleMediaSessionEvent %s", event) }
     when (event) {
       is SessionControlEvent.AddItemAt -> addItemAt(event.item, event.pos, event.addToEnd)
       is SessionControlEvent.CustomAction -> customAction(event.action, event.extras)
@@ -204,8 +200,6 @@ class LocalAudioCommandProcessor(
       is SessionControlEvent.SkipToPrevious -> previous()
       is SessionControlEvent.SkipToQueueItem -> goToQueueItem(event.instanceId)
       is SessionControlEvent.Stop -> stop()
-      SessionControlEvent.Duck -> duck()
-      SessionControlEvent.EndDuck -> endDuck()
     }
   }
 
@@ -254,70 +248,69 @@ class LocalAudioCommandProcessor(
   } else 0
 
   private fun collectCommandFlow() {
-    scope.launch {
-      commandFlow
-        .onEach { command -> processCommand(command) }
-        .catch { cause -> LOG.e(cause) { it("Error processing command") } }
-        .onCompletion { cause -> LOG.i(cause) { it("Command processing end") } }
-        .collect()
-    }
+    commandFlow
+      .onStart { LOG._e { it("Command flow start") } }
+      .onEach { command -> processCommand(command) }
+      .catch { cause -> LOG.e(cause) { it("Error processing command") } }
+      .onCompletion { cause -> LOG.i(cause) { it("Command processing end") } }
+      .launchIn(scope)
   }
 
   private suspend fun processCommand(command: LocalAudioCommand) = command.process(realQueue)
 
-  //private fun handleMediaButton(
-  //  keyEvent: KeyEvent,
-  //  keyCode: Int,
-  //  intent: Intent,
-  //  callback: MediaSessionCompat.Callback
-  //): Boolean = if (isCarHardKey(keyEvent) && keyCode.isPreviousOrNextMedia()) {
-  //  when (keyEvent.action) {
-  //    KeyEvent.ACTION_DOWN -> handleDownAction(keyEvent.isLongPress, keyCode)
-  //    KeyEvent.ACTION_UP -> handleUpAction(keyCode)
-  //    else -> false
-  //  }
-  //} else false
-  //
-  //private fun handleUpAction(keyCode: Int): Boolean {
-  //  var handled = false
-  //  if (!seeking) {
-  //    when (keyCode) {
-  //      KeyEvent.KEYCODE_MEDIA_NEXT -> {
-  //        if (enabledActions.hasSkipToNext) {
-  //          scope.launch { next() }
-  //          handled = true
-  //        }
-  //      }
-  //      KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-  //        if (enabledActions.hasSkipToPrevious) {
-  //          scope.launch { previous() }
-  //          handled = true
-  //        }
-  //      }
-  //    }
-  //  }
-  //  return handled
-  //}
-  //
-  //private fun handleDownAction(isLongPress: Boolean, keyCode: Int): Boolean {
-  //  var handled = false
-  //  if (isSeekable && isLongPress) {
-  //    when (keyCode) {
-  //      KeyEvent.KEYCODE_MEDIA_NEXT -> {
-  //        scope.launch { fastForward() }
-  //        handled = true
-  //      }
-  //      KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-  //        scope.launch { rewind() }
-  //        handled = true
-  //      }
-  //    }
-  //  }
-  //  return handled
-  //}
-  //
-  //private fun isCarHardKey(event: KeyEvent): Boolean = uiModeManager.inCarMode &&
-  //  event.deviceId == 0 && (event.flags and KeyEvent.FLAG_KEEP_TOUCH_MODE != 0)
+//private fun handleMediaButton(
+//  keyEvent: KeyEvent,
+//  keyCode: Int,
+//  intent: Intent,
+//  callback: MediaSessionCompat.Callback
+//): Boolean = if (isCarHardKey(keyEvent) && keyCode.isPreviousOrNextMedia()) {
+//  when (keyEvent.action) {
+//    KeyEvent.ACTION_DOWN -> handleDownAction(keyEvent.isLongPress, keyCode)
+//    KeyEvent.ACTION_UP -> handleUpAction(keyCode)
+//    else -> false
+//  }
+//} else false
+//
+//private fun handleUpAction(keyCode: Int): Boolean {
+//  var handled = false
+//  if (!seeking) {
+//    when (keyCode) {
+//      KeyEvent.KEYCODE_MEDIA_NEXT -> {
+//        if (enabledActions.hasSkipToNext) {
+//          scope.launch { next() }
+//          handled = true
+//        }
+//      }
+//      KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+//        if (enabledActions.hasSkipToPrevious) {
+//          scope.launch { previous() }
+//          handled = true
+//        }
+//      }
+//    }
+//  }
+//  return handled
+//}
+//
+//private fun handleDownAction(isLongPress: Boolean, keyCode: Int): Boolean {
+//  var handled = false
+//  if (isSeekable && isLongPress) {
+//    when (keyCode) {
+//      KeyEvent.KEYCODE_MEDIA_NEXT -> {
+//        scope.launch { fastForward() }
+//        handled = true
+//      }
+//      KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+//        scope.launch { rewind() }
+//        handled = true
+//      }
+//    }
+//  }
+//  return handled
+//}
+//
+//private fun isCarHardKey(event: KeyEvent): Boolean = uiModeManager.inCarMode &&
+//  event.deviceId == 0 && (event.flags and KeyEvent.FLAG_KEEP_TOUCH_MODE != 0)
 }
 
 private sealed interface LocalAudioCommand {
@@ -419,16 +412,6 @@ private sealed interface LocalAudioCommand {
   ) : LocalAudioCommand {
     override suspend fun process(localAudioQueue: LocalAudioQueue) =
       localAudioQueue.setRating(rating, allowFileUpdate)
-  }
-
-  object Duck : LocalAudioCommand {
-    override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.duck()
-  }
-
-  object EndDuck : LocalAudioCommand {
-    override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.endDuck()
   }
 }
 

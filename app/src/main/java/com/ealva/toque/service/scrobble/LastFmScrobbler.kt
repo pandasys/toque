@@ -83,11 +83,11 @@ internal class LastFmScrobbler(
   private fun broadcastIntent(action: String, item: PlayableAudioItem, isPlaying: Boolean) {
     lastItem = item
     val intent = Intent(action)
-      .putExtra(EXTRA_TRACK, item.title())
+      .putExtra(EXTRA_TRACK, item.title.value)
       .putExtra(EXTRA_ARTIST, item.albumArtist.value)
       .putExtra(EXTRA_ALBUM, item.albumTitle.value)
-      .putExtra(EXTRA_DURATION, item.duration())
-      .putExtra(EXTRA_POSITION, item.position())
+      .putExtra(EXTRA_DURATION, item.duration.value)
+      .putExtra(EXTRA_POSITION, item.position.value)
       .putExtra(EXTRA_PLAYING, isPlaying)
       .putExtra(EXTRA_PLAYER, pkgName.prop)
     debug { logIntent(intent) }

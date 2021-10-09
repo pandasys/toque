@@ -17,6 +17,7 @@
 package com.ealva.toque.db
 
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -41,12 +42,12 @@ interface EqPresetDao {
   /**
    * Insert the preset name and all preset data. Returns the preset ID if successful
    */
-  suspend fun insertPreset(name: String, preAmpAndBands: PreAmpAndBands): LongResult
+  suspend fun insertPreset(name: String, preAmpAndBands: PreAmpAndBands): DaoResult<EqPresetId>
 
   /**
-   * Get all the data for [presetId]
+   * Get all the data for [id]
    */
-  suspend fun getPresetData(presetId: Long): Result<EqPresetData, DaoMessage>
+  suspend fun getPresetData(id: EqPresetId): Result<EqPresetData, DaoMessage>
 
   /**
    * Get all user defined presets
@@ -61,21 +62,21 @@ interface EqPresetDao {
   suspend fun updatePreset(presetData: EqPresetData, duringTxn: () -> Unit = {}): BoolResult
 
   /**
-   * Update [presetId]'s PreAmp [amplitude]
+   * Update [id]'s PreAmp [amplitude]
    */
-  suspend fun updatePreAmp(presetId: Long, amplitude: Amp): BoolResult
+  suspend fun updatePreAmp(id: EqPresetId, amplitude: Amp): BoolResult
 
   /**
-   * Update [presetId]'s band [amplitude] at band column [index]
+   * Update [id]'s band [amplitude] at band column [index]
    */
-  suspend fun updateBand(presetId: Long, index: Int, amplitude: Amp): BoolResult
+  suspend fun updateBand(id: EqPresetId, index: Int, amplitude: Amp): BoolResult
 
-  suspend fun deletePreset(presetId: Long): BoolResult
+  suspend fun deletePreset(id: EqPresetId): BoolResult
 
   companion object {
     operator fun invoke(db: Database): EqPresetDao = EqPresetDaoImpl(db)
 
-    const val MIN_USER_PRESET_ID = 1000L
+    val MIN_USER_PRESET_ID = EqPresetId(1000L)
     val BAND_COUNT = EqPresetTable.bandColumns.size
 
     /**
@@ -98,9 +99,9 @@ interface EqPresetDao {
         val dummyName = "DummyDeleteMeDummy"
         val id = EqPresetTable.insert { it[presetName] = dummyName }
         try {
-          if (id < MIN_USER_PRESET_ID) { // should always be true if tableName was null
+          if (id < MIN_USER_PRESET_ID.value) { // should always be true if tableName was null
             SQLiteSequence
-              .updateColumns { it[seq] = (MIN_USER_PRESET_ID - 1) }
+              .updateColumns { it[seq] = (MIN_USER_PRESET_ID.value - 1) }
               .where { name eq EqPresetTable.tableName }
               .update()
           }
@@ -118,17 +119,17 @@ private class EqPresetDaoImpl(
   override suspend fun insertPreset(
     name: String,
     preAmpAndBands: PreAmpAndBands
-  ): LongResult = db.transaction {
+  ): DaoResult<EqPresetId> = db.transaction {
     runCatching { doInsertPreset(name, preAmpAndBands) }
       .mapError { DaoExceptionMessage(it) }
-      .andThen { if (it > 0) Ok(it) else Err(DaoFailedToInsert("$name $preAmpAndBands")) }
+      .andThen { if (it.value > 0) Ok(it) else Err(DaoFailedToInsert("$name $preAmpAndBands")) }
       .onFailure { rollback() }
   }
 
   private fun TransactionInProgress.doInsertPreset(
     name: String,
     preAmpAndBands: PreAmpAndBands
-  ): Long = INSERT_PRESET.insert {
+  ): EqPresetId = EqPresetId(INSERT_PRESET.insert {
     it[presetName] = name
     it[updatedTime] = System.currentTimeMillis()
     it[preAmp] = preAmpAndBands.preAmp()
@@ -144,21 +145,21 @@ private class EqPresetDaoImpl(
       it[band8] = bands[8]()
       it[band9] = bands[9]()
     }
-  }
+  })
 
   override suspend fun getPresetData(
-    presetId: Long
+    id: EqPresetId
   ): Result<EqPresetData, DaoMessage> = db.query {
-    runCatching { doGetPreset(presetId) }
+    runCatching { doGetPreset(id.value) }
       .mapError { DaoExceptionMessage(it) }
-      .andThen { it?.let { data -> Ok(data) } ?: Err(DaoNotFound("Preset ID:$presetId")) }
+      .andThen { it?.let { data -> Ok(data) } ?: Err(DaoNotFound("Preset ID:$id")) }
   }
 
   private fun Queryable.doGetPreset(presetId: Long): EqPresetData? =
     EqPresetTable
       .select()
       .where { id eq presetId }
-      .sequence { EqPresetData(it[id], it[presetName], dataFromCursor(it)) }
+      .sequence { EqPresetData(EqPresetId(it[id]), it[presetName], dataFromCursor(it)) }
       .singleOrNull()
 
   private fun EqPresetTable.dataFromCursor(cursor: Cursor) = PreAmpAndBands(
@@ -174,7 +175,7 @@ private class EqPresetDaoImpl(
   private fun Queryable.doGetAll(): List<EqPresetInfo> =
     EqPresetTable
       .selectAll()
-      .sequence { EqPresetInfo(it[id], it[presetName]) }
+      .sequence { EqPresetInfo(EqPresetId(it[id]), it[presetName]) }
       .toList()
 
   override suspend fun updatePreset(
@@ -188,7 +189,7 @@ private class EqPresetDaoImpl(
   }
 
   private fun TransactionInProgress.doUpdatePreset(presetData: EqPresetData) = UPDATE_ALL.update {
-    it[BIND_PRESET_ID] = presetData.id
+    it[BIND_PRESET_ID] = presetData.id.value
     it[updatedTime] = System.currentTimeMillis()
     it[preAmp] = presetData.preAmpAndBands.preAmp()
     with(presetData.preAmpAndBands) {
@@ -206,7 +207,7 @@ private class EqPresetDaoImpl(
   }
 
   override suspend fun updatePreAmp(
-    presetId: Long,
+    id: EqPresetId,
     amplitude: Amp
   ): BoolResult = db.transaction {
     runCatching {
@@ -215,19 +216,19 @@ private class EqPresetDaoImpl(
           it[preAmp] = amplitude()
           it[updatedTime] = System.currentTimeMillis()
         }
-        .where { id eq presetId }
+        .where { this.id eq id.value }
         .update()
     }.mapError {
       DaoExceptionMessage(it)
     }.andThen {
-      if (it > 0) Ok(true) else selectUpdateError(presetId, "PresetId:$presetId preamp:$amplitude")
+      if (it > 0) Ok(true) else selectUpdateError(id, "PresetId:$id preamp:$amplitude")
     }.onFailure {
       rollback()
     }
   }
 
   override suspend fun updateBand(
-    presetId: Long,
+    id: EqPresetId,
     index: Int,
     amplitude: Amp
   ): BoolResult = db.transaction {
@@ -238,30 +239,30 @@ private class EqPresetDaoImpl(
         it[bandColumns[index]] = amplitude()
         it[updatedTime] = System.currentTimeMillis()
       }.where {
-        id eq presetId
+        this.id eq id.value
       }.update()
     }.mapError {
       DaoExceptionMessage(it)
     }.andThen {
       if (it > 0) Ok(true)
-      else selectUpdateError(presetId, "PresetId:$presetId band:$index value:$amplitude")
+      else selectUpdateError(id, "PresetId:$id band:$index value:$amplitude")
     }.onFailure {
       rollback()
     }
   }
 
-  override suspend fun deletePreset(presetId: Long): BoolResult = db.transaction {
+  override suspend fun deletePreset(id: EqPresetId): BoolResult = db.transaction {
     runCatching {
-      EqPresetTable.delete { id eq presetId }
+      EqPresetTable.delete { this.id eq id.value }
     }.mapError {
       DaoExceptionMessage(it)
     }.andThen {
       if (it > 0) Ok(true)
       else {
         selectErrorIfExists(
-          presetId,
-          DaoFailedToDelete("PresetId:$presetId"),
-          DaoNotFound("PresetId:$presetId")
+          id,
+          DaoFailedToDelete("PresetId:$id"),
+          DaoNotFound("PresetId:$id")
         )
       }
     }.onFailure {
@@ -269,15 +270,15 @@ private class EqPresetDaoImpl(
     }
   }
 
-  private fun TransactionInProgress.selectUpdateError(presetId: Long, msg: String): BoolResult =
-    selectErrorIfExists(presetId, DaoNotFound("Preset ID:$presetId"), DaoFailedToUpdate(msg))
+  private fun TransactionInProgress.selectUpdateError(id: EqPresetId, msg: String): BoolResult =
+    selectErrorIfExists(id, DaoNotFound("Preset ID:$id"), DaoFailedToUpdate(msg))
 
   /**
    * These error conditions shouldn't occur in practice so another txn to narrow down this issue
    * is not a big deal
    */
   private fun Queryable.selectErrorIfExists(
-    presetId: Long,
+    presetId: EqPresetId,
     existsMsg: DaoMessage,
     notExistsMsg: DaoMessage
   ): Result<Nothing, DaoMessage> = runCatching { presetExists(presetId) }
@@ -286,14 +287,14 @@ private class EqPresetDaoImpl(
       if (exists) Err(existsMsg) else Err(notExistsMsg)
     }
 
-  private fun Queryable.presetExists(presetId: Long): Boolean =
-    EqPresetTable.select().where { id eq presetId }.count() > 0
+  private fun Queryable.presetExists(presetId: EqPresetId): Boolean =
+    EqPresetTable.select().where { id eq presetId.value }.count() > 0
 }
 
-data class EqPresetInfo(val id: Long, val name: String)
+data class EqPresetInfo(val id: EqPresetId, val name: String)
 
 data class EqPresetData(
-  val id: Long,
+  val id: EqPresetId,
   val name: String,
   val preAmpAndBands: PreAmpAndBands
 )
@@ -336,10 +337,10 @@ object NullEqPresetDao : EqPresetDao {
   override suspend fun insertPreset(
     name: String,
     preAmpAndBands: PreAmpAndBands
-  ): LongResult = NotImplemented
+  ): DaoResult<EqPresetId> = NotImplemented
 
   override suspend fun getPresetData(
-    presetId: Long
+    id: EqPresetId
   ): Result<EqPresetData, DaoMessage> = NotImplemented
 
   override suspend fun getAllUserPresets(): Result<List<EqPresetInfo>, DaoMessage> = NotImplemented
@@ -348,15 +349,15 @@ object NullEqPresetDao : EqPresetDao {
     duringTxn: () -> Unit
   ): BoolResult = NotImplemented
 
-  override suspend fun updatePreAmp(presetId: Long, amplitude: Amp): BoolResult = NotImplemented
+  override suspend fun updatePreAmp(id: EqPresetId, amplitude: Amp): BoolResult = NotImplemented
 
   override suspend fun updateBand(
-    presetId: Long,
+    id: EqPresetId,
     index: Int,
     amplitude: Amp
   ): BoolResult = NotImplemented
 
-  override suspend fun deletePreset(presetId: Long): BoolResult = NotImplemented
+  override suspend fun deletePreset(id: EqPresetId): BoolResult = NotImplemented
 
   private val NotImplemented = Err(DaoNotImplemented)
 }

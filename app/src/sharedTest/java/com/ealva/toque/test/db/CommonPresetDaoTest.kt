@@ -24,6 +24,7 @@ import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.DaoNotFound
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetTable
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.toque.test.shared.withTestDatabase
@@ -46,16 +47,16 @@ object CommonPresetDaoTest {
         EqPresetDao.establishMinimumRowId(this)
         val myPresetName = "MyPreset"
         expect(EqPresetTable.insert { it[presetName] = myPresetName })
-          .toBe(expectedFirstId)
+          .toBe(expectedFirstId.value)
         expect(EqPresetTable.delete { presetName eq myPresetName }).toBe(1)
         expect(EqPresetTable.insert { it[presetName] = myPresetName })
-          .toBe(expectedSecondId)
+          .toBe(expectedSecondId.value)
         expect(EqPresetTable.delete { presetName eq myPresetName }).toBe(1)
 
         // call again to ensure calling multiple times does no harm
         EqPresetDao.establishMinimumRowId(this)
         expect(EqPresetTable.insert { it[presetName] = myPresetName })
-          .toBe(expectedThirdId)
+          .toBe(expectedThirdId.value)
       }
     }
   }
@@ -64,7 +65,7 @@ object CommonPresetDaoTest {
     withTestDatabase(appCtx, setOf(EqPresetTable), testDispatcher) {
       val dao = EqPresetDao(this)
       val presetData = EqPresetData(
-        id = 1000,
+        id = EqPresetId(1000),
         name = "NotThere",
         preAmpAndBands = PreAmpAndBands(
           Amp(10F),
@@ -92,7 +93,7 @@ object CommonPresetDaoTest {
         name,
         preAmpAndBands
       )
-      val id = insertResult.get() ?: -1
+      val id = insertResult.get() ?: EqPresetId(-1)
       expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)
       dao.getPresetData(id).let { result ->
         expect(result).toBeInstanceOf<Ok<EqPresetData>>()
@@ -117,7 +118,7 @@ object CommonPresetDaoTest {
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
       dao.insertPreset(name, preAmpAndBands).let { result ->
-        val id = result.get() ?: -1
+        val id = result.get() ?: EqPresetId(-1)
         expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)
         dao.getPresetData(id).let { dataResult ->
           expect(dataResult).toBeInstanceOf<Ok<EqPresetData>>()
@@ -150,9 +151,9 @@ object CommonPresetDaoTest {
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
-      var id: Long
+      var id: EqPresetId
       dao.insertPreset(name, preAmpAndBands).let { result ->
-        id = result.get() ?: -1
+        id = result.get() ?: EqPresetId(-1)
         expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)
         dao.getPresetData(id).let { dataResult ->
           expect(dataResult).toBeInstanceOf<Ok<EqPresetData>>()
@@ -197,7 +198,7 @@ object CommonPresetDaoTest {
         name,
         preAmpAndBands
       )
-      val id = insertResult.get() ?: -1
+      val id = insertResult.get() ?: EqPresetId(-1)
       val updatedPreAmp = Amp(0)
       val result = dao.updatePreAmp(id, updatedPreAmp)
       expect(result).toBe(Ok(true))
@@ -218,7 +219,7 @@ object CommonPresetDaoTest {
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
-      val id = dao.insertPreset(name, preAmpAndBands).get() ?: -1
+      val id = dao.insertPreset(name, preAmpAndBands).get() ?: EqPresetId(-1)
       expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)
       val updatedBands = Array(preAmpAndBands.bands.size) { index ->
         preAmpAndBands.bands[index] + 1F
@@ -247,7 +248,7 @@ object CommonPresetDaoTest {
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
-      val id = dao.insertPreset(name, preAmpAndBands).get() ?: -1
+      val id = dao.insertPreset(name, preAmpAndBands).get() ?: EqPresetId(-1)
       expect(id).toBe(EqPresetDao.MIN_USER_PRESET_ID)
 
       dao.deletePreset(id).let { result ->

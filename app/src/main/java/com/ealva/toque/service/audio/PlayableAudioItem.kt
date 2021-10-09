@@ -27,7 +27,6 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
@@ -57,19 +56,11 @@ interface PlayableAudioItem : QueueAudioItem {
 
   var isMuted: Boolean
 
-  /**
-   * Directly set an Eq preset for this media regardless of any association the user has made. This
-   * is useful for both editing of presets and user selection
-   */
-  var equalizer: EqPreset
-
   var playbackRate: PlaybackRate
 
   fun play(immediate: Boolean = false)
 
   fun stop()
-
-  suspend fun togglePlayPause()
 
   fun pause(immediate: Boolean = false)
 
@@ -77,17 +68,15 @@ interface PlayableAudioItem : QueueAudioItem {
    * Seek to a position within the valid playback range, which is [Metadata.playbackRange]. If
    * [position] falls outside that range this call is a NoOp.
    */
-  suspend fun seekTo(position: Millis)
+  fun seekTo(position: Millis)
 
   fun shutdown()
 
-  suspend fun reset(
-    immediateTransition: Boolean,
-    playNow: PlayNow
-  )
+  fun duck()
+  fun endDuck()
 
   /**
-   * Prepare the player, seek to [position] and when the player is "prepared", apply the
+   * Prepare the player, seek to [startPosition] and when the player is "prepared", apply the
    * [onPreparedTransition]. If [playNow] is true, when the player has buffered sufficient media it
    * will auto play.
    *
@@ -97,8 +86,8 @@ interface PlayableAudioItem : QueueAudioItem {
    * an apparent glitch in playback. May need to rethink this and only start paused when
    * transition is not immediate
    */
-  suspend fun prepareSeekMaybePlay(
-    position: Millis,
+  fun prepareSeekMaybePlay(
+    startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
     timePlayed: Millis = Millis(0),
@@ -110,8 +99,6 @@ interface PlayableAudioItem : QueueAudioItem {
 
   fun shutdown(shutdownTransition: PlayerTransition)
 
-  suspend fun applyEqualization(eqPresetSelector: EqPresetSelector, applyEdits: Boolean)
-
   /**
    * Checks the playback position of the item and if it's in the "skipped" range, the skipped count
    * will be incremented and last skipped set to the current time.
@@ -122,7 +109,7 @@ interface PlayableAudioItem : QueueAudioItem {
    * If rating is coming from an external source (not our app), allowFileUpdate should be false
    * because we may need to ask the user for permission (>=Android 11/SDK R)
    */
-  suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean = false)
+  fun setRating(newRating: Rating, allowFileUpdate: Boolean = false)
 
   fun previousShouldRewind(): Boolean
 }
@@ -177,25 +164,20 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override val supportsFade: Boolean = false
   override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
-  override suspend fun togglePlayPause() = Unit
   override fun pause(immediate: Boolean) = Unit
   override val isSeekable: Boolean = false
-  override suspend fun seekTo(position: Millis) = Unit
+  override fun seekTo(position: Millis) = Unit
   override val position: Millis = Millis(0)
   override val duration: Millis = Millis(0)
   override var volume: Volume = Volume.MAX
   override var isMuted: Boolean = false
-  override var equalizer: EqPreset = EqPreset.NONE
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL
   override fun shutdown() = Unit
+  override fun duck() = Unit
+  override fun endDuck() = Unit
   override fun shutdown(shutdownTransition: PlayerTransition) = Unit
-  override suspend fun reset(
-    immediateTransition: Boolean,
-    playNow: PlayNow
-  ) = Unit
-
-  override suspend fun prepareSeekMaybePlay(
-    position: Millis,
+  override fun prepareSeekMaybePlay(
+    startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
     timePlayed: Millis,
@@ -204,13 +186,9 @@ object NullPlayableAudioItem : PlayableAudioItem {
   ) = Unit
 
   override fun cloneItem(): PlayableAudioItem = this
-  override suspend fun applyEqualization(
-    eqPresetSelector: EqPresetSelector,
-    applyEdits: Boolean
-  ) = Unit
 
   override fun checkMarkSkipped() = Unit
-  override suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean): Unit = Unit
+  override fun setRating(newRating: Rating, allowFileUpdate: Boolean): Unit = Unit
   override fun previousShouldRewind(): Boolean = false
 
   override val id: MediaId = MediaId.INVALID

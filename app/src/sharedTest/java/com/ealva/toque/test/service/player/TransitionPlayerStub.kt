@@ -70,6 +70,20 @@ class TransitionPlayerStub : TransitionPlayer {
       return _volumeRange
     }
 
+
+  var _allowVolumeChange = true
+  var _allowVolumeChangeGetCalled = 0
+  var _allowVolumeChangeSetCalled = 0
+  override var allowVolumeChange: Boolean
+    get() {
+      ++_allowVolumeChangeGetCalled
+      return _allowVolumeChange
+    }
+    set(value) {
+      ++_allowVolumeChangeSetCalled
+      _allowVolumeChange = value
+    }
+
   var _remainingTime = Millis(0)
   var _remainingTimeCalled = 0
   override val remainingTime: Millis

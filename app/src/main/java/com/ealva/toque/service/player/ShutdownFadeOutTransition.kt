@@ -43,11 +43,7 @@ class ShutdownFadeOutTransition(
     setComplete()
   }
 
-  override fun cancelTransition(player: TransitionPlayer) {
-    player.shutdownPlayer()
-  }
+  override fun cancelTransition(player: TransitionPlayer) = player.shutdownPlayer()
 
-  override fun toString(): String {
-    return "ShutdownFadeOutTransition($requestedFadeLength)"
-  }
+  override fun toString(): String = "ShutdownFadeOutTransition($requestedFadeLength)"
 }

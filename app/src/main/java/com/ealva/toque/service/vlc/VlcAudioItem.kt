@@ -28,15 +28,16 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
-import com.ealva.toque.service.audio.EqPresetSelector
+import com.ealva.toque.service.audio.ActiveEqPreset
+import com.ealva.toque.service.audio.DuckedState
 import com.ealva.toque.service.audio.MediaFileStore
 import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.AvPlayerEvent
@@ -55,7 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onSubscription
@@ -86,10 +87,12 @@ class VlcAudioItem(
   override val artistSet: Set<ArtistName>,
   private val libVlc: LibVlc,
   private val mediaFileStore: MediaFileStore,
-  private val eqPresetSelector: EqPresetSelector,
+  private val activeEqPreset: ActiveEqPreset,
   private val appPrefs: AppPrefs,
   private val libVlcPrefs: LibVlcPrefs,
   private val wakeLockFactory: WakeLockFactory,
+  private val requestFocus: AvPlayer.FocusRequest,
+  private val duckedState: DuckedState,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : PlayableAudioItem {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -122,6 +125,7 @@ class VlcAudioItem(
     get() = metadata.duration
 
   override fun play(immediate: Boolean) {
+    LOG._e { it("play isStopped=%s", isStopped) }
     if (isStopped)
       scope.launch { reset(immediateTransition = immediate, playNow = PlayNow(true)) }
     else
@@ -132,10 +136,6 @@ class VlcAudioItem(
     if (!isStopped) avPlayer.stop()
   }
 
-  override suspend fun togglePlayPause() {
-    if (avPlayer.isPlaying) avPlayer.pause(false) else play(false)
-  }
-
   override fun pause(immediate: Boolean) {
     avPlayer.pause(immediate)
   }
@@ -143,7 +143,7 @@ class VlcAudioItem(
   override val isSeekable: Boolean
     get() = avPlayer.isValid && avPlayer.isSeekable
 
-  override suspend fun seekTo(position: Millis) {
+  override fun seekTo(position: Millis) {
     if (position in metadata.playbackRange) {
       if (isStopped)
         scope.launch { reset(immediateTransition = false, playNow = PlayNow(false)) }
@@ -162,8 +162,21 @@ class VlcAudioItem(
     }
   }
 
-  private var _position = Millis(0)
-  override val position: Millis get() = _position
+  private fun reset(immediateTransition: Boolean, playNow: PlayNow) {
+    val shouldPlayNow = PlayNow(playNow() || isPlaying)
+    val currentTime = position
+    avPlayer.shutdown()
+    avPlayer = NullAvPlayer
+    prepareSeekMaybePlay(
+      currentTime,
+      if (immediateTransition) PlayImmediateTransition() else NoOpPlayerTransition,
+      shouldPlayNow,
+      previousTimePlayed,
+      countTimeFrom
+    )
+  }
+
+  override var position: Millis = Millis(0)
 
   override var volume: Volume
     get() = avPlayer.volume
@@ -175,12 +188,6 @@ class VlcAudioItem(
     get() = avPlayer.isMuted
     set(mute) {
       avPlayer.isMuted = mute
-    }
-
-  override var equalizer: EqPreset
-    get() = avPlayer.equalizer
-    set(eqPreset) {
-      avPlayer.setEqualizer(eqPreset, true)
     }
 
   override var playbackRate: PlaybackRate
@@ -199,59 +206,56 @@ class VlcAudioItem(
     }
   }
 
+  override fun duck() = avPlayer.duck()
+
+  override fun endDuck() = avPlayer.endDuck()
+
   override fun shutdown(shutdownTransition: PlayerTransition) =
     avPlayer.transitionTo(shutdownTransition)
 
-  override suspend fun reset(immediateTransition: Boolean, playNow: PlayNow) {
-    val shouldPlayNow = PlayNow(playNow() || isPlaying)
-    val currentTime = _position
-    avPlayer.shutdown()
-    avPlayer = NullAvPlayer
-    prepareSeekMaybePlay(
-      currentTime,
-      if (immediateTransition) PlayImmediateTransition() else NoOpPlayerTransition,
-      shouldPlayNow,
-      previousTimePlayed,
-      countTimeFrom
-    )
-  }
-
-  override suspend fun prepareSeekMaybePlay(
-    position: Millis,
+  override fun prepareSeekMaybePlay(
+    startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
     timePlayed: Millis,
     countFrom: Millis,
     startPaused: StartPaused
   ) {
-    isPreparing = true
-    // what I'm calling "position" the underlying VLC player calls "time".
-    // For the VLC player, position is a percentage
-    _position = position
-    startOnPrepared = playNow()
-    isShutdown = false
-    isStopped = false
-    previousTimePlayed = timePlayed
-    countTimeFrom = countFrom
-    avPlayer = libVlc.makeAudioMedia(fileUri, position, startPaused, libVlcPrefs).use { media ->
-      VlcPlayer(
-        media,
-        title,
-        duration,
-        eqPresetSelector.getPreferredEqPreset(id, albumId) as VlcEqPreset,
-        onPreparedTransition,
-        appPrefs,
-        wakeLock,
-        dispatcher
-      )
-    }
-    scope.launch {
-      avPlayer.eventFlow
-        .onSubscription { if (startPaused()) avPlayer.playStartPaused() }
-        .onEach { event -> handleAvPlayerEvent(event) }
-        .catch { cause -> LOG.e(cause) { it("Error processing MediaPlayerEvent") } }
-        .onCompletion { LOG.i { it("MediaPlayer event flow completed") } }
-        .collect()
+    if (!isPreparing) {
+      isPreparing = true
+      scope.launch {
+        // what I'm calling "position" the underlying VLC player calls "time".
+        // For the VLC player, position is a percentage
+        position = startPosition
+        startOnPrepared = playNow()
+        isShutdown = false
+        isStopped = false
+        previousTimePlayed = timePlayed
+        countTimeFrom = countFrom
+        avPlayer =
+          libVlc.makeAudioMedia(fileUri, startPosition, startPaused, libVlcPrefs).use { media ->
+            VlcPlayer.make(
+              id,
+              albumId,
+              media,
+              title,
+              duration,
+              activeEqPreset,
+              onPreparedTransition,
+              appPrefs,
+              requestFocus,
+              duckedState,
+              wakeLock,
+              dispatcher
+            )
+          }
+        avPlayer.eventFlow
+          .onSubscription { if (startPaused()) avPlayer.playStartPaused() }
+          .onEach { event -> handleAvPlayerEvent(event) }
+          .catch { cause -> LOG.e(cause) { it("Error processing MediaPlayerEvent") } }
+          .onCompletion { LOG.i { it("MediaPlayer event flow completed") } }
+          .launchIn(scope)
+      }
     }
   }
 
@@ -269,7 +273,7 @@ class VlcAudioItem(
 
   private suspend fun onPrepared(event: AvPlayerEvent.Prepared) {
     // Can get a 0 before we start actual playback, but we set this during prepareSeekMaybePlay
-    if (_position == Millis(0)) _position = event.position
+    if (position == Millis(0)) position = event.position
     // establish where we will start counting percentage played if not already set
     if (countTimeFrom == Millis(0)) countTimeFrom = event.position
     isPreparing = false
@@ -303,7 +307,7 @@ class VlcAudioItem(
           }
         } else {
           // This is a user seek so establish a new count start time and save the previous total
-          previousTimePlayed += _position - countTimeFrom
+          previousTimePlayed += position - countTimeFrom
           countTimeFrom = event.position
         }
       } else {
@@ -313,7 +317,7 @@ class VlcAudioItem(
         countTimeFrom = event.position
       }
     }
-    _position = event.position
+    position = event.position
     eventFlow.emit(
       PlayableAudioItemEvent.PositionUpdate(
         this,
@@ -327,7 +331,7 @@ class VlcAudioItem(
 
   private suspend fun onPaused(event: AvPlayerEvent.Paused) {
     isPreparing = false
-    _position = event.position
+    position = event.position
     eventFlow.emit(PlayableAudioItemEvent.Paused(this, event.position))
   }
 
@@ -344,7 +348,10 @@ class VlcAudioItem(
     eventFlow.emit(PlayableAudioItemEvent.PlaybackComplete(this))
   }
 
-  private suspend fun onError() = eventFlow.emit(PlayableAudioItemEvent.Error(this))
+  private suspend fun onError() {
+    isPreparing = false
+    eventFlow.emit(PlayableAudioItemEvent.Error(this))
+  }
 
   override fun cloneItem(): PlayableAudioItem = VlcAudioItem(
     metadata,
@@ -353,36 +360,38 @@ class VlcAudioItem(
     artistSet,
     libVlc,
     mediaFileStore,
-    eqPresetSelector,
+    activeEqPreset,
     appPrefs,
     libVlcPrefs,
     wakeLockFactory,
+    requestFocus,
+    duckedState,
     dispatcher
   )
-
-  override suspend fun applyEqualization(eqPresetSelector: EqPresetSelector, applyEdits: Boolean) {
-    val preset = eqPresetSelector.getPreferredEqPreset(id, albumId)
-    avPlayer.setEqualizer(preset, applyEdits)
-  }
 
   override fun checkMarkSkipped() {
     if (position in SKIP_RANGE) mediaFileStore.incrementSkippedCountAsync(id)
   }
 
-  override suspend fun setRating(newRating: Rating, allowFileUpdate: Boolean) {
+  override fun setRating(newRating: Rating, allowFileUpdate: Boolean) {
     val wasPlaying = isPlaying
-    return when (
-      val result = mediaFileStore.setRating(
-        id = id,
-        fileLocation = metadata.location,
-        fileExt = displayName.substringAfterLast('.', ""),
-        newRating = newRating,
-        writeToFile = allowFileUpdate && appPrefs.saveRatingToFile(),
-        beforeFileWrite = { if (wasPlaying) pause(immediate = true) }
-      ) { if (wasPlaying) play(immediate = true) }
-    ) {
-      is Ok -> metadata = metadata.copy(rating = result.value)
-      is Err -> LOG.e { it("Error setting rating. %s", result.error) }
+    val mediaId = id
+    val fileLocation = metadata.location
+    val fileExt = displayName.substringAfterLast('.', "")
+    scope.launch {
+      when (
+        val result = mediaFileStore.setRating(
+          id = mediaId,
+          fileLocation = fileLocation,
+          fileExt = fileExt,
+          newRating = newRating,
+          writeToFile = allowFileUpdate && appPrefs.saveRatingToFile(),
+          beforeFileWrite = { if (wasPlaying) pause(immediate = true) }
+        ) { if (wasPlaying) play(immediate = true) }
+      ) {
+        is Ok -> metadata = metadata.copy(rating = result.value)
+        is Err -> LOG.e { it("Error setting rating. %s", result.error) }
+      }
     }
   }
 

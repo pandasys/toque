@@ -33,6 +33,11 @@ interface PlayerTransition {
   val isFinished: Boolean
 
   /**
+   * Is true if the transition has begun execution and is ![isFinished]
+   */
+  val isActive: Boolean
+
+  /**
    * Should the current state be considered paused. This could be a query of the real player or the
    * transition could represent a paused stated (transitioning to paused/stopped)
    */

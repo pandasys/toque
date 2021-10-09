@@ -18,6 +18,7 @@ package com.ealva.toque.test.db
 
 import android.content.Context
 import com.ealva.toque.audioout.AudioOutputRoute
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetAssociationTable
 import com.ealva.toque.db.PresetAssociation
@@ -35,7 +36,7 @@ object CommonPresetAssocDaoTest {
   suspend fun testSetAsDefault(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
-      val preset = EqPresetStub(1).apply { name = "NewDefault" }
+      val preset = EqPresetStub(EqPresetId(1)).apply { name = "NewDefault" }
       dao.setAsDefault(preset)
       val result = dao.getAssociationsFor(preset)
       expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
@@ -48,8 +49,8 @@ object CommonPresetAssocDaoTest {
   suspend fun testReplaceDefault(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
-      val firstPreset = EqPresetStub(1).apply { name = "FirstPreset" }
-      val lastPreset = EqPresetStub(2).apply { name = "SecondPreset" }
+      val firstPreset = EqPresetStub(EqPresetId(1)).apply { name = "FirstPreset" }
+      val lastPreset = EqPresetStub(EqPresetId(2)).apply { name = "SecondPreset" }
       dao.setAsDefault(firstPreset)
       dao.setAsDefault(lastPreset)
       val firstResult = dao.getAssociationsFor(firstPreset)
@@ -68,7 +69,7 @@ object CommonPresetAssocDaoTest {
   suspend fun testMakeAssociations(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
-      val preset = EqPresetStub(1).apply { name = "NewDefault" }
+      val preset = EqPresetStub(EqPresetId(1)).apply { name = "NewDefault" }
 
       val mediaId = 100L.toMediaId()
       val albumId = 10L.toAlbumId()
@@ -94,7 +95,7 @@ object CommonPresetAssocDaoTest {
   suspend fun testReplaceAssociations(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
-      val preset1 = EqPresetStub(1).apply { name = "Preset1" }
+      val preset1 = EqPresetStub(EqPresetId(1)).apply { name = "Preset1" }
 
       val mediaId1 = 100L.toMediaId()
       val albumId1 = 10L.toAlbumId()
@@ -117,7 +118,7 @@ object CommonPresetAssocDaoTest {
         expect(list[2]).toBe(PresetAssociation.makeForOutput(output1))
       }
 
-      val preset2 = EqPresetStub(2).apply { name = "Preset2" }
+      val preset2 = EqPresetStub(EqPresetId(2)).apply { name = "Preset2" }
       dao.setAsDefault(preset2)
 
       val mediaId2 = 500L.toMediaId()
@@ -153,10 +154,11 @@ object CommonPresetAssocDaoTest {
       dao.getPreferredId(
         10L.toMediaId(),
         11L.toAlbumId(),
-        AudioOutputRoute.Speaker
-      ) { -1 }.let { result ->
+        AudioOutputRoute.Speaker,
+        EqPresetId(-1)
+      ).let { result ->
         expect(result).toBeInstanceOf<Ok<Long>>()
-        expect(result.get()).toBe(-1)
+        expect(result.get()).toBe(EqPresetId(-1))
       }
     }
   }
@@ -164,7 +166,7 @@ object CommonPresetAssocDaoTest {
   suspend fun testGetPreferredId(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
-      val preset = EqPresetStub(1000).apply { name = "A Preset" }
+      val preset = EqPresetStub(EqPresetId(1000)).apply { name = "A Preset" }
 
       val mediaId = 100L.toMediaId()
       val albumId = 10L.toAlbumId()

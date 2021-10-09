@@ -89,20 +89,20 @@ class FadeInTransition(
               player.playerVolume = currentVolume
               if (shouldContinueTransition(player)) {
                 if (currentVolume >= endVolume) {
-                  setComplete()
                   currentVolume = cancelVolume
+                  setComplete()
                 } else {
                   // If using default throttle, sleep until at least 100 millis have passed
                   throttle.acquire()
                 }
               } else {
-                setCancelled()
                 currentVolume = cancelVolume
+                setCancelled()
               }
             }
           } else {
-            setComplete()
             player.playerVolume = endVolume
+            setComplete()
           }
         }
       }

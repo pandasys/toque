@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.audio
+package com.ealva.toque.common
 
-import com.ealva.toque.persist.AlbumId
-import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.EqPreset
+@JvmInline
+value class EqPresetId(val value: Long) {
+  @Suppress("NOTHING_TO_INLINE")
+  inline operator fun invoke(): Long = value
+  operator fun plus(i: Int): EqPresetId = EqPresetId(value + i)
 
-interface EqPresetSelector {
-  suspend fun getPreferredEqPreset(mediaId: MediaId, albumId: AlbumId): EqPreset
-}
-
-object NullEqPresetSelector : EqPresetSelector {
-  override suspend fun getPreferredEqPreset(mediaId: MediaId, albumId: AlbumId): EqPreset =
-    EqPreset.NONE
+  companion object {
+    operator fun invoke(i: Int): EqPresetId = EqPresetId(i.toLong())
+  }
 }

@@ -73,4 +73,6 @@ class AppPrefsStub : AppPrefs {
   override val saveRatingToFile: BoolPref = BoolPrefStub()
   override val scanInternalVolume: BoolPref = BoolPrefStub()
   override val showTimeRemaining: BoolPref = BoolPrefStub()
+  override val playOnBluetoothConnection: BoolPref = BoolPrefStub()
+  override val playOnWiredConnection: BoolPref = BoolPrefStub()
 }

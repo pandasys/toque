@@ -27,8 +27,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.Card
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
@@ -61,7 +63,9 @@ import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.PlayState
+import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.vlc.toFloat
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
@@ -71,7 +75,7 @@ import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_DURATION_TEXT
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_EXTRA_INFO
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_POSITION_SLIDER
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_POSITION_TEXT
-import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_RATING
+import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_RATING_BAR_ROW
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_SLIDER_SPACE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE_SPACE
@@ -104,9 +108,9 @@ object NowPlayingScreenIds {
   const val ID_TITLE = 7
   const val ID_ARTIST = 8
   const val ID_ALBUM = 9
-  const val ID_RATING = 10
   const val ID_TITLE_SPACE = 11
   const val ID_TOP_SPACE = 12
+  const val ID_RATING_BAR_ROW = 13
 }
 
 @Immutable
@@ -136,6 +140,7 @@ data class NowPlayingScreen(private val noArgPlaceholder: String = "") : Compose
       prevList = { viewModel.previousList() },
       seekTo = { position -> viewModel.seekTo(position) },
       toggleShowRemaining = { viewModel.toggleShowTimeRemaining() },
+      toggleEqMode = { viewModel.toggleEqMode() },
       modifier
     )
   }
@@ -174,6 +179,7 @@ fun NowPlaying(
   prevList: () -> Unit,
   seekTo: (Millis) -> Unit,
   toggleShowRemaining: () -> Unit,
+  toggleEqMode: () -> Unit,
   modifier: Modifier
 ) {
   val useDarkIcons = MaterialTheme.colors.isLight
@@ -191,108 +197,85 @@ fun NowPlaying(
     )
   }
   Box(modifier = modifier) {
-    NowPlayingPortrait(
-      screenConfig,
-      state,
-      goToIndex,
-      togglePlayPause,
-      next,
-      prev,
-      nextList,
-      prevList,
-      seekTo,
-      toggleShowRemaining
-    )
-  }
-}
-
-@Composable
-fun NowPlayingPortrait(
-  config: ScreenConfig,
-  state: NowPlayingState,
-  goToIndex: (Int) -> Unit,
-  togglePlayPause: () -> Unit,
-  next: () -> Unit,
-  prev: () -> Unit,
-  nextList: () -> Unit,
-  prevList: () -> Unit,
-  seekTo: (Millis) -> Unit,
-  toggleShowRemaining: () -> Unit
-) {
-  val isPortrait = config.inPortrait
-  ConstraintLayout(modifier = Modifier.fillMaxSize()) {
-    val (pager, controls) = createRefs()
-    MediaArtPager(
-      queue = state.queue,
-      queueIndex = state.queueIndex,
-      size = config.imageSizePx,
-      goToIndex = goToIndex,
-      modifier = if (isPortrait) {
-        Modifier.constrainAs(pager) {
-          top.linkTo(parent.top)
-          start.linkTo(parent.start)
-          end.linkTo(parent.end)
-          bottom.linkTo(controls.top)
-          height = Dimension.value(config.screenWidthDp)
-        }
-      } else {
-        Modifier.constrainAs(pager) {
-          top.linkTo(parent.top)
-          if (config.navOnLeft) {
-            start.linkTo(parent.start)
-            end.linkTo(controls.start)
-          } else {
-            start.linkTo(controls.end)
-            end.linkTo(parent.end)
-          }
-          bottom.linkTo(parent.bottom)
-          width = Dimension.value(config.imageSizeDp)
-        }
-      }
-    )
-    PlayerControls(
-      state = state,
-      togglePlayPause = togglePlayPause,
-      next = next,
-      prev = prev,
-      nextList = nextList,
-      prevList = prevList,
-      seekTo = seekTo,
-      toggleShowRemaining = toggleShowRemaining,
-      constraintSet = if (isPortrait) portraitConstraints() else landscapeConstraints(),
-      modifier = if (isPortrait) {
-        Modifier
-          .constrainAs(controls) {
-            top.linkTo(pager.bottom)
-            start.linkTo(parent.start)
-            end.linkTo(parent.end)
-            bottom.linkTo(parent.bottom)
-            height = Dimension.fillToConstraints
-          }
-          .navigationBarsPadding()
-          .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
-      } else {
-        Modifier
-          .constrainAs(controls) {
+    val isPortrait = screenConfig.inPortrait
+    ConstraintLayout(modifier = Modifier.fillMaxSize()) {
+      val (pager, controls) = createRefs()
+      MediaArtPager(
+        queue = state.queue,
+        queueIndex = state.queueIndex,
+        size = screenConfig.imageSizePx,
+        goToIndex = goToIndex,
+        modifier = if (isPortrait) {
+          Modifier.constrainAs(pager) {
             top.linkTo(parent.top)
-            if (config.navOnLeft) {
-              start.linkTo(pager.end)
-              end.linkTo(parent.end)
-            } else {
+            start.linkTo(parent.start)
+            end.linkTo(parent.end)
+            bottom.linkTo(controls.top)
+            height = Dimension.value(screenConfig.screenWidthDp)
+          }
+        } else {
+          Modifier.constrainAs(pager) {
+            top.linkTo(parent.top)
+            if (screenConfig.navOnLeft) {
               start.linkTo(parent.start)
-              end.linkTo(pager.start)
+              end.linkTo(controls.start)
+            } else {
+              start.linkTo(controls.end)
+              end.linkTo(parent.end)
             }
             bottom.linkTo(parent.bottom)
-            width = Dimension.fillToConstraints
+            width = Dimension.value(screenConfig.imageSizeDp)
           }
-          .statusBarsPadding()
-          .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
-      }
-    )
+        }
+      )
+      PlayerControls(
+        state = state,
+        togglePlayPause = togglePlayPause,
+        next = next,
+        prev = prev,
+        nextList = nextList,
+        prevList = prevList,
+        seekTo = seekTo,
+        toggleShowRemaining = toggleShowRemaining,
+        toggleEqMode = toggleEqMode,
+        constraintSet = if (isPortrait) portraitConstraints() else landscapeConstraints(),
+        modifier = if (isPortrait) {
+          Modifier
+            .constrainAs(controls) {
+              top.linkTo(pager.bottom)
+              start.linkTo(parent.start)
+              end.linkTo(parent.end)
+              bottom.linkTo(parent.bottom)
+              height = Dimension.fillToConstraints
+            }
+            .navigationBarsPadding()
+            .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
+        } else {
+          Modifier
+            .constrainAs(controls) {
+              top.linkTo(parent.top)
+              if (screenConfig.navOnLeft) {
+                start.linkTo(pager.end)
+                end.linkTo(parent.end)
+              } else {
+                start.linkTo(parent.start)
+                end.linkTo(pager.start)
+              }
+              bottom.linkTo(parent.bottom)
+              width = Dimension.fillToConstraints
+            }
+            .statusBarsPadding()
+            .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
+        }
+      )
+    }
   }
 }
 
-@OptIn(ExperimentalUnitApi::class)
+private const val ALPHA_ON = 1.0F
+private const val ALPHA_OFF = 0.2F
+
+@OptIn(ExperimentalUnitApi::class, ExperimentalCoilApi::class)
 @Composable
 fun PlayerControls(
   state: NowPlayingState,
@@ -303,6 +286,7 @@ fun PlayerControls(
   prevList: () -> Unit,
   seekTo: (Millis) -> Unit,
   toggleShowRemaining: () -> Unit,
+  toggleEqMode: () -> Unit,
   constraintSet: ConstraintSet,
   modifier: Modifier
 ) {
@@ -311,15 +295,14 @@ fun PlayerControls(
     ConstraintLayout(constraintSet = constraintSet, modifier = Modifier.fillMaxSize()) {
 
       Spacer(modifier = Modifier.layoutId(ID_TOP_SPACE)) // can't top align rating bar without this
-      RatingBar(
-        modifier = Modifier.layoutId(ID_RATING),
-        value = item.rating.toStarRating().value,
-        isIndicator = true,
-        activeColor = Color.White,
-        inactiveColor = Color.White,
-        ratingBarStyle = RatingBarStyle.HighLighted,
-        onValueChange = {},
-        onRatingChanged = {},
+      RatingBarRow(
+        state.eqMode,
+        item.rating,
+        toggleEqMode,
+        Modifier
+          .layoutId(ID_RATING_BAR_ROW)
+          .padding(horizontal = 8.dp)
+          .fillMaxWidth()
       )
       Text(
         text = item.title.value,
@@ -380,7 +363,18 @@ fun PlayerControls(
           .clickable(onClick = toggleShowRemaining)
           .padding(end = 12.dp)
       )
-      ButtonRow(state.playingState, togglePlayPause, next, prev, nextList, prevList)
+      ButtonRow(
+        state.playingState,
+        togglePlayPause,
+        next,
+        prev,
+        nextList,
+        prevList,
+        Modifier
+          .layoutId(ID_BUTTON_ROW)
+          .padding(horizontal = 8.dp)
+          .fillMaxWidth()
+      )
     }
   }
 }
@@ -450,6 +444,41 @@ fun PositionSlider(
 
 @OptIn(ExperimentalCoilApi::class)
 @Composable
+fun RatingBarRow(
+  eqMode: EqMode,
+  rating: Rating,
+  toggleEqMode: () -> Unit,
+  modifier: Modifier
+) {
+  Row(
+    modifier = modifier,
+    horizontalArrangement = Arrangement.SpaceEvenly
+  ) {
+    IconButton(onClick = toggleEqMode, modifier = Modifier.size(30.dp)) {
+      Image(
+        painter = rememberImagePainter(data = R.drawable.ic_audio_equalizer),
+        contentDescription = "Toggle Equalizer",
+        alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF,
+        modifier = Modifier.size(30.dp)
+      )
+    }
+    Spacer(modifier = Modifier.height(30.dp))
+    RatingBar(
+      modifier = Modifier.wrapContentSize(),
+      value = rating.toStarRating().value,
+      isIndicator = true,
+      activeColor = Color.White,
+      inactiveColor = Color.White,
+      ratingBarStyle = RatingBarStyle.HighLighted,
+      onValueChange = {},
+      onRatingChanged = {},
+    )
+    Spacer(modifier = Modifier.height(30.dp))
+  }
+}
+
+@OptIn(ExperimentalCoilApi::class)
+@Composable
 fun ButtonRow(
   playState: PlayState,
   togglePlayPause: () -> Unit,
@@ -457,12 +486,10 @@ fun ButtonRow(
   prev: () -> Unit,
   nextList: () -> Unit,
   prevList: () -> Unit,
+  modifier: Modifier,
 ) {
   Row(
-    modifier = Modifier
-      .layoutId(ID_BUTTON_ROW)
-      .padding(horizontal = 8.dp)
-      .fillMaxWidth(),
+    modifier = modifier,
     horizontalArrangement = Arrangement.SpaceEvenly
   ) {
     IconButton(onClick = prevList, modifier = Modifier.size(50.dp)) {
@@ -514,25 +541,24 @@ fun portraitConstraints(): ConstraintSet = ConstraintSet {
   val title = createRefFor(ID_TITLE)
   val artist = createRefFor(ID_ARTIST)
   val album = createRefFor(ID_ALBUM)
-  val rating = createRefFor(ID_RATING)
   val sliderSpace = createRefFor(ID_SLIDER_SPACE)
   val titleSpace = createRefFor(ID_TITLE_SPACE)
   val topSpace = createRefFor(ID_TOP_SPACE)
-
+  val ratingBarRow = createRefFor(ID_RATING_BAR_ROW)
   constrain(topSpace) {
     top.linkTo(parent.top)
     centerHorizontallyTo(parent)
-    bottom.linkTo(rating.top)
+    bottom.linkTo(ratingBarRow.top)
     height = Dimension.value(8.dp)
   }
-  constrain(rating) {
+  constrain(ratingBarRow) {
     top.linkTo(topSpace.bottom)
-    centerHorizontallyTo(parent)
+    start.linkTo(parent.start)
+    end.linkTo(parent.end)
     bottom.linkTo(titleSpace.top)
-    height = Dimension.wrapContent
   }
   constrain(titleSpace) {
-    top.linkTo(rating.bottom)
+    top.linkTo(ratingBarRow.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(title.top)
@@ -546,14 +572,14 @@ fun portraitConstraints(): ConstraintSet = ConstraintSet {
     height = Dimension.wrapContent
   }
   constrain(artist) {
-    top.linkTo(title.bottom, margin = 6.dp)
+    top.linkTo(title.bottom, margin = 2.dp)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(album.top)
     height = Dimension.wrapContent
   }
   constrain(album) {
-    top.linkTo(artist.bottom, margin = 6.dp)
+    top.linkTo(artist.bottom, margin = 2.dp)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(sliderSpace.top)
@@ -610,10 +636,9 @@ fun landscapeConstraints(): ConstraintSet = ConstraintSet {
   val title = createRefFor(ID_TITLE)
   val artist = createRefFor(ID_ARTIST)
   val album = createRefFor(ID_ALBUM)
-  val rating = createRefFor(ID_RATING)
   val sliderSpace = createRefFor(ID_SLIDER_SPACE)
   val topSpace = createRefFor(ID_TOP_SPACE)
-
+  val ratingBarRow = createRefFor(ID_RATING_BAR_ROW)
   constrain(topSpace) {
     top.linkTo(parent.top)
     start.linkTo(parent.start)
@@ -646,17 +671,17 @@ fun landscapeConstraints(): ConstraintSet = ConstraintSet {
     top.linkTo(album.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
-    bottom.linkTo(rating.top)
+    bottom.linkTo(ratingBarRow.top)
     height = Dimension.fillToConstraints
   }
-  constrain(rating) {
+  constrain(ratingBarRow) {
     top.linkTo(sliderSpace.bottom)
-    centerHorizontallyTo(parent)
+    start.linkTo(parent.start)
+    end.linkTo(parent.end)
     bottom.linkTo(slider.top, margin = (-12).dp)
-    height = Dimension.wrapContent
   }
   constrain(slider) {
-    top.linkTo(rating.bottom)
+    top.linkTo(ratingBarRow.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(extraInfo.top)
