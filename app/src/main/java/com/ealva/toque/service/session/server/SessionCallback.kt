@@ -132,11 +132,8 @@ internal class SessionCallback(
     }
       ?: LOG.e { it("onSetRating with extras, null rating") }
 
-  override fun onSetCaptioningEnabled(enabled: Boolean) = emit(
-    SessionControlEvent.EnableCaption(
-      enabled
-    )
-  )
+  override fun onSetCaptioningEnabled(enabled: Boolean) =
+    emit(SessionControlEvent.EnableCaption(enabled))
 
   override fun onSetRepeatMode(repeatMode: Int) =
     emit(SessionControlEvent.Repeat(repeatMode.compatToRepeatMode()))

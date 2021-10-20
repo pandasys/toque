@@ -89,9 +89,9 @@ class UrisTest {
 
   @Test
   fun testPlaylistFileExtMimeType() {
-    Extensions.PLAYLIST.filterNot { it == ".b4s" }.forEach { ext ->
-      expect(ext.mimeTypeFromExt()).toNotBeNullOrEmpty { "$ext no MimeType" }
-    }
+    Extensions.PLAYLIST
+      .filterNot { it == ".b4s" || it == ".wpl" }
+      .forEach { ext -> expect(ext.mimeTypeFromExt()).toNotBeNullOrEmpty { "$ext no MimeType" } }
   }
 }
 

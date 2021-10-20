@@ -18,7 +18,7 @@ package com.ealva.toque.service.vlc
 
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.audioout.AudioOutputRoute
+import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.Micros
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
@@ -30,11 +30,8 @@ import com.ealva.toque.log._w
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
-import com.ealva.toque.service.audio.ActiveEqPreset
-import com.ealva.toque.service.audio.DuckedState
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.media.EqMode
-import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.service.audio.SharedPlayerState
 import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.AvPlayer.Companion.OFFSET_CONSIDERED_END
 import com.ealva.toque.service.player.AvPlayerEvent
@@ -50,8 +47,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
@@ -63,33 +62,31 @@ private val LOG by lazyLogger(VlcPlayer::class)
 interface VlcPlayer : AvPlayer {
 
   companion object {
-    suspend fun make(
+    operator fun invoke(
       id: MediaId,
       albumId: AlbumId,
       media: IMedia,
       title: Title,
       duration: Millis,
-      activeEqPreset: ActiveEqPreset,
+      sharedPlayerState: SharedPlayerState,
       onPreparedTransition: PlayerTransition,
       prefs: AppPrefs,
       requestFocus: AvPlayer.FocusRequest,
-      duckedState: DuckedState,
       wakeLock: WakeLock,
       dispatcher: CoroutineDispatcher
     ): VlcPlayer {
-      val initialPreset = activeEqPreset.getPreferred(id, albumId).asVlcPreset()
+      // kick off the search for a preset so maybe it's ready by the time we collect the flow
+      sharedPlayerState.setPreferred(id, albumId)
       return VlcPlayerImpl(
         id,
         albumId,
         media,
         title,
-        initialPreset,
-        activeEqPreset,
+        sharedPlayerState,
         duration,
         onPreparedTransition,
         prefs,
         requestFocus,
-        duckedState,
         wakeLock,
         dispatcher
       ).apply {
@@ -115,13 +112,11 @@ private class VlcPlayerImpl(
   private val albumId: AlbumId,
   vlcMedia: IMedia,
   @Suppress("unused") private val title: Title,
-  private var eqPreset: VlcEqPreset,
-  private val activeEqPreset: ActiveEqPreset,
+  private val sharedPlayerState: SharedPlayerState,
   override var duration: Millis,
   onPreparedTransition: PlayerTransition,
   private val appPrefs: AppPrefs,
   private val requestFocus: AvPlayer.FocusRequest,
-  private val duckedState: DuckedState,
   private val wakeLock: WakeLock,
   dispatcher: CoroutineDispatcher
 ) : VlcPlayer {
@@ -133,51 +128,34 @@ private class VlcPlayerImpl(
   private var unmutedVolume = Volume.NONE
   private var firstStart: Boolean = true
   private var allowPositionUpdate = true
-  private val mediaPlayer: MediaPlayer = vlcMedia.makePlayer(eqPreset)
-  private var eqMode = activeEqPreset.eqMode.value
-  private var outputRoute = activeEqPreset.outputRoute.value
+  private val mediaPlayer: MediaPlayer = vlcMedia.makePlayer()
 
   init {
-    activeEqPreset.currentPreset
-      .onEach { preset ->
-        LOG._e { it("preset flow %s", preset) }
-        setPlayerPreset(preset.asVlcPreset())
-      }
+    setAudioOutput(sharedPlayerState.outputModule.value)
+
+    sharedPlayerState.currentPreset
+      .onEach { preset -> if (!isShutdown) preset.asVlcPreset().applyToPlayer(mediaPlayer) }
       .launchIn(scope)
 
-    activeEqPreset.outputRoute
-      .onEach { route ->
-        LOG._e { it("route flow %s", route) }
-        handleRoute(route)
-      }
+    // We should have a currentPreset emission for the "current" outputRoute, so drop the first.
+    // While the lookup for a preferred preset occurs on another thread, no reason to churn for
+    // something that won't be emitted.
+    sharedPlayerState.outputRoute
+      .drop(1)
+      .onEach { sharedPlayerState.setPreferred(id, albumId) }
       .launchIn(scope)
 
-    activeEqPreset.eqMode
-      .onEach { eqMode ->
-        LOG._e { it("eqMode flow %s", eqMode) }
-        handleEqMode(eqMode)
-      }
+    // We should have a currentPreset emission for the "current" eqMode, so drop the first.
+    // While the lookup for a preferred preset occurs on another thread, no reason to churn for
+    // something that won't be emitted.
+    sharedPlayerState.eqMode
+      .drop(1)
+      .onEach { sharedPlayerState.setPreferred(id, albumId) }
       .launchIn(scope)
-  }
 
-  private fun handleEqMode(mode: EqMode) {
-    if (eqMode != mode) {
-      LOG._e { it("eqMode differs") }
-      eqMode = mode
-      updatePreferredPreset()
-    }
-  }
-
-  private fun handleRoute(route: AudioOutputRoute) {
-    if (outputRoute != route) { // because first emission is already baked in
-      LOG._e { it("route differs") }
-      outputRoute = route
-      updatePreferredPreset()
-    }
-  }
-
-  private fun updatePreferredPreset() {
-    scope.launch { activeEqPreset.getPreferred(id, albumId) }
+    sharedPlayerState.playbackRate
+      .onEach { mediaPlayer.rate = it.value }
+      .launchIn(scope)
   }
 
   override val eventFlow = MutableSharedFlow<AvPlayerEvent>(extraBufferCapacity = 30)
@@ -213,11 +191,9 @@ private class VlcPlayerImpl(
       realVolume = value.coerceIn(AvPlayer.DEFAULT_VOLUME_RANGE)
       muted = false
       unmutedVolume = realVolume // MediaPlayer get volume not working
-      val newVolume = if (duckedState.ducked)
-        realVolume.coerceAtMost(appPrefs.duckVolume())
-      else
-        realVolume
-      if (isValid) mediaPlayer.setMappedVolume(newVolume)
+      if (isValid) mediaPlayer.setMappedVolume(
+        if (sharedPlayerState.ducked) realVolume.coerceAtMost(appPrefs.duckVolume()) else realVolume
+      )
     }
 
   private var muted = false
@@ -287,8 +263,11 @@ private class VlcPlayerImpl(
       updates so disallowing updates is only for scenario where media is playing.
       */
       allowPositionUpdate = false
-      mediaPlayer.time = position()
-      emit(AvPlayerEvent.PositionUpdate(Millis(mediaPlayer.time), duration, false))
+      mediaPlayer.time = position.value
+      val theDuration = duration
+      scope.launch {
+        emit(AvPlayerEvent.PositionUpdate(position, theDuration, false))
+      }
       allowPositionUpdate = true
     }
   }
@@ -299,12 +278,20 @@ private class VlcPlayerImpl(
 
   override fun shutdown() {
     if (!isShutdown) {
-      scope.cancel()
       isShutdown = true
       transition.setCancelled()
       seekable = false
       if (prepared) secondStageShutdown() else shutdownOnPrepared = true
     }
+  }
+
+  private fun secondStageShutdown() {
+    scope.cancel()
+    removeFromQueue(this)
+    if (!mediaPlayer.isReleased) {
+      mediaPlayer.release()
+    }
+    wakeLock.release()
   }
 
   override fun duck() {
@@ -321,81 +308,71 @@ private class VlcPlayerImpl(
     startTransition(transition, false)
   }
 
-  private fun setPlayerPreset(preset: VlcEqPreset) {
-    if (!isShutdown) {
-      if (preset.applyToPlayer(mediaPlayer)) eqPreset = preset
-    }
-  }
-
   private inline fun getPauseTransition(immediate: () -> Boolean) =
     if (immediate()) PauseImmediateTransition() else pauseTransition
 
   private fun getPlayTransition(immediate: () -> Boolean) =
     if (immediate()) PlayImmediateTransition() else playTransition
 
-  private fun secondStageShutdown() {
-    removeFromQueue(this)
-    if (!mediaPlayer.isReleased) {
-      mediaPlayer.release()
-    }
-    wakeLock.release()
+  private fun setAudioOutput(module: AudioOutputModule) {
+    LOG._e { it("setAudioOutput %s", module) }
+    mediaPlayer.setAudioOutput(module.toString())
   }
 
-  private fun emit(event: AvPlayerEvent) {
-    scope.launch { eventFlow.emit(event) }
+  private suspend fun emit(event: AvPlayerEvent) {
+    eventFlow.emit(event)
   }
 
   private fun makeEventListener() = MediaPlayer.EventListener { event ->
 //    LOG._e { it("%s %s", title(), event.asString()) }
     if (!isShutdown) {
-      when (event.type) {
-        MediaPlayer.Event.Opening -> mediaPlayer.setMappedVolume(realVolume)
-        MediaPlayer.Event.Buffering -> if (!prepared && event.bufferedEnoughForPrepare()) {
-          prepared = true
-          startTransition(onPrepared, notifyPrepared = true)
-        }
-        MediaPlayer.Event.Playing -> if (prepared) wakeLock.acquire()
-        MediaPlayer.Event.Paused -> if (prepared) wakeLock.release()
-        MediaPlayer.Event.Stopped -> {
-          wakeLock.release()
-          seekable = false
-          emit(AvPlayerEvent.Stopped(time))
-        }
-        MediaPlayer.Event.EndReached -> {
-          shutdown()
-          emit(AvPlayerEvent.PlaybackComplete)
-        }
-        MediaPlayer.Event.EncounteredError -> {
-          prepared = false
-          shutdown()
-          emit(AvPlayerEvent.Error)
-        }
-        MediaPlayer.Event.TimeChanged -> {
-          if (allowPositionUpdate) {
-            emit(AvPlayerEvent.PositionUpdate(Millis(event.timeChanged), duration, true))
+      scope.launch {
+        when (event.type) {
+          MediaPlayer.Event.Opening -> mediaPlayer.setMappedVolume(realVolume)
+          MediaPlayer.Event.Buffering -> if (!prepared && event.ampleBufferedForPrepare()) {
+            prepared = true
+            startTransition(onPrepared, notifyPrepared = true)
           }
-        }
-        MediaPlayer.Event.PositionChanged -> {
-          event.positionChanged
-        }
-        MediaPlayer.Event.SeekableChanged -> seekable = event.seekable
-        MediaPlayer.Event.PausableChanged -> {
-          pausable = event.pausable
-          val reportedLength = mediaPlayer.length
-          if (reportedLength > 0) {
-            duration = Millis(reportedLength)
+          MediaPlayer.Event.Playing -> if (prepared) wakeLock.acquire()
+          MediaPlayer.Event.Paused -> if (prepared) wakeLock.release()
+          MediaPlayer.Event.Stopped -> {
+            wakeLock.release()
+            seekable = false
+            emit(AvPlayerEvent.Stopped(time))
           }
-        }
-        MediaPlayer.Event.LengthChanged -> {
+          MediaPlayer.Event.EndReached -> {
+            LOG._e { it("endReached") }
+            // emit before shutdown or won't go due to scope cancellation
+            emit(AvPlayerEvent.PlaybackComplete)
+            shutdown()
+          }
+          MediaPlayer.Event.EncounteredError -> {
+            prepared = false
+            // emit before shutdown or won't go due to scope cancellation
+            emit(AvPlayerEvent.Error)
+            shutdown()
+          }
+          MediaPlayer.Event.TimeChanged -> {
+            if (allowPositionUpdate) {
+              emit(AvPlayerEvent.PositionUpdate(Millis(event.timeChanged), duration, true))
+            }
+          }
+          MediaPlayer.Event.PositionChanged -> event.positionChanged
+          MediaPlayer.Event.SeekableChanged -> seekable = event.seekable
+          MediaPlayer.Event.PausableChanged -> {
+            pausable = event.pausable
+            val reportedLength = mediaPlayer.length
+            if (reportedLength > 0) {
+              duration = Millis(reportedLength)
+            }
+          }
+          MediaPlayer.Event.LengthChanged -> {
 
+          }
         }
       }
     } else {
-      if (!prepared &&
-        shutdownOnPrepared &&
-        event.type == MediaPlayer.Event.Buffering &&
-        event.bufferedEnoughForPrepare()
-      ) {
+      if (!prepared && shutdownOnPrepared && event.isBuffering && event.ampleBufferedForPrepare()) {
         secondStageShutdown()
       }
     }
@@ -405,8 +382,7 @@ private class VlcPlayerImpl(
     setPlayer(transitionPlayer)
   }
 
-  private fun IMedia.makePlayer(eqPreset: EqPreset): MediaPlayer = MediaPlayer(this).apply {
-    if (eqPreset is VlcEqPreset) eqPreset.applyToPlayer(this)
+  private fun IMedia.makePlayer(): MediaPlayer = MediaPlayer(this).apply {
     setEventListener(makeEventListener())
   }
 
@@ -415,8 +391,10 @@ private class VlcPlayerImpl(
       transition.setCancelled()
       newTransition.setPlayer(transitionPlayer)
       transition = newTransition
-      if (notifyPrepared) emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration))
-      scope.launch { newTransition.execute() }
+      scope.launch {
+        if (notifyPrepared) emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration))
+        newTransition.execute()
+      }
     }
   }
 
@@ -446,10 +424,13 @@ private class VlcPlayerImpl(
     override val remainingTime: Millis
       get() = if (isValid) duration - mediaPlayer.time else Millis(0)
 
-    override fun notifyPaused() = emit(AvPlayerEvent.Paused(time))
+    override fun notifyPaused() {
+      scope.launch { emit(AvPlayerEvent.Paused(time)) }
+    }
 
     override fun notifyPlaying() {
-      emit(AvPlayerEvent.Start(firstStart))
+      val isFirstStart = firstStart
+      scope.launch { emit(AvPlayerEvent.Start(isFirstStart)) }
       firstStart = false
     }
 

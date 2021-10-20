@@ -77,10 +77,8 @@ class LibVlcFactoryTest {
     )
 
     // Test will break when upgrading LibVlc and that's expected (obviously)
-    val libVlc: LibVlc = factory.instance()
-    expect(libVlc.libVlcVersion()).toBe("3.0.12.1 Vetinari")
-
-    val another: LibVlc = factory.instance()
-    expect(libVlc).toBeTheSameAs(another)
+    factory.withInstance { libVlc ->
+      expect(libVlc.libVlcVersion()).toBe("3.0.16 Vetinari")
+    }
   }
 }

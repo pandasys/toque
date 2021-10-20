@@ -26,6 +26,7 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -43,6 +44,7 @@ import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
+import com.ealva.welite.db.table.Column
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -59,7 +61,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -183,20 +184,16 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }.delete()
   }
 
-  override suspend fun getAllAlbums(
-    limit: Long
-  ): Result<List<AlbumDescription>, DaoMessage> = db.query {
-    runCatching { doGetAlbums(limit = limit) }
+  override suspend fun getAllAlbums(limit: Long): Result<List<AlbumDescription>, DaoMessage> =
+    runSuspendCatching { db.query { doGetAlbums(limit = limit) } }
       .mapError { DaoExceptionMessage(it) }
-  }
 
   override suspend fun getAllAlbumsFor(
     artistId: ArtistId,
     limit: Long
-  ): Result<List<AlbumDescription>, DaoMessage> = db.query {
-    runCatching { doGetAlbums(artistId, limit) }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  ): Result<List<AlbumDescription>, DaoMessage> = runSuspendCatching {
+    db.query { doGetAlbums(artistId, limit) }
+  }.mapError { DaoExceptionMessage(it) }
 
   private fun Queryable.doGetAlbums(
     artistId: ArtistId? = null,
@@ -231,27 +228,22 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
     .toList()
 
-  override suspend fun getNextAlbum(
-    title: AlbumTitle
-  ): Result<AlbumIdName, DaoMessage> = db.query {
-    runCatching { doGetNextAlbum(title) }.mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getNextAlbum(title: AlbumTitle): Result<AlbumIdName, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        AlbumTable
+          .selects { listOf<Column<out Any>>(id, albumTitle) }
+          .where { albumTitle greater title.value }
+          .orderByAsc { albumTitle }
+          .limit(1)
+          .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+          .single()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
-  /**
-   * Throws NoSuchElementException if there is no album title > greater than [title]
-   */
-  private fun Queryable.doGetNextAlbum(title: AlbumTitle): AlbumIdName = AlbumTable
-    .selects { listOf(id, albumTitle) }
-    .where { albumTitle greater title.value }
-    .orderByAsc { albumTitle }
-    .limit(1)
-    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
-    .single()
-
-  override suspend fun getPreviousAlbum(title: AlbumTitle) = db.query {
-    runCatching { if (title.isEmpty()) doGetMaxAlbum() else doGetPreviousAlbum(title) }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getPreviousAlbum(title: AlbumTitle) = runSuspendCatching {
+    db.query { if (title.isEmpty()) doGetMaxAlbum() else doGetPreviousAlbum(title) }
+  }.mapError { DaoExceptionMessage(it) }
 
   /**
    * Throws NoSuchElementException if there is no album title > greater than [previousTitle]
@@ -272,15 +264,15 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumMax])) }
     .single()
 
-  override suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage> = db.query {
-    runCatching { doGetRandomAlbum() }.mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetRandomAlbum(): AlbumIdName = AlbumTable
-    .selects { listOf(id, albumTitle) }
-    .where { id inSubQuery AlbumTable.select(id).all().orderByRandom().limit(1) }
-    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
-    .single()
+  override suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage> = runSuspendCatching {
+    db.query {
+      AlbumTable
+        .selects { listOf<Column<out Any>>(id, albumTitle) }
+        .where { id inSubQuery AlbumTable.select(id).all().orderByRandom().limit(1) }
+        .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
 
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,

@@ -20,9 +20,9 @@ import android.net.Uri
 import com.ealva.toque.tag.ArtistParser
 
 interface MediaMetadataParser {
-  fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaFileTagInfo
+  suspend fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaFileTagInfo
 }
 
 interface MediaMetadataParserFactory {
-  suspend fun make(): MediaMetadataParser
+  fun make(): MediaMetadataParser
 }

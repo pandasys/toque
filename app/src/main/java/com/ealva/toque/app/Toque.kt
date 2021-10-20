@@ -22,6 +22,7 @@ import android.app.NotificationManager
 import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.PowerManager
 import android.telephony.TelephonyManager
@@ -49,6 +50,7 @@ import com.ealva.toque.tag.TagModule
 import com.ealva.welite.db.log.WeLiteLog
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.zhuinden.simplestack.GlobalServices
+import com.zhuinden.simplestackextensions.servicesktx.add
 import ealvatag.logging.EalvaTagLog
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
@@ -87,6 +89,7 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
     single<KeyguardManager> { requireSystemService() }
     single<WindowManager> { requireSystemService() }
     single<UiModeManager> { requireSystemService() }
+    single<PackageManager> { requireSystemService() }
   }
 
   override fun onCreate() {
@@ -95,11 +98,11 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
     _globalServicesBuilder = GlobalServices.builder()
 
     setupLogging()
-    val logger = logger(ToqueImpl::class)
-    debug {
-      WeLiteLog.logQueryPlans = true
-      WeLiteLog.logSql = true
-    }
+    //val logger = logger(ToqueImpl::class)
+    //debug {
+    //  WeLiteLog.logQueryPlans = true
+    //  WeLiteLog.logSql = true
+    //}
 
 //    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 //      StrictMode.VmPolicy.Builder()
@@ -114,7 +117,7 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
 //    }
 //    StrictMode.setVmPolicy(policy)
 
-    val koinApp = startKoin {
+    startKoin {
 //      androidLogger(Level.NONE)
       androidContext(androidContext = this@ToqueImpl)
 

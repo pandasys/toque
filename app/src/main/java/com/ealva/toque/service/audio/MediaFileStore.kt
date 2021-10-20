@@ -23,6 +23,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
@@ -35,7 +36,6 @@ import com.ealva.toque.tag.SongTag
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.binding.binding
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.buffer
@@ -148,7 +148,7 @@ private class MediaFileStoreImpl(
     beforeFileWrite: suspend () -> Unit,
     afterFileWrite: suspend () -> Unit
   ): Result<Rating, DaoMessage> = withContext(Dispatchers.IO) {
-    runCatching {
+    runSuspendCatching {
       doWriteToFile(
         location,
         fileExt,

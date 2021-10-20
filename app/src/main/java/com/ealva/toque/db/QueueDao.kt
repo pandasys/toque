@@ -16,11 +16,11 @@
 
 package com.ealva.toque.db
 
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.db.QueueTable.itemId
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.welite.db.Database
-import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.statements.deleteWhere
@@ -28,8 +28,6 @@ import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Table
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.runCatching
-import it.unimi.dsi.fastutil.longs.LongListIterator
 
 interface QueueDao {
   /**
@@ -66,48 +64,36 @@ private class QueueDaoImpl(
     queueId: QueueId,
     queueItems: List<HasId>,
     shuffledItems: List<HasId>
-  ): BoolResult = db.transaction {
-    runCatching {
+  ): BoolResult = runSuspendCatching {
+    db.transaction {
       deleteAll(queueId)
       insertList(queueId, queueItems, isShuffled = false)
       insertList(queueId, shuffledItems, isShuffled = true)
-    }.mapError {
-      rollback()
-      DaoExceptionMessage(it)
     }
-  }
+  }.mapError { DaoExceptionMessage(it) }
 
   override suspend fun addQueueItems(
     queueId: QueueId,
     mediaIds: MediaIdList
-  ): BoolResult = db.transaction {
-    val iterator = mediaIds.value.iterator()
-    runCatching { insertIds(iterator, queueId) }
-      .mapError {
-        rollback()
-        DaoExceptionMessage(it)
+  ): BoolResult = runSuspendCatching {
+    db.transaction {
+      val iterator = mediaIds.value.iterator()
+      while (iterator.hasNext()) {
+        val mediaId = iterator.nextLong()
+        if (
+          QueueTable.insert {
+            it[QueueTable.queueId] = queueId.value
+            it[itemId] = mediaId
+            it[shuffled] = false
+          } <= 0
+        ) {
+          rollback()
+          throw DaoException("Failed to insert item:$itemId into queue:$queueId")
+        }
       }
-  }
-
-  private fun Transaction.insertIds(
-    iterator: LongListIterator,
-    queueId: QueueId
-  ): Boolean {
-    while (iterator.hasNext()) {
-      val mediaId = iterator.nextLong()
-      if (
-        QueueTable.insert {
-          it[QueueTable.queueId] = queueId.value
-          it[itemId] = mediaId
-          it[shuffled] = false
-        } <= 0
-      ) {
-        rollback()
-        throw DaoException("Failed to insert item:$itemId into queue:$queueId")
-      }
+      true
     }
-    return true
-  }
+  }.mapError { DaoExceptionMessage(it) }
 
   private fun TransactionInProgress.insertList(
     queue: QueueId,

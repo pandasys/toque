@@ -29,6 +29,7 @@ import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.session.server.MediaSessionControl
 import com.ealva.toque.service.session.server.MediaSessionState
+import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 
 interface PlayableQueueFactory {
   suspend fun make(
@@ -42,12 +43,14 @@ interface PlayableQueueFactory {
       queuePositionStateDaoFactory: QueuePositionStateDaoFactory,
       playableAudioItemFactory: PlayableAudioItemFactory,
       audioManager: AudioManager,
-      appPrefsSingleton: AppPrefsSingleton
+      appPrefsSingleton: AppPrefsSingleton,
+      libVlcPrefsSingleton: LibVlcPrefsSingleton
     ): PlayableQueueFactory = PlayableQueueFactoryImpl(
       queuePositionStateDaoFactory,
       playableAudioItemFactory,
       audioManager,
-      appPrefsSingleton
+      appPrefsSingleton,
+      libVlcPrefsSingleton
     )
   }
 }
@@ -58,8 +61,9 @@ private class PlayableQueueFactoryImpl(
   private val queuePositionStateDaoFactory: QueuePositionStateDaoFactory,
   private val playableAudioItemFactory: PlayableAudioItemFactory,
   private val audioManager: AudioManager,
-  private val appPrefsSingleton: AppPrefsSingleton
-) : PlayableQueueFactory {
+  private val appPrefsSingleton: AppPrefsSingleton,
+  private val libVlcPrefsSingleton: LibVlcPrefsSingleton,
+  ) : PlayableQueueFactory {
   override suspend fun make(
     queueType: QueueType,
     sessionControl: MediaSessionControl,
@@ -84,7 +88,8 @@ private class PlayableQueueFactoryImpl(
       queuePositionStateDaoFactory,
       playableAudioItemFactory,
       audioManager,
-      appPrefsSingleton
+      appPrefsSingleton,
+      libVlcPrefsSingleton,
     )
   }
 }

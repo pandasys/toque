@@ -28,6 +28,7 @@ import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetTable
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.toque.test.shared.withTestDatabase
+import com.ealva.welite.db.WeLiteUncaughtException
 import com.ealva.welite.db.expr.eq
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -133,7 +134,7 @@ object CommonPresetDaoTest {
         result.getError()?.let { error ->
           expect(error).toBeInstanceOf<DaoExceptionMessage>()
           error as DaoExceptionMessage
-          expect(error.ex).toBeInstanceOf<SQLiteConstraintException>()
+          expect(error.ex).toBeInstanceOf<WeLiteUncaughtException>()
         } ?: error("unexpected null error")
       }
     }

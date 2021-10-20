@@ -24,8 +24,6 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
-import com.ealva.toque.common.Volume
-import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
@@ -34,12 +32,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 interface PlayableAudioItem : QueueAudioItem {
-  val eventFlow: Flow<PlayableAudioItemEvent>
+  val eventFlow: Flow<PlayableItemEvent>
 
   val metadata: Metadata
 
-  val albumId: AlbumId
-  val artistSet: Set<ArtistName>
   val position: Millis
 
   val isValid: Boolean
@@ -48,13 +44,7 @@ interface PlayableAudioItem : QueueAudioItem {
 
   val isPausable: Boolean
 
-  val isSeekable: Boolean
-
   val supportsFade: Boolean
-
-  var volume: Volume
-
-  var isMuted: Boolean
 
   var playbackRate: PlaybackRate
 
@@ -63,6 +53,8 @@ interface PlayableAudioItem : QueueAudioItem {
   fun stop()
 
   fun pause(immediate: Boolean = false)
+
+  fun togglePlayPause()
 
   /**
    * Seek to a position within the valid playback range, which is [Metadata.playbackRange]. If
@@ -112,17 +104,41 @@ interface PlayableAudioItem : QueueAudioItem {
   fun setRating(newRating: Rating, allowFileUpdate: Boolean = false)
 
   fun previousShouldRewind(): Boolean
+  fun reset(playNow: PlayNow)
+
+  override val id: MediaId
+    get() = metadata.id
+  override val title: Title
+    get() = metadata.title
+  override val albumTitle: AlbumTitle
+    get() = metadata.albumTitle
+  override val albumArtist: ArtistName
+    get() = metadata.albumArtist
+  override val artist: ArtistName
+    get() = metadata.artistName
+  override val trackNumber: Int
+    get() = metadata.trackNumber
+  override val localAlbumArt: Uri
+    get() = metadata.localAlbumArt
+  override val albumArt: Uri
+    get() = metadata.albumArt
+  override val rating: Rating
+    get() = metadata.rating
+  override val location: Uri
+    get() = metadata.location
+  override val fileUri: Uri
+    get() = metadata.fileUri
 }
 
 inline val PlayableAudioItem.isNotValid: Boolean
   get() = !isValid
 
-sealed interface PlayableAudioItemEvent {
+sealed interface PlayableItemEvent {
   data class Prepared(
     val audioItem: PlayableAudioItem,
     val position: Millis,
     val duration: Millis
-  ) : PlayableAudioItemEvent
+  ) : PlayableItemEvent
 
   data class PositionUpdate(
     val audioItem: PlayableAudioItem,
@@ -130,33 +146,26 @@ sealed interface PlayableAudioItemEvent {
     val duration: Millis,
     val timePlayed: Millis,
     val countingFrom: Millis
-  ) : PlayableAudioItemEvent
+  ) : PlayableItemEvent
 
   data class Start(
     val audioItem: PlayableAudioItem,
     val firstStart: Boolean,
     val position: Millis,
-  ) : PlayableAudioItemEvent
+  ) : PlayableItemEvent
 
-  data class Paused(
-    val audioItem: PlayableAudioItem,
-    val position: Millis
-  ) : PlayableAudioItemEvent
+  data class Paused(val audioItem: PlayableAudioItem, val position: Millis) : PlayableItemEvent
+  data class Stopped(val audioItem: PlayableAudioItem, val position: Millis) : PlayableItemEvent
+  data class PlaybackComplete(val audioItem: PlayableAudioItem) : PlayableItemEvent
+  data class Error(val audioItem: PlayableAudioItem) : PlayableItemEvent
 
-  data class Stopped(
-    val audioItem: PlayableAudioItem,
-    val position: Millis
-  ) : PlayableAudioItemEvent
-
-  data class PlaybackComplete(val audioItem: PlayableAudioItem) : PlayableAudioItemEvent
-  data class Error(val audioItem: PlayableAudioItem) : PlayableAudioItemEvent
-  object None : PlayableAudioItemEvent {
+  object None : PlayableItemEvent {
     override fun toString(): String = "None"
   }
 }
 
 object NullPlayableAudioItem : PlayableAudioItem {
-  override val eventFlow: Flow<PlayableAudioItemEvent> = emptyFlow()
+  override val eventFlow: Flow<PlayableItemEvent> = emptyFlow()
   override val metadata: Metadata = Metadata.NullMetadata
   override val isValid: Boolean = false
   override val isPlaying: Boolean = false
@@ -165,12 +174,10 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
   override fun pause(immediate: Boolean) = Unit
-  override val isSeekable: Boolean = false
+  override fun togglePlayPause() = Unit
   override fun seekTo(position: Millis) = Unit
   override val position: Millis = Millis(0)
   override val duration: Millis = Millis(0)
-  override var volume: Volume = Volume.MAX
-  override var isMuted: Boolean = false
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL
   override fun shutdown() = Unit
   override fun duck() = Unit
@@ -186,25 +193,9 @@ object NullPlayableAudioItem : PlayableAudioItem {
   ) = Unit
 
   override fun cloneItem(): PlayableAudioItem = this
-
   override fun checkMarkSkipped() = Unit
   override fun setRating(newRating: Rating, allowFileUpdate: Boolean): Unit = Unit
   override fun previousShouldRewind(): Boolean = false
-
-  override val id: MediaId = MediaId.INVALID
-  override val location: Uri
-    get() = Uri.EMPTY
-  override val fileUri: Uri
-    get() = Uri.EMPTY
-  override val title: Title = Title.UNKNOWN
-  override val albumTitle: AlbumTitle = AlbumTitle.UNKNOWN
-  override val albumId: AlbumId = AlbumId.INVALID
-  override val albumArtist: ArtistName = ArtistName.UNKNOWN
-  override val artist: ArtistName = ArtistName.UNKNOWN
-  override val artistSet: Set<ArtistName> = setOf(ArtistName.UNKNOWN)
-  override val rating: Rating = Rating.RATING_NONE
-  override val trackNumber: Int = 1
-  override val localAlbumArt: Uri = Uri.EMPTY
-  override val albumArt: Uri = Uri.EMPTY
+  override fun reset(playNow: PlayNow) = Unit
   override val instanceId: Long = 0
 }

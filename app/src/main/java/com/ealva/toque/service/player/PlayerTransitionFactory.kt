@@ -15,7 +15,7 @@
  */
 
 package com.ealva.toque.service.player
-
+/*
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.audioout.AudioOutputModule.AudioTrack
@@ -68,3 +68,4 @@ private class PlayerTransitionFactoryImpl(val prefs: AppPrefs) : PlayerTransitio
   override fun getMediaTransition(type: MediaTransitionType): PlayerTransitionPair =
     type.make(prefs)
 }
+*/

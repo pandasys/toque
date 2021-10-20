@@ -34,6 +34,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.common.toTitle
 import com.ealva.toque.db.AudioMediaDao.Companion.QUEUE_ID
 import com.ealva.toque.db.MediaTable.albumId
@@ -60,6 +61,7 @@ import com.ealva.toque.persist.toAlbumId
 import com.ealva.toque.persist.toArtistId
 import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaFormat
 import com.ealva.toque.service.media.MediaMetadataParser
@@ -99,8 +101,6 @@ import com.ealva.welite.db.view.View
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.binding.binding
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.runCatching
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongArrayList
@@ -193,10 +193,10 @@ interface AudioMediaDao {
   suspend fun getCountAllAudio(): LongResult
 
   suspend fun getAllAudio(limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(id: ArtistId, limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(id: AlbumId, limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(id: GenreId, limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(id: ComposerId, limit: Long): AudioDescriptionResult
+  suspend fun getAllAudioFor(artistId: ArtistId, limit: Long): AudioDescriptionResult
+  suspend fun getAllAudioFor(albumId: AlbumId, limit: Long): AudioDescriptionResult
+  suspend fun getAllAudioFor(genreId: GenreId, limit: Long): AudioDescriptionResult
+  suspend fun getAllAudioFor(composerId: ComposerId, limit: Long): AudioDescriptionResult
   suspend fun getAudioQueueItems(shuffled: Boolean): AudioItemListResult
 
   suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
@@ -242,6 +242,7 @@ interface AudioMediaDao {
       genreMediaDao: GenreMediaDao,
       composerMediaDao: ComposerMediaDao,
       eqPresetAssociationDao: EqPresetAssociationDao,
+      appPrefsSingleton: AppPrefsSingleton,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): AudioMediaDao {
       return AudioMediaDaoImpl(
@@ -256,6 +257,7 @@ interface AudioMediaDao {
         genreMediaDao,
         composerMediaDao,
         eqPresetAssociationDao,
+        appPrefsSingleton,
         dispatcher
       )
     }
@@ -299,6 +301,7 @@ private class AudioMediaDaoImpl(
   private val genreMediaDao: GenreMediaDao,
   private val composerMediaDao: ComposerMediaDao,
   private val eqPresetAssocDao: EqPresetAssociationDao,
+  private val appPrefsSingleton: AppPrefsSingleton,
   dispatcher: CoroutineDispatcher
 ) : AudioMediaDao {
   val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -310,9 +313,8 @@ private class AudioMediaDaoImpl(
   }
 
   /**
-   * Parse the file tags and create/update all media relationships. Usually the list would be of one
-   * album/artist. There is no contract that the list is only one album/artist or that every track
-   * on the album is included.
+   * Parse the file tags and create/update all media relationships. There is no contract that the
+   * list is only one album/artist or that every track on the album is included.
    */
   override suspend fun upsertAudioList(
     audioInfoList: List<AudioInfo>,
@@ -320,13 +322,37 @@ private class AudioMediaDaoImpl(
     minimumDuration: Millis,
     createUpdateTime: Millis
   ) {
+    val appPrefs = appPrefsSingleton.instance()
     val artistParser = artistParserFactory.make()
-    db.transaction {
-      val upsertResults = UpsertResults(audioInfoList.size)
-      onCommit { emitResults(upsertResults) }
-      audioInfoList.forEach { audioInfo ->
-        metadataParser.parseMetadata(audioInfo.uriToParse(), artistParser).use { fileTagInfo ->
-          upsertAudio(audioInfo, fileTagInfo, minimumDuration, createUpdateTime, upsertResults)
+    /*
+      Note about this algorithm: at one time the forEach loop was inside the transaction. The
+      parseMetadata function was changed to be suspending and was moved outside the transaction. So,
+      now there is a transaction for every item in the list instead of for the list itself.
+      Surprisingly, or not, looping outside the transaction bounds is more than twice as fast on
+      average. I don't care enough to investigate, because I like the result, but I'm guessing it's
+      due to more parallel processing between file tag parsing and writing to the DB. Looping inside
+      the transaction meant parsing an entire album and then committing all that info, whereas now
+      each individual song is parsed and then written in a txn. Transaction write locks are held for
+      a much shorter time in many cases. A library with 1 song per album would probably perform
+      about the same with either algorithm.
+
+      The thinking originally was that fewer transactions would equal better performance, so was
+      designed to process an "album" at a time. As is typical, if a time came to optimize this
+      function, testing will be required.
+    */
+    audioInfoList.forEach { audioInfo ->
+      metadataParser.parseMetadata(audioInfo.uriToParse(), artistParser).use { fileTagInfo ->
+        db.transaction {
+          val upsertResults = UpsertResults(1)
+          onCommit { emitResults(upsertResults) }
+          upsertAudio(
+            audioInfo,
+            fileTagInfo,
+            minimumDuration,
+            createUpdateTime,
+            appPrefs,
+            upsertResults
+          )
         }
       }
     }
@@ -337,6 +363,7 @@ private class AudioMediaDaoImpl(
     fileTagInfo: MediaFileTagInfo,
     minimumDuration: Millis,
     createUpdateTime: Millis,
+    appPrefs: AppPrefs,
     upsertResults: UpsertResults
   ) {
     val duration = fileTagInfo.duration
@@ -357,6 +384,7 @@ private class AudioMediaDaoImpl(
         mediaArtistsIds.first(),
         fileTagInfo,
         createUpdateTime,
+        appPrefs,
         upsertResults
       )
       artistMediaDao.replaceMediaArtists(this, mediaArtistsIds, mediaId, createUpdateTime)
@@ -494,149 +522,122 @@ private class AudioMediaDaoImpl(
      */
   }
 
-  override suspend fun getCountAllAudio(): LongResult = db.query {
-    runCatching { MediaTable.selectCount { mediaType eq MediaType.Audio.id }.count() }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getCountAllAudio(): LongResult = runSuspendCatching {
+    db.query { MediaTable.selectCount { mediaType eq MediaType.Audio.id }.count() }
+  }.mapError { DaoExceptionMessage(it) }
 
-  override suspend fun getAllAudio(limit: Long): AudioDescriptionResult = db.query {
-    runCatching { doGetAllAudio(limit) }
-      .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetAllAudio(limit: Long): List<AudioDescription> = MediaTable
-    .join(AlbumTable, INNER, albumId, AlbumTable.id)
-    .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
-    .where { MediaTable.mediaType eq MediaType.Audio.id }
-    .orderByAsc { title }
-    .limit(limit)
-    .sequence {
-      AudioDescription(
-        it[id].toMediaId(),
-        it[title].toTitle(),
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty()
-      )
+  override suspend fun getAllAudio(limit: Long): AudioDescriptionResult = runSuspendCatching {
+    db.query {
+      MediaTable
+        .join(AlbumTable, INNER, albumId, AlbumTable.id)
+        .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+        .where { MediaTable.mediaType eq MediaType.Audio.id }
+        .orderByAsc { title }
+        .limit(limit)
+        .sequence {
+          AudioDescription(
+            it[id].toMediaId(),
+            it[title].toTitle(),
+            it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+            it[AlbumTable.albumArtUri].toUriOrEmpty()
+          )
+        }
+        .toList()
     }
-    .toList()
+  }.mapError { DaoExceptionMessage(it) }
 
-  override suspend fun getAllAudioFor(
-    id: ArtistId,
-    limit: Long
-  ): AudioDescriptionResult = db.query {
-    runCatching { doGetArtistMedia(id, limit) }
+  override suspend fun getAllAudioFor(artistId: ArtistId, limit: Long): AudioDescriptionResult =
+    runSuspendCatching {
+      db.query {
+        MediaTable
+          .join(ArtistMediaTable, INNER, id, ArtistMediaTable.mediaId)
+          .join(AlbumTable, INNER, albumId, AlbumTable.id)
+          .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+          .where { MediaTable.artistId eq artistId.value }
+          .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(title)) }
+          .limit(limit)
+          .sequence {
+            AudioDescription(
+              it[id].toMediaId(),
+              it[title].toTitle(),
+              it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+              it[AlbumTable.albumArtUri].toUriOrEmpty()
+            )
+          }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getAllAudioFor(albumId: AlbumId, limit: Long): AudioDescriptionResult =
+    runSuspendCatching {
+      db.query {
+        MediaTable
+          .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
+          .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+          .where { MediaTable.albumId eq albumId.value }
+          .orderByAsc { trackNumber }
+          .limit(limit)
+          .sequence {
+            AudioDescription(
+              it[id].toMediaId(),
+              it[title].toTitle(),
+              it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+              it[AlbumTable.albumArtUri].toUriOrEmpty()
+            )
+          }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getAllAudioFor(genreId: GenreId, limit: Long): AudioDescriptionResult =
+    runSuspendCatching {
+      db.query {
+        MediaTable
+          .join(GenreMediaTable, INNER, id, GenreMediaTable.mediaId)
+          .join(AlbumTable, INNER, albumId, AlbumTable.id)
+          .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+          .where { GenreMediaTable.genreId eq genreId.value }
+          .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(trackNumber)) }
+          .limit(limit)
+          .sequence {
+            AudioDescription(
+              it[id].toMediaId(),
+              it[title].toTitle(),
+              it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+              it[AlbumTable.albumArtUri].toUriOrEmpty()
+            )
+          }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getAllAudioFor(composerId: ComposerId, limit: Long): AudioDescriptionResult =
+    runSuspendCatching {
+      db.query {
+        MediaTable
+          .join(ComposerMediaTable, INNER, MediaTable.id, ComposerMediaTable.mediaId)
+          .join(AlbumTable, INNER, albumId, AlbumTable.id)
+          .selects {
+            listOf(MediaTable.id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri)
+          }
+          .where { ComposerMediaTable.composerId eq composerId.value }
+          .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(trackNumber)) }
+          .limit(limit)
+          .sequence {
+            AudioDescription(
+              it[MediaTable.id].toMediaId(),
+              it[title].toTitle(),
+              it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+              it[AlbumTable.albumArtUri].toUriOrEmpty()
+            )
+          }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getAudioQueueItems(shuffled: Boolean): AudioItemListResult =
+    runSuspendCatching { db.query { doGetAudioQueueItems(shuffled) } }
       .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetArtistMedia(
-    artistId: ArtistId,
-    limit: Long
-  ): List<AudioDescription> = MediaTable
-    .join(ArtistMediaTable, INNER, id, ArtistMediaTable.mediaId)
-    .join(AlbumTable, INNER, albumId, AlbumTable.id)
-    .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
-    .where { MediaTable.artistId eq artistId.value }
-    .ordersBy {
-      listOf(OrderBy(AlbumTable.albumTitle), OrderBy(title))
-    }
-    .limit(limit)
-    .sequence {
-      AudioDescription(
-        it[id].toMediaId(),
-        it[title].toTitle(),
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty()
-      )
-    }
-    .toList()
-
-  override suspend fun getAllAudioFor(
-    id: AlbumId,
-    limit: Long
-  ): AudioDescriptionResult = db.query {
-    runCatching { doGetAlbumMedia(id, limit) }
-      .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetAlbumMedia(
-    albumId: AlbumId,
-    limit: Long
-  ): List<AudioDescription> = MediaTable
-    .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
-    .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
-    .where { MediaTable.albumId eq albumId.value }
-    .orderByAsc { trackNumber }
-    .limit(limit)
-    .sequence {
-      AudioDescription(
-        it[id].toMediaId(),
-        it[title].toTitle(),
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty()
-      )
-    }
-    .toList()
-
-  override suspend fun getAllAudioFor(
-    id: GenreId,
-    limit: Long
-  ): AudioDescriptionResult = db.query {
-    runCatching { doGetGenreMedia(id, limit) }
-      .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetGenreMedia(
-    genreId: GenreId,
-    limit: Long
-  ): List<AudioDescription> = MediaTable
-    .join(GenreMediaTable, INNER, id, GenreMediaTable.mediaId)
-    .join(AlbumTable, INNER, albumId, AlbumTable.id)
-    .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
-    .where { GenreMediaTable.genreId eq genreId.value }
-    .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(trackNumber)) }
-    .limit(limit)
-    .sequence {
-      AudioDescription(
-        it[id].toMediaId(),
-        it[title].toTitle(),
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty()
-      )
-    }
-    .toList()
-
-  override suspend fun getAllAudioFor(
-    id: ComposerId,
-    limit: Long
-  ): AudioDescriptionResult = db.query {
-    runCatching { doGetComposerMedia(id, limit) }
-      .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetComposerMedia(
-    id: ComposerId,
-    limit: Long
-  ): List<AudioDescription> = MediaTable
-    .join(ComposerMediaTable, INNER, MediaTable.id, ComposerMediaTable.mediaId)
-    .join(AlbumTable, INNER, albumId, AlbumTable.id)
-    .selects { listOf(MediaTable.id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
-    .where { ComposerMediaTable.composerId eq id.value }
-    .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(trackNumber)) }
-    .limit(limit)
-    .sequence {
-      AudioDescription(
-        it[MediaTable.id].toMediaId(),
-        it[title].toTitle(),
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty()
-      )
-    }
-    .toList()
-
-  override suspend fun getAudioQueueItems(shuffled: Boolean): AudioItemListResult = db.query {
-    runCatching { doGetAudioQueueItems(shuffled) }
-      .mapError { DaoExceptionMessage(it) }
-  }
 
   private fun Queryable.doGetAudioQueueItems(shuffled: Boolean): List<AudioQueueItemData> =
     MediaTable
@@ -720,10 +721,9 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  override suspend fun getAudioItemsForQueue(idList: LongList): AudioItemListResult = db.query {
-    runCatching { doGetAudioItemsForQueue(idList) }
+  override suspend fun getAudioItemsForQueue(idList: LongList): AudioItemListResult =
+    runSuspendCatching { db.query { doGetAudioItemsForQueue(idList) } }
       .mapError { DaoExceptionMessage(it) }
-  }
 
   private fun Queryable.doGetAudioItemsForQueue(idList: LongList): List<AudioQueueItemData> {
     if (idList.isEmpty()) return emptyList()
@@ -930,14 +930,9 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  override suspend fun setRating(
-    id: MediaId,
-    newRating: Rating
-  ): Result<Rating, DaoMessage> = db.transaction {
-    runCatching { doSetRating(id, newRating) }
+  override suspend fun setRating(id: MediaId, newRating: Rating): Result<Rating, DaoMessage> =
+    runSuspendCatching { db.transaction { doSetRating(id, newRating) } }
       .mapError { DaoExceptionMessage(it) }
-      .onFailure { rollback() }
-  }
 
   private fun Transaction.doSetRating(id: MediaId, newRating: Rating): Rating = MediaTable
     .updateColumns {
@@ -955,16 +950,16 @@ private class AudioMediaDaoImpl(
       newRating
     }
 
-  override suspend fun getMediaTitle(mediaId: MediaId): Result<Title, DaoMessage> = db.query {
-    runCatching { doGetMediaTitle(mediaId) }
-      .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetMediaTitle(mediaId: MediaId): Title = MediaTable
-    .select(title)
-    .where { id eq mediaId.value }
-    .sequence { Title(it[title]) }
-    .single()
+  override suspend fun getMediaTitle(mediaId: MediaId): Result<Title, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        MediaTable
+          .select(title)
+          .where { id eq mediaId.value }
+          .sequence { Title(it[title]) }
+          .single()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
   /**
    * While there could be a race condition if 2 threads tried to insert the same media, it's
@@ -978,6 +973,7 @@ private class AudioMediaDaoImpl(
     newArtistId: ArtistId,
     fileTagInfo: MediaFileTagInfo,
     createUpdateTime: Millis,
+    appPrefs: AppPrefs,
     upsertResults: UpsertResults
   ): MediaId {
     val formatFromExt = MediaFormat.mediaFormatFromExtension(audioInfo.extension)
@@ -988,6 +984,7 @@ private class AudioMediaDaoImpl(
       newArtistId,
       fileTagInfo,
       createUpdateTime,
+      appPrefs,
       upsertResults
     ) ?: INSERT_AUDIO_STATEMENT.insert {
       it[location] = audioInfo.location.toString()
@@ -1001,7 +998,7 @@ private class AudioMediaDaoImpl(
       it[albumArtistId] = newAlbumArtistId.value
       it[artistId] = newArtistId.value
       it[year] = fileTagInfo.year
-      it[rating] = fileTagInfo.rating.toRating().value
+      if (appPrefs.readTagRating()) it[rating] = fileTagInfo.rating.toRating().value
       it[duration] = fileTagInfo.duration()
       it[trackNumber] = fileTagInfo.trackNumber
       it[totalTracks] = fileTagInfo.totalTracks
@@ -1021,6 +1018,7 @@ private class AudioMediaDaoImpl(
     newArtistId: ArtistId,
     fileTagInfo: MediaFileTagInfo,
     newUpdateTime: Millis,
+    appPrefs: AppPrefs,
     upsertResults: UpsertResults
   ): MediaId? = queryAudioForUpdate(newInfo.location)?.let { info ->
     val updateTitle = info.title.updateOrNull { fileTagInfo.title }
@@ -1029,7 +1027,8 @@ private class AudioMediaDaoImpl(
     val updateAlbumArtistId = info.albumArtistId.updateOrNull { newAlbumArtistId }
     val updateArtistId = info.artistId.updateOrNull { newArtistId }
     val updateYear = info.year.updateOrNull { fileTagInfo.year }
-    val updateRating = info.rating.updateOrNull { fileTagInfo.rating }
+    val updateRating = if (appPrefs.readTagRating()) info.rating.updateOrNull { fileTagInfo.rating }
+    else null
     val updateDuration = info.duration.updateOrNull { fileTagInfo.duration }
     val updateTrackNumber = info.trackNumber.updateOrNull { fileTagInfo.trackNumber }
     val updateTotalTracks = info.totalTracks.updateOrNull { fileTagInfo.totalTracks }

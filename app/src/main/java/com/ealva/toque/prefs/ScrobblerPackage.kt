@@ -32,6 +32,6 @@ enum class ScrobblerPackage(
   @StringRes override val titleRes: Int
 ) : HasConstId, HasTitle {
   None(0, PackageName.NONE, R.string.None),
-  LastFm(1, "com.adam.aslfms".toPackageName(), R.string.LastFm),
+  LastFm(1, "fm.last.android".toPackageName(), R.string.LastFm),
   SimpleLastFm(2, "com.adam.aslfms".toPackageName(), R.string.SimpleLastFm);
 }

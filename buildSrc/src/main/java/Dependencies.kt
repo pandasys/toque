@@ -21,13 +21,12 @@ object SdkVersion {
 }
 
 object PluginsVersion {
-  const val AGP = "7.0.2"
+  const val AGP = "7.0.3"
   const val DETEKT = "1.18.1"
-  const val DOKKA = "1.5.30"
-  const val KOTLIN = "1.5.21"
+  const val DOKKA = "1.5.31"
+  const val KOTLIN = "1.5.31"
   const val PUBLISH = "0.18.0"
-  const val SERIALIZATION = "1.5.21"
-  const val GLIDE = "1.5.21"
+  const val SERIALIZATION = "1.5.31"
   const val VERSIONS = "0.39.0"
 }
 
@@ -36,7 +35,7 @@ object Libs {
   const val DESUGAR = "com.android.tools:desugar_jdk_libs:1.1.5"
 
   object Accompanist {
-    private const val VERSION = "0.18.0"
+    private const val VERSION = "0.19.0"
     const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
     const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
     const val PERMISSIONS = "com.google.accompanist:accompanist-permissions:$VERSION"
@@ -49,7 +48,7 @@ object Libs {
 
   object AndroidX {
     const val APPCOMPAT = "androidx.appcompat:appcompat:1.3.1"
-    const val PALETTE = "androidx.palette:palette:1.0.0"
+    //const val PALETTE = "androidx.palette:palette:1.0.0"
 
     object Ktx {
       const val CORE = "androidx.core:core-ktx:1.6.0"
@@ -65,8 +64,8 @@ object Libs {
 
     object Compose {
       @Suppress("MemberVisibilityCanBePrivate")
-      const val VERSION = "1.0.2"
-      const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
+      const val VERSION = "1.0.4"
+      //const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
       const val UI = "androidx.compose.ui:ui:$VERSION"
       const val MATERIAL = "androidx.compose.material:material:$VERSION"
       const val TOOLING = "androidx.compose.ui:ui-tooling:$VERSION"
@@ -102,8 +101,8 @@ object Libs {
   }
 
   object Coil {
-    const val COIL = "io.coil-kt:coil:1.3.2"
-    const val COIL_COMPOSE = "io.coil-kt:coil-compose:1.3.2"
+    const val COIL = "io.coil-kt:coil:1.4.0"
+    const val COIL_COMPOSE = "io.coil-kt:coil-compose:1.4.0"
   }
 
   object Datastore {
@@ -156,7 +155,7 @@ object Libs {
   }
 
   object Kotlin {
-    private const val VERSION = "1.5.21"
+    private const val VERSION = "1.5.31"
     const val KGP = "org.jetbrains.kotlin:kotlin-gradle-plugin:$VERSION"
     const val REFLECT = "org.jetbrains.kotlin:kotlin-reflect:$VERSION"
 
@@ -172,18 +171,14 @@ object Libs {
     }
 
     object Serialization {
-      private const val VERSION = "1.2.2"
+      private const val VERSION = "1.3.0"
       const val CORE = "org.jetbrains.kotlinx:kotlinx-serialization-core:$VERSION"
       const val JSON = "org.jetbrains.kotlinx:kotlinx-serialization-json:$VERSION"
     }
   }
 
   object LibVLC {
-    const val ALL = "org.videolan.android:libvlc-all:3.3.14"
-  }
-
-  object Navigation {
-    const val COMPOSE = "androidx.navigation:navigation-compose:2.4.0-alpha01"
+    const val ALL = "org.videolan.android:libvlc-all:3.4.3"
   }
 
   object Phoenix {
@@ -191,7 +186,7 @@ object Libs {
   }
 
   object PreferenceStore {
-    private const val VERSION = "0.8.0-0"
+    private const val VERSION = "0.10.5-SNAPSHOT"
     const val STORE = "com.ealva:pref-store:$VERSION"
     const val COMPOSE = "com.ealva:compose-preference:$VERSION"
   }
@@ -209,7 +204,7 @@ object Libs {
   object SimpleStack {
     const val CORE = "com.github.Zhuinden:simple-stack:2.6.2"
     const val EXT = "com.github.Zhuinden:simple-stack-extensions:2.2.2"
-    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.1"
+    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.3"
   }
 
   object Square {

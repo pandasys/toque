@@ -49,7 +49,7 @@ class AppPrefsStub : AppPrefs {
   }
 
   override val firstRun = BoolPrefStub()
-  override val allowDuplicates = PrefStub<Boolean, AllowDuplicates>()
+  override val allowDuplicates = BoolPrefStub()
   override val goToNowPlaying = BoolPrefStub()
   override val ignoreSmallFiles = BoolPrefStub()
   override val ignoreThreshold = MillisPrefStub()
@@ -66,7 +66,6 @@ class AppPrefsStub : AppPrefs {
   override val playUpNextAction = PrefStub<Int, PlayUpNextAction>()
   override val endOfQueueAction = PrefStub<Int, EndOfQueueAction>()
   override val selectMediaAction = PrefStub<Int, SelectMediaAction>()
-  override val audioOutputModule = PrefStub<Int, AudioOutputModule>()
   override val markPlayedPercentage = PrefStub<Double, Double>()
   override val rewindThenPrevious: BoolPref = BoolPrefStub()
   override val scanAfterMediaScanner: BoolPref = BoolPrefStub()
@@ -75,4 +74,6 @@ class AppPrefsStub : AppPrefs {
   override val showTimeRemaining: BoolPref = BoolPrefStub()
   override val playOnBluetoothConnection: BoolPref = BoolPrefStub()
   override val playOnWiredConnection: BoolPref = BoolPrefStub()
+  override val readTagRating: BoolPref = BoolPrefStub()
+  override val readTagSortFields: BoolPref = BoolPrefStub()
 }

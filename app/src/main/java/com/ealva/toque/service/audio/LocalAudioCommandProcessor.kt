@@ -79,13 +79,9 @@ class LocalAudioCommandProcessor(
   //private val uiModeManager: UiModeManager by inject()
 
   override suspend fun activate(resume: Boolean, playNow: PlayNow) {
-    LOG._e { it("activate") }
 //    sessionControl.onMediaButton(::handleMediaButton)
     realQueue.isActive
-      .onStart {
-        LOG._e { it("LocalAudioQueue isActive flow started") }
-        realQueue.activate(resume, playNow)
-      }
+      .onStart { realQueue.activate(resume, playNow) }
       .onEach { isActive -> handleIsActive(isActive) }
       .catch { cause -> LOG.e(cause) { it("LocalAudioQueue isActive flow error") } }
       .onCompletion { LOG._i { it("LocalAudioQueue isActive flow complete") } }
@@ -95,23 +91,16 @@ class LocalAudioCommandProcessor(
   }
 
   private suspend fun handleIsActive(isActive: Boolean) {
-    LOG._e { it("handleIsActive %s", isActive) }
-    if (isActive) {
-      if (appPrefs.firstRun()) collectAudioDaoEventsAndStartMediaScanner()
-    }
+    if (isActive && appPrefs.firstRun()) collectAudioDaoEventsAndStartMediaScanner()
   }
 
   override fun deactivate() {
-    LOG._e { it("deactivate") }
     scope.cancel()
     realQueue.deactivate()
   }
 
   private fun emitCommand(command: LocalAudioCommand) {
-    scope.launch {
-      LOG._e { it("emit %s", command) }
-      commandFlow.emit(command)
-    }
+    scope.launch { commandFlow.emit(command) }
   }
 
   override fun goToQueueItem(instanceId: Long) = emitCommand(GoToQueueItem(instanceId))
@@ -126,6 +115,8 @@ class LocalAudioCommandProcessor(
   override fun previousList() = emitCommand(LocalAudioCommand.PreviousList)
   override fun fastForward() = emitCommand(LocalAudioCommand.FastForward)
   override fun rewind() = emitCommand(LocalAudioCommand.Rewind)
+  override fun setRepeatMode(mode: RepeatMode) = emitCommand(SetRepeatMode(mode))
+  override fun setShuffleMode(mode: ShuffleMode) = emitCommand(SetShuffleMode(mode))
   override suspend fun addToUpNext(audioIdList: AudioIdList) = emitCommand(AddToUpNext(audioIdList))
   private suspend fun prepareFromId(id: String, extras: Bundle) = try {
     MediaSessionBrowser.handleMedia(id, extras, PrepareMediaFromId(this, audioMediaDao))
@@ -175,7 +166,6 @@ class LocalAudioCommandProcessor(
   )
 
   private suspend fun handleSessionEvent(event: SessionControlEvent) {
-    LOG._e { it("-->handleMediaSessionEvent %s", event) }
     when (event) {
       is SessionControlEvent.AddItemAt -> addItemAt(event.item, event.pos, event.addToEnd)
       is SessionControlEvent.CustomAction -> customAction(event.action, event.extras)
@@ -249,10 +239,10 @@ class LocalAudioCommandProcessor(
 
   private fun collectCommandFlow() {
     commandFlow
-      .onStart { LOG._e { it("Command flow start") } }
+      .onStart { LOG._i { it("Command flow start") } }
       .onEach { command -> processCommand(command) }
       .catch { cause -> LOG.e(cause) { it("Error processing command") } }
-      .onCompletion { cause -> LOG.i(cause) { it("Command processing end") } }
+      .onCompletion { cause -> LOG._i(cause) { it("Command processing end") } }
       .launchIn(scope)
   }
 
@@ -316,14 +306,14 @@ class LocalAudioCommandProcessor(
 private sealed interface LocalAudioCommand {
   suspend fun process(localAudioQueue: LocalAudioQueue)
 
-  data class Play(val immediateTransition: Boolean = false) : LocalAudioCommand {
+  data class Play(val immediate: Boolean = false) : LocalAudioCommand {
     override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.play(immediateTransition)
+      localAudioQueue.play(immediate)
   }
 
-  data class Pause(val immediateTransition: Boolean = false) : LocalAudioCommand {
+  data class Pause(val immediate: Boolean = false) : LocalAudioCommand {
     override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.pause(immediateTransition)
+      localAudioQueue.pause(immediate)
   }
 
   data class SeekTo(val position: Millis) : LocalAudioCommand {

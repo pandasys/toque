@@ -16,52 +16,7 @@
 
 package com.ealva.toque.service.session.client
 
-import android.content.ComponentName
-import android.content.Context
-import android.net.Uri
-import android.os.Bundle
-import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.RatingCompat
-import android.support.v4.media.session.MediaControllerCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import com.ealva.ealvabrainz.common.AlbumTitle
-import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.ealvalog.w
-import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.audio.QueueAudioItem
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.RepeatMode
-import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.common.Title
-import com.ealva.toque.common.compatToRepeatMode
-import com.ealva.toque.common.compatToShuffleMode
-import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._e
-import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.Rating
-import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.media.toRating
-import com.ealva.toque.service.media.toStarRating
-import com.ealva.toque.service.session.common.Metadata
-import com.ealva.toque.service.session.common.PlaybackState
-import com.ealva.toque.service.session.common.toPersistentId
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.onFailure
-import kotlinx.coroutines.channels.trySendBlocking
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.callbackFlow
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
-
+/*
 private val LOG by lazyLogger(MediaSessionClient::class)
 
 sealed class LoadEvent {
@@ -75,7 +30,9 @@ sealed class LoadEvent {
 }
 
 private typealias ChildList = MutableList<MediaBrowserCompat.MediaItem>
+*/
 
+/*
 class MediaSessionClientProvider(
   private val context: Context,
   private val componentName: ComponentName,
@@ -92,7 +49,9 @@ class MediaSessionClientProvider(
     }
   }
 }
+*/
 
+/*
 interface MediaSessionClient {
   val isConnected: StateFlow<Boolean>
   val networkError: StateFlow<Boolean>
@@ -110,7 +69,9 @@ interface MediaSessionClient {
 
   fun loadChildren(parentId: String, options: Bundle = Bundle.EMPTY): Flow<LoadEvent>
 }
+*/
 
+/*
 private class MediaSessionClientImpl(
   ctx: Context,
   name: ComponentName
@@ -213,6 +174,7 @@ private class MediaSessionClientImpl(
      * Since other connection status events are sent to [MediaBrowserCompat.ConnectionCallback], we
      * catch the disconnect here and send it on to the other callback.
      */
+
     override fun onSessionDestroyed() {
       connectionCallback.onConnectionSuspended()
     }
@@ -256,7 +218,9 @@ private class MediaSessionClientImpl(
     }
   }
 }
+*/
 
+/*
 private fun List<MediaSessionCompat.QueueItem>?.toAudioQueueItemList(): List<AudioItem> {
   if (this == null) return emptyList()
   return List(size) { index -> get(index).toAudioItem() }
@@ -330,3 +294,4 @@ private fun ClosedFloatingPointRange<Float>.convert(number: Float): StarRating {
     (ratio * (STAR_5_RANGE.endInclusive - STAR_5_RANGE.start)).coerceIn(STAR_5_RANGE)
   )
 }
+*/

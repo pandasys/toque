@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 
 inline fun <reified T : Any> Context.requireSystemService(): T = checkNotNull(getSystemService())
+
 fun Context.haveReadPermission() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
   ContextCompat.checkSelfPermission(
     this,

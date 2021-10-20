@@ -24,6 +24,7 @@ import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.SUB_AUTODETECT_PATHS
 private val LOG by lazyLogger("libVlcOptions")
 
 private const val PARM_AUDIO_TIME_STRETCH = "--audio-time-stretch"
+private const val PARM_NO_AUDIO_TIME_STRETCH = "--no-audio-time-stretch"
 private const val PARM_GAIN_MODE = "--audio-replay-gain-mode"
 private const val PARM_GAIN_PREAMP = "--audio-replay-gain-preamp"
 private const val PARM_GAIN_DEFAULT = "--audio-replay-gain-default"
@@ -37,9 +38,8 @@ private const val PARM_SKIP_IDCT = "--avcodec-skip-idct"
 private const val PARM_SUBSDEC_ENCODING = "--subsdec-encoding"
 private const val PARM_SUB_AUTO_DETECT_PATH = "--sub-autodetect-path"
 private const val PARM_CHROMA = "--android-display-chroma"
-private const val PARM_NO_AUDIO_TIME_STRETCH = "--no-audio-time-stretch"
-private const val PARM_VVV_VERBOSE = "-vvv"
 private const val PARM_VV_VERBOSE = "-vv"
+private const val PARM_V_VERBOSE = "-v"
 
 private const val SOXR_RESAMPLER = "soxr"
 private const val UGLY_RESAMPLER = "ugly"
@@ -67,51 +67,8 @@ fun libVlcOptions(
   }
 }
 
-private fun getResampler(vlcUtil: VlcUtil): String =
-  if (vlcUtil.machineSpecs.processors > 2) SOXR_RESAMPLER else UGLY_RESAMPLER
-
-@Suppress("unused")
-private fun ArrayList<String>.dumpOptions() {
-  forEach { option ->
-    LOG.i { it(option) }
-  }
-}
-
-private fun ArrayList<String>.subtitlesAutoDetectPath() {
-//  subtitlesDirectory.mkdirs()
-  add(PARM_SUB_AUTO_DETECT_PATH)
-  add(SUB_AUTODETECT_PATHS)
-//  options.add("./Subtitles, ./subtitles, ./Subs, ./subs, " +
-//    if (FileUtil.SUBTITLES_DIRECTORY.isDirectory) FileUtil.SUBTITLES_DIRECTORY.path else "")
-}
-
-private fun ArrayList<String>.verboseModeOption(prefs: LibVlcPrefs) {
-  if (prefs.debugAndLogging) {
-    add(if (prefs.enableVerboseMode()) PARM_VVV_VERBOSE else PARM_VV_VERBOSE)
-  } else {
-    add(PARM_LOG_VERBOSE)
-    add("-1")
-  }
-}
-
-private fun ArrayList<String>.resamplerOption(vlcUtil: VlcUtil) {
-  add(PARM_RESAMPLER)
-  add(getResampler(vlcUtil))
-}
-
-private fun ArrayList<String>.androidWindowChromaOption(prefs: LibVlcPrefs) {
-  add(PARM_CHROMA)
-  add(prefs.chroma().toString())
-}
-
-private fun ArrayList<String>.networkCachingOption(prefs: LibVlcPrefs) {
-  add(PARM_NETWORK_CACHING)
-  add(prefs.networkCachingAmount().toString())
-}
-
-private fun ArrayList<String>.subsEncodingOption(prefs: LibVlcPrefs) {
-  add(PARM_SUBSDEC_ENCODING)
-  add(prefs.subtitleEncoding().toString())
+private fun ArrayList<String>.audioTimeStretchOption(prefs: LibVlcPrefs) {
+  add(if (prefs.allowTimeStretchAudio()) PARM_AUDIO_TIME_STRETCH else PARM_NO_AUDIO_TIME_STRETCH)
 }
 
 private fun ArrayList<String>.audioReplayGainMode(prefs: LibVlcPrefs) {
@@ -123,12 +80,23 @@ private fun ArrayList<String>.audioReplayGainMode(prefs: LibVlcPrefs) {
   add(prefs.defaultReplayGain().toString())
 }
 
-private fun ArrayList<String>.skipFrameAndIdctOptions(prefs: LibVlcPrefs) {
-  val frameSkip = prefs.enableFrameSkip()
-  add(PARM_SKIP_FRAME)
-  add(if (frameSkip) "2" else "0")
-  add(PARM_SKIP_IDCT)
-  add(if (frameSkip) "2" else "0")
+private fun ArrayList<String>.networkCachingOption(prefs: LibVlcPrefs) {
+  add(PARM_NETWORK_CACHING)
+  add(prefs.networkCachingAmount().toString())
+}
+
+private fun ArrayList<String>.resamplerOption(vlcUtil: VlcUtil) {
+  add(PARM_RESAMPLER)
+  add(getResampler(vlcUtil))
+}
+
+private fun ArrayList<String>.verboseModeOption(prefs: LibVlcPrefs) {
+  if (prefs.debugAndLogging) {
+    add(if (prefs.enableVerboseMode()) PARM_VV_VERBOSE else PARM_V_VERBOSE)
+  } else {
+    add(PARM_LOG_VERBOSE)
+    add("-1")
+  }
 }
 
 private fun ArrayList<String>.skipLoopFilterOption(
@@ -139,9 +107,41 @@ private fun ArrayList<String>.skipLoopFilterOption(
   add(prefs.skipLoopFilter().getDeblocking(vlcUtil).toString())
 }
 
-private fun ArrayList<String>.audioTimeStretchOption(prefs: LibVlcPrefs) {
-  add(if (prefs.allowTimeStretchAudio()) PARM_AUDIO_TIME_STRETCH else PARM_NO_AUDIO_TIME_STRETCH)
+private fun ArrayList<String>.skipFrameAndIdctOptions(prefs: LibVlcPrefs) {
+  val frameSkip = prefs.enableFrameSkip()
+  add(PARM_SKIP_FRAME)
+  add(if (frameSkip) "2" else "0")
+  add(PARM_SKIP_IDCT)
+  add(if (frameSkip) "2" else "0")
 }
+
+private fun ArrayList<String>.subsEncodingOption(prefs: LibVlcPrefs) {
+  add(PARM_SUBSDEC_ENCODING)
+  add(prefs.subtitleEncoding().toString())
+}
+
+private fun ArrayList<String>.subtitlesAutoDetectPath() {
+//  subtitlesDirectory.mkdirs()
+  add(PARM_SUB_AUTO_DETECT_PATH)
+  add(SUB_AUTODETECT_PATHS)
+//  options.add("./Subtitles, ./subtitles, ./Subs, ./subs, " +
+//    if (FileUtil.SUBTITLES_DIRECTORY.isDirectory) FileUtil.SUBTITLES_DIRECTORY.path else "")
+}
+
+private fun ArrayList<String>.androidWindowChromaOption(prefs: LibVlcPrefs) {
+  add(PARM_CHROMA)
+  add(prefs.chroma().toString())
+}
+
+@Suppress("unused")
+private fun ArrayList<String>.dumpOptions() {
+  forEach { option ->
+    LOG.i { it(option) }
+  }
+}
+
+private fun getResampler(vlcUtil: VlcUtil): String =
+  if (vlcUtil.machineSpecs.processors > 2) SOXR_RESAMPLER else UGLY_RESAMPLER
 
 private fun SkipLoopFilter.getDeblocking(vlcUtil: VlcUtil): SkipLoopFilter {
   var ret = this

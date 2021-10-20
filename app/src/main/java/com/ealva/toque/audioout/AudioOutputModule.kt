@@ -47,7 +47,7 @@ enum class AudioOutputModule(
   override fun toString(): String = module
 
   companion object {
-    val DEFAULT = select(OpenSlEs)
+    val DEFAULT = select(AudioTrack)
 
     private val deviceCapable = HWDecoderUtil.getAudioOutputFromDevice()
 

@@ -34,11 +34,18 @@ import java.io.FileNotFoundException
 
 interface LibVlcSingleton {
   /**
-   * Get the single instance, which may need to be constructed
-   *
-   * @throws IllegalStateException if error during LibVLC initialization
+   * Use the LibVlc instance within the scope of the [block] function. Do not save the instance
+   * anywhere as it may become invalid. Specifically, [reset] invalidates the current instance
+   * and forces it to be rebuilt when the function is called.
    */
-  suspend fun instance(): LibVlc
+  suspend fun <R> withInstance(block: (LibVlc) -> R): R
+
+  /**
+   * Set the LibVlc instance as invalid and force it's reconstruction when needed. This is needed
+   * due to some parameters needed to construct LibVlc being changed. After this is called, any
+   * current Media players should be reset to incorporate the new parameters.
+   */
+  fun reset()
 
   companion object {
     operator fun invoke(
@@ -71,8 +78,16 @@ private class LibVlcSingletonImpl(
   private var instance: LibVlc? = null
   private val mutex = Mutex()
 
-  override suspend fun instance(): LibVlc = instance ?: withContext(dispatcher) {
+  private suspend fun instance(): LibVlc = instance ?: withContext(dispatcher) {
     mutex.withLock { instance ?: make().also { instance = it } }
+  }
+
+  override suspend fun <R> withInstance(block: (LibVlc) -> R): R {
+    return block(instance())
+  }
+
+  override fun reset() {
+    instance = null
   }
 }
 

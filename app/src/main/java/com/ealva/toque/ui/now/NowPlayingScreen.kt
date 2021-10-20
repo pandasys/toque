@@ -18,7 +18,9 @@ package com.ealva.toque.ui.now
 
 import android.content.res.Configuration
 import android.net.Uri
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,18 +37,22 @@ import androidx.compose.material.Card
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Slider
+import androidx.compose.material.SnackbarResult
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
@@ -58,16 +64,23 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.common.RepeatMode
+import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.vlc.toFloat
+import com.ealva.toque.ui.main.LocalSnackbarHostState
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ARTIST
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_BUTTON_ROW
@@ -83,7 +96,6 @@ import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TOP_SPACE
 import com.google.accompanist.insets.ExperimentalAnimatedInsets
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.WindowInsets
-import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
@@ -96,7 +108,10 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
+
+private val LOG by lazyLogger(NowPlayingScreen::class)
 
 object NowPlayingScreenIds {
   const val ID_SLIDER_SPACE = 1
@@ -116,11 +131,9 @@ object NowPlayingScreenIds {
 @Immutable
 @Parcelize
 data class NowPlayingScreen(private val noArgPlaceholder: String = "") : ComposeKey() {
-  @Suppress("RemoveExplicitTypeArguments")
   override fun bindServices(serviceBinder: ServiceBinder) {
-    super.bindServices(serviceBinder)
     with(serviceBinder) {
-      add(NowPlayingViewModel(lookup(), lookup()))
+      add(NowPlayingViewModel(lookup(), lookup("AppPrefs")))
     }
   }
 
@@ -141,6 +154,8 @@ data class NowPlayingScreen(private val noArgPlaceholder: String = "") : Compose
       seekTo = { position -> viewModel.seekTo(position) },
       toggleShowRemaining = { viewModel.toggleShowTimeRemaining() },
       toggleEqMode = { viewModel.toggleEqMode() },
+      nextRepeatMode = { viewModel.nextRepeatMode() },
+      nextShuffleMode = { viewModel.nextShuffleMode() },
       modifier
     )
   }
@@ -180,6 +195,8 @@ fun NowPlaying(
   seekTo: (Millis) -> Unit,
   toggleShowRemaining: () -> Unit,
   toggleEqMode: () -> Unit,
+  nextRepeatMode: () -> Unit,
+  nextShuffleMode: () -> Unit,
   modifier: Modifier
 ) {
   val useDarkIcons = MaterialTheme.colors.isLight
@@ -238,6 +255,8 @@ fun NowPlaying(
         seekTo = seekTo,
         toggleShowRemaining = toggleShowRemaining,
         toggleEqMode = toggleEqMode,
+        nextRepeatMode = nextRepeatMode,
+        nextShuffleMode = nextShuffleMode,
         constraintSet = if (isPortrait) portraitConstraints() else landscapeConstraints(),
         modifier = if (isPortrait) {
           Modifier
@@ -248,7 +267,6 @@ fun NowPlaying(
               bottom.linkTo(parent.bottom)
               height = Dimension.fillToConstraints
             }
-            .navigationBarsPadding()
             .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
         } else {
           Modifier
@@ -287,19 +305,38 @@ fun PlayerControls(
   seekTo: (Millis) -> Unit,
   toggleShowRemaining: () -> Unit,
   toggleEqMode: () -> Unit,
+  nextRepeatMode: () -> Unit,
+  nextShuffleMode: () -> Unit,
   constraintSet: ConstraintSet,
   modifier: Modifier
 ) {
   val item = state.currentItem
+
+  val snackbarHostState = LocalSnackbarHostState.current
+  val scope = rememberCoroutineScope()
+
   BoxWithConstraints(modifier = modifier) {
     ConstraintLayout(constraintSet = constraintSet, modifier = Modifier.fillMaxSize()) {
 
       Spacer(modifier = Modifier.layoutId(ID_TOP_SPACE)) // can't top align rating bar without this
       RatingBarRow(
-        state.eqMode,
-        item.rating,
-        toggleEqMode,
-        Modifier
+        eqMode = state.eqMode,
+        rating = item.rating,
+        playbackRate = state.playbackRate,
+        repeatMode = state.repeatMode,
+        shuffleMode = state.shuffleMode,
+        toggleEqMode = toggleEqMode,
+        setPlaybackRate = {
+          scope.launch {
+            when (snackbarHostState.showSnackbar("Snackbar it is", "Label")) {
+              SnackbarResult.Dismissed -> LOG._e { it("dismissed") }
+              SnackbarResult.ActionPerformed -> LOG._e { it("action") }
+            }
+          }
+        },
+        nextRepeatMode = nextRepeatMode,
+        nextShuffleMode = nextShuffleMode,
+        modifier = Modifier
           .layoutId(ID_RATING_BAR_ROW)
           .padding(horizontal = 8.dp)
           .fillMaxWidth()
@@ -388,9 +425,8 @@ private fun MediaArtPager(
   goToIndex: (Int) -> Unit,
   modifier: Modifier
 ) {
-  val pagerState = rememberPagerState(pageCount = queue.size)
+  val pagerState = rememberPagerState(initialPage = queueIndex.coerceAtLeast(0))
 
-  pagerState.pageCount = queue.size
   if (queueIndex >= 0) {
     LaunchedEffect(key1 = queueIndex) {
       if (queueIndex in queue.indices) pagerState.scrollToPage(queueIndex)
@@ -400,14 +436,18 @@ private fun MediaArtPager(
   LaunchedEffect(pagerState) {
     snapshotFlow { pagerState.currentPage }.collect { index -> goToIndex(index) }
   }
-  HorizontalPager(state = pagerState, modifier = modifier) { page ->
+  HorizontalPager(
+    count = queue.size,
+    state = pagerState,
+    modifier = modifier
+  ) { page ->
     ArtPagerCard(queue, page, size)
   }
 }
 
 @OptIn(ExperimentalCoilApi::class)
 @Composable
-fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
+private fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
   if (currentPage in queue.indices) {
     val item = queue[currentPage]
     Card(modifier = Modifier.fillMaxSize()) {
@@ -447,25 +487,46 @@ fun PositionSlider(
 fun RatingBarRow(
   eqMode: EqMode,
   rating: Rating,
+  playbackRate: PlaybackRate,
+  repeatMode: RepeatMode,
+  shuffleMode: ShuffleMode,
   toggleEqMode: () -> Unit,
+  setPlaybackRate: () -> Unit,
+  nextRepeatMode: () -> Unit,
+  nextShuffleMode: () -> Unit,
   modifier: Modifier
 ) {
   Row(
     modifier = modifier,
     horizontalArrangement = Arrangement.SpaceEvenly
   ) {
-    IconButton(onClick = toggleEqMode, modifier = Modifier.size(30.dp)) {
+    IconButton(onClick = toggleEqMode, modifier = Modifier.size(26.dp)) {
       Image(
         painter = rememberImagePainter(data = R.drawable.ic_audio_equalizer),
         contentDescription = "Toggle Equalizer",
         alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(30.dp)
+        modifier = Modifier.size(26.dp)
       )
     }
-    Spacer(modifier = Modifier.height(30.dp))
+    Spacer(modifier = Modifier.height(26.dp))
+    Box(modifier = Modifier.height(26.dp), contentAlignment = Alignment.Center) {
+      Text(
+        text = "%.2fX".format(playbackRate.value),
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        style = MaterialTheme.typography.caption,
+        modifier = Modifier
+          .border(1.dp, Color.White)
+          .padding(2.dp)
+          .clickable(onClick = setPlaybackRate)
+      )
+    }
+    Spacer(modifier = Modifier.height(26.dp))
     RatingBar(
       modifier = Modifier.wrapContentSize(),
       value = rating.toStarRating().value,
+      size = 24.dp,
+      padding = 2.dp,
       isIndicator = true,
       activeColor = Color.White,
       inactiveColor = Color.White,
@@ -473,7 +534,24 @@ fun RatingBarRow(
       onValueChange = {},
       onRatingChanged = {},
     )
-    Spacer(modifier = Modifier.height(30.dp))
+    Spacer(modifier = Modifier.height(26.dp))
+    IconButton(onClick = nextRepeatMode, modifier = Modifier.size(26.dp)) {
+      Image(
+        painter = rememberImagePainter(data = repeatMode.drawable),
+        contentDescription = stringResource(id = repeatMode.titleRes),
+        alpha = if (repeatMode.isOn()) ALPHA_ON else ALPHA_OFF,
+        modifier = Modifier.size(26.dp)
+      )
+    }
+    Spacer(modifier = Modifier.height(26.dp))
+    IconButton(onClick = nextShuffleMode, modifier = Modifier.size(26.dp)) {
+      Image(
+        painter = rememberImagePainter(data = shuffleMode.drawable),
+        contentDescription = stringResource(id = shuffleMode.titleRes),
+        alpha = if (shuffleMode.isOn()) ALPHA_ON else ALPHA_OFF,
+        modifier = Modifier.size(26.dp)
+      )
+    }
   }
 }
 
@@ -734,3 +812,18 @@ fun makeScreenConfig(config: Configuration, density: Density, insets: WindowInse
     navRight = with(density) { insets.navigationBars.right.toDp() }
   )
 }
+
+private val RepeatMode.drawable: Int
+  @DrawableRes get() = when (this) {
+    RepeatMode.None -> R.drawable.ic_repeat_off
+    RepeatMode.All -> R.drawable.ic_repeat
+    RepeatMode.One -> R.drawable.ic_repeat_once
+  }
+
+private val ShuffleMode.drawable: Int
+  @DrawableRes get() = when (this) {
+    ShuffleMode.None -> R.drawable.ic_shuffle_disabled
+    ShuffleMode.Media -> R.drawable.ic_shuffle_media
+    ShuffleMode.Lists -> R.drawable.ic_shuffle
+    ShuffleMode.MediaAndLists -> R.drawable.ic_shuffle_both
+  }

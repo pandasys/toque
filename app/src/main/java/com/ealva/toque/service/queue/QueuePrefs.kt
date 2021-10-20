@@ -16,20 +16,17 @@
 
 package com.ealva.toque.service.queue
 
-import androidx.datastore.preferences.core.MutablePreferences
-import androidx.datastore.preferences.core.Preferences
 import com.ealva.prefstore.store.BoolPref
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
+import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.SongListType
 import com.ealva.toque.prefs.BaseToquePreferenceStore
 import com.ealva.toque.service.media.EqMode
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 
 typealias QueuePrefsSingleton = PreferenceStoreSingleton<QueuePrefs>
 
@@ -40,27 +37,11 @@ interface QueuePrefs : PreferenceStore<QueuePrefs> {
   val eqMode: PreferenceStore.Preference<Int, EqMode>
   val lastListType: PreferenceStore.Preference<Int, SongListType>
   val lastListName: PreferenceStore.Preference<String, String>
-
+  val playbackRate: PreferenceStore.Preference<Float, PlaybackRate>
   suspend fun setLastList(idList: AudioIdList)
 
-  /*
-  fun nextRepeatMode(): Repeat
-  fun shuffleSongs(): Boolean
-   */
   companion object {
     fun make(storage: Storage): QueuePrefs = QueuePrefsImpl(storage)
-
-    val NULL: QueuePrefs by lazy {
-      object : BaseToquePreferenceStore<QueuePrefs>(NullStorage), QueuePrefs {
-        override val firstRun by preference(false)
-        override val repeatMode by enumPref(RepeatMode.None)
-        override val shuffleMode by enumPref(ShuffleMode.None)
-        override val eqMode by enumPref(EqMode.Off)
-        override val lastListType by enumPref(SongListType.All)
-        override val lastListName by preference("")
-        override suspend fun setLastList(idList: AudioIdList) {}
-      }
-    }
   }
 }
 
@@ -73,15 +54,15 @@ private class QueuePrefsImpl(
   override val eqMode by enumPref(EqMode.Off)
   override val lastListType by enumPref(SongListType.All)
   override val lastListName by preference("")
+  override val playbackRate by asTypePref(
+    default = PlaybackRate.NORMAL,
+    maker = { PlaybackRate(it) },
+    serialize = { it.value },
+    sanitize = { playbackRate -> playbackRate.coerceIn(PlaybackRate.RANGE) }
+  )
+
   override suspend fun setLastList(idList: AudioIdList) = edit {
     it[lastListType] = idList.listType
     it[lastListName] = idList.listName
   }
-}
-
-private object NullStorage : Storage {
-  override val data: Flow<Preferences> = emptyFlow()
-  override suspend fun clear() {}
-  override suspend fun edit(transform: suspend (MutablePreferences) -> Unit) {}
-  override fun <T> get(key: Preferences.Key<T>): T? = null
 }

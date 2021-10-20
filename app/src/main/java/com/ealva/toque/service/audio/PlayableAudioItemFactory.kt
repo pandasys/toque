@@ -39,8 +39,7 @@ interface PlayableAudioItemFactory {
   suspend fun makeUpNextQueue(
     shuffled: Boolean,
     request: AvPlayer.FocusRequest,
-    duckedState: DuckedState,
-    activeEqPreset: ActiveEqPreset
+    sharedPlayerState: SharedPlayerState
   ): MutableList<PlayableAudioItem>
 
   /**
@@ -54,8 +53,7 @@ interface PlayableAudioItemFactory {
   suspend fun makeNewQueueItems(
     idList: LongList,
     request: AvPlayer.FocusRequest,
-    duckedState: DuckedState,
-    activeEqPreset: ActiveEqPreset
+    sharedPlayerState: SharedPlayerState
   ): QueueList
 
   companion object {
@@ -88,10 +86,8 @@ private class PlayableAudioItemFactoryImpl(
   override suspend fun makeUpNextQueue(
     shuffled: Boolean,
     request: AvPlayer.FocusRequest,
-    duckedState: DuckedState,
-    activeEqPreset: ActiveEqPreset
+    sharedPlayerState: SharedPlayerState
   ): MutableList<PlayableAudioItem> {
-    val libVlc = libVlcSingleton.instance()
     val appPrefs = appPrefsSingleton.instance()
     val libVlcPrefs = libVlcPrefsSingleton.instance()
     return when (val result = audioMediaDao.getAudioQueueItems(shuffled)) {
@@ -116,14 +112,13 @@ private class PlayableAudioItemFactoryImpl(
               itemData.displayName,
               itemData.albumId,
               itemData.artists,
-              libVlc,
+              libVlcSingleton,
               mediaFileStore,
-              activeEqPreset,
+              sharedPlayerState,
               appPrefs,
               libVlcPrefs,
               wakeLockFactory,
               request,
-              duckedState,
             )
           )
         }
@@ -141,10 +136,8 @@ private class PlayableAudioItemFactoryImpl(
   override suspend fun makeNewQueueItems(
     idList: LongList,
     request: AvPlayer.FocusRequest,
-    duckedState: DuckedState,
-    activeEqPreset: ActiveEqPreset
+    sharedPlayerState: SharedPlayerState
   ): QueueList {
-    val libVlc = libVlcSingleton.instance()
     val appPrefs = appPrefsSingleton.instance()
     val libVlcPrefs = libVlcPrefsSingleton.instance()
     return when (val result = audioMediaDao.getAudioItemsForQueue(idList)) {
@@ -169,14 +162,13 @@ private class PlayableAudioItemFactoryImpl(
               itemData.displayName,
               itemData.albumId,
               itemData.artists,
-              libVlc,
+              libVlcSingleton,
               mediaFileStore,
-              activeEqPreset,
+              sharedPlayerState,
               appPrefs,
               libVlcPrefs,
               wakeLockFactory,
               request,
-              duckedState,
             )
           )
         }

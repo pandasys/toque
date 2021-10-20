@@ -38,6 +38,8 @@ enum class ShuffleMode(
   Lists(3, false, true, R.string.ShuffleLists),
   MediaAndLists(4, true, true, R.string.ShuffleMediaAndLists);
 
+  fun isOn(): Boolean = this !== None
+
   /**
    * This function is useful when the user presses a "shuffle" button and the value needs to be
    * rotated to the next.
@@ -52,7 +54,7 @@ enum class ShuffleMode(
 
 fun Int.compatToShuffleMode(): ShuffleMode = when (this) {
   PlaybackStateCompat.SHUFFLE_MODE_NONE -> ShuffleMode.None
-  PlaybackStateCompat.SHUFFLE_MODE_ALL -> ShuffleMode.MediaAndLists
+  PlaybackStateCompat.SHUFFLE_MODE_ALL -> ShuffleMode.Media
   PlaybackStateCompat.SHUFFLE_MODE_GROUP -> ShuffleMode.Lists
   else -> ShuffleMode.None
 }
@@ -62,5 +64,5 @@ val ShuffleMode.asCompat
     ShuffleMode.None -> PlaybackStateCompat.SHUFFLE_MODE_NONE
     ShuffleMode.Media -> PlaybackStateCompat.SHUFFLE_MODE_ALL
     ShuffleMode.Lists -> PlaybackStateCompat.SHUFFLE_MODE_GROUP
-    ShuffleMode.MediaAndLists -> PlaybackStateCompat.SHUFFLE_MODE_ALL
+    ShuffleMode.MediaAndLists -> PlaybackStateCompat.SHUFFLE_MODE_GROUP
   }

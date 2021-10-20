@@ -16,14 +16,17 @@
 
 package com.ealva.toque.prefs
 
+import androidx.annotation.StringRes
+import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 
 enum class EndOfQueueAction(
   override val id: Int,
   val shouldGoToNextList: Boolean,
-  val shouldShuffle: Boolean
+  val shouldShuffle: Boolean,
+  @StringRes val titleRes: Int
 ) : HasConstId {
-  PlayNextList(1, true, false),
-  ShuffleNextList(2, true, true),
-  Stop(3, false, false);
+  PlayNextList(1, true, false,R.string.PlayNextList),
+  ShuffleNextList(2, true, true, R.string.ShuffleNextList),
+  Stop(3, false, false, R.string.Stop);
 }

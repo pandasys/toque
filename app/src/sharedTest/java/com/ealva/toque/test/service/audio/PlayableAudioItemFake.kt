@@ -29,7 +29,7 @@ import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.service.audio.NullPlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItem
-import com.ealva.toque.service.audio.PlayableAudioItemEvent
+import com.ealva.toque.service.audio.PlayableItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.PlayNow
@@ -38,25 +38,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 class PlayableAudioItemFake(
-  override val eventFlow: Flow<PlayableAudioItemEvent> = emptyFlow(),
+  override val eventFlow: Flow<PlayableItemEvent> = emptyFlow(),
   override val id: MediaId = 1.toMediaId(),
   override val instanceId: Long = 1,
   override var title: Title = Title.UNKNOWN,
   override var trackNumber: Int = 1,
   override var duration: Millis = Millis(100),
   override val albumTitle: AlbumTitle = AlbumTitle.UNKNOWN,
-  override val albumId: AlbumId = AlbumId.INVALID,
   override val albumArtist: ArtistName = ArtistName.UNKNOWN,
-  override val artistSet: Set<ArtistName> = setOf(ArtistName.UNKNOWN),
   override val rating: Rating = Rating.RATING_NONE,
   override val isValid: Boolean = true,
   override val isPlaying: Boolean = false,
   override val isPausable: Boolean = true,
   override val supportsFade: Boolean = false,
-  override val isSeekable: Boolean = true,
   override val position: Millis = Millis(0),
-  override var volume: Volume = Volume.MAX,
-  override var isMuted: Boolean = false,
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL,
   override var fileUri: Uri = Uri.EMPTY
 ) : PlayableAudioItem {
@@ -67,6 +62,7 @@ class PlayableAudioItemFake(
   override fun play(immediate: Boolean) = Unit
   override fun stop() = Unit
   override fun pause(immediate: Boolean) = Unit
+  override fun togglePlayPause() = Unit
   override fun seekTo(position: Millis) = Unit
   override fun shutdown() = Unit
   override fun duck() = Unit
@@ -86,6 +82,7 @@ class PlayableAudioItemFake(
   override fun checkMarkSkipped() = Unit
   override fun setRating(newRating: Rating, allowFileUpdate: Boolean) = Unit
   override fun previousShouldRewind(): Boolean = false
+  override fun reset(playNow: PlayNow) = Unit
 
   override val artist: ArtistName = ArtistName.UNKNOWN
 }

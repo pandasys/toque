@@ -21,6 +21,7 @@ import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.toComposerId
 import com.ealva.welite.db.Database
@@ -50,7 +51,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -147,29 +147,24 @@ private class ComposerDaoImpl(
     }.delete()
   }
 
-  override suspend fun getNextComposer(
-    name: ComposerName
-  ): Result<ComposerIdName, DaoMessage> = db.query {
-    runCatching { doGetNextComposer(name) }.mapError { DaoExceptionMessage(it) }
-  }
-
-  /**
-   * Throws NoSuchElementException if there is no composer name > greater than [name]
-   */
-  private fun Queryable.doGetNextComposer(name: ComposerName): ComposerIdName = ComposerTable
-    .selects { listOf(id, composer) }
-    .where { composer greater name.value }
-    .orderByAsc { composer }
-    .limit(1)
-    .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
-    .single()
+  override suspend fun getNextComposer(name: ComposerName): Result<ComposerIdName, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        ComposerTable
+          .selects { listOf(id, composer) }
+          .where { composer greater name.value }
+          .orderByAsc { composer }
+          .limit(1)
+          .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
+          .single()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
   override suspend fun getPreviousComposer(
     name: ComposerName
-  ): Result<ComposerIdName, DaoMessage> = db.query {
-    runCatching { if (name.isEmpty()) doGetMaxComposer() else doGetPreviousComposer(name) }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  ): Result<ComposerIdName, DaoMessage> = runSuspendCatching {
+    db.query { if (name.isEmpty()) doGetMaxComposer() else doGetPreviousComposer(name) }
+  }.mapError { DaoExceptionMessage(it) }
 
   /**
    * Throws NoSuchElementException if there is no genre name < greater than [name]
@@ -190,9 +185,8 @@ private class ComposerDaoImpl(
     .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composerMax])) }
     .single()
 
-  override suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage> = db.query {
-    runCatching { doGetRandomComposer() }.mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage> =
+    runSuspendCatching { db.query { doGetRandomComposer() } }.mapError { DaoExceptionMessage(it) }
 
   private fun Queryable.doGetRandomComposer(): ComposerIdName = ComposerTable
     .selects { listOf(id, composer) }

@@ -21,6 +21,7 @@ import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
+import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.MillisRange
@@ -31,19 +32,77 @@ import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.NETWORK_CACHING_RANGE
 
 typealias LibVlcPrefsSingleton = PreferenceStoreSingleton<LibVlcPrefs>
 
+/**
+ * Preferences which require that [LibVlcSingleton] be reset: [LibVlcSingleton.reset]
+ * * network_caching [networkCachingAmount]
+ * * opengl
+ * * chroma_format [chroma]
+ * * deblocking [skipLoopFilter]
+ * * enable_frame_skip [enableFrameSkip]
+ * * enable_time_stretching_audio [allowTimeStretchAudio]
+ * * enable_verbose_mode [enableVerboseMode]
+ * * prefer_smbv1 - currently not used
+ * * aout [audioOutputModule]
+ * * subtitles_size
+ * * subtitles_bold
+ * * subtitles_color
+ * * subtitles_background
+ * * subtitle_text_encoding [subtitleEncoding]
+ * * casting_passthrough
+ * * casting_quality
+ */
 interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
+  /**
+   * If true turns on LibVlc logging. Requires [LibVlcSingleton.reset]. Requires
+   * [LibVlcSingleton.reset] and media player reset. Use in combination with [enableVerboseMode]
+   */
   val debugAndLogging: Boolean
+  /**
+   * If true verbose mode set to -vv else -v. Requires [LibVlcSingleton.reset] and media player
+   * reset.
+   */
   val enableVerboseMode: BoolPref
+  /**
+   * Sets audio output to AudioTrack or OpenSL ES. Requires [LibVlcSingleton.reset] and media player
+   * reset.
+   */
+  val audioOutputModule: StorePref<Int, AudioOutputModule>
+  /**
+   * Sets --android-display-chroma. Requires [LibVlcSingleton.reset] and media player
+   * reset.
+   */
   val chroma: StorePref<Int, Chroma>
+  /**
+   * Sets --network-caching. Requires [LibVlcSingleton.reset] and media player reset.
+   */
   val networkCachingAmount: MillisStorePref
+  /** Sets --subsdec-encoding. Requires [LibVlcSingleton.reset] and media player reset. */
   val subtitleEncoding: StorePref<Int, SubtitleEncoding>
+  /** Sets --audio-replay-gain-mode. Requires [LibVlcSingleton.reset] and media player reset. */
   val replayGainMode: StorePref<Int, ReplayGainMode>
+  /** Sets --audio-replay-gain-preamp. Requires [LibVlcSingleton.reset] and media player reset. */
   val replayPreamp: AmpStorePref
+  /** Sets --audio-replay-gain-default. Requires [LibVlcSingleton.reset] and media player reset. */
   val defaultReplayGain: AmpStorePref
+  /**
+   * If true sets --avcodec-skip-frame and --avcodec-skip-idct to "2" else "0". Requires
+   * [LibVlcSingleton.reset] and active media player reset.
+   */
   val enableFrameSkip: BoolPref
+  /**
+   * Sets --avcodec-skiploopfilter deblocking value. Requires [LibVlcSingleton.reset] and media
+   * player reset.
+   */
   val skipLoopFilter: StorePref<Int, SkipLoopFilter>
+  /**
+   * If true sets --audio-time-stretch else sets --no-audio-time-stretch Requires
+   * [LibVlcSingleton.reset] and media player reset.
+   */
   val allowTimeStretchAudio: BoolPref
+
+
   val digitalAudioOutputEnabled: BoolPref
+  /** Sets hardware/software decoding per media. Requires media player reset */
   val hardwareAcceleration: StorePref<Int, HardwareAcceleration>
 
   companion object {
@@ -71,4 +130,5 @@ private class LibVlcPrefsImpl(
   override val allowTimeStretchAudio by preference(true)
   override val digitalAudioOutputEnabled by preference(false)
   override val hardwareAcceleration by enumPref(HardwareAcceleration.DEFAULT)
+  override val audioOutputModule by enumPref(AudioOutputModule.DEFAULT)
 }

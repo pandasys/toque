@@ -22,10 +22,10 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.isValid
 import com.ealva.welite.db.Database
-import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.bindInt
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.eq
@@ -34,7 +34,6 @@ import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -175,27 +174,26 @@ private class QueuePositionStateDaoImpl(
     }
   }
 
-  override suspend fun getState(): DaoResult<QueuePositionState> = db.transaction {
+  override suspend fun getState(): DaoResult<QueuePositionState> {
     check(!closed)
-    runCatching { doGetState() }
-      .mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun TransactionInProgress.doGetState(): QueuePositionState {
-    return QueueStateTable
-      .selects { listOf(mediaId, queueIndex, playbackPosition, timePlayed, countingFrom) }
-      .where { id eq queueId.value }
-      .sequence {
-        QueuePositionState(
-          MediaId(it[mediaId]),
-          it[queueIndex],
-          Millis(it[playbackPosition]),
-          Millis(it[timePlayed]),
-          Millis(it[countingFrom])
-        )
+    return runSuspendCatching {
+      db.transaction {
+        QueueStateTable
+          .selects { listOf(mediaId, queueIndex, playbackPosition, timePlayed, countingFrom) }
+          .where { id eq this@QueuePositionStateDaoImpl.queueId.value }
+          .sequence {
+            QueuePositionState(
+              MediaId(it[mediaId]),
+              it[queueIndex],
+              Millis(it[playbackPosition]),
+              Millis(it[timePlayed]),
+              Millis(it[countingFrom])
+            )
+          }
+          .singleOrNull()
+          ?: QueuePositionState.INACTIVE_QUEUE_STATE
       }
-      .singleOrNull()
-      ?: QueuePositionState.INACTIVE_QUEUE_STATE
+    }.mapError { DaoExceptionMessage(it) }
   }
 
   override fun persistState(state: QueuePositionState): QueuePositionState {

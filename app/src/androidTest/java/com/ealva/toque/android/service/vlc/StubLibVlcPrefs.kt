@@ -19,6 +19,7 @@ package com.ealva.toque.android.service.vlc
 import com.ealva.prefstore.store.MutablePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.StoreHolder
+import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.Millis
 import com.ealva.toque.service.vlc.Chroma
@@ -38,6 +39,7 @@ typealias AmpPrefStub = PrefStub<Float, Amp>
 class StubLibVlcPrefs : LibVlcPrefs {
   override var debugAndLogging: Boolean = false
   override val enableVerboseMode = BoolPrefStub(false)
+  override val audioOutputModule = PrefStub<Int, AudioOutputModule>(AudioOutputModule.DEFAULT)
   override val chroma = PrefStub<Int, Chroma>(Chroma.DEFAULT)
   override val networkCachingAmount = MillisPrefStub(Millis.ONE_SECOND)
   override val subtitleEncoding = PrefStub<Int, SubtitleEncoding>(SubtitleEncoding.DEFAULT)
@@ -50,12 +52,6 @@ class StubLibVlcPrefs : LibVlcPrefs {
   override val digitalAudioOutputEnabled = BoolPrefStub(false)
   override val hardwareAcceleration = PrefStub<Int, HardwareAccel>(HardwareAccel.DEFAULT)
   override val updateFlow: Flow<StoreHolder<LibVlcPrefs>> = emptyFlow()
-
-  override suspend fun clear(vararg prefs: PreferenceStore.Preference<*, *>) {
-    TODO("Not yet implemented")
-  }
-
-  override suspend fun edit(block: suspend LibVlcPrefs.(MutablePreferenceStore) -> Unit) {
-    TODO("Not yet implemented")
-  }
+  override suspend fun clear(vararg prefs: PreferenceStore.Preference<*, *>) = Unit
+  override suspend fun edit(block: suspend LibVlcPrefs.(MutablePreferenceStore) -> Unit) = Unit
 }

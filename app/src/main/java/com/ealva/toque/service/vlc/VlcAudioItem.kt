@@ -16,8 +16,6 @@
 
 package com.ealva.toque.service.vlc
 
-import android.net.Uri
-import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
@@ -26,18 +24,15 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
-import com.ealva.toque.common.Title
-import com.ealva.toque.common.Volume
+import com.ealva.toque.common.debug
 import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
-import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
-import com.ealva.toque.service.audio.ActiveEqPreset
-import com.ealva.toque.service.audio.DuckedState
 import com.ealva.toque.service.audio.MediaFileStore
 import com.ealva.toque.service.audio.PlayableAudioItem
-import com.ealva.toque.service.audio.PlayableAudioItemEvent
+import com.ealva.toque.service.audio.PlayableItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.service.audio.SharedPlayerState
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.AvPlayerEvent
@@ -83,16 +78,15 @@ private val SKIP_RANGE = Millis(3)..Millis(10)
 class VlcAudioItem(
   override var metadata: Metadata,
   private val displayName: String,
-  override val albumId: AlbumId,
-  override val artistSet: Set<ArtistName>,
-  private val libVlc: LibVlc,
+  private val albumId: AlbumId,
+  private val artistSet: Set<ArtistName>,
+  private val libVlcSingleton: LibVlcSingleton,
   private val mediaFileStore: MediaFileStore,
-  private val activeEqPreset: ActiveEqPreset,
+  private val sharedPlayerState: SharedPlayerState,
   private val appPrefs: AppPrefs,
   private val libVlcPrefs: LibVlcPrefs,
   private val wakeLockFactory: WakeLockFactory,
   private val requestFocus: AvPlayer.FocusRequest,
-  private val duckedState: DuckedState,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : PlayableAudioItem {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -108,7 +102,7 @@ class VlcAudioItem(
   private var startOnPrepared = false
   private val wakeLock: WakeLock =
     wakeLockFactory.makeWakeLock(WAKE_LOCK_TIMEOUT, "$LOCK_TAG_PREFIX:${title()}")
-  override val eventFlow = MutableSharedFlow<PlayableAudioItemEvent>(extraBufferCapacity = 10)
+  override val eventFlow = MutableSharedFlow<PlayableItemEvent>(extraBufferCapacity = 10)
 
   override val isValid: Boolean
     get() = id.value > 0
@@ -127,7 +121,7 @@ class VlcAudioItem(
   override fun play(immediate: Boolean) {
     LOG._e { it("play isStopped=%s", isStopped) }
     if (isStopped)
-      scope.launch { reset(immediateTransition = immediate, playNow = PlayNow(true)) }
+      scope.launch { reset(immediate = immediate, playNow = PlayNow(true)) }
     else
       avPlayer.play(immediate)
   }
@@ -137,39 +131,49 @@ class VlcAudioItem(
   }
 
   override fun pause(immediate: Boolean) {
-    avPlayer.pause(immediate)
+    if (!isStopped) avPlayer.pause(immediate)
   }
 
-  override val isSeekable: Boolean
-    get() = avPlayer.isValid && avPlayer.isSeekable
+  /**
+   * If stopped or paused, play, else pause. Call this object's play or pause method to keep
+   * the AvPlayer reset/play and pause logic in one place.
+   */
+  override fun togglePlayPause() {
+    if (isStopped || avPlayer.isPaused) play() else pause()
+  }
 
   override fun seekTo(position: Millis) {
     if (position in metadata.playbackRange) {
       if (isStopped)
-        scope.launch { reset(immediateTransition = false, playNow = PlayNow(false)) }
+        scope.launch { reset(immediate = false, playNow = PlayNow(false)) }
       else
         avPlayer.seek(position)
     } else {
-      LOG.e {
-        it(
-          "%d:%s attempt to seek to %d which is outside %s",
-          metadata.id(),
-          metadata.title(),
-          position(),
-          metadata.playbackRange
-        )
+      val id = metadata.id()
+      val title = metadata.title()
+      val pos = position()
+      val range = metadata.playbackRange
+      LOG.e { it("%d:%s attempt to seek to %d which is outside %s", id, title, pos, range) }
+      debug {
+        throw IllegalArgumentException("$id:$title attempt to seek to $pos which is outside $range")
       }
+      seekTo(position.coerceIn(metadata.playbackRange)) // fix position, call recursively
     }
   }
 
-  private fun reset(immediateTransition: Boolean, playNow: PlayNow) {
+  override fun reset(playNow: PlayNow) {
+    LOG._e { it("reset %s", playNow) }
+    reset(immediate = true, playNow = playNow)
+  }
+
+  private fun reset(immediate: Boolean, playNow: PlayNow) {
     val shouldPlayNow = PlayNow(playNow() || isPlaying)
     val currentTime = position
     avPlayer.shutdown()
     avPlayer = NullAvPlayer
     prepareSeekMaybePlay(
       currentTime,
-      if (immediateTransition) PlayImmediateTransition() else NoOpPlayerTransition,
+      if (playNow() && immediate) PlayImmediateTransition() else NoOpPlayerTransition,
       shouldPlayNow,
       previousTimePlayed,
       countTimeFrom
@@ -177,18 +181,6 @@ class VlcAudioItem(
   }
 
   override var position: Millis = Millis(0)
-
-  override var volume: Volume
-    get() = avPlayer.volume
-    set(volume) {
-      avPlayer.volume = volume
-    }
-
-  override var isMuted: Boolean
-    get() = avPlayer.isMuted
-    set(mute) {
-      avPlayer.isMuted = mute
-    }
 
   override var playbackRate: PlaybackRate
     get() = avPlayer.playbackRate
@@ -232,23 +224,25 @@ class VlcAudioItem(
         isStopped = false
         previousTimePlayed = timePlayed
         countTimeFrom = countFrom
-        avPlayer =
-          libVlc.makeAudioMedia(fileUri, startPosition, startPaused, libVlcPrefs).use { media ->
-            VlcPlayer.make(
-              id,
-              albumId,
-              media,
-              title,
-              duration,
-              activeEqPreset,
-              onPreparedTransition,
-              appPrefs,
-              requestFocus,
-              duckedState,
-              wakeLock,
-              dispatcher
-            )
-          }
+        avPlayer = libVlcSingleton.withInstance { libVlc ->
+          libVlc
+            .makeAudioMedia(fileUri, startPosition, startPaused, libVlcPrefs)
+            .use { media ->
+              VlcPlayer(
+                id,
+                albumId,
+                media,
+                title,
+                duration,
+                sharedPlayerState,
+                onPreparedTransition,
+                appPrefs,
+                requestFocus,
+                wakeLock,
+                dispatcher
+              )
+            }
+        }
         avPlayer.eventFlow
           .onSubscription { if (startPaused()) avPlayer.playStartPaused() }
           .onEach { event -> handleAvPlayerEvent(event) }
@@ -281,13 +275,13 @@ class VlcAudioItem(
       metadata = metadata.copy(duration = event.duration)
       mediaFileStore.updateDurationAsync(id, duration)
     }
-    eventFlow.emit(PlayableAudioItemEvent.Prepared(this, event.position, event.duration))
+    eventFlow.emit(PlayableItemEvent.Prepared(this, event.position, event.duration))
     if (startOnPrepared) play()
   }
 
   private suspend fun onStart(event: AvPlayerEvent.Start) {
     isPreparing = false
-    eventFlow.emit(PlayableAudioItemEvent.Start(this, event.firstStart, position))
+    eventFlow.emit(PlayableItemEvent.Start(this, event.firstStart, position))
   }
 
   /**
@@ -297,7 +291,7 @@ class VlcAudioItem(
   private suspend fun onPositionUpdate(event: AvPlayerEvent.PositionUpdate) {
     if (!hasBeenMarkedPlayed) {
       if (event.position > countTimeFrom) {
-        if (event.isPlaying) {
+        if (avPlayer.isPlaying) {
           val currentTimePlayed = event.position - countTimeFrom
           val total = previousTimePlayed + currentTimePlayed
           val percentagePlayed = total.asPercentageOf(event.duration)
@@ -319,7 +313,7 @@ class VlcAudioItem(
     }
     position = event.position
     eventFlow.emit(
-      PlayableAudioItemEvent.PositionUpdate(
+      PlayableItemEvent.PositionUpdate(
         this,
         event.position,
         event.duration,
@@ -332,25 +326,25 @@ class VlcAudioItem(
   private suspend fun onPaused(event: AvPlayerEvent.Paused) {
     isPreparing = false
     position = event.position
-    eventFlow.emit(PlayableAudioItemEvent.Paused(this, event.position))
+    eventFlow.emit(PlayableItemEvent.Paused(this, event.position))
   }
 
   private suspend fun onStopped(event: AvPlayerEvent.Stopped) {
     isPreparing = false
     isStopped = true
-    eventFlow.emit(PlayableAudioItemEvent.Stopped(this, event.position))
+    eventFlow.emit(PlayableItemEvent.Stopped(this, event.position))
   }
 
   private suspend fun onPlaybackComplete() {
     isPreparing = false
     isShutdown = true
     avPlayer = NullAvPlayer
-    eventFlow.emit(PlayableAudioItemEvent.PlaybackComplete(this))
+    eventFlow.emit(PlayableItemEvent.PlaybackComplete(this))
   }
 
   private suspend fun onError() {
     isPreparing = false
-    eventFlow.emit(PlayableAudioItemEvent.Error(this))
+    eventFlow.emit(PlayableItemEvent.Error(this))
   }
 
   override fun cloneItem(): PlayableAudioItem = VlcAudioItem(
@@ -358,14 +352,13 @@ class VlcAudioItem(
     displayName,
     albumId,
     artistSet,
-    libVlc,
+    libVlcSingleton,
     mediaFileStore,
-    activeEqPreset,
+    sharedPlayerState,
     appPrefs,
     libVlcPrefs,
     wakeLockFactory,
     requestFocus,
-    duckedState,
     dispatcher
   )
 
@@ -397,29 +390,6 @@ class VlcAudioItem(
 
   override fun previousShouldRewind(): Boolean =
     appPrefs.rewindThenPrevious() && position >= SEEK_TO_ZERO_MIN_POSITION
-
-  override val id: MediaId
-    get() = metadata.id
-  override val title: Title
-    get() = metadata.title
-  override val albumTitle: AlbumTitle
-    get() = metadata.albumTitle
-  override val albumArtist: ArtistName
-    get() = metadata.albumArtist
-  override val artist: ArtistName
-    get() = metadata.artistName
-  override val trackNumber: Int
-    get() = metadata.trackNumber
-  override val localAlbumArt: Uri
-    get() = metadata.localAlbumArt
-  override val albumArt: Uri
-    get() = metadata.albumArt
-  override val rating: Rating
-    get() = metadata.rating
-  override val location: Uri
-    get() = metadata.location
-  override val fileUri: Uri
-    get() = metadata.fileUri
 
 //  override fun getArtist(preferAlbumArtist: Boolean): ArtistName {
 //    return if (preferAlbumArtist) {

@@ -20,11 +20,11 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.log.runLogging
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.mapError
 import com.github.michaelbull.result.onSuccess
-import com.github.michaelbull.result.runCatching
 
 typealias PostUndoFunc = () -> Unit
 
@@ -69,7 +69,7 @@ abstract class BaseMemento : Memento {
   final override suspend fun undo(): BoolResult {
     check(!released) { "Tried to undo a memento already released" }
     val postUndoList = postList.toList() // release clears the list, use a copy
-    return runCatching { doUndo() }
+    return runSuspendCatching { doUndo() }
       .mapError { DaoExceptionMessage(it) }
       .releaseWithResult()
       .onSuccess { success ->

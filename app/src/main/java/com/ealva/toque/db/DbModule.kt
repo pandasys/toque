@@ -20,6 +20,7 @@ import android.content.Context
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.OpenParams
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 private const val DB_FILENAME = "ToqueDB"
@@ -50,7 +51,8 @@ object DbModule {
         artistMediaDao = get(),
         genreMediaDao = get(),
         composerMediaDao = get(),
-        eqPresetAssociationDao = get()
+        eqPresetAssociationDao = get(),
+        appPrefsSingleton = get(named("AppPrefs"))
       )
     }
     single { QueuePositionStateDaoFactory(db = get()) }

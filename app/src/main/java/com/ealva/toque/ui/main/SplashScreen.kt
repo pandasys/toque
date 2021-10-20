@@ -50,7 +50,6 @@ import com.ealva.toque.R
 import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.theme.toque
-import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionRequired
@@ -90,7 +89,6 @@ fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
     modifier = Modifier
       .padding(start = 20.dp, end = 20.dp)
       .statusBarsPadding()
-      .navigationBarsPadding()
       .fillMaxWidth()
   ) {
     Image(

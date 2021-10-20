@@ -32,6 +32,8 @@ enum class RepeatMode(
   All(2, false, true, R.string.RepeatQueue),
   One(3, true, false, R.string.RepeatCurrent);
 
+  fun isOn(): Boolean = this !== None
+
   fun getNext(): RepeatMode = when (this) {
     None -> All
     All -> One

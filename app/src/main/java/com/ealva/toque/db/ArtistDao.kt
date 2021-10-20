@@ -22,6 +22,7 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.toArtistId
 import com.ealva.welite.db.Database
@@ -40,6 +41,7 @@ import com.ealva.welite.db.statements.DeleteStatement
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
+import com.ealva.welite.db.table.Column
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
@@ -55,7 +57,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.runCatching
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -211,37 +212,34 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
   }
 
   override suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage> =
-    db.query { runCatching { doGetArtistNames(limit) }.mapError { DaoExceptionMessage(it) } }
+    runSuspendCatching {
+      db.query {
+        ArtistTable
+          .selects { listOf(id, artistName) }
+          .all()
+          .orderByAsc { artistName }
+          .limit(limit)
+          .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
-  private fun Queryable.doGetArtistNames(limit: Long): List<ArtistIdName> = ArtistTable
-    .selects { listOf(id, artistName) }
-    .all()
-    .orderByAsc { artistName }
-    .limit(limit)
-    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
-    .toList()
+  override suspend fun getNextArtist(name: ArtistName): Result<ArtistIdName, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        ArtistTable
+          .selects { listOf(id, artistName) }
+          .where { artistName greater name.value }
+          .orderByAsc { artistName }
+          .limit(1)
+          .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+          .single()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
-  override suspend fun getNextArtist(
-    name: ArtistName
-  ): Result<ArtistIdName, DaoMessage> = db.query {
-    runCatching { doGetNextArtist(name) }.mapError { DaoExceptionMessage(it) }
-  }
-
-  /**
-   * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
-   */
-  private fun Queryable.doGetNextArtist(previousArtist: ArtistName): ArtistIdName = ArtistTable
-    .selects { listOf(id, artistName) }
-    .where { artistName greater previousArtist.value }
-    .orderByAsc { artistName }
-    .limit(1)
-    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
-    .single()
-
-  override suspend fun getPreviousArtist(name: ArtistName) = db.query {
-    runCatching { if (name.isEmpty()) doGetMaxArtist() else doGetPreviousArtist(name) }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getPreviousArtist(name: ArtistName) = runSuspendCatching {
+    db.query { if (name.isEmpty()) doGetMaxArtist() else doGetPreviousArtist(name) }
+  }.mapError { DaoExceptionMessage(it) }
 
   /**
    * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
@@ -262,28 +260,27 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistMax])) }
     .single()
 
-  override suspend fun getArtistName(id: ArtistId): Result<ArtistName, DaoMessage> = db.query {
-    runCatching { doGetArtistName(id) }.mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getArtistName(id: ArtistId): Result<ArtistName, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        ArtistTable
+          .select { artistName }
+          .where { this.id eq id.value }
+          .sequence { ArtistName(it[artistName]) }
+          .single()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
-  private fun Queryable.doGetArtistName(artistId: ArtistId) = ArtistTable
-    .select { artistName }
-    .where { id eq artistId.value }
-    .sequence { ArtistName(it[artistName]) }
-    .single()
-
-  override suspend fun getRandomArtist(
-  ): Result<ArtistIdName, DaoMessage> = db.query {
-    runCatching { doGetRandomArtist() }.mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetRandomArtist(): ArtistIdName = ArtistTable
-    .selects { listOf(id, artistName) }
-    .where {
-      id inSubQuery ArtistTable.select(id).all().orderByRandom().limit(1)
-    }
-    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
-    .single()
+  override suspend fun getRandomArtist(): Result<ArtistIdName, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        ArtistTable
+          .selects { listOf<Column<out Any>>(id, artistName) }
+          .where { id inSubQuery ArtistTable.select(id).all().orderByRandom().limit(1) }
+          .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+          .single()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 }
 
 private val INSERT_STATEMENT = ArtistTable.insertValues {

@@ -16,39 +16,33 @@
 
 package com.ealva.toque.ui.main
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.IconButton
+import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.Surface
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.constraintlayout.compose.ConstraintLayout
-import androidx.constraintlayout.compose.Dimension
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import coil.annotation.ExperimentalCoilApi
-import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.R
 import com.ealva.toque.android.content.haveReadPermission
 import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.app.Toque
@@ -62,7 +56,11 @@ import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
+import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.ui.now.NowPlayingScreen
+import com.ealva.toque.ui.settings.AppSettingsScreen
+import com.ealva.toque.ui.settings.SettingScreenKeys
+import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
 import com.ealva.toque.ui.theme.ToqueTheme
 import com.google.accompanist.insets.ProvideWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
@@ -83,12 +81,13 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
 
 private val LOG by lazyLogger(MainActivity::class)
 
-private val backstackKeyFlow = mutableStateOf<ComposeKey>(SplashScreen())
+private val backstackKeyFlow: MutableState<ComposeKey> = mutableStateOf(SplashScreen())
 
 class MainActivity : ComponentActivity() {
   private lateinit var scope: CoroutineScope
@@ -99,6 +98,7 @@ class MainActivity : ComponentActivity() {
   private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
   private var currentQueueJob: Job? = null
   private val appPrefsSingleton: AppPrefsSingleton by inject(named("AppPrefs"))
+  private val libVlcPrefsSingleton: LibVlcPrefsSingleton by inject(named("LibVlcPrefs"))
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -121,12 +121,16 @@ class MainActivity : ComponentActivity() {
       ToqueTheme {
         ProvideWindowInsets(windowInsetsAnimationsEnabled = true) {
           BackstackProvider(backstack) {
-            MainScreen(composeStateChanger = composeStateChanger)
+            MainScreen(
+              composeStateChanger = composeStateChanger,
+              backstackKeyFlow = backstackKeyFlow,
+              goToSettings = { backstack.goTo(AppSettingsScreen(PrimarySettings)) },
+              goToNowPlaying = { backstack.goUp(NowPlayingScreen(), true) }
+            )
           }
         }
       }
     }
-    //if (haveReadPermission()) gainedReadExternalPermission() else requestReadExternalPermission()
   }
 
   override fun onDestroy() {
@@ -180,8 +184,10 @@ class MainActivity : ComponentActivity() {
 
   private fun getGlobalServicesBuilder(): GlobalServices.Builder = globalServices.apply {
     add(this@MainActivity)
-    add(appPrefsSingleton)
+    addService("AppPrefs", appPrefsSingleton)
+    addService("LibVlcPrefs", libVlcPrefsSingleton)
     add(playerServiceConnection)
+    add(LocalAudioMiniPlayerViewModel(playerServiceConnection))
   }
 
   private val globalServices get() = (application as Toque).globalServicesBuilder
@@ -193,81 +199,73 @@ class MainActivity : ComponentActivity() {
   private fun makeInitialHistory(): History<ComposeKey> = History.of(SplashScreen())
 }
 
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
-fun MainScreen(composeStateChanger: ComposeStateChanger) {
-  Surface(modifier = Modifier.fillMaxSize()) {
-
-    val topOfStack by remember { backstackKeyFlow }
-
-    ConstraintLayout(modifier = Modifier.fillMaxSize()) {
-      val (content, bottomSheet) = createRefs()
-      composeStateChanger.RenderScreen(
-        modifier = Modifier
-          .constrainAs(content) {
-            start.linkTo(parent.start)
-            top.linkTo(parent.top)
-            end.linkTo(parent.end)
-            bottom.linkTo(parent.bottom)
-          }
-          .zIndex(0F)
-      )
-      if (topOfStack !is SplashScreen) {
-        //val screenConfig = makeScreenConfig(
-        //  LocalConfiguration.current,
-        //  LocalDensity.current,
-        //  LocalWindowInsets.current
-        //)
-
-        val config = LocalConfiguration.current
-        MainBottomSheet(
-          modifier = if (config.inPortrait) {
-            Modifier
-              .constrainAs(bottomSheet) {
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                bottom.linkTo(parent.bottom)
-                width = Dimension.wrapContent
-              }
-              .navigationBarsPadding()
-              .padding(horizontal = 16.dp)
-              .zIndex(1F)
-          } else {
-            Modifier
-              .constrainAs(bottomSheet) {
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                bottom.linkTo(parent.bottom)
-                width = Dimension.wrapContent
-              }
-              .padding(horizontal = 8.dp)
-              .zIndex(1F)
-          }
-        )
-      }
-    }
-  }
+val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> {
+  throw IllegalStateException("LocalScaffoldState not provided")
 }
 
-@OptIn(ExperimentalCoilApi::class)
 @Composable
-fun MainBottomSheet(modifier: Modifier) {
-  Row(
-    modifier = modifier
-      .background(
-        color = Color(0xFF151515),
-        shape = RoundedCornerShape(8.dp)
-      )
-      .height(50.dp),
-    horizontalArrangement = Arrangement.SpaceEvenly
-  ) {
-    IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
-      Image(
-        painter = rememberImagePainter(data = R.drawable.ic_menu),
-        contentDescription = "Settings",
-        modifier = Modifier.size(44.dp)
-      )
-    }
+fun ProvideSnackbarHostState(
+  snackbarHostState: SnackbarHostState,
+  content: @Composable () -> Unit
+) = CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) { content() }
 
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+fun MainScreen(
+  composeStateChanger: ComposeStateChanger,
+  backstackKeyFlow: MutableState<ComposeKey>,
+  goToSettings: () -> Unit,
+  goToNowPlaying: () -> Unit
+) {
+  Surface(modifier = Modifier.fillMaxSize()) {
+
+    val topOfStack: ComposeKey by remember { backstackKeyFlow }
+    val config = LocalConfiguration.current
+    val scaffoldState = rememberScaffoldState()
+    val (isBottomSheetExpanded, expandBottomSheet) = remember { mutableStateOf(false) }
+
+    expandBottomSheet(topOfStack !is SplashScreen && topOfStack !is NowPlayingScreen)
+
+    ProvideSnackbarHostState(snackbarHostState = scaffoldState.snackbarHostState) {
+      if (topOfStack is SplashScreen) {
+        Scaffold(
+          modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+          scaffoldState = scaffoldState,
+        ) {
+          composeStateChanger.RenderScreen(modifier = Modifier.fillMaxSize())
+        }
+      } else {
+        Scaffold(
+          modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+          scaffoldState = scaffoldState,
+          bottomBar = {
+            MainBottomSheet(
+              topOfStack = topOfStack,
+              isExpanded = isBottomSheetExpanded,
+              goToSettings = goToSettings,
+              goToNowPlaying = goToNowPlaying,
+              modifier = if (config.inPortrait) {
+                Modifier
+                  .padding(horizontal = 20.dp)
+                  .zIndex(1F)
+              } else {
+                Modifier
+                  .padding(horizontal = 8.dp)
+                  .zIndex(1F)
+              }
+            )
+          },
+          backgroundColor = Color.Transparent
+        ) {
+          composeStateChanger.RenderScreen(
+            modifier = Modifier.fillMaxSize()
+          )
+        }
+      }
+    }
   }
 }

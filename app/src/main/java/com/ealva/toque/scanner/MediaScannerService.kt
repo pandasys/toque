@@ -36,6 +36,7 @@ import com.ealva.toque.BuildConfig
 import com.ealva.toque.R
 import com.ealva.toque.android.content.doNotHaveReadPermission
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.debug
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.MediaStorage
@@ -48,8 +49,9 @@ import com.ealva.toque.service.media.MediaMetadataParser
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import com.ealva.toque.service.player.WakeLock
 import com.ealva.toque.service.player.WakeLockFactory
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
 import com.google.common.base.Stopwatch
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -121,18 +123,18 @@ class MediaScannerService : LifecycleService() {
     }
     startNotification()
     job = workFlow
-        .onStart { LOG._i { it("Work flow started") } }
-        .onEach { work ->
-          workEnqueuer?.serviceProcessingStarted()
-          if (work.intent != null) onHandleWork(work.intent)
-          stopSelf(work.startId)
-        }
-        .catch { cause -> LOG.e(cause) { it("Error processing work flow") } }
-        .onCompletion {
-          LOG._e { it("Work flow completed") }
-          workEnqueuer?.serviceProcessingFinished()
-        }
-        .launchIn(lifecycleScope + Dispatchers.IO)
+      .onStart { LOG._i { it("Work flow started") } }
+      .onEach { work ->
+        workEnqueuer?.serviceProcessingStarted()
+        if (work.intent != null) onHandleWork(work.intent)
+        stopSelf(work.startId)
+      }
+      .catch { cause -> LOG.e(cause) { it("Error processing work flow") } }
+      .onCompletion {
+        LOG._e { it("Work flow completed") }
+        workEnqueuer?.serviceProcessingFinished()
+      }
+      .launchIn(lifecycleScope + Dispatchers.IO)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -218,6 +220,12 @@ class MediaScannerService : LifecycleService() {
       createUpdateTime
     ) { prefs.edit { it[firstRun] = false } }
     audioMediaDao.deleteEntitiesWithNoMedia()
+    debug {
+      when (val result = audioMediaDao.getCountAllAudio()) {
+        is Ok -> LOG._e { it("audio count=%d", result.value) }
+        is Err -> LOG._e { it("%s", result.error) }
+      }
+    }
     LOG.i { it("Elapsed:%d end scan", stopWatch.stop().elapsed(TimeUnit.MILLISECONDS)) }
     prefs.lastScanTime.set(createUpdateTime)
   }

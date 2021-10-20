@@ -130,8 +130,8 @@ interface EqPreset {
 
   /**
    * Return and exact clone, including any underlying native preset. This is used during editing.
-   * When a band value is changed a clone should be made because EqPreset instances use identity
-   * equals. A clone will not be equal to the original
+   * When a band value is changed a clone should be made because EqPreset instances currently use
+   * identity equals. A clone will not be equal to the original.
    */
   fun clone(): EqPreset
 

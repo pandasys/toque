@@ -85,10 +85,10 @@ class AppPreferencesTest {
   fun testAllowDuplicates() = coroutineRule.runBlockingTest {
     prefsSingleton {
       expect(allowDuplicates()).toBe(allowDuplicates.default)
-      allowDuplicates.set(AllowDuplicates(true))
-      expect(allowDuplicates()).toBe(AllowDuplicates(true))
-      allowDuplicates.set(AllowDuplicates(false))
-      expect(allowDuplicates()).toBe(AllowDuplicates(false))
+      allowDuplicates.set(true)
+      expect(allowDuplicates()).toBe(true)
+      allowDuplicates.set(false)
+      expect(allowDuplicates()).toBe(false)
 
       clear()
       expectAllAreDefault()

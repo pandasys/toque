@@ -20,6 +20,7 @@ import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.audioout.longId
 import com.ealva.toque.audioout.toAudioOutputRoute
 import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.MediaId
@@ -28,7 +29,6 @@ import com.ealva.toque.persist.toAlbumId
 import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.welite.db.Database
-import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.and
@@ -46,8 +46,6 @@ import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.mapError
-import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.runCatching
 
 typealias AssociationListResult = Result<List<PresetAssociation>, DaoMessage>
 
@@ -111,11 +109,8 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
   override suspend fun makeAssociations(
     preset: EqPreset,
     associations: List<PresetAssociation>
-  ): BoolResult = db.transaction {
-    runCatching { doMakeAssociations(preset, associations) }
-      .mapError { DaoExceptionMessage(it) }
-      .onFailure { rollback() }
-  }
+  ): BoolResult = runSuspendCatching { db.transaction { doMakeAssociations(preset, associations) } }
+    .mapError { DaoExceptionMessage(it) }
 
   private fun Transaction.doMakeAssociations(
     preset: EqPreset,
@@ -128,35 +123,34 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     }
   }
 
-  override suspend fun getAssociationsFor(preset: EqPreset): AssociationListResult = db.query {
-    runCatching { doGetAssociations(preset) }
-      .mapError { DaoExceptionMessage(it) }
-  }
+  override suspend fun getAssociationsFor(preset: EqPreset): AssociationListResult =
+    runSuspendCatching {
+      db.query {
+        QUERY_ASSOCIATIONS
+          .sequence(bind = {
+            it[BIND_PRESET_ID] = preset.id.value
+            it[BIND_IS_SYSTEM] = preset.isSystemPreset
+          }) { PresetAssociation.reify(it[associationType], it[associationId]) }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
   override suspend fun getPreferredId(
     mediaId: MediaId,
     albumId: AlbumId,
     route: AudioOutputRoute,
     defaultValue: EqPresetId
-  ): DaoResult<EqPresetId> = db.query {
-    runCatching {
+  ): DaoResult<EqPresetId> = runSuspendCatching {
+    db.query {
       QUERY_DEFAULT
-        .sequence({
+        .sequence(bind = {
           it[BIND_MEDIA_ID] = mediaId.value
           it[BIND_ALBUM_ID] = albumId.value
           it[BIND_ROUTE_ID] = route.longId
         }) { EqPresetId(it[presetId]) }
         .singleOrNull() ?: defaultValue
-    }.mapError { DaoExceptionMessage(it) }
-  }
-
-  private fun Queryable.doGetAssociations(preset: EqPreset): List<PresetAssociation> =
-    QUERY_ASSOCIATIONS
-      .sequence({
-        it[BIND_PRESET_ID] = preset.id.value
-        it[BIND_IS_SYSTEM] = preset.isSystemPreset
-      }) { PresetAssociation.reify(it[associationType], it[associationId]) }
-      .toList()
+    }
+  }.mapError { DaoExceptionMessage(it) }
 
   private fun Transaction.deletePresetAssociations(id: EqPresetId) =
     DELETE_PRESET.delete { it[BIND_PRESET_ID] = id.value }
@@ -183,14 +177,10 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     }
   }
 
-  override suspend fun setAsDefault(
-    preset: EqPreset
-  ): BoolResult = db.transaction {
-    runCatching { doSetAsDefault(preset) }
+  override suspend fun setAsDefault(preset: EqPreset): BoolResult =
+    runSuspendCatching { db.transaction { doSetAsDefault(preset) } }
       .mapError { DaoExceptionMessage(it) }
       .andThen { if (it > 0) Ok(true) else Err(DaoFailedToInsert("$preset")) }
-      .onFailure { rollback() }
-  }
 
   private fun Transaction.doSetAsDefault(preset: EqPreset): Long {
     deleteAssociation(PresetAssociation.DEFAULT)

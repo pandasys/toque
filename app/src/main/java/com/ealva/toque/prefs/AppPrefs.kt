@@ -34,6 +34,7 @@ import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_DUCK_VOLUME
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_END_OF_QUEUE_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_GO_TO_NOW_PLAYING
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_IGNORE_SMALL_FILES
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_IGNORE_THRESHOLD
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_FADE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_FADE_LENGTH
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MARK_PLAYED_PERCENTAGE
@@ -43,6 +44,8 @@ import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SCROBBLER_PACKAGE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SELECT_MEDIA_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.MARK_PLAYED_PERCENTAGE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 
@@ -52,7 +55,7 @@ typealias AllowDuplicatesPref = StorePref<Boolean, AllowDuplicates>
 
 interface AppPrefs : PreferenceStore<AppPrefs> {
   val firstRun: BoolPref
-  val allowDuplicates: AllowDuplicatesPref
+  val allowDuplicates: BoolPref
   val goToNowPlaying: BoolPref
   val ignoreSmallFiles: BoolPref
   val ignoreThreshold: MillisStorePref
@@ -69,7 +72,6 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val playUpNextAction: StorePref<Int, PlayUpNextAction>
   val endOfQueueAction: StorePref<Int, EndOfQueueAction>
   val selectMediaAction: StorePref<Int, SelectMediaAction>
-  val audioOutputModule: StorePref<Int, AudioOutputModule>
 
   /**
    * This represents a percentage of media which needs to be played before it is marked as played.
@@ -83,16 +85,20 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val showTimeRemaining: BoolPref
   val playOnBluetoothConnection: BoolPref
   val playOnWiredConnection: BoolPref
+  val readTagRating: BoolPref
+  val readTagSortFields: BoolPref
 
   companion object {
     val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
     const val DEFAULT_GO_TO_NOW_PLAYING = true
     const val DEFAULT_IGNORE_SMALL_FILES = false
+    val IGNORE_FILES_RANGE: ClosedRange<Millis> = Millis.FIVE_SECONDS..Millis.ONE_MINUTE
+    val DEFAULT_IGNORE_THRESHOLD = Millis(20000).coerceIn(IGNORE_FILES_RANGE)
     const val DEFAULT_PLAY_PAUSE_FADE = true
     val PLAY_PAUSE_FADE_RANGE: ClosedRange<Millis> = Millis(500)..Millis(2000)
     val DEFAULT_PLAY_PAUSE_FADE_LENGTH = Millis.ONE_SECOND.coerceIn(PLAY_PAUSE_FADE_RANGE)
     val MEDIA_FADE_RANGE: ClosedRange<Millis> = Millis.ONE_SECOND..Millis.TEN_SECONDS
-    const val DEFAULT_AUTO_ADVANCE_FADE = true
+    const val DEFAULT_AUTO_ADVANCE_FADE = false
     val DEFAULT_AUTO_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
     const val DEFAULT_MANUAL_ADVANCE_FADE = true
     val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.TWO_SECONDS.coerceIn(MEDIA_FADE_RANGE)
@@ -103,22 +109,25 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
     val DEFAULT_DUCK_ACTION = DuckAction.Duck
     val DUCK_VOLUME_RANGE: ClosedRange<Volume> = Volume.NONE..Volume.MAX
     val DEFAULT_DUCK_VOLUME: Volume = DUCK_VOLUME_RANGE.endInclusive / 2
+
+    val MARK_PLAYED_PERCENTAGE_RANGE = 0.0..1.0
     const val DEFAULT_MARK_PLAYED_PERCENTAGE: Double = 0.5
 
     fun make(storage: Storage): AppPrefs = AppPrefsImpl(storage)
   }
 }
 
-private val MARK_PLAYED_PERCENTAGE_RANGE = 0.0..1.0
 
 private class AppPrefsImpl(
   storage: Storage
 ) : BaseToquePreferenceStore<AppPrefs>(storage), AppPrefs {
   override val firstRun by preference(true)
-  override val allowDuplicates by booleanValuePref(DEFAULT_ALLOW_DUPLICATES, ::AllowDuplicates)
+  override val allowDuplicates by preference(DEFAULT_ALLOW_DUPLICATES.value)
   override val goToNowPlaying by preference(DEFAULT_GO_TO_NOW_PLAYING)
   override val ignoreSmallFiles by preference(DEFAULT_IGNORE_SMALL_FILES)
-  override val ignoreThreshold by millisPref(Millis(0))
+  override val ignoreThreshold by millisPref(DEFAULT_IGNORE_THRESHOLD) { millis ->
+    millis.coerceIn(IGNORE_FILES_RANGE)
+  }
   override val lastScanTime by millisPref(Millis(0))
   override val playPauseFade by preference(DEFAULT_PLAY_PAUSE_FADE)
   override val playPauseFadeLength by millisPref(DEFAULT_PLAY_PAUSE_FADE_LENGTH) { millis ->
@@ -140,7 +149,6 @@ private class AppPrefsImpl(
   override val playUpNextAction by enumPref(DEFAULT_PLAY_UP_NEXT_ACTION)
   override val endOfQueueAction by enumPref(DEFAULT_END_OF_QUEUE_ACTION)
   override val selectMediaAction by enumPref(DEFAULT_SELECT_MEDIA_ACTION)
-  override val audioOutputModule by enumPref(AudioOutputModule.DEFAULT)
   override val markPlayedPercentage by preference(DEFAULT_MARK_PLAYED_PERCENTAGE) { percentage ->
     percentage.coerceIn(MARK_PLAYED_PERCENTAGE_RANGE)
   }
@@ -151,4 +159,6 @@ private class AppPrefsImpl(
   override val showTimeRemaining: BoolPref by preference(false)
   override val playOnBluetoothConnection: BoolPref by preference(false)
   override val playOnWiredConnection: BoolPref by preference(false)
+  override val readTagRating: BoolPref by preference(true)
+  override val readTagSortFields: BoolPref by preference(true)
 }

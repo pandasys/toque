@@ -48,8 +48,8 @@ private const val SUBSDEC_ENCODING = "--subsdec-encoding"
 private const val SUB_AUTO_DETECT_PATH = "--sub-autodetect-path"
 private const val CHROMA = "--android-display-chroma"
 private const val NO_AUDIO_TIME_STRETCH = "--no-audio-time-stretch"
-private const val VVV_VERBOSE = "-vvv"
 private const val VV_VERBOSE = "-vv"
+private const val V_VERBOSE = "-v"
 
 private const val SOXR_RESAMPLER = "soxr"
 private const val UGLY_RESAMPLER = "ugly"
@@ -130,13 +130,13 @@ class LibVlcOptionsTest {
     prefs.enableVerboseMode._value = true
     libVlcOptions(prefs, VlcUtil(appCtx)).let { options ->
       expect(options.size).toBe(25)
-      expect(options[12]).toBe(VVV_VERBOSE)
+      expect(options[12]).toBe(VV_VERBOSE)
     }
 
     prefs.enableVerboseMode._value = false
     libVlcOptions(prefs, VlcUtil(appCtx)).let { options ->
       expect(options.size).toBe(25)
-      expect(options[12]).toBe(VV_VERBOSE)
+      expect(options[12]).toBe(V_VERBOSE)
     }
   }
 

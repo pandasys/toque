@@ -21,6 +21,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.toDurationString
@@ -70,6 +71,7 @@ data class NowPlayingState(
   val eqMode: EqMode,
   val currentPreset: EqPreset,
   val extraMediaInfo: String,
+  val playbackRate: PlaybackRate,
   val presets: List<EqPreset>,
   val showTimeRemaining: Boolean = false
 ) {
@@ -93,6 +95,7 @@ data class NowPlayingState(
       eqMode = EqMode.Off,
       currentPreset = EqPreset.NONE,
       extraMediaInfo = "",
+      playbackRate = PlaybackRate.NORMAL,
       presets = emptyList()
     )
   }
@@ -172,8 +175,6 @@ interface NowPlayingViewModel {
 //  fun updatePlayStatusIfCurrent(mediaId: Long, playStatus: PlayStatus): Boolean
 
   companion object {
-    const val INVALID_INDEX = -1
-
     operator fun invoke(
       serviceConnection: MediaPlayerServiceConnection,
       appPrefsSingleton: AppPrefsSingleton
@@ -194,6 +195,7 @@ private class NowPlayingViewModelImpl(
   private var appPrefs: AppPrefs? = null
   private var controllerJob: Job? = null
   private var currentQueueJob: Job? = null
+  private var queueStateJob: Job? = null
   private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
 
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
@@ -240,6 +242,8 @@ private class NowPlayingViewModelImpl(
   override fun onServiceInactive() {
     LOG._e { it("onServiceInactive") }
     controllerJob?.cancel()
+    controllerJob = null
+    handleControllerChange(NullMediaController)
   }
 
   private fun handleControllerChange(controller: ToqueMediaController) {
@@ -251,6 +255,7 @@ private class NowPlayingViewModelImpl(
         .launchIn(scope)
     } else {
       currentQueueJob?.cancel()
+      currentQueueJob = null
       handleQueueChange(NullPlayableMediaQueue)
     }
   }
@@ -266,11 +271,17 @@ private class NowPlayingViewModelImpl(
   private fun queueActive(queue: LocalAudioQueue) {
     LOG._e { it("queueActive") }
     audioQueue = queue
-    audioQueue.queueState
+    queueStateJob = audioQueue.queueState
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("") } }
       .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
+  }
+
+  private fun queueInactive() {
+    queueStateJob?.cancel()
+    queueStateJob = null
+    audioQueue = NullLocalAudioQueue
   }
 
   private suspend fun handleServiceState(queueState: LocalAudioQueueState) {
@@ -284,13 +295,10 @@ private class NowPlayingViewModelImpl(
       shuffleMode = queueState.shuffleMode,
       eqMode = queueState.eqMode,
       currentPreset = queueState.currentPreset,
-      extraMediaInfo = queueState.extraMediaInfo
+      extraMediaInfo = queueState.extraMediaInfo,
+      playbackRate = queueState.playbackRate
     )
     nowPlayingState.emit(newState)
-  }
-
-  private fun queueInactive() {
-    audioQueue = NullLocalAudioQueue
   }
 
   override fun nextShuffleMode() {
@@ -310,7 +318,6 @@ private class NowPlayingViewModelImpl(
   }
 
   override fun previousList() {
-    LOG._e { it("previousList") }
     scope.launch { audioQueue.previousList() }
   }
 

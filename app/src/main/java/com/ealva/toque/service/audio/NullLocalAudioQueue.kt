@@ -34,7 +34,6 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val queueState: StateFlow<LocalAudioQueueState> =
     MutableStateFlow(LocalAudioQueueState.NONE)
   override val seeking: Boolean = false
-  override val isSeekable: Boolean = false
   override val manualTransition: PlayerTransitionPair = NoOpMediaTransition
   override val autoAdvanceTransition: PlayerTransitionPair = NoOpMediaTransition
   override fun toggleEqMode() = Unit

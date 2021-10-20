@@ -21,8 +21,11 @@ import org.videolan.libvlc.MediaPlayer
 
 const val BUFFERING_PERCENT_TRIGGER_PREPARED = 90.0
 @Suppress("NOTHING_TO_INLINE")
-inline fun MediaPlayer.Event.bufferedEnoughForPrepare(): Boolean =
+inline fun MediaPlayer.Event.ampleBufferedForPrepare(): Boolean =
   buffering > BUFFERING_PERCENT_TRIGGER_PREPARED
+
+val MediaPlayer.Event.isBuffering: Boolean
+  inline get() = type == MediaPlayer.Event.Buffering
 
 /**
  * Map the volume value used by the MediaPlayer to a value which better matches human hearing. As of
@@ -44,7 +47,7 @@ fun MediaPlayer.setMappedVolume(linearVolume: Volume) {
  * you should hear the volume decrease much too quickly and be silent for too long. Fade in sounds
  * very sudden too.
  *
- * Currently no reason to calculate this at runtime and there are only 101 distinct values, so this
+ * Currently no reason to calculate this at runtime as there are only 101 distinct values, so this
  * function was used to calculate these values:
  * ```
  * fun linearToLog(z: Int): Int {

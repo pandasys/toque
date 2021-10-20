@@ -43,6 +43,7 @@ object ServiceModule {
         playableAudioItemFactory = get(),
         audioManager = get(),
         appPrefsSingleton = get(named("AppPrefs")),
+        libVlcPrefsSingleton = get(named("LibVlcPrefs")),
       )
     }
   }

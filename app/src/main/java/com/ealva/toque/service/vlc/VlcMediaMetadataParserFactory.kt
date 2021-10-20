@@ -51,27 +51,21 @@ fun Uri.tagCanParseExtension(): Boolean =
 class VlcMediaMetadataParserFactory(
   private val libVlcSingleton: LibVlcSingleton
 ) : MediaMetadataParserFactory {
-  override suspend fun make(): MediaMetadataParser {
-    return MediaMetadataParserImpl(
-      libVlcSingleton.instance()
-    )
-  }
+  override fun make(): MediaMetadataParser = MediaMetadataParserImpl(libVlcSingleton)
 }
 
-private class MediaMetadataParserImpl(
-  private val libVlc: LibVlc
-) : MediaMetadataParser {
-  override fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaFileTagInfo {
+private class MediaMetadataParserImpl(private val libVlc: LibVlcSingleton) : MediaMetadataParser {
+  override suspend fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaFileTagInfo {
     return if (uri.isFileScheme() && uri.tagCanParseExtension()) {
       try {
         FileTagInfo(File(uri.path.orEmpty()), artistParser)
       } catch (e: Exception) {
         LOG.e(e) { it("Could not open file '%s' uri=%s", uri.path.orEmpty(), uri) }
-        VlcTagInfo(uri, libVlc, artistParser)
+        libVlc.withInstance { VlcTagInfo(uri, it, artistParser) }
       }
     } else {
       LOG.w { it("Fallback to LibVLC as no parser found for %s", uri) }
-      VlcTagInfo(uri, libVlc, artistParser)
+      libVlc.withInstance { VlcTagInfo(uri, it, artistParser) }
     }
   }
 }
