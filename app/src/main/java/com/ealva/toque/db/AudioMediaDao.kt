@@ -39,9 +39,11 @@ import com.ealva.toque.common.toTitle
 import com.ealva.toque.db.AudioMediaDao.Companion.QUEUE_ID
 import com.ealva.toque.db.MediaTable.albumId
 import com.ealva.toque.db.MediaTable.displayName
+import com.ealva.toque.db.MediaTable.duration
 import com.ealva.toque.db.MediaTable.fileUri
 import com.ealva.toque.db.MediaTable.id
 import com.ealva.toque.db.MediaTable.location
+import com.ealva.toque.db.MediaTable.rating
 import com.ealva.toque.db.MediaTable.title
 import com.ealva.toque.db.MediaTable.trackNumber
 import com.ealva.toque.file.AudioInfo
@@ -123,6 +125,10 @@ sealed interface AudioDaoEvent {
 data class AudioDescription(
   val mediaId: MediaId,
   val title: Title,
+  val duration: Millis,
+  val rating: Rating,
+  val album: AlbumTitle,
+  val artist: ArtistName,
   val albumLocalArt: Uri,
   val albumArt: Uri
 )
@@ -173,8 +179,8 @@ interface AudioMediaDao {
    * dispatcher on another thread (except in tests). This is the method the media scanner calls
    * to create or update audio media information.
    */
-  suspend fun upsertAudioList(
-    audioInfoList: List<AudioInfo>,
+  suspend fun upsertAudio(
+    audioInfo: AudioInfo,
     metadataParser: MediaMetadataParser,
     minimumDuration: Millis,
     createUpdateTime: Millis
@@ -192,11 +198,19 @@ interface AudioMediaDao {
 
   suspend fun getCountAllAudio(): LongResult
 
-  suspend fun getAllAudio(limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(artistId: ArtistId, limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(albumId: AlbumId, limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(genreId: GenreId, limit: Long): AudioDescriptionResult
-  suspend fun getAllAudioFor(composerId: ComposerId, limit: Long): AudioDescriptionResult
+  suspend fun getAllAudio(limit: Long = Long.MAX_VALUE): AudioDescriptionResult
+  suspend fun getAllAudioFor(
+    artistId: ArtistId,
+    limit: Long = Long.MAX_VALUE
+  ): AudioDescriptionResult
+
+  suspend fun getAllAudioFor(albumId: AlbumId, limit: Long = Long.MAX_VALUE): AudioDescriptionResult
+  suspend fun getAllAudioFor(genreId: GenreId, limit: Long = Long.MAX_VALUE): AudioDescriptionResult
+  suspend fun getAllAudioFor(
+    composerId: ComposerId,
+    limit: Long = Long.MAX_VALUE
+  ): AudioDescriptionResult
+
   suspend fun getAudioQueueItems(shuffled: Boolean): AudioItemListResult
 
   suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
@@ -316,49 +330,28 @@ private class AudioMediaDaoImpl(
    * Parse the file tags and create/update all media relationships. There is no contract that the
    * list is only one album/artist or that every track on the album is included.
    */
-  override suspend fun upsertAudioList(
-    audioInfoList: List<AudioInfo>,
+  override suspend fun upsertAudio(
+    audioInfo: AudioInfo,
     metadataParser: MediaMetadataParser,
     minimumDuration: Millis,
     createUpdateTime: Millis
-  ) {
+  ) = metadataParser.parseMetadata(audioInfo.uriToParse(), artistParserFactory.make()).use { tag ->
     val appPrefs = appPrefsSingleton.instance()
-    val artistParser = artistParserFactory.make()
-    /*
-      Note about this algorithm: at one time the forEach loop was inside the transaction. The
-      parseMetadata function was changed to be suspending and was moved outside the transaction. So,
-      now there is a transaction for every item in the list instead of for the list itself.
-      Surprisingly, or not, looping outside the transaction bounds is more than twice as fast on
-      average. I don't care enough to investigate, because I like the result, but I'm guessing it's
-      due to more parallel processing between file tag parsing and writing to the DB. Looping inside
-      the transaction meant parsing an entire album and then committing all that info, whereas now
-      each individual song is parsed and then written in a txn. Transaction write locks are held for
-      a much shorter time in many cases. A library with 1 song per album would probably perform
-      about the same with either algorithm.
-
-      The thinking originally was that fewer transactions would equal better performance, so was
-      designed to process an "album" at a time. As is typical, if a time came to optimize this
-      function, testing will be required.
-    */
-    audioInfoList.forEach { audioInfo ->
-      metadataParser.parseMetadata(audioInfo.uriToParse(), artistParser).use { fileTagInfo ->
-        db.transaction {
-          val upsertResults = UpsertResults(1)
-          onCommit { emitResults(upsertResults) }
-          upsertAudio(
-            audioInfo,
-            fileTagInfo,
-            minimumDuration,
-            createUpdateTime,
-            appPrefs,
-            upsertResults
-          )
-        }
-      }
+    db.transaction {
+      val upsertResults = UpsertResults(1)
+      onCommit { emitResults(upsertResults) }
+      doUpsertAudio(
+        audioInfo,
+        tag,
+        minimumDuration,
+        createUpdateTime,
+        appPrefs,
+        upsertResults
+      )
     }
   }
 
-  private fun Transaction.upsertAudio(
+  private fun Transaction.doUpsertAudio(
     audioInfo: AudioInfo,
     fileTagInfo: MediaFileTagInfo,
     minimumDuration: Millis,
@@ -529,8 +522,20 @@ private class AudioMediaDaoImpl(
   override suspend fun getAllAudio(limit: Long): AudioDescriptionResult = runSuspendCatching {
     db.query {
       MediaTable
-        .join(AlbumTable, INNER, albumId, AlbumTable.id)
-        .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+        .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
+        .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
+        .selects {
+          listOf(
+            id,
+            title,
+            duration,
+            rating,
+            AlbumTable.albumTitle,
+            AlbumTable.albumLocalArtUri,
+            AlbumTable.albumArtUri,
+            ArtistTable.artistName,
+          )
+        }
         .where { MediaTable.mediaType eq MediaType.Audio.id }
         .orderByAsc { title }
         .limit(limit)
@@ -538,6 +543,10 @@ private class AudioMediaDaoImpl(
           AudioDescription(
             it[id].toMediaId(),
             it[title].toTitle(),
+            Millis(it[duration]),
+            Rating(it[rating]),
+            AlbumTitle(it[AlbumTable.albumTitle]),
+            ArtistName(it[ArtistTable.artistName]),
             it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
             it[AlbumTable.albumArtUri].toUriOrEmpty()
           )
@@ -550,9 +559,21 @@ private class AudioMediaDaoImpl(
     runSuspendCatching {
       db.query {
         MediaTable
-          .join(ArtistMediaTable, INNER, id, ArtistMediaTable.mediaId)
-          .join(AlbumTable, INNER, albumId, AlbumTable.id)
-          .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+          .join(ArtistMediaTable, INNER, MediaTable.id, ArtistMediaTable.mediaId)
+          .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
+          .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
+          .selects {
+            listOf(
+              id,
+              title,
+              duration,
+              rating,
+              AlbumTable.albumTitle,
+              AlbumTable.albumLocalArtUri,
+              AlbumTable.albumArtUri,
+              ArtistTable.artistName,
+            )
+          }
           .where { MediaTable.artistId eq artistId.value }
           .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(title)) }
           .limit(limit)
@@ -560,6 +581,10 @@ private class AudioMediaDaoImpl(
             AudioDescription(
               it[id].toMediaId(),
               it[title].toTitle(),
+              Millis(it[duration]),
+              Rating(it[rating]),
+              AlbumTitle(it[AlbumTable.albumTitle]),
+              ArtistName(it[ArtistTable.artistName]),
               it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
               it[AlbumTable.albumArtUri].toUriOrEmpty()
             )
@@ -573,7 +598,19 @@ private class AudioMediaDaoImpl(
       db.query {
         MediaTable
           .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
-          .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+          .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
+          .selects {
+            listOf(
+              id,
+              title,
+              duration,
+              rating,
+              AlbumTable.albumTitle,
+              AlbumTable.albumLocalArtUri,
+              AlbumTable.albumArtUri,
+              ArtistTable.artistName,
+            )
+          }
           .where { MediaTable.albumId eq albumId.value }
           .orderByAsc { trackNumber }
           .limit(limit)
@@ -581,6 +618,10 @@ private class AudioMediaDaoImpl(
             AudioDescription(
               it[id].toMediaId(),
               it[title].toTitle(),
+              Millis(it[duration]),
+              Rating(it[rating]),
+              AlbumTitle(it[AlbumTable.albumTitle]),
+              ArtistName(it[ArtistTable.artistName]),
               it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
               it[AlbumTable.albumArtUri].toUriOrEmpty()
             )
@@ -593,9 +634,21 @@ private class AudioMediaDaoImpl(
     runSuspendCatching {
       db.query {
         MediaTable
-          .join(GenreMediaTable, INNER, id, GenreMediaTable.mediaId)
-          .join(AlbumTable, INNER, albumId, AlbumTable.id)
-          .selects { listOf(id, title, AlbumTable.albumLocalArtUri, AlbumTable.albumArtUri) }
+          .join(GenreMediaTable, INNER, MediaTable.id, GenreMediaTable.mediaId)
+          .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
+          .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
+          .selects {
+            listOf(
+              id,
+              title,
+              duration,
+              rating,
+              AlbumTable.albumTitle,
+              AlbumTable.albumLocalArtUri,
+              AlbumTable.albumArtUri,
+              ArtistTable.artistName,
+            )
+          }
           .where { GenreMediaTable.genreId eq genreId.value }
           .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(trackNumber)) }
           .limit(limit)
@@ -603,6 +656,10 @@ private class AudioMediaDaoImpl(
             AudioDescription(
               it[id].toMediaId(),
               it[title].toTitle(),
+              Millis(it[duration]),
+              Rating(it[rating]),
+              AlbumTitle(it[AlbumTable.albumTitle]),
+              ArtistName(it[ArtistTable.artistName]),
               it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
               it[AlbumTable.albumArtUri].toUriOrEmpty()
             )
@@ -627,6 +684,10 @@ private class AudioMediaDaoImpl(
             AudioDescription(
               it[MediaTable.id].toMediaId(),
               it[title].toTitle(),
+              Millis(it[duration]),
+              Rating(it[rating]),
+              AlbumTitle(it[AlbumTable.albumTitle]),
+              ArtistName(it[ArtistTable.artistName]),
               it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
               it[AlbumTable.albumArtUri].toUriOrEmpty()
             )

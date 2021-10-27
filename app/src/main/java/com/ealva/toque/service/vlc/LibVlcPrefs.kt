@@ -28,6 +28,8 @@ import com.ealva.toque.common.MillisRange
 import com.ealva.toque.prefs.AmpStorePref
 import com.ealva.toque.prefs.BaseToquePreferenceStore
 import com.ealva.toque.prefs.MillisStorePref
+import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.DEFAULT_DEFAULT_REPLAY_GAIN
+import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.DEFAULT_REPLAY_GAIN
 import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.NETWORK_CACHING_RANGE
 
 typealias LibVlcPrefsSingleton = PreferenceStoreSingleton<LibVlcPrefs>
@@ -53,11 +55,6 @@ typealias LibVlcPrefsSingleton = PreferenceStoreSingleton<LibVlcPrefs>
  */
 interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
   /**
-   * If true turns on LibVlc logging. Requires [LibVlcSingleton.reset]. Requires
-   * [LibVlcSingleton.reset] and media player reset. Use in combination with [enableVerboseMode]
-   */
-  val debugAndLogging: Boolean
-  /**
    * If true verbose mode set to -vv else -v. Requires [LibVlcSingleton.reset] and media player
    * reset.
    */
@@ -81,7 +78,7 @@ interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
   /** Sets --audio-replay-gain-mode. Requires [LibVlcSingleton.reset] and media player reset. */
   val replayGainMode: StorePref<Int, ReplayGainMode>
   /** Sets --audio-replay-gain-preamp. Requires [LibVlcSingleton.reset] and media player reset. */
-  val replayPreamp: AmpStorePref
+  val replayGainPreamp: AmpStorePref
   /** Sets --audio-replay-gain-default. Requires [LibVlcSingleton.reset] and media player reset. */
   val defaultReplayGain: AmpStorePref
   /**
@@ -100,7 +97,6 @@ interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
    */
   val allowTimeStretchAudio: BoolPref
 
-
   val digitalAudioOutputEnabled: BoolPref
   /** Sets hardware/software decoding per media. Requires media player reset */
   val hardwareAcceleration: StorePref<Int, HardwareAcceleration>
@@ -108,6 +104,9 @@ interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
   companion object {
     val NETWORK_CACHING_RANGE: MillisRange = Millis(0)..Millis.ONE_MINUTE
     const val SUB_AUTODETECT_PATHS = "./Subtitles, ./subtitles, ./Subs, ./subs"
+    val DEFAULT_REPLAY_GAIN = Amp.NONE.coerceIn(Amp.REPLAY_GAIN_RANGE)
+    val DEFAULT_DEFAULT_REPLAY_GAIN = Amp(-6).coerceIn(Amp.REPLAY_GAIN_RANGE)
+
     fun make(storage: Storage): LibVlcPrefs = LibVlcPrefsImpl(storage)
   }
 }
@@ -115,20 +114,23 @@ interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
 private class LibVlcPrefsImpl(
   storage: Storage
 ) : BaseToquePreferenceStore<LibVlcPrefs>(storage), LibVlcPrefs {
-  override val debugAndLogging: Boolean = true
   override val enableVerboseMode by preference(false)
+  override val audioOutputModule by enumPref(AudioOutputModule.DEFAULT)
   override val chroma by enumPref(Chroma.DEFAULT)
   override val networkCachingAmount by millisPref(Millis.ONE_SECOND) {
     it.coerceIn(NETWORK_CACHING_RANGE)
   }
   override val subtitleEncoding by enumPref(SubtitleEncoding.DEFAULT)
   override val replayGainMode by enumPref(ReplayGainMode.DEFAULT)
-  override val replayPreamp by ampPref(Amp.NONE) { it.coerceIn(Amp.RANGE) }
-  override val defaultReplayGain by ampPref(Amp(-7F)) { it.coerceIn(Amp.RANGE) }
+  override val replayGainPreamp by ampPref(DEFAULT_REPLAY_GAIN) {
+    it.coerceIn(Amp.REPLAY_GAIN_RANGE)
+  }
+  override val defaultReplayGain by ampPref(DEFAULT_DEFAULT_REPLAY_GAIN) {
+    it.coerceIn(Amp.REPLAY_GAIN_RANGE)
+  }
   override val enableFrameSkip by preference(false)
   override val skipLoopFilter by enumPref(SkipLoopFilter.DEFAULT)
   override val allowTimeStretchAudio by preference(true)
   override val digitalAudioOutputEnabled by preference(false)
   override val hardwareAcceleration by enumPref(HardwareAcceleration.DEFAULT)
-  override val audioOutputModule by enumPref(AudioOutputModule.DEFAULT)
 }

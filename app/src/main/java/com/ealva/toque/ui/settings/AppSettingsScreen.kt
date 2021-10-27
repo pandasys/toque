@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.ealva.comppref.pref.CallbackSettingItem
+import com.ealva.comppref.pref.CheckboxSettingItem
 import com.ealva.comppref.pref.DefaultSettingMakers
 import com.ealva.comppref.pref.ListSettingItem
 import com.ealva.comppref.pref.SettingItem
@@ -56,6 +57,8 @@ import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.toque.R
 import com.ealva.toque.audioout.AudioOutputModule
+import com.ealva.toque.common.Amp
+import com.ealva.toque.common.AmpRange
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.MillisRange
 import com.ealva.toque.common.Volume
@@ -122,9 +125,11 @@ object SettingScreenKeys {
   val AdvancedSettings = SettingScreenKey(R.string.Advanced, R.string.Settings)
 }
 
+abstract class BaseAppSettingsScreen : ComposeKey()
+
 @Immutable
 @Parcelize
-data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
+data class AppSettingsScreen(private val key: SettingScreenKey) : BaseAppSettingsScreen() {
 
   @OptIn(ExperimentalPagerApi::class)
   @Composable
@@ -176,10 +181,7 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
       }
     }
 
-  private fun makeItems(
-    key: SettingScreenKey,
-    prefs: LibVlcPrefs
-  ): List<SettingItem> =
+  private fun makeItems(key: SettingScreenKey, prefs: LibVlcPrefs): List<SettingItem> =
     when (key) {
       AdvancedSettings -> makeAdvancedSettings(prefs)
       else -> {
@@ -242,9 +244,9 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
       singleLineTitle = true,
       summary = fetch(R.string.TotalCrossFadeDuration),
       steps = 0,
-      valueRepresentation = { floatValue -> "${floatValue.toMillisInSeconds().value} ms" },
+      valueRepresentation = { floatValue -> "${floatValue.roundToCentiseconds()} ms" },
       valueRange = MEDIA_FADE_RANGE.toFloatRange(),
-      floatToType = { value -> value.toMillisInSeconds() },
+      floatToType = { value -> Millis(value.roundToCentiseconds()) },
       typeToFloat = millisToFloat
     ),
     SwitchSettingItem(
@@ -261,9 +263,9 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
       singleLineTitle = true,
       summary = fetch(R.string.TotalCrossFadeDuration),
       steps = 0,
-      valueRepresentation = { floatValue -> "${floatValue.toMillisInSeconds().value} ms" },
+      valueRepresentation = { floatValue -> "${floatValue.roundToCentiseconds()} ms" },
       valueRange = MEDIA_FADE_RANGE.toFloatRange(),
-      floatToType = { value -> value.toMillisInSeconds() },
+      floatToType = { value -> Millis(value.roundToCentiseconds()) },
       typeToFloat = millisToFloat
     ),
     SwitchSettingItem(
@@ -280,9 +282,9 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
       singleLineTitle = true,
       summary = fetch(R.string.FadeInOutDuration),
       steps = 0,
-      valueRepresentation = { floatValue -> "${floatValue.toMillisInSeconds().value} ms" },
+      valueRepresentation = { floatValue -> "${floatValue.roundToCentiseconds()} ms" },
       valueRange = PLAY_PAUSE_FADE_RANGE.toFloatRange(),
-      floatToType = { value -> value.toMillisInSeconds() },
+      floatToType = { value -> Millis(value.roundToCentiseconds()) },
       typeToFloat = millisToFloat
     ),
   )
@@ -442,9 +444,9 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
       singleLineTitle = true,
       summary = "Smallest files to scan",
       steps = 0,
-      valueRepresentation = { floatValue -> floatValue.roundToSeconds().toString() },
+      valueRepresentation = { floatValue -> floatValue.toSeconds().toString() },
       valueRange = IGNORE_FILES_RANGE.toFloatRange(),
-      floatToType = { value -> Millis(value.roundToLong()) },
+      floatToType = { value -> Millis(value.toSeconds()) },
       typeToFloat = millisToFloat
     ),
     //CallbackSettingItem(
@@ -494,6 +496,43 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : ComposeKey() {
         ReplayGainMode.Track.titleValuePair
       )
     ),
+    SliderSettingItem(
+      preference = prefs.replayGainPreamp,
+      title = "Replay Gain Preamp",
+      enabled = prefs.replayGainMode() != ReplayGainMode.None,
+      singleLineTitle = true,
+      summary = "For song files containing Replay Gain info",
+      steps = 0,
+      valueRepresentation = { floatValue -> floatValue.toDecibelString() },
+      valueRange = Amp.REPLAY_GAIN_RANGE.toFloatRange(),
+      floatToType = { value -> Amp(value).coerceIn(Amp.REPLAY_GAIN_RANGE) },
+      typeToFloat = { it.value }
+    ),
+    SliderSettingItem(
+      preference = prefs.defaultReplayGain,
+      title = "Default Replay Gain Preamp",
+      enabled = prefs.replayGainMode() != ReplayGainMode.None,
+      singleLineTitle = true,
+      summary = "For songs without Replay Gain info",
+      steps = 0,
+      valueRepresentation = { floatValue -> floatValue.toDecibelString() },
+      valueRange = Amp.REPLAY_GAIN_RANGE.toFloatRange(),
+      floatToType = { value -> Amp(value).coerceIn(Amp.REPLAY_GAIN_RANGE) },
+      typeToFloat = { it.value }
+    ),
+    SwitchSettingItem(
+      prefs.allowTimeStretchAudio,
+      title = "Allow Time Stretch Audio",
+      summary = "Allows playing audio at different speeds without affecting pitch",
+      offSummary = "Playing at different speeds affects pitch",
+      singleLineTitle = true
+    ),
+    CheckboxSettingItem(
+      preference = prefs.enableVerboseMode,
+      title = "Verbose Logging",
+      summary = "Increases amount of info logged",
+      singleLineTitle = true
+    )
   )
 }
 
@@ -570,9 +609,9 @@ private fun TitleAndSubtitle(title: String, subtitle: String) {
   }
 }
 
-private fun Float.roundToSeconds(): Long = div(1000).roundToLong()
+private fun Float.toSeconds(): Long = div(1000).roundToLong()
 private val millisToFloat: (Millis) -> Float = { it.value.toFloat() }
-private fun Float.toMillisInSeconds() = Millis((this / 100).roundToLong() * 100)
+private fun Float.roundToCentiseconds(): Long = (this / 100).roundToLong() * 100
 
 @JvmName("millisToFloatRange")
 private fun MillisRange.toFloatRange(): ClosedFloatingPointRange<Float> =
@@ -585,6 +624,12 @@ private fun Float.toVolume() =
 @JvmName("volumeToFloatRange")
 private fun VolumeRange.toFloatRange(): ClosedFloatingPointRange<Float> =
   start.value.toFloat()..endInclusive.value.toFloat()
+
+@JvmName("AmpToFloatRange")
+private fun AmpRange.toFloatRange(): ClosedFloatingPointRange<Float> =
+  start.value..endInclusive.value
+private fun Float.toDecibelString(): String =
+  "${"%.1f".format(this)}dB".let { if (it == "-0.0dB") "0.0dB" else it }
 
 private class SettingMaker : DefaultSettingMakers() {
   @Composable
@@ -612,23 +657,3 @@ val ReplayGainMode.titleValuePair: Pair<String, ReplayGainMode>
 
 val AudioOutputModule.titleViewPair: Pair<String, AudioOutputModule>
   get() = Pair(fetch(titleRes), this)
-/*
-          Pair(R.string.root_settings_pref_key, cmd_cog),
-          Pair(R.string.look_and_feel_pref_key, cmd_eye),
-          Pair(R.string.lists_look_and_feel_pref_key, cmd_view_list),
-          Pair(R.string.now_playing_look_and_feel_pref_key, cmd_presentation_play),
-          Pair(R.string.toasts_look_and_feel_pref_key, cmd_message_alert),
-          Pair(R.string.library_pref_key, cmd_music_box_multiple),
-          Pair(R.string.media_scanner_library_pref_key, cmd_refresh),
-          Pair(R.string.when_to_scan_pref_key, cmd_alarm_check),
-          Pair(R.string.scan_media_file_tag_pref_key, cmd_tag_outline),
-          Pair(R.string.album_art_pref_key, cmd_image_multiple),
-          Pair(R.string.audio_pref_key, cmd_headphones),
-          Pair(R.string.replay_gain_pref_key, cmd_volume_high),
-          Pair(R.string.fade_pref_key, cmd_elevation_rise),
-          Pair(R.string.social_pref_key, cmd_earth),
-          Pair(R.string.about_pref_key, cmd_information_outline),
-          Pair(R.string.advanced_audio_pref_key, cmd_wrench),
-          Pair(R.string.rate_alva_player_pref_key, cmd_star),
-          Pair(R.string.advanced_never_ask_pref_key, GoogleMaterial.Icon.gmd_warning)
- */

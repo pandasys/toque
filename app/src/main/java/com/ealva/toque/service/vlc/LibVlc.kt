@@ -172,7 +172,7 @@ private class LibVlcImpl(
   private inline fun IMedia.maybeSetReplayGain(prefs: () -> LibVlcPrefs) = prefs().apply {
     if (replayGainMode() != ReplayGainMode.None) {
       addMediaOption { """:audio-replay-gain-mode=${replayGainMode()}""" }
-      addMediaOption { """:audio-replay-gain-preamp=${replayPreamp()}""" }
+      addMediaOption { """:audio-replay-gain-preamp=${replayGainPreamp()}""" }
       addMediaOption { """:audio-replay-gain-default=${defaultReplayGain()}""" }
     }
   }

@@ -75,7 +75,7 @@ private fun ArrayList<String>.audioReplayGainMode(prefs: LibVlcPrefs) {
   add(PARM_GAIN_MODE)
   add(prefs.replayGainMode().toString())
   add(PARM_GAIN_PREAMP)
-  add(prefs.replayPreamp().toString())
+  add(prefs.replayGainPreamp().toString())
   add(PARM_GAIN_DEFAULT)
   add(prefs.defaultReplayGain().toString())
 }
@@ -91,12 +91,7 @@ private fun ArrayList<String>.resamplerOption(vlcUtil: VlcUtil) {
 }
 
 private fun ArrayList<String>.verboseModeOption(prefs: LibVlcPrefs) {
-  if (prefs.debugAndLogging) {
-    add(if (prefs.enableVerboseMode()) PARM_VV_VERBOSE else PARM_V_VERBOSE)
-  } else {
-    add(PARM_LOG_VERBOSE)
-    add("-1")
-  }
+  add(if (prefs.enableVerboseMode()) PARM_VV_VERBOSE else PARM_V_VERBOSE)
 }
 
 private fun ArrayList<String>.skipLoopFilterOption(

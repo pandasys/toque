@@ -18,6 +18,8 @@
 
 package com.ealva.toque.common
 
+typealias AmpRange = ClosedRange<Amp>
+
 operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean =
   contains(amp())
 
@@ -38,9 +40,10 @@ value class Amp(val value: Float) : Comparable<Amp> {
     inline operator fun invoke(value: Int) = Amp(value.toFloat())
 
     val NONE = Amp(0F)
-    val DEFAULT_PREAMP = Amp(12F)
-    val MIN = Amp(-20F)
-    val MAX = Amp(20F)
+    val DEFAULT_PREAMP = Amp(12)
+    val MIN = Amp(-20)
+    val MAX = Amp(20)
     val RANGE = MIN..MAX
+    val REPLAY_GAIN_RANGE = Amp(-16)..Amp(16)
   }
 }

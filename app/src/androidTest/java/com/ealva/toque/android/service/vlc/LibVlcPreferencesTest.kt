@@ -136,13 +136,13 @@ class LibVlcPreferencesTest {
   @Test
   fun testReplayPreamp() = coroutineRule.runBlockingTest {
     prefsSingleton {
-      expect(replayPreamp()).toBe(replayPreamp.default)
-      replayPreamp.set(Amp(-50))
-      expect(replayPreamp()).toBe(Amp.RANGE.start)
-      replayPreamp.set(Amp(100))
-      expect(replayPreamp()).toBe(Amp.RANGE.endInclusive)
-      replayPreamp.set(Amp(15))
-      expect(replayPreamp()).toBe(Amp(15))
+      expect(replayGainPreamp()).toBe(replayGainPreamp.default)
+      replayGainPreamp.set(Amp(-50))
+      expect(replayGainPreamp()).toBe(Amp.RANGE.start)
+      replayGainPreamp.set(Amp(100))
+      expect(replayGainPreamp()).toBe(Amp.RANGE.endInclusive)
+      replayGainPreamp.set(Amp(15))
+      expect(replayGainPreamp()).toBe(Amp(15))
 
       clear()
     }
@@ -222,7 +222,7 @@ class LibVlcPreferencesTest {
     expect(networkCachingAmount()).toBe(networkCachingAmount.default)
     expect(subtitleEncoding()).toBe(subtitleEncoding.default)
     expect(replayGainMode()).toBe(replayGainMode.default)
-    expect(replayPreamp()).toBe(replayPreamp.default)
+    expect(replayGainPreamp()).toBe(replayGainPreamp.default)
     expect(defaultReplayGain()).toBe(defaultReplayGain.default)
     expect(enableFrameSkip()).toBe(enableFrameSkip.default)
     expect(skipLoopFilter()).toBe(skipLoopFilter.default)

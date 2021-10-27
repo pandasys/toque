@@ -16,7 +16,6 @@
 
 package com.ealva.toque.ui.now
 
-import android.content.res.Configuration
 import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
@@ -50,13 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layoutId
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
@@ -67,7 +62,6 @@ import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
@@ -80,6 +74,7 @@ import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.vlc.toFloat
+import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.main.LocalSnackbarHostState
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ARTIST
@@ -94,8 +89,7 @@ import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE_SPACE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TOP_SPACE
 import com.google.accompanist.insets.ExperimentalAnimatedInsets
-import com.google.accompanist.insets.LocalWindowInsets
-import com.google.accompanist.insets.WindowInsets
+import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
@@ -130,7 +124,7 @@ object NowPlayingScreenIds {
 
 @Immutable
 @Parcelize
-data class NowPlayingScreen(private val noArgPlaceholder: String = "") : ComposeKey() {
+data class NowPlayingScreen(private val noArg: String = "") : ComposeKey() {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
       add(NowPlayingViewModel(lookup(), lookup("AppPrefs")))
@@ -161,30 +155,12 @@ data class NowPlayingScreen(private val noArgPlaceholder: String = "") : Compose
   }
 }
 
-data class ScreenConfig(
-  val inPortrait: Boolean,
-  val screenWidthDp: Dp,
-  val screenWidthPx: Int,
-  val screenHeightDp: Dp,
-  val screenHeightPx: Int,
-  val statusBarHeight: Dp,
-  val navLeft: Dp,
-  val navRight: Dp,
-) {
-  val imageSizePx: Int
-    get() = if (inPortrait) screenWidthPx else screenHeightPx
-  val imageSizeDp: Dp
-    get() = if (inPortrait) screenHeightDp else screenHeightDp
-  val navOnLeft: Boolean
-    get() = navLeft > navRight
-}
-
 private val bottomSheetHeight = 50.dp
 private val bottomSheetVertPadding = 8.dp
 
 @OptIn(ExperimentalAnimatedInsets::class, ExperimentalUnitApi::class)
 @Composable
-fun NowPlaying(
+private fun NowPlaying(
   state: NowPlayingState,
   goToIndex: (Int) -> Unit,
   togglePlayPause: () -> Unit,
@@ -200,11 +176,7 @@ fun NowPlaying(
   modifier: Modifier
 ) {
   val useDarkIcons = MaterialTheme.colors.isLight
-  val screenConfig = makeScreenConfig(
-    LocalConfiguration.current,
-    LocalDensity.current,
-    LocalWindowInsets.current
-  )
+  val screenConfig = LocalScreenConfig.current
 
   val systemUiController = rememberSystemUiController()
   SideEffect {
@@ -213,7 +185,7 @@ fun NowPlaying(
       darkIcons = useDarkIcons,
     )
   }
-  Box(modifier = modifier) {
+  Box(modifier = modifier.navigationBarsPadding()) {
     val isPortrait = screenConfig.inPortrait
     ConstraintLayout(modifier = Modifier.fillMaxSize()) {
       val (pager, controls) = createRefs()
@@ -267,7 +239,7 @@ fun NowPlaying(
               bottom.linkTo(parent.bottom)
               height = Dimension.fillToConstraints
             }
-            .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
+            .padding(bottom = screenConfig.getBottomSheetHeight(false) + 8.dp)
         } else {
           Modifier
             .constrainAs(controls) {
@@ -283,7 +255,7 @@ fun NowPlaying(
               width = Dimension.fillToConstraints
             }
             .statusBarsPadding()
-            .padding(bottom = bottomSheetHeight + bottomSheetVertPadding)
+            .padding(bottom = screenConfig.getBottomSheetHeight(false) + 8.dp)
         }
       )
     }
@@ -295,7 +267,7 @@ private const val ALPHA_OFF = 0.2F
 
 @OptIn(ExperimentalUnitApi::class, ExperimentalCoilApi::class)
 @Composable
-fun PlayerControls(
+private fun PlayerControls(
   state: NowPlayingState,
   togglePlayPause: () -> Unit,
   next: () -> Unit,
@@ -468,7 +440,7 @@ private fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
 }
 
 @Composable
-fun PositionSlider(
+private fun PositionSlider(
   position: Millis,
   range: ClosedFloatingPointRange<Float>,
   seekTo: (Millis) -> Unit,
@@ -484,7 +456,7 @@ fun PositionSlider(
 
 @OptIn(ExperimentalCoilApi::class)
 @Composable
-fun RatingBarRow(
+private fun RatingBarRow(
   eqMode: EqMode,
   rating: Rating,
   playbackRate: PlaybackRate,
@@ -498,7 +470,8 @@ fun RatingBarRow(
 ) {
   Row(
     modifier = modifier,
-    horizontalArrangement = Arrangement.SpaceEvenly
+    horizontalArrangement = Arrangement.SpaceEvenly,
+    verticalAlignment = Alignment.CenterVertically
   ) {
     IconButton(onClick = toggleEqMode, modifier = Modifier.size(26.dp)) {
       Image(
@@ -525,7 +498,7 @@ fun RatingBarRow(
     RatingBar(
       modifier = Modifier.wrapContentSize(),
       value = rating.toStarRating().value,
-      size = 24.dp,
+      size = 22.dp,
       padding = 2.dp,
       isIndicator = true,
       activeColor = Color.White,
@@ -557,7 +530,7 @@ fun RatingBarRow(
 
 @OptIn(ExperimentalCoilApi::class)
 @Composable
-fun ButtonRow(
+private fun ButtonRow(
   playState: PlayState,
   togglePlayPause: () -> Unit,
   next: () -> Unit,
@@ -610,7 +583,7 @@ fun ButtonRow(
   }
 }
 
-fun portraitConstraints(): ConstraintSet = ConstraintSet {
+private fun portraitConstraints(): ConstraintSet = ConstraintSet {
   val buttonRow = createRefFor(ID_BUTTON_ROW)
   val slider = createRefFor(ID_POSITION_SLIDER)
   val position = createRefFor(ID_POSITION_TEXT)
@@ -705,7 +678,7 @@ fun portraitConstraints(): ConstraintSet = ConstraintSet {
   }
 }
 
-fun landscapeConstraints(): ConstraintSet = ConstraintSet {
+private fun landscapeConstraints(): ConstraintSet = ConstraintSet {
   val buttonRow = createRefFor(ID_BUTTON_ROW)
   val slider = createRefFor(ID_POSITION_SLIDER)
   val position = createRefFor(ID_POSITION_TEXT)
@@ -796,21 +769,6 @@ fun landscapeConstraints(): ConstraintSet = ConstraintSet {
     bottom.linkTo(parent.bottom)
     height = Dimension.wrapContent
   }
-}
-
-fun makeScreenConfig(config: Configuration, density: Density, insets: WindowInsets): ScreenConfig {
-  val screenWidthDp = config.screenWidthDp.dp
-  val screenHeightDp = config.screenHeightDp.dp
-  return ScreenConfig(
-    inPortrait = config.inPortrait,
-    screenWidthDp = screenWidthDp,
-    screenWidthPx = with(density) { screenWidthDp.roundToPx() },
-    screenHeightDp = screenHeightDp,
-    screenHeightPx = with(density) { screenHeightDp.roundToPx() },
-    statusBarHeight = with(density) { insets.statusBars.top.toDp() },
-    navLeft = with(density) { insets.navigationBars.left.toDp() },
-    navRight = with(density) { insets.navigationBars.right.toDp() }
-  )
 }
 
 private val RepeatMode.drawable: Int

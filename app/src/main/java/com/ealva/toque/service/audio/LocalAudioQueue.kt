@@ -469,7 +469,7 @@ private class LocalAudioQueueImpl(
     libVlcPrefs.networkCachingAmount,
     libVlcPrefs.subtitleEncoding,
     libVlcPrefs.replayGainMode,
-    libVlcPrefs.replayPreamp,
+    libVlcPrefs.replayGainPreamp,
     libVlcPrefs.defaultReplayGain,
     libVlcPrefs.enableFrameSkip,
     libVlcPrefs.skipLoopFilter,

@@ -78,7 +78,7 @@ class LibVlcOptionsTest {
       expect(options[1]).toBe(GAIN_MODE)
       expect(options[2]).toBe(ReplayGainMode.None.toString())
       expect(options[3]).toBe(GAIN_PREAMP)
-      expect(options[4]).toBe(prefs.replayPreamp().toString())
+      expect(options[4]).toBe(prefs.replayGainPreamp().toString())
       expect(options[5]).toBe(GAIN_DEFAULT)
       expect(options[6]).toBe(prefs.defaultReplayGain().toString())
       expect(options[7]).toBe(NETWORK_CACHING)
@@ -126,7 +126,6 @@ class LibVlcOptionsTest {
   @Test
   fun testLibVlcOptionsVerboseMode() {
     val prefs = StubLibVlcPrefs()
-    prefs.debugAndLogging = true
     prefs.enableVerboseMode._value = true
     libVlcOptions(prefs, VlcUtil(appCtx)).let { options ->
       expect(options.size).toBe(25)

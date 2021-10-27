@@ -29,6 +29,7 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.bindString
+import com.ealva.welite.db.expr.count
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
@@ -36,11 +37,13 @@ import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
+import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.groupBy
 import com.ealva.welite.db.table.inSubQuery
 import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
@@ -66,6 +69,12 @@ private val LOG by lazyLogger(ComposerDao::class)
 private val getOrInsertLock: Lock = ReentrantLock()
 
 data class ComposerIdName(val composerId: ComposerId, val composerName: ComposerName)
+
+data class ComposerDescription(
+  val composerId: ComposerId,
+  val composerName: ComposerName,
+  val songCount: Long
+)
 
 sealed class ComposerDaoEvent {
   data class ComposerCreated(val composerId: ComposerId) : ComposerDaoEvent()
@@ -94,6 +103,11 @@ interface ComposerDao {
 
   fun deleteAll(txn: TransactionInProgress)
   fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
+
+  suspend fun getAllComposers(
+    limit: Long = Long.MAX_VALUE
+  ): Result<List<ComposerDescription>, DaoMessage>
+
   suspend fun getNextComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
   suspend fun getPreviousComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
   suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage>
@@ -146,6 +160,27 @@ private class ComposerDaoImpl(
       literal(0) eq (ComposerMediaTable.selectCount { composerId eq id }).asExpression()
     }.delete()
   }
+
+  private val songCountColumn = ComposerMediaTable.mediaId.count()
+  override suspend fun getAllComposers(limit: Long): Result<List<ComposerDescription>, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        ComposerTable
+          .join(ComposerMediaTable, JoinType.INNER, ComposerTable.id, ComposerMediaTable.composerId)
+          .selects { listOf(ComposerTable.id, ComposerTable.composer, songCountColumn) }
+          .all()
+          .groupBy { ComposerTable.composer }
+          .orderByAsc { ComposerTable.composerSort }
+          .sequence {
+            ComposerDescription(
+              composerId = ComposerId(it[ComposerTable.id]),
+              composerName = ComposerName(it[ComposerTable.composer]),
+              songCount = it[songCountColumn]
+            )
+          }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
   override suspend fun getNextComposer(name: ComposerName): Result<ComposerIdName, DaoMessage> =
     runSuspendCatching {

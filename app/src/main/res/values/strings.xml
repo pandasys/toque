@@ -15,6 +15,17 @@
   -->
 
 <resources>
+
+  <plurals name="SongCount">
+    <item quantity="one">%1$d song</item>
+    <item quantity="other">%1$d songs</item>
+  </plurals>
+
+  <plurals name="AlbumCount">
+    <item quantity="one">%1$d album</item>
+    <item quantity="other">%1$d albums</item>
+  </plurals>
+
   <string name="app_name">Toque</string>
 
   <string name="None">None</string>
@@ -158,4 +169,6 @@
   <string name="PlayOnBluetoothConnection">Play on Bluetooth Connection</string>
   <string name="StartPlayerOnBluetoothConnection">Start player on Bluetooth connection</string>
   <string name="SelectScrobbler">Select Scrobbler</string>
+  <string name="AlbumArt">Album art</string>
+  <string name="ArtistImage">Artist image</string>
 </resources>

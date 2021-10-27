@@ -40,15 +40,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ealva.toque.R
-import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.theme.toque
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -59,7 +58,7 @@ import kotlinx.parcelize.Parcelize
 
 @Immutable
 @Parcelize
-data class SplashScreen(private val noArgPlaceholder: String = "") : ComposeKey() {
+data class SplashScreen(private val noArg: String = "") : ComposeKey() {
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val activity = rememberService<MainActivity>()
@@ -82,8 +81,7 @@ data class SplashScreen(private val noArgPlaceholder: String = "") : ComposeKey(
 fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
   var userExit by rememberSaveable { mutableStateOf(false) }
   val readExternalState = rememberPermissionState(READ_EXTERNAL_STORAGE)
-
-  val imageSize = if (LocalConfiguration.current.inPortrait) 200.dp else 120.dp
+  val imageSize = if (LocalScreenConfig.current.inPortrait) 200.dp else 120.dp
 
   Column(
     modifier = Modifier

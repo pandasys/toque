@@ -35,7 +35,7 @@ object Libs {
   const val DESUGAR = "com.android.tools:desugar_jdk_libs:1.1.5"
 
   object Accompanist {
-    private const val VERSION = "0.19.0"
+    private const val VERSION = "0.20.0"
     const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
     const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
     const val PERMISSIONS = "com.google.accompanist:accompanist-permissions:$VERSION"
@@ -178,7 +178,7 @@ object Libs {
   }
 
   object LibVLC {
-    const val ALL = "org.videolan.android:libvlc-all:3.4.3"
+    const val ALL = "org.videolan.android:libvlc-all:3.4.5"
   }
 
   object Phoenix {
@@ -186,7 +186,7 @@ object Libs {
   }
 
   object PreferenceStore {
-    private const val VERSION = "0.10.5-SNAPSHOT"
+    private const val VERSION = "0.10.5-0"
     const val STORE = "com.ealva:pref-store:$VERSION"
     const val COMPOSE = "com.ealva:compose-preference:$VERSION"
   }
@@ -212,6 +212,6 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.2.3-SNAPSHOT"
+    const val CORE = "com.ealva:welite-core:0.2.7-0"
   }
 }

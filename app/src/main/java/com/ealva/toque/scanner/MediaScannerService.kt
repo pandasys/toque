@@ -253,12 +253,12 @@ class MediaScannerService : LifecycleService() {
   }
 
   private suspend fun persistAudioList(
-    audioList: List<AudioInfo>,
+    audioList: AudioInfo,
     parser: MediaMetadataParser,
     minimumDuration: Millis,
     createUpdateTime: Millis
   ): Boolean = try {
-    audioMediaDao.upsertAudioList(audioList, parser, minimumDuration, createUpdateTime)
+    audioMediaDao.upsertAudio(audioList, parser, minimumDuration, createUpdateTime)
     true
   } catch (e: Exception) {
     LOG.e(e) { it("Error persisting %s", audioList) }

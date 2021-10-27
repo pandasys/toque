@@ -275,7 +275,7 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun makeArtistList(): Result<List<MediaItem>, DaoMessage> =
     artistDao
-      .getAllArtists(MAX_LIST_SIZE)
+      .getAllArtistNames(MAX_LIST_SIZE)
       .mapAll {
         Ok(
           MediaItem(

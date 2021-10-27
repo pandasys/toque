@@ -16,37 +16,23 @@
 
 package com.ealva.toque.ui.main
 
-import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Scaffold
-import androidx.compose.material.SnackbarHostState
-import androidx.compose.material.Surface
-import androidx.compose.material.rememberScaffoldState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.haveReadPermission
-import com.ealva.toque.android.content.inPortrait
 import com.ealva.toque.app.Toque
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -57,13 +43,16 @@ import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
+import com.ealva.toque.ui.config.ProvideScreenConfig
+import com.ealva.toque.ui.config.makeScreenConfig
+import com.ealva.toque.ui.library.LibraryCategoriesScreen
+import com.ealva.toque.ui.nav.goToAboveRoot
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.ealva.toque.ui.settings.AppSettingsScreen
-import com.ealva.toque.ui.settings.SettingScreenKeys
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
 import com.ealva.toque.ui.theme.ToqueTheme
+import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.ProvideWindowInsets
-import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.AsyncStateChanger
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.GlobalServices
@@ -81,7 +70,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.core.qualifier.named
 
@@ -91,7 +79,7 @@ private val backstackKeyFlow: MutableState<ComposeKey> = mutableStateOf(SplashSc
 
 class MainActivity : ComponentActivity() {
   private lateinit var scope: CoroutineScope
-  private val composeStateChanger = ComposeStateChanger()
+  private val composeStateChanger = makeAppComposeStateChanger()
   private lateinit var backstack: Backstack
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
   private var mediaController: ToqueMediaController = NullMediaController
@@ -108,9 +96,7 @@ class MainActivity : ComponentActivity() {
 
     backstack = Navigator.configure()
       .addStateChangeCompletionListener { stateChange ->
-        val composeKey = stateChange.topNewKey<ComposeKey>()
-        LOG._e { it("ComposeKey=%s", composeKey) }
-        backstackKeyFlow.value = composeKey
+        backstackKeyFlow.value = stateChange.topNewKey()
       }
       .setGlobalServices(getGlobalServicesBuilder().build())
       .setScopedServices(DefaultServiceProvider())
@@ -120,13 +106,24 @@ class MainActivity : ComponentActivity() {
     setContent {
       ToqueTheme {
         ProvideWindowInsets(windowInsetsAnimationsEnabled = true) {
-          BackstackProvider(backstack) {
-            MainScreen(
-              composeStateChanger = composeStateChanger,
-              backstackKeyFlow = backstackKeyFlow,
-              goToSettings = { backstack.goTo(AppSettingsScreen(PrimarySettings)) },
-              goToNowPlaying = { backstack.goUp(NowPlayingScreen(), true) }
+          ProvideScreenConfig(
+            screenConfig = makeScreenConfig(
+              LocalConfiguration.current,
+              LocalDensity.current,
+              LocalWindowInsets.current
             )
+          )
+          {
+            BackstackProvider(backstack) {
+              val topOfStack: ComposeKey by remember { backstackKeyFlow }
+              MainScreen(
+                composeStateChanger = composeStateChanger,
+                topOfStack = topOfStack,
+                goToSettings = { backstack.goTo(AppSettingsScreen(PrimarySettings)) },
+                goToNowPlaying = { backstack.jumpToRoot() },
+                goToLibrary = { backstack.goToAboveRoot(LibraryCategoriesScreen()) }
+              )
+            }
           }
         }
       }
@@ -199,73 +196,13 @@ class MainActivity : ComponentActivity() {
   private fun makeInitialHistory(): History<ComposeKey> = History.of(SplashScreen())
 }
 
-val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> {
-  throw IllegalStateException("LocalScaffoldState not provided")
-}
-
-@Composable
-fun ProvideSnackbarHostState(
-  snackbarHostState: SnackbarHostState,
-  content: @Composable () -> Unit
-) = CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) { content() }
-
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
-fun MainScreen(
-  composeStateChanger: ComposeStateChanger,
-  backstackKeyFlow: MutableState<ComposeKey>,
-  goToSettings: () -> Unit,
-  goToNowPlaying: () -> Unit
-) {
-  Surface(modifier = Modifier.fillMaxSize()) {
-
-    val topOfStack: ComposeKey by remember { backstackKeyFlow }
-    val config = LocalConfiguration.current
-    val scaffoldState = rememberScaffoldState()
-    val (isBottomSheetExpanded, expandBottomSheet) = remember { mutableStateOf(false) }
-
-    expandBottomSheet(topOfStack !is SplashScreen && topOfStack !is NowPlayingScreen)
-
-    ProvideSnackbarHostState(snackbarHostState = scaffoldState.snackbarHostState) {
-      if (topOfStack is SplashScreen) {
-        Scaffold(
-          modifier = Modifier
-            .fillMaxSize()
-            .navigationBarsPadding(),
-          scaffoldState = scaffoldState,
-        ) {
-          composeStateChanger.RenderScreen(modifier = Modifier.fillMaxSize())
-        }
-      } else {
-        Scaffold(
-          modifier = Modifier
-            .fillMaxSize()
-            .navigationBarsPadding(),
-          scaffoldState = scaffoldState,
-          bottomBar = {
-            MainBottomSheet(
-              topOfStack = topOfStack,
-              isExpanded = isBottomSheetExpanded,
-              goToSettings = goToSettings,
-              goToNowPlaying = goToNowPlaying,
-              modifier = if (config.inPortrait) {
-                Modifier
-                  .padding(horizontal = 20.dp)
-                  .zIndex(1F)
-              } else {
-                Modifier
-                  .padding(horizontal = 8.dp)
-                  .zIndex(1F)
-              }
-            )
-          },
-          backgroundColor = Color.Transparent
-        ) {
-          composeStateChanger.RenderScreen(
-            modifier = Modifier.fillMaxSize()
-          )
-        }
-      }
+private fun makeAppComposeStateChanger() = ComposeStateChanger(
+  ComposeStateChanger.AnimationConfiguration(
+    previousComposableTransition = { modifier, _, _, _, animationProgress ->
+      modifier.then(Modifier.graphicsLayer(alpha = (1 - animationProgress)))
+    },
+    newComposableTransition = { modifier, _, _, _, animationProgress ->
+      modifier.then(Modifier.graphicsLayer(alpha = (animationProgress)))
     }
-  }
-}
+  )
+)

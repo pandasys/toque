@@ -18,13 +18,10 @@
 
 package com.ealva.toque.db
 
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.db.QueueStateTable.id
 import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
-
-private val LOG by lazyLogger("Tables.kt")
 
 /**
  * Used as an optimization if there are many "unknown" items, eg. Composer is often unknown. This

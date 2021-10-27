@@ -17,15 +17,16 @@
 package com.ealva.toque.ui.main
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,7 +43,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,7 +54,9 @@ import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.ui.settings.AppSettingsScreen
+import com.ealva.toque.ui.config.ScreenConfig
+import com.ealva.toque.ui.library.BaseLibraryItemsScreen
+import com.ealva.toque.ui.settings.BaseAppSettingsScreen
 import com.ealva.toque.ui.theme.shapes
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
@@ -65,6 +67,8 @@ import kotlinx.coroutines.flow.collect
 private const val ALPHA_ON = 1.0F
 private const val ALPHA_OFF = 0.3F
 
+private val backgroundColor = Color(0xFF151515)
+
 @OptIn(ExperimentalCoilApi::class, ExperimentalAnimationApi::class)
 @Composable
 fun MainBottomSheet(
@@ -72,49 +76,49 @@ fun MainBottomSheet(
   isExpanded: Boolean,
   goToSettings: () -> Unit,
   goToNowPlaying: () -> Unit,
+  goToLibrary: () -> Unit,
+  config: ScreenConfig,
   modifier: Modifier
 ) {
   Card(
-    modifier = Modifier
-      .background(Color.Transparent)
-      .height(if (isExpanded) 92.dp else 50.dp)
-      .fillMaxWidth()
-      .padding(horizontal = 12.dp),
+    modifier = modifier,
     shape = shapes.medium,
+    backgroundColor = Color.Transparent,
+    elevation = 8.dp
   ) {
-    val visibleState = MutableTransitionState(isExpanded)
-    ConstraintLayout(
-      modifier = Modifier.fillMaxWidth()
-    ) {
-      val (pager, buttonRow) = createRefs()
+    Column(modifier = Modifier.fillMaxSize()) {
       if (isExpanded) {
-        AnimatedVisibility(visibleState = visibleState) {
-          CurrentItemPager(
-            goToNowPlaying = goToNowPlaying,
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(42.dp)
-              .constrainAs(pager) {
-                top.linkTo(parent.top)
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                bottom.linkTo(buttonRow.top)
-              }
-          )
-        }
+        CurrentItemPager(
+          goToNowPlaying = goToNowPlaying,
+          config,
+          modifier = Modifier
+            .fillMaxWidth()
+            .background(
+              color = backgroundColor,
+              shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+            )
+            .height(config.getMiniPlayerHeight())
+        )
       }
+      val bottomShape = if (isExpanded)
+        RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
+      else
+        RoundedCornerShape(8.dp)
+
       MainBottomSheetButtonRow(
         topOfStack,
         goToSettings,
-        modifier
-          .background(color = Color(0xFF151515), shape = RoundedCornerShape(8.dp))
-          .height(50.dp)
-          .constrainAs(buttonRow) {
-            if (isExpanded) top.linkTo(pager.bottom) else top.linkTo(parent.top)
-            start.linkTo(parent.start)
-            end.linkTo(parent.end)
-            bottom.linkTo(parent.bottom)
-          }
+        goToLibrary,
+        config,
+        Modifier
+          .fillMaxWidth()
+          .background(color = backgroundColor, shape = bottomShape)
+          .height(config.getButtonBarHeight())
+      )
+      Spacer(
+        modifier = Modifier
+          .height(config.navBottom)
+          .fillMaxWidth()
       )
     }
   }
@@ -126,22 +130,45 @@ private fun doNothing() = Unit
 private fun MainBottomSheetButtonRow(
   topOfStack: ComposeKey,
   goToSettings: () -> Unit,
+  goToLibrary: () -> Unit,
+  config: ScreenConfig,
   modifier: Modifier
 ) {
-  val onSettingScreen = topOfStack is AppSettingsScreen
+  val onSettingScreen = topOfStack is BaseAppSettingsScreen
+  val onLibraryScreen = topOfStack is BaseLibraryItemsScreen
+
+  val imageSize = config.getButtonBarHeight() - 12.dp
+
   Row(
     modifier = modifier,
-    horizontalArrangement = Arrangement.SpaceEvenly
+    horizontalArrangement = Arrangement.SpaceAround
   ) {
     IconButton(
+      onClick = if (!onLibraryScreen) goToLibrary else ::doNothing,
+      modifier = Modifier
+        .fillMaxHeight()
+        .weight(1.0F)
+        .background(Color.Transparent)
+    ) {
+      Image(
+        painter = rememberImagePainter(data = R.drawable.ic_map),
+        contentDescription = "Library",
+        alpha = if (onLibraryScreen) ALPHA_ON else ALPHA_OFF,
+        modifier = Modifier.size(imageSize)
+      )
+    }
+    IconButton(
       onClick = if (!onSettingScreen) goToSettings else ::doNothing,
-      modifier = Modifier.size(48.dp)
+      modifier = Modifier
+        .height(48.dp)
+        .weight(1.0F)
+        .background(Color.Transparent)
     ) {
       Image(
         painter = rememberImagePainter(data = R.drawable.ic_settings),
         contentDescription = "Settings",
         alpha = if (onSettingScreen) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(44.dp)
+        modifier = Modifier.size(imageSize)
       )
     }
   }
@@ -149,10 +176,7 @@ private fun MainBottomSheetButtonRow(
 
 @OptIn(ExperimentalPagerApi::class)
 @Composable
-private fun CurrentItemPager(
-  goToNowPlaying: () -> Unit,
-  modifier: Modifier
-) {
+private fun CurrentItemPager(goToNowPlaying: () -> Unit, config: ScreenConfig, modifier: Modifier) {
   val viewModel = rememberService<LocalAudioMiniPlayerViewModel>()
   val nowPlayingState = viewModel.miniPlayerState.collectAsState()
 
@@ -184,7 +208,8 @@ private fun CurrentItemPager(
       item = queue[page],
       playState = playingState,
       togglePlayPause = { viewModel.togglePlayPause() },
-      goToNowPlaying = goToNowPlaying
+      goToNowPlaying = goToNowPlaying,
+      config = config
     )
   }
 }
@@ -195,32 +220,32 @@ private fun CurrentItemPagerCard(
   item: AudioItem,
   playState: PlayState,
   togglePlayPause: () -> Unit,
-  goToNowPlaying: () -> Unit
+  goToNowPlaying: () -> Unit,
+  config: ScreenConfig
 ) {
+  val miniPlayerHeight = config.getMiniPlayerHeight()
   BoxWithConstraints(
     modifier = Modifier
+      .background(Color.Transparent)
       .fillMaxWidth()
-      .height(42.dp)
+      .height(miniPlayerHeight)
       .clickable(onClick = goToNowPlaying)
   ) {
     ConstraintLayout(modifier = Modifier.fillMaxSize()) {
       val (albumArt, title, artistAlbum, playPause) = createRefs()
 
-      val imageSize = 40.dp
-      val bitmapSize = with(LocalDensity.current) { imageSize.roundToPx() }
-
       Image(
         painter = rememberImagePainter(
           data = if (item.localAlbumArt !== Uri.EMPTY) item.localAlbumArt else item.albumArt,
           builder = {
-            size(bitmapSize)
             error(R.drawable.ic_big_album)
             placeholder(R.drawable.ic_big_album)
           }
         ),
         contentDescription = "${item.title()} Album Cover Art",
         modifier = Modifier
-          .size(40.dp)
+          .size(miniPlayerHeight - 2.dp)
+          .padding(2.dp)
           .constrainAs(albumArt) {
             top.linkTo(parent.top)
             start.linkTo(parent.start)
@@ -265,7 +290,7 @@ private fun CurrentItemPagerCard(
       IconButton(
         onClick = togglePlayPause,
         modifier = Modifier
-          .size(42.dp)
+          .size(miniPlayerHeight)
           .constrainAs(playPause) {
             top.linkTo(parent.top)
             start.linkTo(artistAlbum.end)
@@ -278,7 +303,7 @@ private fun CurrentItemPagerCard(
             data = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
           ),
           contentDescription = "Toggle play pause",
-          modifier = Modifier.size(36.dp)
+          modifier = Modifier.size(miniPlayerHeight - 8.dp)
         )
       }
     }

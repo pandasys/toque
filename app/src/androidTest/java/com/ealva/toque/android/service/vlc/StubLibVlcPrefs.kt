@@ -37,14 +37,13 @@ typealias MillisPrefStub = PrefStub<Long, Millis>
 typealias AmpPrefStub = PrefStub<Float, Amp>
 
 class StubLibVlcPrefs : LibVlcPrefs {
-  override var debugAndLogging: Boolean = false
   override val enableVerboseMode = BoolPrefStub(false)
   override val audioOutputModule = PrefStub<Int, AudioOutputModule>(AudioOutputModule.DEFAULT)
   override val chroma = PrefStub<Int, Chroma>(Chroma.DEFAULT)
   override val networkCachingAmount = MillisPrefStub(Millis.ONE_SECOND)
   override val subtitleEncoding = PrefStub<Int, SubtitleEncoding>(SubtitleEncoding.DEFAULT)
   override val replayGainMode = PrefStub<Int, ReplayGainMode>(ReplayGainMode.DEFAULT)
-  override val replayPreamp = AmpPrefStub(Amp(0))
+  override val replayGainPreamp = AmpPrefStub(Amp(0))
   override val defaultReplayGain = AmpPrefStub(Amp(-7))
   override val enableFrameSkip = BoolPrefStub(false)
   override val skipLoopFilter = PrefStub<Int, SkipLoopFilter>(SkipLoopFilter.DEFAULT)

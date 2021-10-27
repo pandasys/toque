@@ -16,6 +16,7 @@
 
 package com.ealva.toque.db
 
+import android.net.Uri
 import com.ealva.ealvabrainz.brainz.data.ArtistMbid
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
@@ -23,6 +24,8 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.runSuspendCatching
+import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.toArtistId
 import com.ealva.welite.db.Database
@@ -42,11 +45,14 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Column
+import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.countDistinct
+import com.ealva.welite.db.table.groupBy
 import com.ealva.welite.db.table.inSubQuery
 import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
@@ -69,6 +75,14 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(ArtistDao::class)
+
+data class ArtistDescription(
+  val artistId: ArtistId,
+  val name: ArtistName,
+  val artwork: Uri,
+  val albumCount: Long,
+  val songCount: Long
+)
 
 data class ArtistIdName(val artistId: ArtistId, val artistName: ArtistName)
 
@@ -100,7 +114,18 @@ interface ArtistDao {
 
   fun deleteAll(txn: TransactionInProgress): Long
   fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
-  suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage>
+  suspend fun getAlbumArtists(
+    limit: Long = Long.MAX_VALUE
+  ): Result<List<ArtistDescription>, DaoMessage>
+
+  suspend fun getSongArtists(
+    limit: Long = Long.MAX_VALUE
+  ): Result<List<ArtistDescription>, DaoMessage>
+
+  suspend fun getAllArtistNames(
+    limit: Long = Long.MAX_VALUE
+  ): Result<List<ArtistIdName>, DaoMessage>
+
   suspend fun getNextArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
   suspend fun getPreviousArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
   suspend fun getRandomArtist(): Result<ArtistIdName, DaoMessage>
@@ -211,13 +236,89 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     DELETE_ARTISTS_WITH_NO_MEDIA.delete()
   }
 
-  override suspend fun getAllArtists(limit: Long): Result<List<ArtistIdName>, DaoMessage> =
+  override suspend fun getAlbumArtists(
+    limit: Long
+  ): Result<List<ArtistDescription>, DaoMessage> = runSuspendCatching {
+    db.query { doGetAlbumArtists(limit) }
+  }.mapError { DaoExceptionMessage(it) }
+
+  private fun Queryable.doGetAlbumArtists(limit: Long): List<ArtistDescription> {
+    return ArtistTable
+      .join(ArtistAlbumTable, JoinType.INNER, ArtistTable.id, ArtistAlbumTable.artistId)
+      .join(AlbumTable, JoinType.INNER, ArtistAlbumTable.albumId, AlbumTable.id)
+      .join(MediaTable, JoinType.INNER, ArtistTable.id, MediaTable.albumArtistId)
+      .selects {
+        listOf(
+          ArtistTable.id,
+          ArtistTable.artistName,
+          ArtistTable.artistImage,
+          songCountColumn,
+          albumArtistAlbumCountColumn
+        )
+      }
+      .all()
+      .groupBy { ArtistTable.artistName }
+      .orderByAsc { ArtistTable.artistSort }
+      .limit(limit)
+      .sequence {
+        ArtistDescription(
+          ArtistId(it[ArtistTable.id]),
+          ArtistName(it[ArtistTable.artistName]),
+          it[ArtistTable.artistImage].toUriOrEmpty(),
+          it[albumArtistAlbumCountColumn],
+          it[songCountColumn]
+        ).also { artist ->
+          LOG._e { it("artist=%s", artist) }
+        }
+      }
+      .toList()
+  }
+
+  override suspend fun getSongArtists(
+    limit: Long
+  ): Result<List<ArtistDescription>, DaoMessage> = runSuspendCatching {
+    db.query { doGetSongArtists(limit) }
+  }.mapError { DaoExceptionMessage(it) }
+
+  private fun Queryable.doGetSongArtists(limit: Long): List<ArtistDescription> {
+    return ArtistTable
+      .join(ArtistMediaTable, JoinType.INNER, ArtistTable.id, ArtistMediaTable.artistId)
+      .join(MediaTable, JoinType.INNER, ArtistMediaTable.artistId, MediaTable.artistId)
+      .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id)
+      .selects {
+        listOf(
+          ArtistTable.id,
+          ArtistTable.artistName,
+          ArtistTable.artistImage,
+          songCountColumn,
+          songArtistAlbumCountColumn
+        )
+      }
+      .all()
+      .groupBy { ArtistTable.artistName }
+      .orderByAsc { ArtistTable.artistSort }
+      .limit(limit)
+      .sequence {
+        ArtistDescription(
+          ArtistId(it[ArtistTable.id]),
+          ArtistName(it[ArtistTable.artistName]),
+          it[ArtistTable.artistImage].toUriOrEmpty(),
+          it[songArtistAlbumCountColumn],
+          it[songCountColumn]
+        ).also { artist ->
+          LOG._e { it("artist=%s", artist) }
+        }
+      }
+      .toList()
+  }
+
+  override suspend fun getAllArtistNames(limit: Long): Result<List<ArtistIdName>, DaoMessage> =
     runSuspendCatching {
       db.query {
         ArtistTable
           .selects { listOf(id, artistName) }
           .all()
-          .orderByAsc { artistName }
+          .orderByAsc { artistSort }
           .limit(limit)
           .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
           .toList()
@@ -230,7 +331,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         ArtistTable
           .selects { listOf(id, artistName) }
           .where { artistName greater name.value }
-          .orderByAsc { artistName }
+          .orderByAsc { artistSort }
           .limit(1)
           .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
           .single()
@@ -252,7 +353,6 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
     .single()
 
-  private val artistMax by lazy { ArtistTable.artistName.max().alias("artist_max_alias") }
   private fun Queryable.doGetMaxArtist(): ArtistIdName = ArtistTable
     .selects { listOf(id, artistMax) }
     .all()
@@ -282,6 +382,11 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       }
     }.mapError { DaoExceptionMessage(it) }
 }
+
+private val songCountColumn = MediaTable.id.countDistinct()
+private val songArtistAlbumCountColumn = AlbumTable.id.countDistinct()
+private val albumArtistAlbumCountColumn = ArtistAlbumTable.albumId.countDistinct()
+private val artistMax by lazy { ArtistTable.artistName.max().alias("artist_max_alias") }
 
 private val INSERT_STATEMENT = ArtistTable.insertValues {
   it[artistName].bindArg()

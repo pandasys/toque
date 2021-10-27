@@ -38,11 +38,14 @@ import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Column
+import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.countDistinct
+import com.ealva.welite.db.table.groupBy
 import com.ealva.welite.db.table.inSubQuery
 import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
@@ -72,6 +75,12 @@ sealed class GenreDaoEvent {
 
 data class GenreIdName(val genreId: GenreId, val genreName: GenreName)
 
+data class GenreDescription(
+  val genreId: GenreId,
+  val genreName: GenreName,
+  val songCount: Long
+)
+
 /**
  * If a function receives a transaction parameter it is not suspending, whereas suspend functions
  * are expected to start transaction or query which will dispatch on another thread, should return a
@@ -95,7 +104,9 @@ interface GenreDao {
   fun deleteAll(txn: TransactionInProgress)
   fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long
 
-  suspend fun getAllGenreNames(limit: Long): Result<List<GenreIdName>, DaoMessage>
+  suspend fun getAllGenres(limit: Long = Long.MAX_VALUE): Result<List<GenreDescription>, DaoMessage>
+
+  suspend fun getAllGenreNames(limit: Long = Long.MAX_VALUE): Result<List<GenreIdName>, DaoMessage>
   suspend fun getNextGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
   suspend fun getPreviousGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
   suspend fun getRandomGenre(): Result<GenreIdName, DaoMessage>
@@ -136,6 +147,27 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       literal(0) eq (GenreMediaTable.selectCount { genreId eq id }).asExpression()
     }.delete()
   }
+
+  private val songCountColumn = GenreMediaTable.mediaId.countDistinct()
+  override suspend fun getAllGenres(limit: Long): Result<List<GenreDescription>, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        GenreTable
+          .join(GenreMediaTable, JoinType.INNER, GenreTable.id, GenreMediaTable.genreId)
+          .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn) }
+          .all()
+          .groupBy { GenreTable.genre }
+          .orderByAsc { GenreTable.genre }
+          .sequence {
+            GenreDescription(
+              GenreId(it[GenreTable.id]),
+              GenreName(it[GenreTable.genre]),
+              it[songCountColumn]
+            )
+          }
+          .toList()
+      }
+    }.mapError { DaoExceptionMessage(it) }
 
   override suspend fun getAllGenreNames(limit: Long): Result<List<GenreIdName>, DaoMessage> =
     runSuspendCatching {

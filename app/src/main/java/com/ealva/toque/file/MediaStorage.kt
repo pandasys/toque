@@ -48,12 +48,10 @@ private val ARTWORK_URI = Uri.parse("content://media/external/audio/albumart")
  */
 interface MediaStorage {
   /**
-   * Get all audio grouped by artist and album. Each list of the flow contains all the tracks
-   * found for a given artist.album. eg. a list might contain all the songs on the Beatles Let It Be
-   * album and another list would contain all the songs on the Beatles Revolver album. This
-   * grouping is based on the MediaStore database sorted by artist then album
+   * Get all audio [modifiedAfter] a particular time with a [minimumDuration]. There is no
+   * particular ordering of the results.
    */
-  fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<List<AudioInfo>>
+  fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<AudioInfo>
 
   companion object {
     operator fun invoke(
@@ -97,10 +95,9 @@ private class MediaStorageImpl(
   @Suppress("DEPRECATION")
   private val audioQueryFields = arrayOf(
     MediaStore.Audio.Media._ID,
-    MediaStore.Audio.AlbumColumns.ALBUM,
     MediaStore.Audio.AlbumColumns.ALBUM_ID,
-    MediaStore.Audio.AudioColumns.DISPLAY_NAME,
     MediaStore.MediaColumns.DATA,
+    MediaStore.Audio.AudioColumns.DISPLAY_NAME,
     MediaStore.Audio.AudioColumns.TITLE,
     MediaStore.Audio.AudioColumns.DATE_ADDED,
     MediaStore.Audio.AudioColumns.DATE_MODIFIED,
@@ -111,7 +108,7 @@ private class MediaStorageImpl(
   fun Cursor.longColumnToDate(columnIndex: Int): Date =
     Date(TimeUnit.SECONDS.toMillis(getLong(columnIndex)))
 
-  override fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<List<AudioInfo>> {
+  override fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<AudioInfo> {
     return flow {
       LOG._e { it("emit external") }
       emitAudioCollection(externalAudioCollectionUri, modifiedAfter, minimumDuration)
@@ -123,7 +120,7 @@ private class MediaStorageImpl(
     }
   }
 
-  private suspend fun FlowCollector<List<AudioInfo>>.emitAudioCollection(
+  private suspend fun FlowCollector<AudioInfo>.emitAudioCollection(
     collectionUri: Uri,
     modifiedAfter: Date,
     minimumDuration: Millis
@@ -133,10 +130,9 @@ private class MediaStorageImpl(
       audioQueryFields,
       makeAudioQueryWhereClause(modifiedAfter, minimumDuration),
       null,
-      makeAudioQuerySortClause()
+      null
     )?.use { cursor: Cursor ->
       val iId = cursor.indexOf(MediaStore.Audio.Media._ID)
-      val iAlbum = cursor.indexOf(MediaStore.Audio.AlbumColumns.ALBUM)
       val iAlbumId = cursor.indexOf(MediaStore.Audio.AlbumColumns.ALBUM_ID)
       @Suppress("DEPRECATION") val iData = cursor.indexOf(MediaStore.MediaColumns.DATA)
       val iDisplayName = cursor.indexOf(MediaStore.Audio.AudioColumns.DISPLAY_NAME)
@@ -146,50 +142,30 @@ private class MediaStorageImpl(
       val iMimeType = cursor.indexOf(MediaStore.Audio.AudioColumns.MIME_TYPE)
       val iSize = cursor.indexOf(MediaStore.Audio.AudioColumns.SIZE)
 
-      val list = ArrayList<AudioInfo>(DEFAULT_AUDIO_LIST_SIZE)
-      var currentAlbum = ""
-      var currentAlbumId = -1L
-      var currentAlbumArt = Uri.EMPTY
       while (cursor.moveToNext()) {
-        val nextAlbum = cursor.getString(iAlbum)
-        if (nextAlbum != currentAlbum) {
-          if (list.isNotEmpty()) emit(list.toList())
-          list.clear()
-          currentAlbum = nextAlbum
-          currentAlbumId = -1
-        }
-        val id = cursor.getLong(iId).toAudioContentId()
-        if (currentAlbumId == -1L) {
-          val albumId = cursor.getLong(iAlbumId)
-          if (albumId > 0) {
-            currentAlbumId = albumId
-            currentAlbumArt = currentAlbumId.albumArtFor()
-          }
-        }
-        list += AudioInfo(
-          collectionUri.location(id),
-          cursor.getString(iDisplayName),
-          File(cursor.getString(iData)),
-          cursor.getString(iTitle),
-          cursor.longColumnToDate(iDateAdded),
-          cursor.longColumnToDate(iDateModified),
-          cursor.getString(iMimeType),
-          cursor.getLong(iSize),
-          currentAlbumArt
+        emit(
+          AudioInfo(
+            collectionUri.location(cursor.getLong(iId).toAudioContentId()),
+            cursor.getString(iDisplayName),
+            File(cursor.getString(iData)),
+            cursor.getString(iTitle),
+            cursor.longColumnToDate(iDateAdded),
+            cursor.longColumnToDate(iDateModified),
+            cursor.getString(iMimeType),
+            cursor.getLong(iSize),
+            cursor.getLong(iAlbumId).albumArtFor()
+          )
         )
-      }
-      if (list.isNotEmpty()) {
-        emit(list.toList())
       }
     }
   }
 
-  private fun makeAudioQuerySortClause() =
-    "${MediaStore.Audio.ArtistColumns.ARTIST}, ${MediaStore.Audio.AlbumColumns.ALBUM}"
+  //private fun makeAudioQuerySortClause() =
+  //  "${MediaStore.Audio.ArtistColumns.ARTIST}, ${MediaStore.Audio.AlbumColumns.ALBUM}"
 
   private fun makeAudioQueryWhereClause(lastScan: Date, minimumDuration: Millis) =
     """${MediaStore.MediaColumns.DATE_MODIFIED} > ${TimeUnit.MILLISECONDS.toSeconds(lastScan.time)}
-      | AND ${MediaStore.Audio.Media.DURATION} > ${minimumDuration()}""".trimMargin()
+      | AND ${MediaStore.Audio.Media.DURATION} >= ${minimumDuration()}""".trimMargin()
 
   private fun Long.albumArtFor(): Uri = ContentUris.withAppendedId(ARTWORK_URI, this).let { uri ->
     if (uri.exists()) uri else Uri.EMPTY

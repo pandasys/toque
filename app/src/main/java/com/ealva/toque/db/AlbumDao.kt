@@ -51,6 +51,8 @@ import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.by
+import com.ealva.welite.db.table.countDistinct
+import com.ealva.welite.db.table.groupBy
 import com.ealva.welite.db.table.inSubQuery
 import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
@@ -84,7 +86,8 @@ data class AlbumDescription(
   val albumTitle: AlbumTitle,
   val albumLocalArt: Uri,
   val albumArt: Uri,
-  val artistName: ArtistName
+  val artistName: ArtistName,
+  val songCount: Long
 )
 
 data class AlbumIdName(
@@ -120,11 +123,11 @@ interface AlbumDao {
 
   fun deleteAlbumsWithNoMedia(txn: TransactionInProgress): Long
 
-  suspend fun getAllAlbums(limit: Long): Result<List<AlbumDescription>, DaoMessage>
+  suspend fun getAllAlbums(limit: Long = Long.MAX_VALUE): Result<List<AlbumDescription>, DaoMessage>
 
   suspend fun getAllAlbumsFor(
     artistId: ArtistId,
-    limit: Long
+    limit: Long = Long.MAX_VALUE
   ): Result<List<AlbumDescription>, DaoMessage>
 
   suspend fun getNextAlbum(title: AlbumTitle): Result<AlbumIdName, DaoMessage>
@@ -195,19 +198,22 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     db.query { doGetAlbums(artistId, limit) }
   }.mapError { DaoExceptionMessage(it) }
 
+  private val songCountColumn = MediaTable.id.countDistinct()
   private fun Queryable.doGetAlbums(
     artistId: ArtistId? = null,
     limit: Long = Long.MAX_VALUE
   ): List<AlbumDescription> = AlbumTable
     .join(ArtistAlbumTable, JoinType.INNER, AlbumTable.id, ArtistAlbumTable.albumId)
     .join(ArtistTable, JoinType.INNER, ArtistAlbumTable.artistId, ArtistTable.id)
+    .join(MediaTable, JoinType.INNER, AlbumTable.id, MediaTable.albumId)
     .selects {
       listOf(
         AlbumTable.id,
         AlbumTable.albumTitle,
         AlbumTable.albumLocalArtUri,
         AlbumTable.albumArtUri,
-        ArtistTable.artistName
+        ArtistTable.artistName,
+        songCountColumn
       )
     }
     .where {
@@ -215,6 +221,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         null
       }
     }
+    .groupBy { AlbumTable.albumTitle }
     .orderByAsc { AlbumTable.albumTitle }
     .limit(limit)
     .sequence {
@@ -223,7 +230,8 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         it[AlbumTable.albumTitle].toAlbumTitle(),
         it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
         it[AlbumTable.albumArtUri].toUriOrEmpty(),
-        ArtistName(it[ArtistTable.artistName])
+        ArtistName(it[ArtistTable.artistName]),
+        it[songCountColumn]
       )
     }
     .toList()
