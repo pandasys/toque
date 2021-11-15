@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,13 @@ import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Filter
+import com.ealva.toque.common.Filter.Companion.NoFilter
+import com.ealva.toque.common.Limit
+import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.runSuspendCatching
+import com.ealva.toque.db.DaoCommon.ESC_CHAR
+import com.ealva.toque.db.GenreDaoEvent.GenresCreatedOrUpdated
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.toGenreId
@@ -31,13 +36,14 @@ import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
-import com.ealva.welite.db.table.Column
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -55,6 +61,7 @@ import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -98,15 +105,19 @@ interface GenreDao {
   fun getOrCreateGenreIds(
     txn: TransactionInProgress,
     genreList: List<String>,
-    createTime: Millis
+    createTime: Millis,
+    upsertResults: AudioUpsertResults
   ): GenreIdList
 
   fun deleteAll(txn: TransactionInProgress)
   fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long
 
-  suspend fun getAllGenres(limit: Long = Long.MAX_VALUE): Result<List<GenreDescription>, DaoMessage>
+  suspend fun getAllGenres(
+    filter: Filter = NoFilter,
+    limit: Limit = NoLimit
+  ): Result<List<GenreDescription>, DaoMessage>
 
-  suspend fun getAllGenreNames(limit: Long = Long.MAX_VALUE): Result<List<GenreIdName>, DaoMessage>
+  suspend fun getAllGenreNames(limit: Limit = NoLimit): Result<List<GenreIdName>, DaoMessage>
   suspend fun getNextGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
   suspend fun getPreviousGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
   suspend fun getRandomGenre(): Result<GenreIdName, DaoMessage>
@@ -129,12 +140,22 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   override fun getOrCreateGenreIds(
     txn: TransactionInProgress,
     genreList: List<String>,
-    createTime: Millis
+    createTime: Millis,
+    upsertResults: AudioUpsertResults
   ): GenreIdList {
     val genreIdList = GenreIdList()
     return GenreIdList(genreList.size).also { list ->
-      genreList.forEach { genre -> list += txn.getOrCreateGenre(genre, createTime, genreIdList) }
-    }.also { if (genreIdList.isNotEmpty) emit(GenreDaoEvent.GenresCreatedOrUpdated(genreIdList)) }
+      genreList.forEach { genre ->
+        list += txn.getOrCreateGenre(
+          genre,
+          createTime,
+          genreIdList
+        )
+      }
+    }.also {
+      if (genreIdList.isNotEmpty)
+        upsertResults.alwaysEmit { emit(GenresCreatedOrUpdated(genreIdList)) }
+    }
   }
 
   override fun deleteAll(txn: TransactionInProgress) = txn.run {
@@ -149,15 +170,19 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   }
 
   private val songCountColumn = GenreMediaTable.mediaId.countDistinct()
-  override suspend fun getAllGenres(limit: Long): Result<List<GenreDescription>, DaoMessage> =
+  override suspend fun getAllGenres(
+    filter: Filter,
+    limit: Limit
+  ): Result<List<GenreDescription>, DaoMessage> =
     runSuspendCatching {
       db.query {
         GenreTable
           .join(GenreMediaTable, JoinType.INNER, GenreTable.id, GenreMediaTable.genreId)
           .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn) }
-          .all()
+          .where { filter.whereCondition() }
           .groupBy { GenreTable.genre }
           .orderByAsc { GenreTable.genre }
+          .limit(limit.value)
           .sequence {
             GenreDescription(
               GenreId(it[GenreTable.id]),
@@ -169,14 +194,17 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       }
     }.mapError { DaoExceptionMessage(it) }
 
-  override suspend fun getAllGenreNames(limit: Long): Result<List<GenreIdName>, DaoMessage> =
+  private fun Filter.whereCondition() =
+    if (isEmpty) null else GenreTable.genre like value escape ESC_CHAR
+
+  override suspend fun getAllGenreNames(limit: Limit): Result<List<GenreIdName>, DaoMessage> =
     runSuspendCatching {
       db.query {
         GenreTable
-          .selects { listOf<Column<out Any>>(id, genre) }
+          .selects { listOf(id, genre) }
           .all()
           .orderByAsc { genre }
-          .limit(limit)
+          .limit(limit.value)
           .sequence { GenreIdName(it[id].toGenreId(), GenreName(it[genre])) }
           .toList()
       }
@@ -240,21 +268,25 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   private fun TransactionInProgress.getOrCreateGenre(
     genre: String,
     createTime: Millis,
-    genreIdList: GenreIdList
+    genreIdList: GenreIdList,
   ): GenreId =
-    getGenreId(genre) ?: getOrInsert(genre, createTime, genreIdList)
+    getGenreId(genre, genreIdList) ?: getOrInsert(genre, createTime, genreIdList)
 
-  private fun Queryable.getGenreId(genre: String): GenreId? = QUERY_GENRE_ID
+  private fun Queryable.getGenreId(
+    genre: String,
+    genreIdList: GenreIdList
+  ): GenreId? = QUERY_GENRE_ID
     .sequence({ it[queryGenreNameBind] = genre }) { it[id] }
     .singleOrNull()
     ?.toGenreId()
+    ?.also { genreId -> genreIdList += genreId }
 
   private fun TransactionInProgress.getOrInsert(
     newGenre: String,
     createTime: Millis,
-    genreIdList: GenreIdList
+    genreIdList: GenreIdList,
   ): GenreId = getOrInsertLock.withLock {
-    getGenreId(newGenre) ?: INSERT_GENRE.insert {
+    getGenreId(newGenre, genreIdList) ?: INSERT_GENRE.insert {
       it[genre] = newGenre
       it[createdTime] = createTime()
     }.toGenreId().also { id -> genreIdList += id }

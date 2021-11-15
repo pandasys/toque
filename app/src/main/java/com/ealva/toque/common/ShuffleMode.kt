@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,18 @@
 
 package com.ealva.toque.common
 
+import android.os.Parcelable
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasTitle
+import kotlinx.parcelize.Parcelize
 
 /**
  * Describes the state of "shuffle"
  */
+@Parcelize
 enum class ShuffleMode(
   override val id: Int,
   /** Should the media in a list be randomly shuffled */
@@ -32,7 +35,7 @@ enum class ShuffleMode(
   /** Should list selection be random */
   val shuffleLists: Boolean,
   @StringRes override val titleRes: Int
-) : HasConstId, HasTitle {
+) : HasConstId, HasTitle, Parcelable {
   None(1, false, false, R.string.ShuffleNone),
   Media(2, true, false, R.string.ShuffleMedia),
   Lists(3, false, true, R.string.ShuffleLists),
@@ -50,6 +53,10 @@ enum class ShuffleMode(
     Lists -> MediaAndLists
     MediaAndLists -> None
   }
+
+  fun shuffleListsDiffers(other: ShuffleMode): Boolean = shuffleLists != other.shuffleLists
+
+  fun shuffleMediaDiffers(other: ShuffleMode): Boolean = shuffleMedia != other.shuffleMedia
 }
 
 fun Int.compatToShuffleMode(): ShuffleMode = when (this) {

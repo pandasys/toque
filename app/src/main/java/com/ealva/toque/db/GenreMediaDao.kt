@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +57,6 @@ private val INSERT_GENRE_MEDIA = GenreMediaTable.insertValues(OnConflict.Ignore)
 
 private val BIND_MEDIA_ID = bindLong()
 private val DELETE_MEDIA = GenreMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
-
 private class GenreMediaDaoImpl : GenreMediaDao {
   override fun replaceMediaGenres(
     txn: TransactionInProgress,

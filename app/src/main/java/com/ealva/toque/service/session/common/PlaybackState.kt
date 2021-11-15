@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package com.ealva.toque.service.session.common
 
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.media.PlayState
 
 data class PlaybackState(
   val playState: PlayState,
   val position: Millis,
   val playbackRate: PlaybackRate,
-  val itemInstanceId: Long,
+  val itemInstanceId: InstanceId,
   val actions: PlaybackActions
 ) {
   companion object {
@@ -32,7 +33,7 @@ data class PlaybackState(
       playState = PlayState.None,
       position = Millis(0),
       playbackRate = PlaybackRate.NORMAL,
-      itemInstanceId = 0L,
+      itemInstanceId = InstanceId.INVALID,
       actions = PlaybackActions.DEFAULT
     )
   }

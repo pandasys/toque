@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
 import com.ealva.toque.log._e
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
@@ -68,6 +69,7 @@ internal class SessionCallback(
   }
 
   override fun onPrepare() {
+    LOG._e { it("onPrepare") }
     emit(SessionControlEvent.Prepare)
   }
 
@@ -106,7 +108,9 @@ internal class SessionCallback(
       ?: LOG.e { it("onPrepareFromUri null uri") }
   }
 
-  override fun onSkipToQueueItem(id: Long) = emit(SessionControlEvent.SkipToQueueItem(id))
+  override fun onSkipToQueueItem(id: Long) =
+    emit(SessionControlEvent.SkipToQueueItem(InstanceId(id)))
+
   override fun onPause() = emit(SessionControlEvent.Pause)
   override fun onSkipToNext() = emit(SessionControlEvent.SkipToNext)
   override fun onSkipToPrevious() = emit(SessionControlEvent.SkipToPrevious)

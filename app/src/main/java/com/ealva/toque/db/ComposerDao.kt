@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,12 @@ import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Limit
+import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.runSuspendCatching
+import com.ealva.toque.db.ComposerDaoEvent.ComposerCreatedOrUpdated
 import com.ealva.toque.persist.ComposerId
+import com.ealva.toque.persist.isValid
 import com.ealva.toque.persist.toComposerId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -53,6 +56,7 @@ import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -77,7 +81,7 @@ data class ComposerDescription(
 )
 
 sealed class ComposerDaoEvent {
-  data class ComposerCreated(val composerId: ComposerId) : ComposerDaoEvent()
+  data class ComposerCreatedOrUpdated(val composerId: ComposerId) : ComposerDaoEvent()
 }
 
 /**
@@ -91,23 +95,20 @@ interface ComposerDao {
   val composerDaoEvents: SharedFlow<ComposerDaoEvent>
 
   /**
-   * Creates or gets the Ids for the list of genres. Throws IllegalStateException if a genre is
+   * Creates or gets the ID for for the [composer]. Throws IllegalStateException if [composer] is
    * not found and cannot be inserted.
    */
   fun getOrCreateComposerId(
     txn: TransactionInProgress,
     composer: String,
     composerSort: String,
-    createTime: Millis
+    createTime: Millis,
+    upsertResults: AudioUpsertResults
   ): ComposerId
 
   fun deleteAll(txn: TransactionInProgress)
   fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
-
-  suspend fun getAllComposers(
-    limit: Long = Long.MAX_VALUE
-  ): Result<List<ComposerDescription>, DaoMessage>
-
+  suspend fun getAllComposers(limit: Limit = NoLimit): Result<List<ComposerDescription>, DaoMessage>
   suspend fun getNextComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
   suspend fun getPreviousComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
   suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage>
@@ -147,8 +148,17 @@ private class ComposerDaoImpl(
     txn: TransactionInProgress,
     composer: String,
     composerSort: String,
-    createTime: Millis
-  ): ComposerId = txn.getOrCreateComposer(composer, composerSort, createTime)
+    createTime: Millis,
+    upsertResults: AudioUpsertResults
+  ): ComposerId = txn
+    .getOrCreateComposer(composer, composerSort, createTime)
+    .also { composerId ->
+      if (composerId.isValid) upsertResults.alwaysEmit { emitUpdateOrCreated(composerId) }
+    }
+
+  fun emitUpdateOrCreated(composerId: ComposerId) {
+    scope.launch { emit(ComposerCreatedOrUpdated(composerId)) }
+  }
 
   override fun deleteAll(txn: TransactionInProgress) = txn.run {
     val count = ComposerTable.deleteAll()
@@ -162,7 +172,9 @@ private class ComposerDaoImpl(
   }
 
   private val songCountColumn = ComposerMediaTable.mediaId.count()
-  override suspend fun getAllComposers(limit: Long): Result<List<ComposerDescription>, DaoMessage> =
+  override suspend fun getAllComposers(
+    limit: Limit
+  ): Result<List<ComposerDescription>, DaoMessage> =
     runSuspendCatching {
       db.query {
         ComposerTable
@@ -171,6 +183,7 @@ private class ComposerDaoImpl(
           .all()
           .groupBy { ComposerTable.composer }
           .orderByAsc { ComposerTable.composerSort }
+          .limit(limit.value)
           .sequence {
             ComposerDescription(
               composerId = ComposerId(it[ComposerTable.id]),
@@ -260,7 +273,7 @@ private class ComposerDaoImpl(
       it[composer] = newComposer
       it[composerSort] = newComposerSort
       it[createdTime] = createTime()
-    }.toComposerId().also { id -> emit(ComposerDaoEvent.ComposerCreated(id)) }
+    }.toComposerId()
   }
 }
 

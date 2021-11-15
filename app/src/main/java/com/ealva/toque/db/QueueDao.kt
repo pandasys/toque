@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.ealva.toque.db
 
-import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.db.QueueTable.itemId
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaIdList
@@ -27,6 +26,7 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Table
 import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 
 interface QueueDao {

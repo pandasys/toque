@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 
 package com.ealva.toque.common
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import java.util.Date
 import kotlin.math.abs
 
@@ -25,8 +27,9 @@ typealias MillisRange = ClosedRange<Millis>
 
 private const val MILLIS_PER_SECOND = 1000.0F
 
+@Parcelize
 @JvmInline
-value class Millis(val value: Long) : Comparable<Millis> {
+value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
   inline operator fun invoke(): Long = value
 
   override fun toString(): String = value.toString()

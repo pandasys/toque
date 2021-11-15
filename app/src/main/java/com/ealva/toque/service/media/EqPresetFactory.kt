@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.common.EqPresetId
-import com.ealva.toque.db.EqPresetInfo
+import com.ealva.toque.db.EqPresetIdName
 import com.ealva.toque.persist.MediaId
 import com.github.michaelbull.result.Result
 
@@ -35,7 +35,7 @@ interface EqPresetFactory {
 
   val systemPresetCount: Int
 
-  suspend fun getAllPresets(): List<EqPresetInfo>
+  suspend fun getAllPresets(): List<EqPresetIdName>
 
   suspend fun getPreset(id: EqPresetId): Result<EqPreset, DaoMessage>
 

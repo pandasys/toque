@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.provider.MediaStore
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.log._e
 import com.ealva.toque.prefs.AppPrefsSingleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -64,15 +61,7 @@ interface MediaStorage {
   }
 }
 
-private val LOG by lazyLogger(MediaStorage::class)
-
 fun Uri.location(id: AudioContentId): Uri = ContentUris.withAppendedId(this, id.prop)
-
-
-/**
- * Unlikely to be this many tracks on an album so use this as starting list size.
- */
-private const val DEFAULT_AUDIO_LIST_SIZE = 64
 
 private class MediaStorageImpl(
   context: Context,
@@ -108,15 +97,10 @@ private class MediaStorageImpl(
   fun Cursor.longColumnToDate(columnIndex: Int): Date =
     Date(TimeUnit.SECONDS.toMillis(getLong(columnIndex)))
 
-  override fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<AudioInfo> {
-    return flow {
-      LOG._e { it("emit external") }
-      emitAudioCollection(externalAudioCollectionUri, modifiedAfter, minimumDuration)
-      if (appPrefsSingleton.instance().scanInternalVolume()) {
-        LOG._e { it("emit internal") }
-        emitAudioCollection(internalAudioCollectionUri, modifiedAfter, minimumDuration)
-      }
-      LOG._e { it("end emitting") }
+  override fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<AudioInfo> = flow {
+    emitAudioCollection(externalAudioCollectionUri, modifiedAfter, minimumDuration)
+    if (appPrefsSingleton.instance().scanInternalVolume()) {
+      emitAudioCollection(internalAudioCollectionUri, modifiedAfter, minimumDuration)
     }
   }
 
@@ -159,9 +143,6 @@ private class MediaStorageImpl(
       }
     }
   }
-
-  //private fun makeAudioQuerySortClause() =
-  //  "${MediaStore.Audio.ArtistColumns.ARTIST}, ${MediaStore.Audio.AlbumColumns.ALBUM}"
 
   private fun makeAudioQueryWhereClause(lastScan: Date, minimumDuration: Millis) =
     """${MediaStore.MediaColumns.DATE_MODIFIED} > ${TimeUnit.MILLISECONDS.toSeconds(lastScan.time)}

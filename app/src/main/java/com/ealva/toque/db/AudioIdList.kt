@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,40 +16,36 @@
 
 package com.ealva.toque.db
 
-import android.os.Parcel
 import android.os.Parcelable
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import it.unimi.dsi.fastutil.longs.LongLists
-import java.io.Serializable
+import kotlinx.parcelize.Parcelize
 import java.util.Random
 
+@Parcelize
 data class AudioIdList(
   val idList: MediaIdList,
-  val listType: SongListType,
-  val listName: String
+  val namedType: NamedSongListType,
 ) : Parcelable {
+  inline val listType: SongListType get() = namedType.listType
+  inline val listName: String get() = namedType.listName
+
   companion object {
-    @Suppress("unused") // not true
-    @JvmField
-    val CREATOR = createParcel { AudioIdList(it) }
+    val EMPTY_ALL_LIST = AudioIdList(MediaIdList(LongLists.EMPTY_LIST), NamedSongListType.EMPTY_ALL)
+
     private val random = Random()
+
+    operator fun invoke(
+      mediaId: MediaId,
+      listType: SongListType,
+      listName: String
+    ): AudioIdList {
+      return AudioIdList(MediaIdList(mediaId), NamedSongListType(listName, listType))
+    }
   }
-
-  private constructor(parcelIn: Parcel) : this(
-    MediaIdList(parcelIn.readSerializable() as LongList),
-    parcelIn.readSerializable() as SongListType,
-    parcelIn.readString() ?: ""
-  )
-
-  override fun writeToParcel(dest: Parcel, flags: Int) {
-    dest.writeSerializable(idList.value as Serializable)
-    dest.writeSerializable(listType)
-    dest.writeString(listName)
-  }
-
-  override fun describeContents() = 0
 
   /**
    * @return If [idList] size is > 1 returns a copy of this list shuffled, else returns this
@@ -69,5 +65,3 @@ data class AudioIdList(
   inline val isNotEmpty: Boolean
     get() = idList.isNotEmpty()
 }
-
-val EMPTY_MEDIA_ID_LIST = AudioIdList(MediaIdList(LongLists.EMPTY_LIST), SongListType.All, "")

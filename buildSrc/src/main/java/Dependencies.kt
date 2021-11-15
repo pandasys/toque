@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 
 object SdkVersion {
-  const val COMPILE = 30
+  const val COMPILE = 31
   const val MIN = 21
   const val TARGET = 30
 }
@@ -35,7 +35,7 @@ object Libs {
   const val DESUGAR = "com.android.tools:desugar_jdk_libs:1.1.5"
 
   object Accompanist {
-    private const val VERSION = "0.20.0"
+    private const val VERSION = "0.20.2"
     const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
     const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
     const val PERMISSIONS = "com.google.accompanist:accompanist-permissions:$VERSION"
@@ -51,11 +51,11 @@ object Libs {
     //const val PALETTE = "androidx.palette:palette:1.0.0"
 
     object Ktx {
-      const val CORE = "androidx.core:core-ktx:1.6.0"
+      const val CORE = "androidx.core:core-ktx:1.7.0"
     }
 
     object Activity {
-      const val COMPOSE = "androidx.activity:activity-compose:1.3.1"
+      const val COMPOSE = "androidx.activity:activity-compose:1.4.0"
     }
 
     object Constraint {
@@ -64,7 +64,7 @@ object Libs {
 
     object Compose {
       @Suppress("MemberVisibilityCanBePrivate")
-      const val VERSION = "1.0.4"
+      const val VERSION = "1.0.5"
       //const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
       const val UI = "androidx.compose.ui:ui:$VERSION"
       const val MATERIAL = "androidx.compose.material:material:$VERSION"
@@ -77,7 +77,7 @@ object Libs {
     }
 
     object Lifecycle {
-      private const val VERSION = "2.4.0-alpha01"
+      private const val VERSION = "2.4.0"
       const val RUNTIME_KTX = "androidx.lifecycle:lifecycle-runtime-ktx:$VERSION"
       const val COMMON_JAVA8 = "androidx.lifecycle:lifecycle-common-java8:$VERSION"
       const val SERVICE = "androidx.lifecycle:lifecycle-service:$VERSION"
@@ -110,7 +110,7 @@ object Libs {
   }
 
   object EAlvaBrainz {
-    private const val VERSION = "0.7.2-SNAPSHOT"
+    private const val VERSION = "0.7.3-SNAPSHOT"
     const val BRAINZ = "com.ealva:ealvabrainz:$VERSION"
     const val BRAINZ_SERVICE = "com.ealva:ealvabrainz-service:$VERSION"
   }
@@ -144,8 +144,8 @@ object Libs {
   }
 
   object Koin {
-    private const val VERSION = "3.1.2"
-    private const val COMPOSE_VERSION = "3.1.2"
+    private const val VERSION = "3.1.3"
+    private const val COMPOSE_VERSION = "3.1.3"
     const val CORE = "io.insert-koin:koin-core:$VERSION"
     const val ANDROID = "io.insert-koin:koin-android:$VERSION"
     const val COMPOSE = "io.insert-koin:koin-androidx-compose:$COMPOSE_VERSION"
@@ -192,7 +192,7 @@ object Libs {
   }
 
   object Result {
-    private const val VERSION = "1.1.12"
+    private const val VERSION = "1.1.13"
     const val RESULT = "com.michael-bull.kotlin-result:kotlin-result:$VERSION"
     const val COROUTINES = "com.michael-bull.kotlin-result:kotlin-result-coroutines:$VERSION"
   }
@@ -204,14 +204,14 @@ object Libs {
   object SimpleStack {
     const val CORE = "com.github.Zhuinden:simple-stack:2.6.2"
     const val EXT = "com.github.Zhuinden:simple-stack-extensions:2.2.2"
-    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.3"
+    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.4"
   }
 
   object Square {
-    const val OKIO = "com.squareup.okio:okio:2.10.0"
+    const val OKIO = "com.squareup.okio:okio:3.0.0"
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.2.7-0"
+    const val CORE = "com.ealva:welite-core:0.2.10-SNAPSHOT"
   }
 }

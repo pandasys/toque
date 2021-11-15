@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import com.ealva.toque.audioout.AudioOutputState.Event.BluetoothConnected
 import com.ealva.toque.audioout.AudioOutputState.Event.BluetoothDisconnected
 import com.ealva.toque.audioout.AudioOutputState.Event.HeadsetConnected
 import com.ealva.toque.audioout.AudioOutputState.Event.HeadsetDisconnected
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -167,7 +166,6 @@ private class AudioOutputStateImpl(audioManager: AudioManager) : AudioOutputStat
         BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED -> {
           when (intent.getIntExtra(BluetoothA2dp.EXTRA_STATE, BluetoothA2dp.STATE_DISCONNECTED)) {
             BluetoothA2dp.STATE_CONNECTED -> {
-              LOG._e { it("Bluetooth connected") }
               _bluetoothConnected = true
               emitEvent(BluetoothConnected)
             }

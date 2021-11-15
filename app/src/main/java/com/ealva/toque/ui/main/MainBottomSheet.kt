@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,7 +148,6 @@ private fun MainBottomSheetButtonRow(
       modifier = Modifier
         .fillMaxHeight()
         .weight(1.0F)
-        .background(Color.Transparent)
     ) {
       Image(
         painter = rememberImagePainter(data = R.drawable.ic_map),
@@ -162,7 +161,6 @@ private fun MainBottomSheetButtonRow(
       modifier = Modifier
         .height(48.dp)
         .weight(1.0F)
-        .background(Color.Transparent)
     ) {
       Image(
         painter = rememberImagePainter(data = R.drawable.ic_settings),
@@ -226,7 +224,6 @@ private fun CurrentItemPagerCard(
   val miniPlayerHeight = config.getMiniPlayerHeight()
   BoxWithConstraints(
     modifier = Modifier
-      .background(Color.Transparent)
       .fillMaxWidth()
       .height(miniPlayerHeight)
       .clickable(onClick = goToNowPlaying)

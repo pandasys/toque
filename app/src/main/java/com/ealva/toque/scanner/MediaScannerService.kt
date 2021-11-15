@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import com.ealva.toque.file.MediaStorage
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.HasConstId
+import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.scanner.MediaScannerService.RescanType
 import com.ealva.toque.service.media.MediaMetadataParser
@@ -71,7 +72,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
-import org.koin.core.qualifier.named
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -95,7 +95,7 @@ class MediaScannerService : LifecycleService() {
   private val storage: MediaStorage by inject()
   private val audioMediaDao: AudioMediaDao by inject()
   private val mediaDataParserFactory: MediaMetadataParserFactory by inject()
-  private val appPrefsSingleton: AppPrefsSingleton by inject(qualifier = named("AppPrefs"))
+  private val appPrefsSingleton: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
   private val workFlow = MutableSharedFlow<Work>(extraBufferCapacity = 10)
   private val notificationManager: NotificationManager by lazy {
     requireNotNull(getSystemService())
@@ -131,7 +131,7 @@ class MediaScannerService : LifecycleService() {
       }
       .catch { cause -> LOG.e(cause) { it("Error processing work flow") } }
       .onCompletion {
-        LOG._e { it("Work flow completed") }
+        LOG._i { it("Work flow completed") }
         workEnqueuer?.serviceProcessingFinished()
       }
       .launchIn(lifecycleScope + Dispatchers.IO)
@@ -243,7 +243,7 @@ class MediaScannerService : LifecycleService() {
   ) {
     withContext(Dispatchers.IO) {
       storage.audioFlow(modifiedAfter, minimumDuration)
-        .map { async { persistAudioList(it, parser, minimumDuration, createUpdateTime) } }
+        .map { async { persistAudio(it, parser, minimumDuration, createUpdateTime) } }
         .buffer(PERSIST_WORKER_COUNT)
         .map { it.await() }
         .catch { cause -> LOG.e(cause) { it("Scan completed: %s", cause.message ?: "failed") } }
@@ -252,16 +252,16 @@ class MediaScannerService : LifecycleService() {
     }
   }
 
-  private suspend fun persistAudioList(
-    audioList: AudioInfo,
+  private suspend fun persistAudio(
+    audioInfo: AudioInfo,
     parser: MediaMetadataParser,
     minimumDuration: Millis,
     createUpdateTime: Millis
   ): Boolean = try {
-    audioMediaDao.upsertAudio(audioList, parser, minimumDuration, createUpdateTime)
+    audioMediaDao.upsertAudio(audioInfo, parser, minimumDuration, createUpdateTime)
     true
   } catch (e: Exception) {
-    LOG.e(e) { it("Error persisting %s", audioList) }
+    LOG.e(e) { it("Error persisting %s", audioInfo) }
     false
   }
 

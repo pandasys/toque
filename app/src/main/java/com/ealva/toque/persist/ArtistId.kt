@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,14 @@
 
 package com.ealva.toque.persist
 
+import android.os.Parcelable
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
+import kotlinx.parcelize.Parcelize
 
+@Parcelize
 @JvmInline
-value class ArtistId(override val value: Long) : PersistentId
+value class ArtistId(override val value: Long) : PersistentId, Parcelable
 
 inline fun Long.toArtistId(): ArtistId = ArtistId(this)
 inline fun Int.toArtistId(): ArtistId = toLong().toArtistId()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,5 @@ import com.ealva.toque.common.BooleanValue
 
 @JvmInline
 value class PlayNow(override val value: Boolean) : BooleanValue {
-  operator fun invoke(): Boolean = value
   operator fun not(): PlayNow = PlayNow(!value)
 }

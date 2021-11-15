@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,10 +50,8 @@ import android.view.KeyEvent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.OnLifecycleEvent
 import androidx.media.session.MediaButtonReceiver
 import androidx.media.session.MediaButtonReceiver.buildMediaButtonPendingIntent
 import coil.imageLoader
@@ -78,7 +76,6 @@ import com.ealva.toque.common.asCompat
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.windowOf15
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.log._e
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.session.common.Metadata
@@ -296,9 +293,8 @@ private class MediaSessionImpl(
   private val notificationListener: MediaSessionState.NotificationListener,
   private val channelId: String,
   dispatcher: CoroutineDispatcher
-) : MediaSession, LifecycleObserver {
+) : MediaSession, DefaultLifecycleObserver {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
-  private var notificationPrefs: NotificationPrefs? = null
   private var allowNotifications = false
   private var lastMetadata: Metadata = Metadata.NullMetadata
   private var msgHandler = makeHandler()
@@ -310,6 +306,9 @@ private class MediaSessionImpl(
   private val sessionCallback = SessionCallback(scope, eventFlow)
 
   override val token: MediaSessionCompat.Token = session.sessionToken
+
+  private suspend fun notificationPrefs(): NotificationPrefs =
+    notificationPrefsSingleton.instance()
 
   override var isActive: Boolean
     get() = session.isActive
@@ -326,7 +325,6 @@ private class MediaSessionImpl(
     }
 
   init {
-    scope.launch { notificationPrefs = notificationPrefsSingleton.instance() }
     session.setCallback(sessionCallback)
     playbackStateFlow
       .onStart { LOG.i { it("PlaybackStateFlow started") } }
@@ -422,21 +420,11 @@ private class MediaSessionImpl(
 
   override var browser: MediaSessionBrowser = MediaSessionBrowser(this, audioMediaDao, scope)
 
-  @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-  fun onDestroy() {
+  override fun onDestroy(lifecycleOwner: LifecycleOwner) {
     session.setCallback(null)
     session.release()
     scope.cancel()
   }
-
-  private fun showPrevAction(): Boolean =
-    notificationPrefs?.let { it.showPrevInNotification() } ?: true
-
-  private fun showNextAction(): Boolean =
-    notificationPrefs?.let { it.showNextInNotification() } ?: true
-
-  private fun showCloseAction(): Boolean =
-    notificationPrefs?.let { it.showCloseInNotification() } ?: true
 
   private var currentIconUri: Uri? = null
   private var currentBitmap: Bitmap? = null
@@ -548,36 +536,38 @@ private class MediaSessionImpl(
   private var notificationArg = 0
   private fun handleMessage(msg: Message): Boolean {
     return when (msg.what) {
-      MSG_START_OR_UPDATE_NOTIFICATION -> {
+      MSG_START_OR_UPDATE_NOTIFICATION -> true.also {
         startOrUpdateNotification(null)
-        true
       }
-      MSG_UPDATE_NOTIFICATION_BITMAP -> {
-        LOG._e {
-          it(
-            "updateBitmap started=%s currentTag=%s msg.arg1=%s",
-            isNotificationStarted,
-            notificationArg,
-            msg.arg1
-          )
-        }
+      MSG_UPDATE_NOTIFICATION_BITMAP -> true.also {
+        //LOG._e {
+        //  it(
+        //    "updateBitmap started=%s currentTag=%s msg.arg1=%s",
+        //    isNotificationStarted,
+        //    notificationArg,
+        //    msg.arg1
+        //  )
+        //}
         if (isNotificationStarted && notificationArg == msg.arg1) {
           startOrUpdateNotification(msg.obj as Bitmap)
         }
-        true
       }
       else -> false
     }
   }
 
-  private fun startOrUpdateNotification(bitmap: Bitmap?) = makeBuilder(bitmap)?.let { builder ->
-    val notification = builder.build()
-    notificationManager.notify(NOW_PLAYING_NOTIFICATION_ID, notification)
-    if (!isNotificationStarted) {
-      isNotificationStarted = true
+  private fun startOrUpdateNotification(bitmap: Bitmap?) {
+    scope.launch {
+      makeBuilder(bitmap)?.let { builder ->
+        val notification = builder.build()
+        notificationManager.notify(NOW_PLAYING_NOTIFICATION_ID, notification)
+        if (!isNotificationStarted) {
+          isNotificationStarted = true
+        }
+        notificationListener.onPosted(NOW_PLAYING_NOTIFICATION_ID, notification)
+      } ?: stopNotificationIfStarted()
     }
-    notificationListener.onPosted(NOW_PLAYING_NOTIFICATION_ID, notification)
-  } ?: stopNotificationIfStarted()
+  }
 
   private fun stopNotificationIfStarted() {
     if (isNotificationStarted) {
@@ -589,7 +579,7 @@ private class MediaSessionImpl(
     }
   }
 
-  private fun makeBuilder(bitmap: Bitmap?): NotificationBuilder? {
+  private suspend fun makeBuilder(bitmap: Bitmap?): NotificationBuilder? {
     val controller: MediaControllerCompat = session.controller
     val state: PlaybackStateCompat? = controller.playbackState
     val description: MediaDescriptionCompat? = controller.metadata?.description
@@ -615,10 +605,26 @@ private class MediaSessionImpl(
 
       val visibleInCompactView = mutableListOf<Int>()
       var index = 0
-      index = addAction(makePreviousAction(), index, showPrevAction(), visibleInCompactView)
+      val prefs = notificationPrefs()
+      index = addAction(
+        makePreviousAction(),
+        index,
+        prefs.showPrevInNotification(),
+        visibleInCompactView
+      )
       index = addAction(makePlayPauseAction(isPlaying), index, true, visibleInCompactView)
-      index = addAction(makeNextAction(), index, showNextAction(), visibleInCompactView)
-      addAction(makeCloseAction(), index, showCloseAction(), visibleInCompactView)
+      index = addAction(
+        makeNextAction(),
+        index,
+        prefs.showNextInNotification(),
+        visibleInCompactView
+      )
+      addAction(
+        makeCloseAction(),
+        index,
+        prefs.showCloseInNotification(),
+        visibleInCompactView
+      )
       setMediaStyle(visibleInCompactView)
     }
   }
@@ -673,7 +679,7 @@ fun Metadata.toCompat(): MediaMetadataCompat {
 private fun List<QueueAudioItem>.toCompat(): List<MediaSessionCompat.QueueItem> =
   ArrayList<MediaSessionCompat.QueueItem>(size).apply {
     this@toCompat.forEach { audioItem ->
-      add(MediaSessionCompat.QueueItem(audioItem.toDescriptionCompat(), audioItem.instanceId))
+      add(MediaSessionCompat.QueueItem(audioItem.toDescriptionCompat(), audioItem.instanceId.value))
     }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
-import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.Rating
 
-interface AudioItem {
-  val id: MediaId
+interface AudioItem : HasId {
+  override val id: MediaId
   val title: Title
   val albumTitle: AlbumTitle
   val albumArtist: ArtistName
@@ -41,4 +40,4 @@ interface AudioItem {
   val fileUri: Uri
 }
 
-interface QueueAudioItem : AudioItem, HasId
+interface QueueAudioItem : AudioItem

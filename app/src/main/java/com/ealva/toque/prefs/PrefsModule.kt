@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,13 @@
 package com.ealva.toque.prefs
 
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 private const val APP_PREFS_FILENAME = "AppPrefs"
 
 object PrefsModule {
   val koinModule = module {
-    single(named("AppPrefs")) {
+    single(AppPrefs.QUALIFIER) {
       AppPrefsSingleton(AppPrefs.Companion::make, androidContext(), APP_PREFS_FILENAME)
     }
   }

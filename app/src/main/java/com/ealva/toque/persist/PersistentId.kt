@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 package com.ealva.toque.persist
 
+import android.os.Parcelable
 import com.ealva.ealvabrainz.brainz.data.isInvalid
 import com.ealva.ealvabrainz.brainz.data.isValid
 import com.ealva.toque.persist.PersistentId.Companion.ID_INVALID
@@ -25,6 +26,8 @@ import com.ealva.toque.persist.PersistentId.Companion.isValidId
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import it.unimi.dsi.fastutil.longs.LongLists
+import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.RawValue
 
 /**
  * Interface for persistent IDs, used to define [value] property, the constant [ID_INVALID], and
@@ -64,16 +67,19 @@ inline fun <reified T : PersistentId> idIterator(
 inline fun Long.toMediaId(): MediaId = MediaId(this)
 inline fun Int.toMediaId() = toLong().toMediaId()
 
+@Parcelize
 @JvmInline
-value class MediaId(override val value: Long) : PersistentId {
+value class MediaId(override val value: Long) : PersistentId, Parcelable {
   inline operator fun invoke(): Long = value
+
   companion object {
     val INVALID = MediaId(ID_INVALID)
   }
 }
 
+@Parcelize
 @JvmInline
-value class MediaIdList(val value: LongList) : Iterable<MediaId> {
+value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parcelable {
   inline fun isEmpty(): Boolean = size == 0
   inline fun isNotEmpty(): Boolean = !isEmpty()
 
@@ -97,9 +103,28 @@ value class MediaIdList(val value: LongList) : Iterable<MediaId> {
     inline operator fun invoke(capacity: Int = 16): MediaIdList =
       MediaIdList(LongArrayList(capacity))
 
-    operator fun invoke(mediaId: Long): MediaIdList = MediaIdList(LongLists.singleton(mediaId))
+    operator fun invoke(mediaId: MediaId): MediaIdList =
+      MediaIdList(LongLists.singleton(mediaId.value))
 
     val EMPTY_LIST = MediaIdList(LongLists.EMPTY_LIST)
+  }
+}
+
+/**
+ * Represents a unique instance of an item in a collection. As a collection may contain duplicate
+ * items there must be a unique ID of some type to distinguish them in some instances, such
+ * as moving items within a list from or from one list to another.
+ *
+ * Values >= zero are "valid", all negative values are considered "invalid"
+ */
+@Parcelize
+@JvmInline
+value class InstanceId(val value: Long): Parcelable {
+  /** True if [value] is >= 0, else false */
+  inline val isValid: Boolean get() = value >= 0
+
+  companion object {
+    val INVALID = InstanceId(-1L)
   }
 }
 
@@ -117,7 +142,7 @@ interface HasId {
   /**
    * The "instance" ID is required as some persistent items may appear in lists more than once.
    * This is the unique ID for a particular instance represented by [id]. If duplicate instances
-   * will not be needed, this field may be equal to [id]
+   * will not be needed, this field may be equal to [id], ie.[PersistentId.value]
    */
-  val instanceId: Long
+  val instanceId: InstanceId
 }

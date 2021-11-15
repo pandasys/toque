@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,13 @@
 
 package com.ealva.toque.service.media
 
+import android.os.Parcelable
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.EqPresetId
+import kotlinx.parcelize.Parcelize
 
-data class PreAmpAndBands(val preAmp: Amp, val bands: Array<Amp>) {
+@Parcelize
+data class PreAmpAndBands(val preAmp: Amp, val bands: Array<Amp>) : Parcelable {
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (javaClass != other?.javaClass) return false

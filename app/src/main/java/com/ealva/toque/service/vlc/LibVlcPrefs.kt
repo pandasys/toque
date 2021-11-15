@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,9 +28,10 @@ import com.ealva.toque.common.MillisRange
 import com.ealva.toque.prefs.AmpStorePref
 import com.ealva.toque.prefs.BaseToquePreferenceStore
 import com.ealva.toque.prefs.MillisStorePref
-import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.DEFAULT_DEFAULT_REPLAY_GAIN
+import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.DEFAULT_NO_INFO_REPLAY_GAIN
 import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.DEFAULT_REPLAY_GAIN
 import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.NETWORK_CACHING_RANGE
+import org.koin.core.qualifier.named
 
 typealias LibVlcPrefsSingleton = PreferenceStoreSingleton<LibVlcPrefs>
 
@@ -102,10 +103,12 @@ interface LibVlcPrefs : PreferenceStore<LibVlcPrefs> {
   val hardwareAcceleration: StorePref<Int, HardwareAcceleration>
 
   companion object {
+    val QUALIFIER = named("LibVlcPrefs")
+
     val NETWORK_CACHING_RANGE: MillisRange = Millis(0)..Millis.ONE_MINUTE
     const val SUB_AUTODETECT_PATHS = "./Subtitles, ./subtitles, ./Subs, ./subs"
     val DEFAULT_REPLAY_GAIN = Amp.NONE.coerceIn(Amp.REPLAY_GAIN_RANGE)
-    val DEFAULT_DEFAULT_REPLAY_GAIN = Amp(-6).coerceIn(Amp.REPLAY_GAIN_RANGE)
+    val DEFAULT_NO_INFO_REPLAY_GAIN = Amp(-6).coerceIn(Amp.REPLAY_GAIN_NO_INFO_RANGE)
 
     fun make(storage: Storage): LibVlcPrefs = LibVlcPrefsImpl(storage)
   }
@@ -125,7 +128,7 @@ private class LibVlcPrefsImpl(
   override val replayGainPreamp by ampPref(DEFAULT_REPLAY_GAIN) {
     it.coerceIn(Amp.REPLAY_GAIN_RANGE)
   }
-  override val defaultReplayGain by ampPref(DEFAULT_DEFAULT_REPLAY_GAIN) {
+  override val defaultReplayGain by ampPref(DEFAULT_NO_INFO_REPLAY_GAIN) {
     it.coerceIn(Amp.REPLAY_GAIN_RANGE)
   }
   override val enableFrameSkip by preference(false)

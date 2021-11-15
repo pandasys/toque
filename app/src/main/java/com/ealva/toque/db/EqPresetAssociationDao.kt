@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.audioout.longId
 import com.ealva.toque.audioout.toAudioOutputRoute
 import com.ealva.toque.common.EqPresetId
-import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.MediaId
@@ -45,6 +44,7 @@ import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.andThen
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 
 typealias AssociationListResult = Result<List<PresetAssociation>, DaoMessage>

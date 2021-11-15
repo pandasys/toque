@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 
 package com.ealva.toque.ui.main
 
+import android.Manifest.permission.READ_EXTERNAL_STORAGE
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,17 +35,14 @@ import androidx.lifecycle.lifecycleScope
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.haveReadPermission
-import com.ealva.toque.app.Toque
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
-import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.ui.config.ProvideScreenConfig
 import com.ealva.toque.ui.config.makeScreenConfig
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
@@ -64,29 +64,29 @@ import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.statebundle.StateBundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-import org.koin.android.ext.android.inject
-import org.koin.core.qualifier.named
 
 private val LOG by lazyLogger(MainActivity::class)
 
 private val backstackKeyFlow: MutableState<ComposeKey> = mutableStateOf(SplashScreen())
 
+private val KEY_BACKSTACK = "${MainActivity::class.java.name}_BACK_STACK"
+
 class MainActivity : ComponentActivity() {
   private lateinit var scope: CoroutineScope
+  private var haveReadExternalPermission = false
   private val composeStateChanger = makeAppComposeStateChanger()
   private lateinit var backstack: Backstack
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
   private var mediaController: ToqueMediaController = NullMediaController
   private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
   private var currentQueueJob: Job? = null
-  private val appPrefsSingleton: AppPrefsSingleton by inject(named("AppPrefs"))
-  private val libVlcPrefsSingleton: LibVlcPrefsSingleton by inject(named("LibVlcPrefs"))
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -135,12 +135,37 @@ class MainActivity : ComponentActivity() {
     playerServiceConnection.unbind()
   }
 
+  override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+    super.onRestoreInstanceState(savedInstanceState)
+    savedInstanceState.getParcelable<StateBundle>(KEY_BACKSTACK)?.let { stateBundle ->
+      backstack.fromBundle(stateBundle)
+      // SplashScreen typically requests read external permission, but if we have a backstack
+      // and SplashScreen is not at the top, we should have the permission and need to behave as
+      // such
+      if (backstack.top<ComposeKey>() !is SplashScreen) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+          checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        ) {
+          gainedReadExternalPermission()
+        }
+      }
+    }
+  }
+
+  override fun onSaveInstanceState(outState: Bundle) {
+    outState.putParcelable(KEY_BACKSTACK, backstack.toBundle())
+    super.onSaveInstanceState(outState)
+  }
+
   fun gainedReadExternalPermission() {
-    playerServiceConnection.mediaController
-      .onStart { playerServiceConnection.bind() }
-      .onEach { controller -> handleControllerChange(controller) }
-      .onCompletion { cause -> LOG._i(cause) { it("mediaController flow completed") } }
-      .launchIn(scope)
+    if (!haveReadExternalPermission) {
+      haveReadExternalPermission = true
+      playerServiceConnection.mediaController
+        .onStart { playerServiceConnection.bind() }
+        .onEach { controller -> handleControllerChange(controller) }
+        .onCompletion { cause -> LOG._i(cause) { it("mediaController flow completed") } }
+        .launchIn(scope)
+    }
   }
 
   private fun handleControllerChange(controller: ToqueMediaController) {
@@ -172,22 +197,20 @@ class MainActivity : ComponentActivity() {
   }
 
   private fun handleAudioQueue() {
-    backstack.setHistory(History.of(NowPlayingScreen()), REPLACE)
+
+    if (backstackKeyFlow.value is SplashScreen)
+      backstack.setHistory(History.of(NowPlayingScreen()), REPLACE)
   }
 
   private fun handleNullQueue() {
     backstack.setHistory(History.of(SplashScreen()), REPLACE)
   }
 
-  private fun getGlobalServicesBuilder(): GlobalServices.Builder = globalServices.apply {
+  private fun getGlobalServicesBuilder() = GlobalServices.builder().apply {
     add(this@MainActivity)
-    addService("AppPrefs", appPrefsSingleton)
-    addService("LibVlcPrefs", libVlcPrefsSingleton)
     add(playerServiceConnection)
     add(LocalAudioMiniPlayerViewModel(playerServiceConnection))
   }
-
-  private val globalServices get() = (application as Toque).globalServicesBuilder
 
   override fun onBackPressed() {
     if (!Navigator.onBackPressed(this)) super.onBackPressed()

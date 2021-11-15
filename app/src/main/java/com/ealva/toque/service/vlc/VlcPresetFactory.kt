@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,11 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
-import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetDao
-import com.ealva.toque.db.EqPresetInfo
+import com.ealva.toque.db.EqPresetIdName
 import com.ealva.toque.db.NullEqPresetDao
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
@@ -37,6 +36,7 @@ import com.ealva.toque.service.vlc.VlcEqPreset.Companion.setNativeEqValues
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import org.videolan.libvlc.MediaPlayer
 
@@ -59,7 +59,7 @@ class VlcPresetFactory(
   override val systemPresetCount: Int
     get() = presetCount
 
-  override suspend fun getAllPresets(): List<EqPresetInfo> {
+  override suspend fun getAllPresets(): List<EqPresetIdName> {
     TODO("Not yet implemented")
   }
 

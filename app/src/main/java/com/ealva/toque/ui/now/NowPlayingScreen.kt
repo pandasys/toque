@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +70,7 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.media.Rating
@@ -104,6 +106,8 @@ import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
 private val LOG by lazyLogger(NowPlayingScreen::class)
 
@@ -120,15 +124,14 @@ object NowPlayingScreenIds {
   const val ID_TITLE_SPACE = 11
   const val ID_TOP_SPACE = 12
   const val ID_RATING_BAR_ROW = 13
+  const val ID_QUEUE_INFO = 14
 }
 
 @Immutable
 @Parcelize
-data class NowPlayingScreen(private val noArg: String = "") : ComposeKey() {
+data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) {
-      add(NowPlayingViewModel(lookup(), lookup("AppPrefs")))
-    }
+    with(serviceBinder) { add(NowPlayingViewModel(lookup(), get(AppPrefs.QUALIFIER))) }
   }
 
   @OptIn(ExperimentalPagerApi::class)
@@ -154,9 +157,6 @@ data class NowPlayingScreen(private val noArg: String = "") : ComposeKey() {
     )
   }
 }
-
-private val bottomSheetHeight = 50.dp
-private val bottomSheetVertPadding = 8.dp
 
 @OptIn(ExperimentalAnimatedInsets::class, ExperimentalUnitApi::class)
 @Composable
@@ -292,6 +292,8 @@ private fun PlayerControls(
 
       Spacer(modifier = Modifier.layoutId(ID_TOP_SPACE)) // can't top align rating bar without this
       RatingBarRow(
+        queueIndex = state.queueIndex,
+        queueSize = state.queue.size,
         eqMode = state.eqMode,
         rating = item.rating,
         playbackRate = state.playbackRate,
@@ -310,7 +312,7 @@ private fun PlayerControls(
         nextShuffleMode = nextShuffleMode,
         modifier = Modifier
           .layoutId(ID_RATING_BAR_ROW)
-          .padding(horizontal = 8.dp)
+          .padding(horizontal = 12.dp)
           .fillMaxWidth()
       )
       Text(
@@ -457,6 +459,8 @@ private fun PositionSlider(
 @OptIn(ExperimentalCoilApi::class)
 @Composable
 private fun RatingBarRow(
+  queueIndex: Int,
+  queueSize: Int,
   eqMode: EqMode,
   rating: Rating,
   playbackRate: PlaybackRate,
@@ -468,61 +472,77 @@ private fun RatingBarRow(
   nextShuffleMode: () -> Unit,
   modifier: Modifier
 ) {
-  Row(
-    modifier = modifier,
-    horizontalArrangement = Arrangement.SpaceEvenly,
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    IconButton(onClick = toggleEqMode, modifier = Modifier.size(26.dp)) {
-      Image(
-        painter = rememberImagePainter(data = R.drawable.ic_audio_equalizer),
-        contentDescription = "Toggle Equalizer",
-        alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(26.dp)
+  Column(modifier = modifier) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceEvenly,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      IconButton(onClick = toggleEqMode, modifier = Modifier.size(26.dp)) {
+        Image(
+          painter = rememberImagePainter(data = R.drawable.ic_audio_equalizer),
+          contentDescription = "Toggle Equalizer",
+          alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF,
+          modifier = Modifier.size(26.dp)
+        )
+      }
+      Spacer(modifier = Modifier.height(26.dp))
+      Box(modifier = Modifier.height(26.dp), contentAlignment = Alignment.Center) {
+        Text(
+          text = "%.2fX".format(playbackRate.value),
+          textAlign = TextAlign.Center,
+          maxLines = 1,
+          style = MaterialTheme.typography.caption,
+          modifier = Modifier
+            .border(1.dp, Color.White)
+            .padding(2.dp)
+            .clickable(onClick = setPlaybackRate)
+        )
+      }
+      Spacer(modifier = Modifier.height(26.dp))
+      RatingBar(
+        modifier = Modifier.wrapContentSize(),
+        value = rating.toStarRating().value,
+        size = 22.dp,
+        padding = 2.dp,
+        isIndicator = true,
+        activeColor = Color.White,
+        inactiveColor = Color.White,
+        ratingBarStyle = RatingBarStyle.HighLighted,
+        onValueChange = {},
+        onRatingChanged = {},
       )
+      Spacer(modifier = Modifier.height(26.dp))
+      IconButton(onClick = nextRepeatMode, modifier = Modifier.size(26.dp)) {
+        Image(
+          painter = rememberImagePainter(data = repeatMode.drawable),
+          contentDescription = stringResource(id = repeatMode.titleRes),
+          alpha = if (repeatMode.isOn()) ALPHA_ON else ALPHA_OFF,
+          modifier = Modifier.size(26.dp)
+        )
+      }
+      Spacer(modifier = Modifier.height(26.dp))
+      IconButton(onClick = nextShuffleMode, modifier = Modifier.size(26.dp)) {
+        Image(
+          painter = rememberImagePainter(data = shuffleMode.drawable),
+          contentDescription = stringResource(id = shuffleMode.titleRes),
+          alpha = if (shuffleMode.isOn()) ALPHA_ON else ALPHA_OFF,
+          modifier = Modifier.size(26.dp)
+        )
+      }
     }
-    Spacer(modifier = Modifier.height(26.dp))
-    Box(modifier = Modifier.height(26.dp), contentAlignment = Alignment.Center) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(start = 8.dp, top = 4.dp, end = 8.dp),
+      horizontalArrangement = Arrangement.End,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
       Text(
-        text = "%.2fX".format(playbackRate.value),
-        textAlign = TextAlign.Center,
+        text = "${queueIndex + 1}/${queueSize}",
+        textAlign = TextAlign.End,
         maxLines = 1,
-        style = MaterialTheme.typography.caption,
-        modifier = Modifier
-          .border(1.dp, Color.White)
-          .padding(2.dp)
-          .clickable(onClick = setPlaybackRate)
-      )
-    }
-    Spacer(modifier = Modifier.height(26.dp))
-    RatingBar(
-      modifier = Modifier.wrapContentSize(),
-      value = rating.toStarRating().value,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = true,
-      activeColor = Color.White,
-      inactiveColor = Color.White,
-      ratingBarStyle = RatingBarStyle.HighLighted,
-      onValueChange = {},
-      onRatingChanged = {},
-    )
-    Spacer(modifier = Modifier.height(26.dp))
-    IconButton(onClick = nextRepeatMode, modifier = Modifier.size(26.dp)) {
-      Image(
-        painter = rememberImagePainter(data = repeatMode.drawable),
-        contentDescription = stringResource(id = repeatMode.titleRes),
-        alpha = if (repeatMode.isOn()) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(26.dp)
-      )
-    }
-    Spacer(modifier = Modifier.height(26.dp))
-    IconButton(onClick = nextShuffleMode, modifier = Modifier.size(26.dp)) {
-      Image(
-        painter = rememberImagePainter(data = shuffleMode.drawable),
-        contentDescription = stringResource(id = shuffleMode.titleRes),
-        alpha = if (shuffleMode.isOn()) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(26.dp)
+        style = MaterialTheme.typography.overline,
       )
     }
   }
@@ -782,6 +802,6 @@ private val ShuffleMode.drawable: Int
   @DrawableRes get() = when (this) {
     ShuffleMode.None -> R.drawable.ic_shuffle_disabled
     ShuffleMode.Media -> R.drawable.ic_shuffle_media
-    ShuffleMode.Lists -> R.drawable.ic_shuffle
+    ShuffleMode.Lists -> R.drawable.ic_shuffle_lists
     ShuffleMode.MediaAndLists -> R.drawable.ic_shuffle_both
   }

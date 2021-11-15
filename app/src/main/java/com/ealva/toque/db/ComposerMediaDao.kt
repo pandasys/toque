@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.MediaId
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.expr.bindLong
+import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
 
@@ -52,8 +55,8 @@ private val INSERT_COMPOSER_MEDIA = ComposerMediaTable.insertValues(OnConflict.I
   it[createdTime].bindArg()
 }
 
-// private val DELETE_MEDIA = Table.deleteWhere { Table.mediaId eq bindLong() }
-
+private val BIND_MEDIA_ID = bindLong()
+private val DELETE_MEDIA = ComposerMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
 private class ComposerMediaDaoImpl : ComposerMediaDao {
   override fun replaceMediaComposer(
     txn: TransactionInProgress,
@@ -61,6 +64,7 @@ private class ComposerMediaDaoImpl : ComposerMediaDao {
     replaceMediaId: MediaId,
     createTime: Millis
   ) = txn.run {
+    DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = replaceMediaId.value }
     INSERT_COMPOSER_MEDIA.insert {
       it[composerId] = replaceComposerId.value
       it[mediaId] = replaceMediaId.value

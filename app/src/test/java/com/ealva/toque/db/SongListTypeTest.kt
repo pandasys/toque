@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,12 +35,20 @@ class SongListTypeTest {
       with(type) {
         expectNext(
           when (this) {
+            //All -> Album
+            //Album -> Artist
+            //Artist -> Composer
+            //Composer -> Genre
+            //Genre -> PlayList
+            //PlayList -> SmartPlaylist
+            //SmartPlaylist -> Album
+            //External -> Album
             All -> Album
             Album -> Artist
             Artist -> Composer
             Composer -> Genre
-            Genre -> PlayList
-            PlayList -> SmartPlaylist
+            Genre -> Album
+            PlayList -> Album
             SmartPlaylist -> Album
             External -> Album
           }
@@ -55,14 +63,23 @@ class SongListTypeTest {
       with(type) {
         expectPrevious(
           when (this) {
-            All -> SmartPlaylist
-            Album -> SmartPlaylist
+            //All -> SmartPlaylist
+            //Album -> SmartPlaylist
+            //Artist -> Album
+            //Composer -> Artist
+            //Genre -> Composer
+            //PlayList -> Genre
+            //SmartPlaylist -> PlayList
+            //External -> SmartPlaylist
+            All -> Genre
+            Album -> Genre
             Artist -> Album
             Composer -> Artist
             Genre -> Composer
             PlayList -> Genre
-            SmartPlaylist -> PlayList
-            External -> SmartPlaylist
+            SmartPlaylist -> Genre
+            External -> Genre
+
           }
         )
       }

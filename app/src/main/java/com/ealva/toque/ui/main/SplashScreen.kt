@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -55,6 +56,8 @@ import com.google.accompanist.permissions.PermissionRequired
 import com.google.accompanist.permissions.rememberPermissionState
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import kotlinx.parcelize.Parcelize
+
+private val LOG by lazyLogger(SplashScreen::class)
 
 @Immutable
 @Parcelize
@@ -85,9 +88,9 @@ fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
 
   Column(
     modifier = Modifier
+      .fillMaxWidth()
       .padding(start = 20.dp, end = 20.dp)
       .statusBarsPadding()
-      .fillMaxWidth()
   ) {
     Image(
       painter = painterResource(R.drawable.ic_toque),
@@ -142,8 +145,11 @@ private fun Rationale(
       text = stringResource(id = R.string.RequiredToScanRationale),
       color = Color.White
     )
-    Spacer(modifier = Modifier.height(8.dp))
-    Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+    Row(
+      modifier = Modifier
+        .padding(top = 12.dp)
+        .align(Alignment.CenterHorizontally)
+    ) {
       Button(onClick = onRequestPermission) {
         Text(text = stringResource(id = R.string.RequestPermission))
       }
@@ -162,8 +168,11 @@ private fun PermissionDenied(
 ) {
   Column {
     Text(text = stringResource(id = R.string.SettingsScanRationale), color = Color.White)
-    Spacer(modifier = Modifier.height(8.dp))
-    Row(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+    Row(
+      modifier = Modifier
+        .padding(top = 12.dp)
+        .align(Alignment.CenterHorizontally)
+    ) {
       Button(onClick = navigateToSettingsScreen) {
         Text(stringResource(R.string.OpenSettings))
       }

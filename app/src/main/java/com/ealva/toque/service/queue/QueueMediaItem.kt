@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ealva.toque.service.queue
 
 import com.ealva.toque.persist.HasId
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.PersistentId
 
 interface QueueMediaItem : HasId
@@ -25,5 +26,5 @@ object NullQueueMediaItem : QueueMediaItem {
   override val id = object : PersistentId {
     override val value: Long = PersistentId.ID_INVALID
   }
-  override val instanceId: Long = id.value
+  override val instanceId: InstanceId = InstanceId(id.value)
 }

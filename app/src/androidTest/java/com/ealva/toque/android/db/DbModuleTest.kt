@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ import com.ealva.toque.db.GenreMediaDao
 import com.ealva.toque.db.GenreMediaTable
 import com.ealva.toque.db.GenreTable
 import com.ealva.toque.db.MediaTable
+import com.ealva.toque.db.PlayListMediaTable
+import com.ealva.toque.db.PlayListTable
 import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.QueueStateTable
 import com.ealva.welite.db.Database
@@ -63,7 +65,6 @@ class DbModuleTest : KoinTest {
   fun testExpectedTables() {
     val db: Database = get()
     val tables = db.tables
-    expect(tables).toHaveSize(13)
     expect(tables).toBe(
       listOf(
         ArtistTable,
@@ -78,7 +79,9 @@ class DbModuleTest : KoinTest {
         EqPresetTable,
         EqPresetAssociationTable,
         QueueTable,
-        QueueStateTable
+        QueueStateTable,
+        PlayListTable,
+        PlayListMediaTable,
       )
     )
   }

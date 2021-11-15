@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.fetch
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.session.common.PlaybackActions
 import com.ealva.toque.service.session.common.PlaybackState
@@ -36,7 +37,7 @@ interface PlaybackStateBuilder {
   fun setState(playState: PlayState, position: Millis, rate: PlaybackRate): PlaybackStateBuilder
   fun setIsStreaming(isStreaming: Boolean): PlaybackStateBuilder
   fun setActions(actions: PlaybackActions): PlaybackStateBuilder
-  fun setActiveQueueItemId(id: Long): PlaybackStateBuilder
+  fun setActiveQueueItemId(id: InstanceId): PlaybackStateBuilder
   fun setError(code: PlaybackErrorCode, @StringRes res: Int): PlaybackStateBuilder
   fun setError(
     code: PlaybackErrorCode,
@@ -77,8 +78,8 @@ private class PlaybackStateBuilderImpl : PlaybackStateBuilder {
     builder.setActions(actions.asCompat)
   }
 
-  override fun setActiveQueueItemId(id: Long) = apply {
-    builder.setActiveQueueItemId(id)
+  override fun setActiveQueueItemId(id: InstanceId) = apply {
+    builder.setActiveQueueItemId(id.value)
   }
 
   override fun setError(code: PlaybackErrorCode, res: Int) = apply {

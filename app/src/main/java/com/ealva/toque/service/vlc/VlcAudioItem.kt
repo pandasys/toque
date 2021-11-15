@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.debug
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.MediaFileStore
 import com.ealva.toque.service.audio.PlayableAudioItem
@@ -41,6 +41,9 @@ import com.ealva.toque.service.player.NullAvPlayer
 import com.ealva.toque.service.player.PlayImmediateTransition
 import com.ealva.toque.service.player.WakeLock
 import com.ealva.toque.service.player.WakeLockFactory
+import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.ForceTransition.AllowFade
+import com.ealva.toque.service.queue.ForceTransition.NoFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
 import com.github.michaelbull.result.Err
@@ -55,6 +58,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.videolan.libvlc.interfaces.IMedia
 import java.util.concurrent.TimeUnit
@@ -118,34 +122,34 @@ class VlcAudioItem(
   override val duration: Millis
     get() = metadata.duration
 
-  override fun play(immediate: Boolean) {
-    LOG._e { it("play isStopped=%s", isStopped) }
-    if (isStopped)
-      scope.launch { reset(immediate = immediate, playNow = PlayNow(true)) }
-    else
-      avPlayer.play(immediate)
+  private fun shouldBeReset(): Boolean = isStopped || avPlayer == NullAvPlayer
+
+  override fun play(forceTransition: ForceTransition) {
+    if (shouldBeReset()) scope.launch { reset(PlayNow(true)) } else avPlayer.play(forceTransition)
   }
 
   override fun stop() {
     if (!isStopped) avPlayer.stop()
   }
 
-  override fun pause(immediate: Boolean) {
-    if (!isStopped) avPlayer.pause(immediate)
+  override fun pause(forceTransition: ForceTransition) {
+    if (!isStopped) avPlayer.pause(forceTransition)
   }
 
   /**
    * If stopped or paused, play, else pause. Call this object's play or pause method to keep
    * the AvPlayer reset/play and pause logic in one place.
+   *
+   * Note: use [shouldBeReset] instead of just [isStopped]
    */
   override fun togglePlayPause() {
-    if (isStopped || avPlayer.isPaused) play() else pause()
+    if (shouldBeReset() || avPlayer.isPaused) play(AllowFade) else pause(AllowFade)
   }
 
   override fun seekTo(position: Millis) {
     if (position in metadata.playbackRange) {
-      if (isStopped)
-        scope.launch { reset(immediate = false, playNow = PlayNow(false)) }
+      if (shouldBeReset())
+        scope.launch { reset(PlayNow(false)) }
       else
         avPlayer.seek(position)
     } else {
@@ -162,18 +166,13 @@ class VlcAudioItem(
   }
 
   override fun reset(playNow: PlayNow) {
-    LOG._e { it("reset %s", playNow) }
-    reset(immediate = true, playNow = playNow)
-  }
-
-  private fun reset(immediate: Boolean, playNow: PlayNow) {
-    val shouldPlayNow = PlayNow(playNow() || isPlaying)
+    val shouldPlayNow = PlayNow(playNow.value || isPlaying)
     val currentTime = position
     avPlayer.shutdown()
     avPlayer = NullAvPlayer
     prepareSeekMaybePlay(
       currentTime,
-      if (playNow() && immediate) PlayImmediateTransition() else NoOpPlayerTransition,
+      if (playNow.value) PlayImmediateTransition() else NoOpPlayerTransition,
       shouldPlayNow,
       previousTimePlayed,
       countTimeFrom
@@ -219,7 +218,7 @@ class VlcAudioItem(
         // what I'm calling "position" the underlying VLC player calls "time".
         // For the VLC player, position is a percentage
         position = startPosition
-        startOnPrepared = playNow()
+        startOnPrepared = playNow.value
         isShutdown = false
         isStopped = false
         previousTimePlayed = timePlayed
@@ -242,26 +241,32 @@ class VlcAudioItem(
                 dispatcher
               )
             }
+        }.also { player ->
+          player.eventFlow
+            .onSubscription {
+              if (startPaused.value) player.playStartPaused() else isPreparing = false
+            }
+            .onEach { event -> handleAvPlayerEvent(event) }
+            .catch { cause -> LOG.e(cause) { it("Error processing MediaPlayerEvent") } }
+            .onCompletion { LOG.i { it("MediaPlayer event flow completed") } }
+            .launchIn(scope)
         }
-        avPlayer.eventFlow
-          .onSubscription { if (startPaused()) avPlayer.playStartPaused() }
-          .onEach { event -> handleAvPlayerEvent(event) }
-          .catch { cause -> LOG.e(cause) { it("Error processing MediaPlayerEvent") } }
-          .onCompletion { LOG.i { it("MediaPlayer event flow completed") } }
-          .launchIn(scope)
       }
     }
   }
 
-  private suspend fun handleAvPlayerEvent(event: AvPlayerEvent) = when (event) {
-    is AvPlayerEvent.Prepared -> onPrepared(event)
-    is AvPlayerEvent.Start -> onStart(event)
-    is AvPlayerEvent.PositionUpdate -> onPositionUpdate(event)
-    is AvPlayerEvent.Paused -> onPaused(event)
-    is AvPlayerEvent.Stopped -> onStopped(event)
-    is AvPlayerEvent.PlaybackComplete -> onPlaybackComplete()
-    is AvPlayerEvent.Error -> onError()
-    is AvPlayerEvent.None -> {
+  private suspend fun handleAvPlayerEvent(event: AvPlayerEvent) {
+    // LOG._e { it("handleAvPlayerEvent %s", event) }
+    when (event) {
+      is AvPlayerEvent.Prepared -> onPrepared(event)
+      is AvPlayerEvent.Start -> onStart(event)
+      is AvPlayerEvent.PositionUpdate -> onPositionUpdate(event)
+      is AvPlayerEvent.Paused -> onPaused(event)
+      is AvPlayerEvent.Stopped -> onStopped(event)
+      is AvPlayerEvent.PlaybackComplete -> onPlaybackComplete()
+      is AvPlayerEvent.Error -> onError()
+      is AvPlayerEvent.None -> {
+      }
     }
   }
 
@@ -276,7 +281,7 @@ class VlcAudioItem(
       mediaFileStore.updateDurationAsync(id, duration)
     }
     eventFlow.emit(PlayableItemEvent.Prepared(this, event.position, event.duration))
-    if (startOnPrepared) play()
+    if (startOnPrepared) play(AllowFade)
   }
 
   private suspend fun onStart(event: AvPlayerEvent.Start) {
@@ -379,8 +384,8 @@ class VlcAudioItem(
           fileExt = fileExt,
           newRating = newRating,
           writeToFile = allowFileUpdate && appPrefs.saveRatingToFile(),
-          beforeFileWrite = { if (wasPlaying) pause(immediate = true) }
-        ) { if (wasPlaying) play(immediate = true) }
+          beforeFileWrite = { if (wasPlaying) pause(NoFade) }
+        ) { if (wasPlaying) play(NoFade) }
       ) {
         is Ok -> metadata = metadata.copy(rating = result.value)
         is Err -> LOG.e { it("Error setting rating. %s", result.error) }
@@ -404,7 +409,7 @@ class VlcAudioItem(
 //private fun fallbackIfEmptyOrUnknown(artist: ArtistName, fallback: () -> ArtistName): ArtistName =
 //    if (artist.value.isNotEmpty() && artist != ArtistName.UNKNOWN) artist else fallback()
 
-  override val instanceId: Long = nextId.getAndIncrement()
+  override val instanceId: InstanceId = InstanceId(nextId.getAndIncrement())
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
@@ -419,6 +424,12 @@ class VlcAudioItem(
   override fun hashCode(): Int {
     return instanceId.hashCode()
   }
+
+  override fun toString(): String = """VlcAudioItem[isActive=${scope.isActive},
+    |isShutdown=${isShutdown},
+    |title=${metadata.title},
+    |avPlayer=${avPlayer}
+    |]""".trimMargin()
 }
 
 inline fun <T : IMedia, R> T.use(block: (T) -> R): R {

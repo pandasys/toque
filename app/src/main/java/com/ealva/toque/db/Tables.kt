@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,12 @@ package com.ealva.toque.db
 
 import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.db.QueueStateTable.id
+import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.neq
 import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
-
-/**
- * Used as an optimization if there are many "unknown" items, eg. Composer is often unknown. This
- * is used in ignore case comparisons to prevent a DB call after the first time an ID is
- * established for "Unknown" of a particular type - Composer, Genre, etc. Other fields, Title,
- * Album, Artist, ..., are typically known so this shortcut is of no value.
- */
-const val UNKNOWN_NAME = "Unknown"
+import com.ealva.welite.db.trigger.Trigger
+import com.ealva.welite.db.trigger.deleteTrigger
 
 val setOfAllTables = setOf(
   ArtistTable,
@@ -44,7 +40,9 @@ val setOfAllTables = setOf(
   EqPresetTable,
   EqPresetAssociationTable,
   QueueTable,
-  QueueStateTable
+  QueueStateTable,
+  PlayListTable,
+  PlayListMediaTable
 )
 
 object ArtistTable : Table() {
@@ -66,7 +64,7 @@ object AlbumTable : Table() {
   val id = long("AlbumId") { primaryKey() }
   val albumTitle = text("Album") { collateNoCase() }
   val albumSort = text("AlbumSort") { collateNoCase() }
-  val albumArtistId = reference("Album_ArtistId", ArtistTable.id)
+  val albumArtist = text("AlbumArtist") { collateNoCase() }
   val albumLocalArtUri = text("AlbumLocalArtUri") { default("") }
   val albumArtUri = text("AlbumArtUri") { default("") }
   val releaseMbid = text("AlbumReleaseMbid") { default("") }
@@ -76,7 +74,7 @@ object AlbumTable : Table() {
   val updatedTime = long("AlbumUpdated") { default(0L) }
 
   init {
-    uniqueIndex(albumTitle, albumArtistId)
+    uniqueIndex(albumTitle, albumArtist)
   }
 }
 
@@ -367,4 +365,52 @@ object QueueStateTable : Table() {
   val playbackPosition = long("QueueState_PlaybackPosition") { default(0) }
   val timePlayed = long("QueueState_TimePlayed") { default(0) }
   val countingFrom = long("QueueState_CountingFrom") { default(0) }
+}
+
+object PlayListTable : Table() {
+  val id = integer("PlayListID") { primaryKey() }
+  val playListName = text("PlayListName") { collateNoCase() }
+  /** [PlayListType] */
+  val playListType = integer("PlayListType")
+  val createdTime = long("PlayListTimeCreated")
+  val updatedTime = long("PlayListUpdated") { default(0) }
+  /** This column should be equal to [PlayListType.sortPosition] */
+  val sort = integer("PlayListSort")
+
+  init {
+    uniqueIndex(playListName)
+    // PlayListMediaTable defines column as ForeignKey with cascade on delete, no trigger necessary
+    //deleteTrigger(
+    //  name = "DeletePlayListTrigger",
+    //  beforeAfter = Trigger.BeforeAfter.BEFORE
+    //) {
+    //  PlayListMediaTable.delete { PlayListMediaTable.playListId eq old(PlayListTable.id) }
+    //}
+  }
+}
+
+object PlayListMediaTable : Table() {
+  val id = integer("PlayListMediaId") { primaryKey() }
+  val playListId = reference(
+    name = "PlayListMedia_PlayListId",
+    refColumn = PlayListTable.id,
+    onDelete = ForeignKeyAction.CASCADE
+  )
+  val mediaId = reference(
+    name = "PlayListMedia_MediaId",
+    refColumn = MediaTable.id,
+    onDelete = ForeignKeyAction.CASCADE
+  )
+  /**
+   * Position within the playlist - no contract that it starts at 0 or 1, just that it sorts
+   * properly based on song position. Query result row index indicates actual playlist index
+   */
+  val sort = integer("PlayListMedia_Sort")
+
+  init {
+    /** For quickly getting the playlist entries */
+    index(playListId)
+    /** To quickly find which playlists a piece of media is in */
+    index(mediaId)
+  }
 }

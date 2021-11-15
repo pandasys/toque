@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,12 @@
 
 package com.ealva.toque.service.media
 
+import android.os.Parcelable
 import android.support.v4.media.session.PlaybackStateCompat
+import kotlinx.parcelize.Parcelize
 
-enum class PlayState(private val compat: Int) {
+@Parcelize
+enum class PlayState(private val compat: Int) : Parcelable {
   None(PlaybackStateCompat.STATE_NONE),
   Stopped(PlaybackStateCompat.STATE_STOPPED),
   Playing(PlaybackStateCompat.STATE_PLAYING),

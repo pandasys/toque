@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,15 +137,12 @@ enum class SongListType(override val id: Int) : HasConstId {
   abstract suspend fun getPreviousList(dao: AudioMediaDao, name: String): AudioIdList
   protected abstract suspend fun doGetRandomList(dao: AudioMediaDao): AudioIdList
 
-  suspend fun getRandomList(dao: AudioMediaDao): AudioIdList = getRandomType().doGetRandomList(dao)
+  suspend fun getRandomList(dao: AudioMediaDao): AudioIdList = doGetRandomList(dao)
 
   /** Public for test - should be package private :) */
-  fun nextType(): SongListType {
-    LOG._e { it("nextType current=%s", this) }
-    return when (val nextIndex = generatingLists.indexOf(this) + 1) {
-      in generatingLists.indices -> generatingLists[nextIndex]
-      else -> generatingLists.first()
-    }.also { type -> LOG._e { it("nextType next=%s", type) } }
+  fun nextType(): SongListType = when (val nextIndex = generatingLists.indexOf(this) + 1) {
+    in generatingLists.indices -> generatingLists[nextIndex]
+    else -> generatingLists.first()
   }
 
   /** Public for test - should be package private :) */
@@ -188,10 +185,12 @@ enum class SongListType(override val id: Int) : HasConstId {
       Artist,
       Composer,
       Genre,
-      PlayList,
-      SmartPlaylist
+      //PlayList,  TODO Add these back in when they are producing items
+      //SmartPlaylist
     )
 
-    fun getRandomType(): SongListType = generatingLists.random()
+    fun getRandomType(): SongListType = generatingLists.random().also { type ->
+      LOG._e { it("getRandomType=%s", type) }
+    }
   }
 }

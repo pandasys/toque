@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,16 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.NullEqPresetDao
-import com.ealva.toque.log._e
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPreset.Companion.BAND_DEFAULT
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.github.michaelbull.result.onFailure
 import org.videolan.libvlc.MediaPlayer
-
-private val LOG by lazyLogger(VlcEqPreset::class)
 
 private val ZEROED_BANDS: Array<Amp> = Array(VlcEqPreset.BAND_COUNT) { Amp.NONE }
 
@@ -112,10 +107,7 @@ class VlcEqPreset private constructor(
 
   override fun clone(): EqPreset = VlcEqPreset(nativeEq, name, isSystemPreset, id, eqPresetDao)
 
-  fun applyToPlayer(nativePlayer: MediaPlayer): Boolean {
-    LOG._e { it("setEqualizer %s", this) }
-    return nativePlayer.setEqualizer(nativeEq)
-  }
+  fun applyToPlayer(nativePlayer: MediaPlayer): Boolean = nativePlayer.setEqualizer(nativeEq)
 
   override fun toString(): String = name
 

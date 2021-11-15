@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ interface LibVlcSingleton {
   /**
    * Use the LibVlc instance within the scope of the [block] function. Do not save the instance
    * anywhere as it may become invalid. Specifically, [reset] invalidates the current instance
-   * and forces it to be rebuilt when the function is called.
+   * and forces it to be rebuilt.
    */
   suspend fun <R> withInstance(block: (LibVlc) -> R): R
 
@@ -45,7 +45,7 @@ interface LibVlcSingleton {
    * due to some parameters needed to construct LibVlc being changed. After this is called, any
    * current Media players should be reset to incorporate the new parameters.
    */
-  fun reset()
+  suspend fun reset()
 
   companion object {
     operator fun invoke(
@@ -86,8 +86,8 @@ private class LibVlcSingletonImpl(
     return block(instance())
   }
 
-  override fun reset() {
-    instance = null
+  override suspend fun reset() {
+    instance = make()
   }
 }
 

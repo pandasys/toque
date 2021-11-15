@@ -3,6 +3,14 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="../../../../layout/compose-model-1635622967984.xml" value="0.67" />
+        <entry key="../../../../layout/compose-model-1635636925656.xml" value="0.67" />
+        <entry key="../../../../layout/compose-model-1635696492571.xml" value="0.67" />
+        <entry key="../../../../layout/compose-model-1635885769695.xml" value="0.29814814814814816" />
+        <entry key="../../../../layout/compose-model-1635956752415.xml" value="0.5" />
+        <entry key="../../../../layout/compose-model-1636066019176.xml" value="0.1" />
+        <entry key="../../../../layout/compose-model-1636491267448.xml" value="0.29814814814814816" />
+        <entry key="../../../../layout/compose-model-1636560389374.xml" value="0.27449324324324326" />
         <entry key="app/src/main/res/drawable/ic_auto_album.xml" value="0.1578125" />
         <entry key="app/src/main/res/drawable/ic_auto_artist.xml" value="0.1675925925925926" />
         <entry key="app/src/main/res/drawable/ic_list.xml" value="0.16944444444444445" />
@@ -11,6 +19,7 @@
         <entry key="app/src/main/res/drawable/ic_repeat.xml" value="0.23425925925925925" />
         <entry key="app/src/main/res/drawable/ic_shuffle.xml" value="0.23425925925925925" />
         <entry key="app/src/main/res/drawable/ic_shuffle_disabled.xml" value="0.23425925925925925" />
+        <entry key="app/src/main/res/drawable/ic_shuffle_media.xml" value="0.29814814814814816" />
         <entry key="app/src/main/res/drawable/ic_toque.xml" value="0.1675925925925926" />
         <entry key="app/src/main/res/drawable/small_play_pause_paused_button.xml" value="0.17037037037037037" />
         <entry key="app/src/main/res/drawable/small_play_pause_playing_button.xml" value="0.17037037037037037" />

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@ package com.ealva.toque.service.audio
 import android.os.Bundle
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Limit
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.NamedSongListType
 import com.ealva.toque.db.SongListType
 import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
@@ -40,35 +42,36 @@ class PlayMediaFromId(
   private val localAudioQueue: LocalAudioQueue,
   private val audioMediaDao: AudioMediaDao
 ) : OnMediaType<Unit> {
-  override suspend fun onMedia(mediaId: MediaId, extras: Bundle, maxListSize: Long) {
+  override suspend fun onMedia(mediaId: MediaId, extras: Bundle, limit: Limit) {
     localAudioQueue.playNext(
-      AudioIdList(MediaIdList(mediaId()), SongListType.All, "None"),
+      AudioIdList(MediaIdList(mediaId), NamedSongListType.EXTERNAL_ALL),
       ClearQueue(false),
-      PlayNow(true)
+      PlayNow(true),
+      TransitionType.Manual
     )
   }
 
-  override suspend fun onArtist(artistId: ArtistId, extras: Bundle, maxListSize: Long) {
+  override suspend fun onArtist(artistId: ArtistId, extras: Bundle, limit: Limit) {
     LOG._e { it("onArtist id=%s extras=%s", artistId, extras) }
-    audioMediaDao.getAllAudioFor(artistId, maxListSize)
+    audioMediaDao.getArtistAudio(artistId, limit = limit)
   }
 
-  override suspend fun onAlbum(albumId: AlbumId, extras: Bundle, maxListSize: Long) {
+  override suspend fun onAlbum(albumId: AlbumId, extras: Bundle, limit: Limit) {
     LOG._e { it("onAlbum id=%s extras=%s", albumId, extras) }
-    audioMediaDao.getAllAudioFor(albumId, maxListSize)
+    audioMediaDao.getAlbumAudio(albumId, null, limit = limit)
   }
 
-  override suspend fun onGenre(genreId: GenreId, extras: Bundle, maxListSize: Long) {
+  override suspend fun onGenre(genreId: GenreId, extras: Bundle, limit: Limit) {
     LOG._e { it("onGenre id=%s extras=%s", genreId, extras) }
-    audioMediaDao.getAllAudioFor(genreId, maxListSize)
+    audioMediaDao.getGenreAudio(genreId, limit = limit)
   }
 
-  override suspend fun onComposer(composerId: ComposerId, extras: Bundle, maxListSize: Long) {
+  override suspend fun onComposer(composerId: ComposerId, extras: Bundle, limit: Limit) {
     LOG._e { it("onComposer id=%s extras=%s", composerId, extras) }
-    audioMediaDao.getAllAudioFor(composerId, maxListSize)
+    audioMediaDao.getComposerAudio(composerId = composerId, limit = limit)
   }
 
-  override suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle, maxListSize: Long) {
+  override suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle, limit: Limit) {
     LOG._e { it("onPlaylist id=%s extras=%s", playlistId, extras) }
   }
 }

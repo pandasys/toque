@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,13 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Filter
+import com.ealva.toque.common.Filter.Companion.NoFilter
+import com.ealva.toque.common.Limit
+import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.runSuspendCatching
+import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.toArtistId
 import com.ealva.welite.db.Database
@@ -35,8 +38,10 @@ import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.or
@@ -62,6 +67,7 @@ import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -109,23 +115,23 @@ interface ArtistDao {
     artistName: String,
     artistSort: String,
     artistMbid: ArtistMbid?,
-    createUpdateTime: Millis
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
   ): ArtistId
 
   fun deleteAll(txn: TransactionInProgress): Long
   fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
   suspend fun getAlbumArtists(
-    limit: Long = Long.MAX_VALUE
+    filter: Filter = NoFilter,
+    limit: Limit = NoLimit
   ): Result<List<ArtistDescription>, DaoMessage>
 
   suspend fun getSongArtists(
-    limit: Long = Long.MAX_VALUE
+    filter: Filter = NoFilter,
+    limit: Limit = NoLimit
   ): Result<List<ArtistDescription>, DaoMessage>
 
-  suspend fun getAllArtistNames(
-    limit: Long = Long.MAX_VALUE
-  ): Result<List<ArtistIdName>, DaoMessage>
-
+  suspend fun getAllArtistNames(limit: Limit = NoLimit): Result<List<ArtistIdName>, DaoMessage>
   suspend fun getNextArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
   suspend fun getPreviousArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
   suspend fun getRandomArtist(): Result<ArtistIdName, DaoMessage>
@@ -154,30 +160,35 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     artistName: String,
     artistSort: String,
     artistMbid: ArtistMbid?,
-    createUpdateTime: Millis
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
   ): ArtistId = upsertLock.withLock {
     require(artistName.isNotBlank()) { "Artist may not be blank" }
-    txn.doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime)
+    txn.doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime, upsertResults)
   }
 
   private fun TransactionInProgress.doUpsertArtist(
     newArtist: String,
     newArtistSort: String,
     newArtistMbid: ArtistMbid?,
-    createUpdateTime: Millis
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
   ): ArtistId = try {
     maybeUpdateArtist(
       newArtist,
       newArtistSort,
       newArtistMbid,
-      createUpdateTime
+      createUpdateTime,
+      upsertResults
     ) ?: INSERT_STATEMENT.insert {
       it[artistName] = newArtist
       it[artistSort] = newArtistSort
       it[artistMbid] = newArtistMbid?.value ?: ""
       it[createdTime] = createUpdateTime()
       it[updatedTime] = createUpdateTime()
-    }.toArtistId().also { id -> onCommit { emit(ArtistDaoEvent.ArtistCreated(id)) } }
+    }
+      .toArtistId()
+      .also { id -> upsertResults.alwaysEmit { emit(ArtistDaoEvent.ArtistCreated(id)) } }
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with artist='%s'", newArtist) }
     throw e
@@ -191,7 +202,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     newArtist: String,
     newArtistSort: String,
     newArtistMbid: ArtistMbid?,
-    newUpdateTime: Millis
+    newUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
   ): ArtistId? = queryArtistUpdateInfo(newArtist)?.let { info ->
     // artist could match on query yet differ in case, so update if case changes
     val updateArtist = info.artist.updateOrNull { newArtist }
@@ -210,10 +222,17 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         it[updatedTime] = newUpdateTime()
       }.where { id eq info.id.value }.update()
 
-      if (updated >= 1) onCommit { emit(ArtistDaoEvent.ArtistUpdated(info.id)) }
-      else LOG.e { it("Could not update $info") }
-    }
+      if (updated >= 1) upsertResults.alwaysEmit { emitUpdated(info.id) } else {
+        LOG.e { it("Could not update $info") }
+        upsertResults.emitIfMediaCreated { emitUpdated(info.id) }
+      }
+    } else upsertResults.emitIfMediaCreated { emitUpdated(info.id) }
+
     info.id
+  }
+
+  private fun emitUpdated(artistId: ArtistId) {
+    emit(ArtistDaoEvent.ArtistUpdated(artistId))
   }
 
   private fun Queryable.queryArtistUpdateInfo(
@@ -237,12 +256,13 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
   }
 
   override suspend fun getAlbumArtists(
-    limit: Long
+    filter: Filter,
+    limit: Limit
   ): Result<List<ArtistDescription>, DaoMessage> = runSuspendCatching {
-    db.query { doGetAlbumArtists(limit) }
+    db.query { doGetAlbumArtists(filter, limit) }
   }.mapError { DaoExceptionMessage(it) }
 
-  private fun Queryable.doGetAlbumArtists(limit: Long): List<ArtistDescription> {
+  private fun Queryable.doGetAlbumArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
     return ArtistTable
       .join(ArtistAlbumTable, JoinType.INNER, ArtistTable.id, ArtistAlbumTable.artistId)
       .join(AlbumTable, JoinType.INNER, ArtistAlbumTable.albumId, AlbumTable.id)
@@ -256,10 +276,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           albumArtistAlbumCountColumn
         )
       }
-      .all()
-      .groupBy { ArtistTable.artistName }
+      .where { filter.whereCondition() }
+      .groupBy { ArtistTable.artistSort }
       .orderByAsc { ArtistTable.artistSort }
-      .limit(limit)
+      .limit(limit.value)
       .sequence {
         ArtistDescription(
           ArtistId(it[ArtistTable.id]),
@@ -267,23 +287,22 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           it[ArtistTable.artistImage].toUriOrEmpty(),
           it[albumArtistAlbumCountColumn],
           it[songCountColumn]
-        ).also { artist ->
-          LOG._e { it("artist=%s", artist) }
-        }
+        )
       }
       .toList()
   }
 
   override suspend fun getSongArtists(
-    limit: Long
+    filter: Filter,
+    limit: Limit
   ): Result<List<ArtistDescription>, DaoMessage> = runSuspendCatching {
-    db.query { doGetSongArtists(limit) }
+    db.query { doGetSongArtists(filter, limit) }
   }.mapError { DaoExceptionMessage(it) }
 
-  private fun Queryable.doGetSongArtists(limit: Long): List<ArtistDescription> {
+  private fun Queryable.doGetSongArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
     return ArtistTable
       .join(ArtistMediaTable, JoinType.INNER, ArtistTable.id, ArtistMediaTable.artistId)
-      .join(MediaTable, JoinType.INNER, ArtistMediaTable.artistId, MediaTable.artistId)
+      .join(MediaTable, JoinType.INNER, ArtistMediaTable.mediaId, MediaTable.id)
       .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id)
       .selects {
         listOf(
@@ -294,10 +313,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           songArtistAlbumCountColumn
         )
       }
-      .all()
-      .groupBy { ArtistTable.artistName }
+      .where { filter.whereCondition() }
+      .groupBy { ArtistTable.artistSort }
       .orderByAsc { ArtistTable.artistSort }
-      .limit(limit)
+      .limit(limit.value)
       .sequence {
         ArtistDescription(
           ArtistId(it[ArtistTable.id]),
@@ -305,21 +324,22 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           it[ArtistTable.artistImage].toUriOrEmpty(),
           it[songArtistAlbumCountColumn],
           it[songCountColumn]
-        ).also { artist ->
-          LOG._e { it("artist=%s", artist) }
-        }
+        )
       }
       .toList()
   }
 
-  override suspend fun getAllArtistNames(limit: Long): Result<List<ArtistIdName>, DaoMessage> =
+  private fun Filter.whereCondition() =
+    if (isEmpty) null else ArtistTable.artistName like value escape ESC_CHAR
+
+  override suspend fun getAllArtistNames(limit: Limit): Result<List<ArtistIdName>, DaoMessage> =
     runSuspendCatching {
       db.query {
         ArtistTable
           .selects { listOf(id, artistName) }
           .all()
           .orderByAsc { artistSort }
-          .limit(limit)
+          .limit(limit.value)
           .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
           .toList()
       }

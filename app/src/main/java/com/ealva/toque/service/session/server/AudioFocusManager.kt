@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,10 @@ import android.media.AudioManager
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.ealva.ealvalog.e
+import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.log._e
-import com.ealva.toque.log._i
 import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
 import com.ealva.toque.service.session.server.AudioFocusManager.FocusReaction
 import com.ealva.toque.service.session.server.AudioFocusManager.PlayState
@@ -178,6 +178,7 @@ abstract class BaseAudioFocusManager(
   protected abstract fun doAbandonFocus(contentType: ContentType): Int
 
   override fun requestFocus(contentType: ContentType, playState: PlayState): Boolean {
+    LOG._e { it("requestFocus type=%s state=%s", contentType, playState) }
     return when {
       released -> {
         LOG.e { it("Requested focus after release") }
@@ -189,14 +190,17 @@ abstract class BaseAudioFocusManager(
         focusLock.withLock {
           when (res) {
             AudioManager.AUDIOFOCUS_REQUEST_FAILED -> {
+              LOG._e { it("AUDIOFOCUS_REQUEST_FAILED") }
               haveAudioFocus = false
               false
             }
             AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> {
+              LOG._e { it("AUDIOFOCUS_REQUEST_GRANTED") }
               haveAudioFocus = true
               true
             }
             AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> {
+              LOG._e { it("AUDIOFOCUS_REQUEST_DELAYED") }
               haveAudioFocus = false
               playbackDelayed = true
               false
@@ -209,13 +213,15 @@ abstract class BaseAudioFocusManager(
   }
 
   override fun abandonFocus(contentType: ContentType) {
+    LOG._e { it("abandonFocus type=%s", contentType) }
     doAbandonFocus(contentType)
   }
 
   override fun onAudioFocusChange(focusChange: Int) {
-    LOG._e { it("onAudioFocusChange %d", focusChange) }
+    LOG._e { it("onAudioFocusChange") }
     when (focusChange) {
       AudioManager.AUDIOFOCUS_GAIN -> {
+        LOG._e { it("AUDIOFOCUS_GAIN") }
         if (playbackDelayed || resumeOnFocusGain) {
           focusLock.withLock {
             haveAudioFocus = true
@@ -231,6 +237,7 @@ abstract class BaseAudioFocusManager(
         }
       }
       AudioManager.AUDIOFOCUS_LOSS -> {
+        LOG._e { it("AUDIOFOCUS_LOSS") }
         focusLock.withLock {
           haveAudioFocus = false
           resumeOnFocusGain = false
@@ -240,6 +247,7 @@ abstract class BaseAudioFocusManager(
         emitReaction(FocusReaction.StopForeground)
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+        LOG._e { it("AUDIOFOCUS_LOSS_TRANSIENT") }
         val isPlaying = playState?.isPlaying() ?: false
         focusLock.withLock {
           // only resume if playback is being interrupted
@@ -249,6 +257,7 @@ abstract class BaseAudioFocusManager(
         if (isPlaying) emitReaction(FocusReaction.Pause)
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+        LOG._e { it("AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK") }
         val isPlaying = playState?.isPlaying() ?: false
         focusLock.withLock {
           endDuckOnFocusGain = isPlaying
@@ -261,7 +270,7 @@ abstract class BaseAudioFocusManager(
   private inner class AudioBecomingNoisyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
       if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-        LOG._i { it("ACTION_AUDIO_BECOMING_NOISY") }
+        LOG.i { it("ACTION_AUDIO_BECOMING_NOISY") }
         emitReaction(FocusReaction.Pause)
       }
     }

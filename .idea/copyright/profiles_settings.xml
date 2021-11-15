@@ -1,7 +1,7 @@
 <component name="CopyrightManager">
-  <settings default="ealva.com">
+  <settings default="Eric A. Snell">
     <module2copyright>
-      <element module="Project Files" copyright="ealva.com" />
+      <element module="Project Files" copyright="Eric A. Snell" />
     </module2copyright>
   </settings>
 </component>

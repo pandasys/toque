@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@
 package com.ealva.toque.db
 
 import android.content.Context
+import com.ealva.toque.prefs.AppPrefs
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.OpenParams
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 private const val DB_FILENAME = "ToqueDB"
@@ -52,7 +52,7 @@ object DbModule {
         genreMediaDao = get(),
         composerMediaDao = get(),
         eqPresetAssociationDao = get(),
-        appPrefsSingleton = get(named("AppPrefs"))
+        appPrefsSingleton = get(AppPrefs.QUALIFIER)
       )
     }
     single { QueuePositionStateDaoFactory(db = get()) }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,20 +87,19 @@ class LibVlcOptionsTest {
       expect(options[10]).toBe(RESAMPLER)
       expect(options[11])
         .toBe(if (vlcUtil.machineSpecs.processors > 2) SOXR_RESAMPLER else UGLY_RESAMPLER)
-      expect(options[12]).toBe(LOG_VERBOSE)
-      expect(options[13]).toBe("-1")
-      expect(options[14]).toBe(SKIP_LOOP_FILTER)
-// expect(options[15]).toBe(prefs.skipLoopFilter().toString()) todo deps on machine specs, revisit
-      expect(options[16]).toBe(SKIP_FRAME)
-      expect(options[17]).toBe("0")
-      expect(options[18]).toBe(SKIP_IDCT)
-      expect(options[19]).toBe("0")
-      expect(options[20]).toBe(SUBSDEC_ENCODING)
-      expect(options[21]).toBe(prefs.subtitleEncoding().toString())
-      expect(options[22]).toBe(SUB_AUTO_DETECT_PATH)
-      expect(options[23]).toBe(LibVlcPrefs.SUB_AUTODETECT_PATHS)
-      expect(options[24]).toBe(CHROMA)
-      expect(options[25]).toBe(prefs.chroma().toString())
+      expect(options[12]).toBe(V_VERBOSE)
+      expect(options[13]).toBe(SKIP_LOOP_FILTER)
+      // expect(options[14]).toBe() todo depends on machine specs, revisit
+      expect(options[15]).toBe(SKIP_FRAME)
+      expect(options[16]).toBe("0")
+      expect(options[17]).toBe(SKIP_IDCT)
+      expect(options[18]).toBe("0")
+      expect(options[19]).toBe(SUBSDEC_ENCODING)
+      expect(options[20]).toBe(prefs.subtitleEncoding().toString())
+      expect(options[21]).toBe(SUB_AUTO_DETECT_PATH)
+      expect(options[22]).toBe(LibVlcPrefs.SUB_AUTODETECT_PATHS)
+      expect(options[23]).toBe(CHROMA)
+      expect(options[24]).toBe(prefs.chroma().toString())
     }
   }
 
@@ -116,7 +115,7 @@ class LibVlcOptionsTest {
         }
       )
     ).let { options ->
-      expect(options.size).toBe(26)
+      expect(options.size).toBe(25)
       expect(options[0]).toBe(NO_AUDIO_TIME_STRETCH)
       expect(options[10]).toBe(RESAMPLER)
       expect(options[11]).toBe(UGLY_RESAMPLER)
@@ -144,9 +143,9 @@ class LibVlcOptionsTest {
     val prefs = StubLibVlcPrefs()
     prefs.skipLoopFilter._value = SkipLoopFilter.NonKey
     libVlcOptions(prefs, VlcUtil(appCtx)).let { options ->
-      expect(options.size).toBe(26)
-      expect(options[14]).toBe(SKIP_LOOP_FILTER)
-      expect(options[15]).toBe(prefs.skipLoopFilter().toString())
+      expect(options.size).toBe(25)
+      expect(options[13]).toBe(SKIP_LOOP_FILTER)
+      expect(options[14]).toBe(prefs.skipLoopFilter().toString())
     }
   }
 

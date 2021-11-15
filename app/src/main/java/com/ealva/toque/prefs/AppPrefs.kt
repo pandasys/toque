@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MARK_PLAYED_PERCENTAGE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
+import org.koin.core.qualifier.named
 
 typealias AppPrefsSingleton = PreferenceStoreSingleton<AppPrefs>
 
@@ -89,6 +90,8 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val readTagSortFields: BoolPref
 
   companion object {
+    val QUALIFIER = named("AppPrefs")
+
     val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
     const val DEFAULT_GO_TO_NOW_PLAYING = true
     const val DEFAULT_IGNORE_SMALL_FILES = false
@@ -155,7 +158,7 @@ private class AppPrefsImpl(
   override val rewindThenPrevious: BoolPref by preference(true)
   override val scanAfterMediaScanner: BoolPref by preference(true)
   override val saveRatingToFile: BoolPref by preference(true)
-  override val scanInternalVolume: BoolPref by preference(true)
+  override val scanInternalVolume: BoolPref by preference(false)
   override val showTimeRemaining: BoolPref by preference(false)
   override val playOnBluetoothConnection: BoolPref by preference(false)
   override val playOnWiredConnection: BoolPref by preference(false)

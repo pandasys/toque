@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,19 @@ data class ScreenConfig(
   fun getBottomSheetHeight(isExpanded: Boolean): Dp =
     MainBottomSheet.getBottomSheetHeight(isExpanded, inPortrait)
 
+  /**
+   * Get the amount to pad LazyColumn-contentPadding.bottom to be above the bottom sheet. If
+   * [isExpanded] the mini player height is included. If [bottomSheetWillRebound] the amount
+   * contains the sheet size plus navigation bottom padding, else just nav bottom.
+   *
+   * As of now the bottom sheet will not rebound at bottom of list. When that capability is
+   * provided can switch default to true.
+   */
+  fun getListBottomContentPadding(
+    isExpanded: Boolean,
+    bottomSheetWillRebound: Boolean = true
+  ): Dp = if (bottomSheetWillRebound) getNavPlusBottomSheetHeight(isExpanded) else navBottom
+
   fun getNavPlusBottomSheetHeight(isExpanded: Boolean): Dp =
     navBottom + getBottomSheetHeight(isExpanded)
 
@@ -86,10 +99,10 @@ fun makeScreenConfig(config: Configuration, density: Density, insets: WindowInse
 }
 
 object MainBottomSheet {
-  val portraitHeight: Dp = 46.dp
-  val portraitMiniPlayerHeight: Dp = 42.dp
-  val landscapeHeight: Dp = 42.dp
-  val landscapeMiniPlayerHeight = 40.dp
+  private val portraitHeight: Dp = 46.dp
+  private val portraitMiniPlayerHeight: Dp = 42.dp
+  private val landscapeHeight: Dp = 42.dp
+  private val landscapeMiniPlayerHeight = 40.dp
 
   fun getButtonBarHeight(inPortrait: Boolean) = if (inPortrait) portraitHeight else landscapeHeight
 

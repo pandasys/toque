@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.ForceTransition.AllowFade
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -50,8 +52,8 @@ interface AvPlayer {
   val isAudioPlayer: Boolean
 
   fun playStartPaused()
-  fun play(immediate: Boolean = false)
-  fun pause(immediate: Boolean = false)
+  fun play(forceTransition: ForceTransition)
+  fun pause(forceTransition: ForceTransition)
   fun seek(position: Millis)
   fun stop()
   fun shutdown()
@@ -159,12 +161,13 @@ object NullAvPlayer : AvPlayer {
   override val isVideoPlayer: Boolean = false
   override val isAudioPlayer: Boolean = true
   override fun playStartPaused() = Unit
-  override fun play(immediate: Boolean) = Unit
-  override fun pause(immediate: Boolean) = Unit
+  override fun play(forceTransition: ForceTransition) = Unit
+  override fun pause(forceTransition: ForceTransition) = Unit
   override fun seek(position: Millis) = Unit
   override fun stop() = Unit
   override fun shutdown() = Unit
   override fun duck() = Unit
   override fun endDuck() = Unit
   override fun transitionTo(transition: PlayerTransition) = Unit
+  override fun toString(): String = "NullAvPlayer"
 }

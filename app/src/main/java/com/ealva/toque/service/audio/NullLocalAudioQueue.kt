@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.player.NoOpMediaTransition
-import com.ealva.toque.service.player.PlayerTransitionPair
 import com.ealva.toque.service.queue.ClearQueue
+import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.NullStreamVolume
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.StreamVolume
@@ -33,21 +33,18 @@ import kotlinx.coroutines.flow.StateFlow
 object NullLocalAudioQueue : LocalAudioQueue {
   override val queueState: StateFlow<LocalAudioQueueState> =
     MutableStateFlow(LocalAudioQueueState.NONE)
-  override val seeking: Boolean = false
-  override val manualTransition: PlayerTransitionPair = NoOpMediaTransition
-  override val autoAdvanceTransition: PlayerTransitionPair = NoOpMediaTransition
   override fun toggleEqMode() = Unit
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
-  override suspend fun addToUpNext(audioIdList: AudioIdList) = Unit
-  override suspend fun playNext(
+  override fun addToUpNext(audioIdList: AudioIdList) = Unit
+  override fun playNext(
     audioIdList: AudioIdList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
-    transition: PlayerTransitionPair
+    transitionType: TransitionType
   ) = Unit
 
-  override fun goToQueueItem(instanceId: Long) = Unit
-  override suspend fun prepareNext(audioIdList: AudioIdList) = Unit
+  override fun goToQueueItem(instanceId: InstanceId) = Unit
+  override fun prepareNext(audioIdList: AudioIdList) = Unit
   override fun nextRepeatMode() = Unit
   override fun nextShuffleMode() = Unit
   override fun setRepeatMode(mode: RepeatMode) = Unit
@@ -55,8 +52,8 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override suspend fun activate(resume: Boolean, playNow: PlayNow) = Unit
   override fun deactivate() = Unit
-  override fun play(immediate: Boolean) = Unit
-  override fun pause(immediateTransition: Boolean) = Unit
+  override fun play(forceTransition: ForceTransition) = Unit
+  override fun pause(forceTransition: ForceTransition) = Unit
   override fun stop() = Unit
   override fun togglePlayPause() = Unit
   override fun next() = Unit

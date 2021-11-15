@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,12 @@
 
 package com.ealva.toque.common
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
 @JvmInline
-value class EqPresetId(val value: Long) {
+value class EqPresetId(val value: Long) : Parcelable {
   @Suppress("NOTHING_TO_INLINE")
   inline operator fun invoke(): Long = value
   operator fun plus(i: Int): EqPresetId = EqPresetId(value + i)

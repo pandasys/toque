@@ -1,5 +1,5 @@
 <!--
-  ~ Copyright 2020 eAlva.com
+  ~ Copyright 2021 Eric A. Snell
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -165,10 +165,18 @@
   <string name="NowPlayingScreenOptions">Now Playing screen options</string>
   <string name="DoNotStartOnConnection">Do not start player on connection</string>
   <string name="PlayOnWiredConnection">Play on Wired Connection</string>
-  <string name="StartPlayerOnWiredconnection">Start player on wired headset/speaker connection</string>
+  <string name="StartPlayerOnWiredConnection">Start player on wired headset/speaker connection</string>
   <string name="PlayOnBluetoothConnection">Play on Bluetooth Connection</string>
   <string name="StartPlayerOnBluetoothConnection">Start player on Bluetooth connection</string>
   <string name="SelectScrobbler">Select Scrobbler</string>
   <string name="AlbumArt">Album art</string>
   <string name="ArtistImage">Artist image</string>
+  <string name="AllAlbumArtistSongs">All Album Artist Songs</string>
+  <string name="AllArtistSongs">All Artist Songs</string>
+  <string name="ReadPhoneIdleState">Read Phone Idle State</string>
+  <string name="ReadPhoneStateRationale">Toque needs permission to read the phone state to ensure the phone is idle before playing media.</string>
+  <string name="ReadPhoneStateSettingsRationale">Automatic playback is requested due to a Toque application settings. The "Phone permission" is required to ensure the phone is idle (no call is active) before auto playback.\n\nNavigate to: Permissions | Phone | Allow</string>
+  <string name="ScanInternalTitle">Scan Internal Storage</string>
+  <string name="ScanInternalOnSummary">Scan Internal Storage for media. This typically includes Ringtones, Notifications, etc.</string>
+  <string name="ScanInternalOffSummary">Do not scan Internal Storage for media.</string>
 </resources>

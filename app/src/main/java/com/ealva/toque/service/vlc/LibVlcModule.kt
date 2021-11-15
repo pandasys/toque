@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package com.ealva.toque.service.vlc
 import com.ealva.toque.service.media.EqPresetFactory
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import com.ealva.toque.service.vlc.LibVlcPrefs.Companion.make as makeLibVlcPrefs
@@ -28,11 +27,11 @@ private const val LIBVLC_PREFS_FILE_NAME = "LibVlcPrefs"
 
 object LibVlcModule {
   val koinModule = module {
-    single(named("LibVlcPrefs")) {
+    single(LibVlcPrefs.QUALIFIER) {
       LibVlcPrefsSingleton(::makeLibVlcPrefs, androidContext(), LIBVLC_PREFS_FILE_NAME)
     }
     single {
-      LibVlcSingleton(androidContext(), prefsSingleton = get(named("LibVlcPrefs")))
+      LibVlcSingleton(androidContext(), prefsSingleton = get(LibVlcPrefs.QUALIFIER))
     }
     single<MediaMetadataParserFactory> {
       VlcMediaMetadataParserFactory(libVlcSingleton = get())

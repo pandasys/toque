@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,21 @@
 
 package com.ealva.toque.common
 
+import android.os.Parcelable
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasTitle
+import kotlinx.parcelize.Parcelize
 
+@Parcelize
 enum class RepeatMode(
   override val id: Int,
   val current: Boolean,
   val queue: Boolean,
   @StringRes override val titleRes: Int
-) : HasConstId, HasTitle {
+) : HasConstId, HasTitle, Parcelable {
   None(1, false, false, R.string.RepeatOff),
   All(2, false, true, R.string.RepeatQueue),
   One(3, true, false, R.string.RepeatCurrent);

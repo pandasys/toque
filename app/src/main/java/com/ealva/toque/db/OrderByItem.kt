@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ data class OrderByItem(
   ): OrderByItem = OrderByItem(orderBy.copy(ascDesc = ascDesc, collate = collate), titleRes)
 }
 
-val MediaTable.TITLE_ORDER by lazy { OrderByItem(OrderBy(MediaTable.title), R.string.Title) }
+val MediaTable.TITLE_ORDER by lazy { OrderByItem(OrderBy(MediaTable.titleSort), R.string.Title) }
 
 /*
 Album Artist

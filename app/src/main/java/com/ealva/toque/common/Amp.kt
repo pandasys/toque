@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,18 @@
 
 package com.ealva.toque.common
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 typealias AmpRange = ClosedRange<Amp>
 
 operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean =
   contains(amp())
 
 /** Represents Amplitude */
+@Parcelize
 @JvmInline
-value class Amp(val value: Float) : Comparable<Amp> {
+value class Amp(val value: Float) : Comparable<Amp>, Parcelable {
   override fun compareTo(other: Amp): Int = value.compareTo(other.value)
   operator fun compareTo(other: Float): Int = value.compareTo(other)
 
@@ -41,9 +45,8 @@ value class Amp(val value: Float) : Comparable<Amp> {
 
     val NONE = Amp(0F)
     val DEFAULT_PREAMP = Amp(12)
-    val MIN = Amp(-20)
-    val MAX = Amp(20)
-    val RANGE = MIN..MAX
+    val RANGE = Amp(-20)..Amp(20)
     val REPLAY_GAIN_RANGE = Amp(-16)..Amp(16)
+    val REPLAY_GAIN_NO_INFO_RANGE = Amp(-20)..Amp(16)
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
-import com.ealva.toque.common.Volume
-import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.toMediaId
 import com.ealva.toque.service.audio.NullPlayableAudioItem
@@ -32,6 +31,7 @@ import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.media.Rating
+import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.emptyFlow
 class PlayableAudioItemFake(
   override val eventFlow: Flow<PlayableItemEvent> = emptyFlow(),
   override val id: MediaId = 1.toMediaId(),
-  override val instanceId: Long = 1,
+  override val instanceId: InstanceId = InstanceId(1),
   override var title: Title = Title.UNKNOWN,
   override var trackNumber: Int = 1,
   override var duration: Millis = Millis(100),
@@ -59,9 +59,9 @@ class PlayableAudioItemFake(
   override lateinit var albumArt: Uri
   override lateinit var localAlbumArt: Uri
   override val metadata: Metadata = Metadata.NullMetadata
-  override fun play(immediate: Boolean) = Unit
+  override fun play(forceTransition: ForceTransition) = Unit
   override fun stop() = Unit
-  override fun pause(immediate: Boolean) = Unit
+  override fun pause(forceTransition: ForceTransition) = Unit
   override fun togglePlayPause() = Unit
   override fun seekTo(position: Millis) = Unit
   override fun shutdown() = Unit

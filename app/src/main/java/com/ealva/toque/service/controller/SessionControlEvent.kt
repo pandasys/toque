@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import android.support.v4.media.MediaDescriptionCompat
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.media.StarRating
 
 sealed interface SessionControlEvent {
@@ -49,7 +50,7 @@ sealed interface SessionControlEvent {
   /**
    * When a list of QueueItem
    */
-  data class SkipToQueueItem(val instanceId: Long) : SessionControlEvent
+  data class SkipToQueueItem(val instanceId: InstanceId) : SessionControlEvent
 
   object Pause : SessionControlEvent {
     override fun toString(): String = "Pause"

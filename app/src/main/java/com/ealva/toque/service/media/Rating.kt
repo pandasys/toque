@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 
 package com.ealva.toque.service.media
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import kotlin.math.roundToInt
 
 /*
@@ -26,8 +28,9 @@ import kotlin.math.roundToInt
  Each increment of 10 is 1/2 star. Some file tags expect 0..100 while MP3s are 0..256 or "*-"
  characters.
  */
+@Parcelize
 @JvmInline
-value class Rating(val value: Int) : Comparable<Rating> {
+value class Rating(val value: Int) : Comparable<Rating>, Parcelable {
   init {
     require(value in -1..100) { "Rating must be between -1 (no rating) and 100" }
   }

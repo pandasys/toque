@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
@@ -134,10 +134,10 @@ private class LocalAudioMiniPlayerViewModelImpl(
   private fun queueActive(queue: LocalAudioQueue) {
     audioQueue = queue
     queueStateJob = audioQueue.queueState
-      .onStart { LOG._e { it("MiniPlayer start collecting queueState") } }
+      .onStart { LOG._i { it("MiniPlayer start collecting queueState") } }
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("") } }
-      .onCompletion { LOG._e { it("MiniPlayer completed collecting queueState") } }
+      .onCompletion { LOG._i { it("MiniPlayer completed collecting queueState") } }
       .launchIn(scope)
   }
 

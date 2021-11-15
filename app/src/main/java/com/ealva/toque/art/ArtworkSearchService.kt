@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.R
 import com.ealva.toque.file.MediaStorage
 import com.ealva.toque.log._i
+import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +48,7 @@ private const val SCANNER_CHANNEL_ID = "com.ealva.toque.art.ArtworkSearchService
 class ArtworkSearchService : JobIntentService() {
 
   private val storage: MediaStorage by inject()
-  private val prefs: AppPrefsSingleton by inject(qualifier = named("AppPrefs"))
+  private val prefs: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
 
   private val notificationManager: NotificationManager by lazy {
     requireNotNull(getSystemService())

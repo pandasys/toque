@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 package com.ealva.toque.service
 
+import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.PlayableAudioItemFactory
 import com.ealva.toque.service.player.WakeLockFactory
 import com.ealva.toque.service.scrobble.ScrobblerFactory
+import com.ealva.toque.service.vlc.LibVlcPrefs
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 object ServiceModule {
@@ -32,9 +33,9 @@ object ServiceModule {
         audioMediaDao = get(),
         mediaFileStore = get(),
         libVlcSingleton = get(),
-        libVlcPrefsSingleton = get(named("LibVlcPrefs")),
-        appPrefsSingleton = get(named("AppPrefs")),
-        wakeLockFactory = get()
+        wakeLockFactory = get(),
+        appPrefsSingleton = get(AppPrefs.QUALIFIER),
+        libVlcPrefsSingleton = get(LibVlcPrefs.QUALIFIER)
       )
     }
     single {
@@ -42,8 +43,8 @@ object ServiceModule {
         queuePositionStateDaoFactory = get(),
         playableAudioItemFactory = get(),
         audioManager = get(),
-        appPrefsSingleton = get(named("AppPrefs")),
-        libVlcPrefsSingleton = get(named("LibVlcPrefs")),
+        appPrefsSingleton = get(AppPrefs.QUALIFIER),
+        libVlcPrefsSingleton = get(LibVlcPrefs.QUALIFIER),
       )
     }
   }

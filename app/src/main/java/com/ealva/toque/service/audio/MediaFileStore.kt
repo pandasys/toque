@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,18 +23,17 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.file.isLocalScheme
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.tag.SongTag
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.binding.binding
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -167,22 +166,15 @@ private class MediaFileStoreImpl(
     afterFileWrite: suspend () -> Unit
   ): Rating {
     require(location.isLocalScheme())
-    LOG._e { it("create temp file") }
     makeTempEditorFile(location.lastPathSegment, fileExt).useTempFile { tempEditorFile ->
-      LOG._e { it("copy to temp file") }
       location.copyTo(tempEditorFile)
-      LOG._e { it("open song tag") }
       SongTag(tempEditorFile, ignoreArtwork = true, createMissingTag = false).use { songTag ->
-        LOG._e { it("set rating and save changes") }
         songTag.starRating = newRating.toStarRating()
         songTag.saveChanges()
-        LOG._e { it("before file write") }
         beforeFileWrite()
         try {
-          LOG._e { it("write to file") }
           tempEditorFile.copyTo(location)
         } finally {
-          LOG._e { it("after file write") }
           afterFileWrite()
         }
       }

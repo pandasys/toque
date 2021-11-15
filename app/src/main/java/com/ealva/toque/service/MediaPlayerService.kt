@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,15 +39,12 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.doNotHaveReadPermission
-import com.ealva.toque.android.content.onBroadcast
 import com.ealva.toque.android.content.orNullObject
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audioout.AudioOutputState
 import com.ealva.toque.audioout.handleAudioOutputStateBroadcasts
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
-import com.ealva.toque.log.logExecTime
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayNow
@@ -74,7 +71,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   // Because we inherit from MediaBrowserServiceCompat we need to maintain our own lifecycle
   private val dispatcher = ServiceLifecycleDispatcher(this)
   private inline val scope: LifecycleCoroutineScope get() = lifecycleScope
-  private lateinit var servicePrefs: PlayerServicePrefs
   private val queueFactory: PlayableQueueFactory by inject()
   private val audioMediaDao: AudioMediaDao by inject()
   private var inForeground = false
@@ -84,6 +80,8 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
 
   override fun getLifecycle(): Lifecycle = dispatcher.lifecycle
   override val currentQueue = MutableStateFlow<PlayableMediaQueue<*>>(NullPlayableMediaQueue)
+
+  private suspend fun servicePrefs(): PlayerServicePrefs = servicePrefsSingleton.instance()
 
   override fun onCreate() {
     dispatcher.onServicePreSuperOnCreate()
@@ -107,11 +105,8 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     }
     sessionToken = mediaSession.token
     scope.launch {
-      logExecTime({ time -> LOG.e { it("setCurrentQueue %d", time) } }) {
-        servicePrefs = servicePrefsSingleton.instance()
-        setCurrentQueue(servicePrefs.currentQueueType(), false)
-        mediaSession.isActive = true
-      }
+      setCurrentQueue(servicePrefs().currentQueueType(), false)
+      mediaSession.isActive = true
     }
     // This creates a lifecycle aware object, no unregister needed
     handleAudioOutputStateBroadcasts(audioOutputState)
@@ -129,7 +124,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       null
     } else {
       dispatcher.onServicePreSuperOnBind()
-      LOG._e { it("onBind %s", intent.action ?: "null") }
       when (intent.action) {
         SERVICE_INTERFACE -> super.onBind(intent)
         else -> binder
@@ -168,10 +162,9 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     }
 
   private fun handleStartIntent(intent: Intent, action: String) {
-    LOG._e { it("handleStartIntent action=%s", action) }
+    //LOG._e { it("handleStartIntent action=%s", action) }
     if (action.isNotEmpty()) {
       if (ACTION_MEDIA_BUTTON == action) {
-        LOG._e { it("is media button") }
         mediaSession.handleMediaButtonIntent(intent)?.let {
           // if this is a recognized key event, prevent redelivery on service restart
           val emptyIntent = Intent(intent)
@@ -188,7 +181,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   override fun onDestroy() {
     dispatcher.onServicePreSuperOnDestroy()
     super.onDestroy()
-    LOG._e { it("onDestroy") }
     isStarted = false
     mediaSession.isActive = false
     mediaSession.release()

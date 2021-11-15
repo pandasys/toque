@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -138,9 +138,9 @@ class LibVlcPreferencesTest {
     prefsSingleton {
       expect(replayGainPreamp()).toBe(replayGainPreamp.default)
       replayGainPreamp.set(Amp(-50))
-      expect(replayGainPreamp()).toBe(Amp.RANGE.start)
+      expect(replayGainPreamp()).toBe(Amp.REPLAY_GAIN_RANGE.start)
       replayGainPreamp.set(Amp(100))
-      expect(replayGainPreamp()).toBe(Amp.RANGE.endInclusive)
+      expect(replayGainPreamp()).toBe(Amp.REPLAY_GAIN_RANGE.endInclusive)
       replayGainPreamp.set(Amp(15))
       expect(replayGainPreamp()).toBe(Amp(15))
 

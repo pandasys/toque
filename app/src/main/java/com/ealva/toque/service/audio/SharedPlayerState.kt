@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.PlaybackRate
-import com.ealva.toque.db.EqPresetInfo
+import com.ealva.toque.db.EqPresetIdName
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.DuckAction
@@ -111,7 +111,7 @@ interface SharedPlayerState {
   fun setCurrent(preset: EqPreset)
 
   /** Get all preset id/name pairs, typically to display to the user */
-  suspend fun getAll(): List<EqPresetInfo>
+  suspend fun getAll(): List<EqPresetIdName>
 
   companion object {
     /**
@@ -197,7 +197,7 @@ private class SharedPlayerStateImpl(
     currentPreset.update { preset }
   }
 
-  override suspend fun getAll(): List<EqPresetInfo> {
+  override suspend fun getAll(): List<EqPresetIdName> {
     return factory.getAllPresets()
   }
 }
@@ -212,5 +212,5 @@ object NullSharedPlayerState : SharedPlayerState {
   override fun setPreferred(mediaId: MediaId, albumId: AlbumId) = Unit
   override fun setCurrent(id: EqPresetId) = Unit
   override fun setCurrent(preset: EqPreset) = Unit
-  override suspend fun getAll(): List<EqPresetInfo> = emptyList()
+  override suspend fun getAll(): List<EqPresetIdName> = emptyList()
 }

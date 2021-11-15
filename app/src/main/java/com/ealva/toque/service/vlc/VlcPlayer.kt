@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.ealva.toque.service.vlc
 
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.ealvalog.w
 import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.Micros
 import com.ealva.toque.common.Millis
@@ -25,8 +26,6 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
-import com.ealva.toque.log._e
-import com.ealva.toque.log._w
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
@@ -42,6 +41,7 @@ import com.ealva.toque.service.player.PauseImmediateTransition
 import com.ealva.toque.service.player.PlayImmediateTransition
 import com.ealva.toque.service.player.TransitionPlayer
 import com.ealva.toque.service.player.WakeLock
+import com.ealva.toque.service.queue.ForceTransition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +50,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.withIndex
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
@@ -184,6 +184,12 @@ private class VlcPlayerImpl(
 
   override var isShutdown = false
 
+  override fun toString(): String = """VlcPlayer[isActive=${scope.isActive},
+    |id=${id.value},
+    |isValid=$isValid
+    |mediaPlayer.isReleased=${mediaPlayer.isReleased}
+    |]""".trimMargin()
+
   private var realVolume = Volume.NONE
   override var volume: Volume
     get() = realVolume
@@ -239,19 +245,16 @@ private class VlcPlayerImpl(
       FadeInTransition(appPrefs.playPauseFadeLength())
     } else PlayImmediateTransition()
 
-  override fun playStartPaused() {
-    mediaPlayer.play()
-  }
+  override fun playStartPaused() = mediaPlayer.play()
 
-  override fun play(immediate: Boolean) {
-    LOG._e { it("play") }
+  override fun play(forceTransition: ForceTransition) {
     if (isValid && requestFocus.requestFocus()) {
-      startTransition(getPlayTransition { immediate }, false)
+      startTransition(getPlayTransition(forceTransition), false)
     }
   }
 
-  override fun pause(immediate: Boolean) {
-    if (isValid) startTransition(getPauseTransition { immediate }, false)
+  override fun pause(forceTransition: ForceTransition) {
+    if (isValid) startTransition(getPauseTransition(forceTransition), false)
   }
 
   override fun seek(position: Millis) {
@@ -308,14 +311,13 @@ private class VlcPlayerImpl(
     startTransition(transition, false)
   }
 
-  private inline fun getPauseTransition(immediate: () -> Boolean) =
-    if (immediate()) PauseImmediateTransition() else pauseTransition
+  private fun getPauseTransition(forceTransition: ForceTransition) =
+    if (forceTransition.noFade) PauseImmediateTransition() else pauseTransition
 
-  private fun getPlayTransition(immediate: () -> Boolean) =
-    if (immediate()) PlayImmediateTransition() else playTransition
+  private fun getPlayTransition(forceTransition: ForceTransition) =
+    if (forceTransition.noFade) PlayImmediateTransition() else playTransition
 
   private fun setAudioOutput(module: AudioOutputModule) {
-    LOG._e { it("setAudioOutput %s", module) }
     mediaPlayer.setAudioOutput(module.toString())
   }
 
@@ -341,7 +343,6 @@ private class VlcPlayerImpl(
             emit(AvPlayerEvent.Stopped(time))
           }
           MediaPlayer.Event.EndReached -> {
-            LOG._e { it("endReached") }
             // emit before shutdown or won't go due to scope cancellation
             emit(AvPlayerEvent.PlaybackComplete)
             shutdown()
@@ -475,7 +476,7 @@ private class VlcPlayerImpl(
       fifoPlayerQueue.remove(player)
       while (fifoPlayerQueue.size > 1) {
         fifoPlayerQueue.removeLast().shutdown()
-        LOG._w { it("removeFromQueue queue size > 1") }
+        LOG.w { it("removeFromQueue queue size > 1") }
       }
     }
   }

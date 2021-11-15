@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 
 package com.ealva.toque.db
 
+import android.os.Parcelable
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.isValid
 import com.ealva.welite.db.Database
@@ -33,6 +33,7 @@ import com.ealva.welite.db.statements.UpdateStatement
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -43,12 +44,14 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.parcelize.Parcelize
 import java.util.concurrent.Executors
 
 private val LOG by lazyLogger(QueueStateTable::class)
 
+@Parcelize
 @JvmInline
-value class QueueId(val value: Int)
+value class QueueId(val value: Int) : Parcelable
 
 data class QueuePositionState(
   val mediaId: MediaId,

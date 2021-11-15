@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,47 +18,68 @@ package com.ealva.toque.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.darkColors
 import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-private val DarkColorPalette = darkColors(
-  primary = blue200,
-  primaryVariant = blue700,
-  secondary = cyan200,
-  background = black,
-  surface = black
+private val Amber500 = Color(0xFFFFC107)
+private val Amber700 = Color(0xFFFF8F00)
+
+private val LightColorPalette = ToqueColors(
+  material = lightColors(
+    primary = blue500,
+    primaryVariant = blue700,
+    secondary = cyan700
+  ),
+  warning = Amber500,
+  onWarning = Color.Black,
+  selectedBackground = Color(0xFF_D0_D0_D0)
 )
 
-private val LightColorPalette = lightColors(
-  primary = blue500,
-  primaryVariant = blue700,
-  secondary = cyan700
-
-  /* Other default colors to override
-background = Color.White,
-surface = Color.White,
-onPrimary = Color.White,
-onSecondary = Color.Black,
-onBackground = Color.Black,
-onSurface = Color.Black,
-*/
+private val DarkColorPalette = ToqueColors(
+  material = darkColors(
+    primary = blue200,
+    primaryVariant = blue700,
+    secondary = cyan200,
+    background = black,
+    surface = black
+  ),
+  warning = Amber700,
+  onWarning = Color.White,
+  selectedBackground = Color(0xFF_30_30_30)
 )
+
+private val LocalColors = staticCompositionLocalOf { DarkColorPalette }
 
 @Composable
-fun ToqueTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-  val colors = if (darkTheme) {
-    DarkColorPalette
-  } else {
-    LightColorPalette
-  }
+fun ToqueTheme(
+  @Suppress("UNUSED_PARAMETER")
+  darkTheme: Boolean = isSystemInDarkTheme(),
+  content: @Composable () -> Unit,
+) {
+  //val colors = if (darkTheme) {
+  //  DarkColorPalette
+  //} else {
+  //  LightColorPalette
+  //}
 
-  MaterialTheme(
-    colors = colors,
-    typography = typography,
-    shapes = shapes,
-    content = content
-  )
+  // Need a setting to allow light color theme
+  val colors = DarkColorPalette
+
+  CompositionLocalProvider(LocalColors provides colors) {
+    MaterialTheme(
+      colors = colors.material,
+      content = content,
+    )
+  }
 }
+
+@Suppress("unused")
+val MaterialTheme.toqueColors: ToqueColors
+  @Composable
+  @ReadOnlyComposable
+  get() = LocalColors.current

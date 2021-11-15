@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -49,8 +48,6 @@ import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import kotlinx.parcelize.Parcelize
-
-private val LOG by lazyLogger("LibraryItemsScreen")
 
 abstract class BaseLibraryItemsScreen : ComposeKey()
 
@@ -131,11 +128,11 @@ private class LibraryItemsViewModelImpl(private val backstack: Backstack) : Libr
 
   override fun getItems(): List<LibraryItem> = listOf(
     LibraryItem(R.drawable.ic_treble_clef, "All Songs", LibrarySongsScreen()),
-    LibraryItem(R.drawable.ic_album, "Albums", AllAlbumsScreen()),
-    LibraryItem(R.drawable.ic_microphone, "Artists", AllArtistsScreen(SongArtist)),
-    LibraryItem(R.drawable.ic_account_box, "Album Artists", AllArtistsScreen(AlbumArtist)),
-    LibraryItem(R.drawable.ic_guitar_acoustic, "Genres", AllGenresScreen()),
-    LibraryItem(R.drawable.ic_person, "Composers", AllComposersScreen()),
+    LibraryItem(R.drawable.ic_album, "Albums", AlbumsScreen()),
+    LibraryItem(R.drawable.ic_microphone, "Artists", ArtistsScreen(SongArtist)),
+    LibraryItem(R.drawable.ic_account_box, "Album Artists", ArtistsScreen(AlbumArtist)),
+    LibraryItem(R.drawable.ic_guitar_acoustic, "Genres", GenresScreen()),
+    LibraryItem(R.drawable.ic_person, "Composers", ComposersScreen()),
     LibraryItem(R.drawable.ic_list, "Playlists", LibrarySongsScreen()),
   )
 }

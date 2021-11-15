@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,12 +92,15 @@ import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.core.LocalBackstack
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -127,15 +130,25 @@ object SettingScreenKeys {
 
 abstract class BaseAppSettingsScreen : ComposeKey()
 
+private const val APP_PREFS_TAG = "AppPrefs"
+private const val LIB_VLC_PREFS_TAG = "LibVlcPrefs"
+
 @Immutable
 @Parcelize
-data class AppSettingsScreen(private val key: SettingScreenKey) : BaseAppSettingsScreen() {
-
+data class AppSettingsScreen(
+  private val key: SettingScreenKey
+  ) : BaseAppSettingsScreen(), KoinComponent {
+  override fun bindServices(serviceBinder: ServiceBinder) {
+    with(serviceBinder) {
+      addService(APP_PREFS_TAG, get<AppPrefsSingleton>(AppPrefs.QUALIFIER))
+      addService(LIB_VLC_PREFS_TAG, get<LibVlcPrefsSingleton>(LibVlcPrefs.QUALIFIER))
+    }
+  }
   @OptIn(ExperimentalPagerApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-    val appPrefsSingleton = rememberService<AppPrefsSingleton>("AppPrefs")
-    val libVlcPrefsSingleton = rememberService<LibVlcPrefsSingleton>("LibVlcPrefs")
+    val appPrefsSingleton = rememberService<AppPrefsSingleton>(APP_PREFS_TAG)
+    val libVlcPrefsSingleton = rememberService<LibVlcPrefsSingleton>(LIB_VLC_PREFS_TAG)
 
     val backstack = LocalBackstack.current
     val goBack: () -> Unit = { backstack.goBack() }
@@ -299,7 +312,7 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : BaseAppSetting
     SwitchSettingItem(
       preference = prefs.playOnWiredConnection,
       title = fetch(R.string.PlayOnWiredConnection),
-      summary = fetch(R.string.StartPlayerOnWiredconnection),
+      summary = fetch(R.string.StartPlayerOnWiredConnection),
       offSummary = fetch(R.string.DoNotStartOnConnection),
       singleLineTitle = true,
     ),
@@ -430,6 +443,13 @@ data class AppSettingsScreen(private val key: SettingScreenKey) : BaseAppSetting
   private fun makeMediaScannerItems(
     prefs: AppPrefs
   ): List<SettingItem> = listOf(
+    SwitchSettingItem(
+      preference = prefs.scanInternalVolume,
+      title = fetch(R.string.ScanInternalTitle),
+      summary = fetch(R.string.ScanInternalOnSummary),
+      offSummary = fetch(R.string.ScanInternalOffSummary),
+      singleLineTitle = true,
+    ),
     SwitchSettingItem(
       preference = prefs.ignoreSmallFiles,
       title = "Ignore Small Files",
@@ -564,7 +584,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
   ) {
     TopAppBar(
       title = { if (subtitle == null) AppBarTitle(title) else TitleAndSubtitle(title, subtitle) },
-      backgroundColor = Color.Transparent,
+      backgroundColor = Color(0xFF_00_00_00),
       modifier = Modifier.fillMaxWidth(),
       navigationIcon = {
         IconButton(onClick = back) {

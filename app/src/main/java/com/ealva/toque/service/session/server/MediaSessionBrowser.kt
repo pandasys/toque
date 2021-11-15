@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
 import com.ealva.toque.R
+import com.ealva.toque.common.Limit
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.ArtistDao
@@ -47,6 +48,7 @@ import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.service.session.common.toCompatMediaId
 import com.ealva.toque.service.session.common.toPersistentId
+import com.ealva.toque.ui.library.ArtistType
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -58,17 +60,17 @@ import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 
 private val LOG by lazyLogger(MediaSessionBrowser::class)
-private const val MAX_LIST_SIZE = 1000L
+private val MAX_LIST_SIZE = Limit(1000L)
 
 typealias BrowserResult = MediaBrowserServiceCompat.Result<List<MediaItem>>
 
 interface OnMediaType<T> {
-  suspend fun onMedia(mediaId: MediaId, extras: Bundle, maxListSize: Long): T
-  suspend fun onArtist(artistId: ArtistId, extras: Bundle, maxListSize: Long): T
-  suspend fun onAlbum(albumId: AlbumId, extras: Bundle, maxListSize: Long): T
-  suspend fun onGenre(genreId: GenreId, extras: Bundle, maxListSize: Long): T
-  suspend fun onComposer(composerId: ComposerId, extras: Bundle, maxListSize: Long): T
-  suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle, maxListSize: Long): T
+  suspend fun onMedia(mediaId: MediaId, extras: Bundle, limit: Limit): T
+  suspend fun onArtist(artistId: ArtistId, extras: Bundle, limit: Limit): T
+  suspend fun onAlbum(albumId: AlbumId, extras: Bundle, limit: Limit): T
+  suspend fun onGenre(genreId: GenreId, extras: Bundle, limit: Limit): T
+  suspend fun onComposer(composerId: ComposerId, extras: Bundle, limit: Limit): T
+  suspend fun onPlaylist(playlistId: PlaylistId, extras: Bundle, limit: Limit): T
 }
 
 interface MediaSessionBrowser {
@@ -128,9 +130,7 @@ private class MediaSessionBrowserImpl(
     clientPackageName: String,
     clientUid: Int,
     rootHints: Bundle
-  ): BrowserRoot = makeBrowserRoot(rootHints).also { root ->
-    LOG._e { it("root=%s", root.rootId) }
-  }
+  ): BrowserRoot = makeBrowserRoot(rootHints)
 
   private fun makeBrowserRoot(rootHints: Bundle): BrowserRoot {
     val rootExtras = Bundle().apply {
@@ -184,32 +184,32 @@ private class MediaSessionBrowserImpl(
               override suspend fun onMedia(
                 mediaId: MediaId,
                 extras: Bundle,
-                maxListSize: Long
+                limit: Limit
               ): List<MediaItem> = emptyList()
 
               override suspend fun onArtist(
                 artistId: ArtistId,
                 extras: Bundle,
-                maxListSize: Long
+                limit: Limit
               ): List<MediaItem> =
                 valueFromList { makeArtistAlbumList(artistId) }
 
               override suspend fun onAlbum(
                 albumId: AlbumId,
                 extras: Bundle,
-                maxListSize: Long
+                limit: Limit
               ): List<MediaItem> = valueFromList { makeAlbumTracksList(albumId) }
 
               override suspend fun onGenre(
                 genreId: GenreId,
                 extras: Bundle,
-                maxListSize: Long
+                limit: Limit
               ): List<MediaItem> = valueFromList { makeGenreTracksList(genreId) }
 
               override suspend fun onComposer(
                 composerId: ComposerId,
                 extras: Bundle,
-                maxListSize: Long
+                limit: Limit
               ): List<MediaItem> {
                 TODO("Not yet implemented")
               }
@@ -217,7 +217,7 @@ private class MediaSessionBrowserImpl(
               override suspend fun onPlaylist(
                 playlistId: PlaylistId,
                 extras: Bundle,
-                maxListSize: Long
+                limit: Limit
               ): List<MediaItem> {
                 TODO("Not yet implemented")
               }
@@ -304,7 +304,7 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun makeAlbumList(): Result<List<MediaItem>, DaoMessage> =
     albumDao
-      .getAllAlbums(MAX_LIST_SIZE)
+      .getAllAlbums(limit = MAX_LIST_SIZE)
       .mapAll {
         Ok(
           MediaItem(
@@ -322,7 +322,7 @@ private class MediaSessionBrowserImpl(
   private suspend fun makeArtistAlbumList(
     artistId: ArtistId
   ): Result<List<MediaItem>, DaoMessage> = albumDao
-    .getAllAlbumsFor(artistId, MAX_LIST_SIZE)
+    .getAllAlbumsFor(artistId, ArtistType.AlbumArtist, limit = MAX_LIST_SIZE)
     .mapAll {
       Ok(
         MediaItem(
@@ -362,7 +362,7 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun makeTrackList(): Result<List<MediaItem>, DaoMessage> =
     audioMediaDao
-      .getAllAudio(MAX_LIST_SIZE)
+      .getAllAudio(limit = MAX_LIST_SIZE)
       .mapToMediaList()
 
   private fun makeTrackListItemDesc(): MediaDescriptionCompat =
@@ -377,7 +377,7 @@ private class MediaSessionBrowserImpl(
   private suspend fun makeAlbumTracksList(
     albumId: AlbumId
   ): Result<List<MediaItem>, DaoMessage> = audioMediaDao
-    .getAllAudioFor(albumId, MAX_LIST_SIZE)
+    .getAlbumAudio(id = albumId, limit = MAX_LIST_SIZE)
     .mapToMediaList()
 
   private fun Result<Iterable<AudioDescription>, DaoMessage>.mapToMediaList(): ItemListResult =
@@ -397,7 +397,7 @@ private class MediaSessionBrowserImpl(
   private suspend fun makeGenreTracksList(
     genreId: GenreId
   ): Result<List<MediaItem>, DaoMessage> = audioMediaDao
-    .getAllAudioFor(genreId, MAX_LIST_SIZE)
+    .getGenreAudio(genreId = genreId, limit = MAX_LIST_SIZE)
     .mapToMediaList()
 
   private fun makeEmptyMediaDesc(parentId: String) = MediaDescriptionCompat.Builder()

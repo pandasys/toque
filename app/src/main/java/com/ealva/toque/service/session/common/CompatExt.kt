@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,43 @@ fun PersistentId.toCompatMediaId(): String {
   }
   return "${prefix}_$value"
 }
+
+//fun logInvalidMediaId(id: String?) {
+//  LOG._e { it("Cannot parse Media ID '%s'", id ?: "null") }
+//}
+//
+//inline fun String?.handleAsMediaId(
+//  onMediaId: (MediaId) -> Unit = {},
+//  onArtistId: (ArtistId) -> Unit = {},
+//  onAlbumId: (AlbumId) -> Unit = {},
+//  onGenreId: (GenreId) -> Unit = {},
+//  onComposerId: (ComposerId) -> Unit = {},
+//  onPlaylistId: (PlaylistId) -> Unit = {},
+//  onInvalid: (String?) -> Unit = ::logInvalidMediaId
+//) {
+//  if (this == null) onInvalid(this) else {
+//    try {
+//      val list = split('_')
+//      when (list.size) {
+//        2 -> {
+//          val id = list[1].toLong()
+//          when (list[0]) {
+//            MEDIA_PREFIX -> onMediaId(MediaId(id))
+//            ARTIST_PREFIX -> onArtistId(ArtistId(id))
+//            ALBUM_PREFIX -> onAlbumId(AlbumId(id))
+//            GENRE_PREFIX -> onGenreId(GenreId(id))
+//            COMPOSER_PREFIX -> onComposerId(ComposerId(id))
+//            PLAYLIST_PREFIX -> onPlaylistId(PlaylistId(id))
+//            else -> onInvalid(this)
+//          }
+//        }
+//        else -> onMediaId(MediaId(toLong()))
+//      }
+//    } catch (e: Exception) {
+//      onInvalid(this)
+//    }
+//  }
+//}
 
 /**
  * Converts this String to a specific PersistentId type if the prefix is recognized or to a MediaId

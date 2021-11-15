@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ dependencies {
   implementation(Libs.Kotlin.Serialization.JSON)
 
   implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
-  implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.3.1")
+  //implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.3.1")
 
   implementation(Libs.Android.MATERIAL)
   implementation(Libs.AndroidX.Compose.UI)
@@ -149,6 +149,7 @@ dependencies {
   implementation(Libs.Accompanist.PAGER)
 
   implementation(Libs.Gowtham.RATING_BAR)
+  //implementation(Libs.Scrollbar.LAZY_COLUMN)
 
   implementation(Libs.Square.OKIO)
 
@@ -196,4 +197,6 @@ dependencies {
   androidTestImplementation(Libs.Expect.EXPECT)
   androidTestImplementation(Libs.Kotlin.Coroutines.TEST)
   androidTestImplementation(Libs.Koin.TEST)
+
+  implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
 }

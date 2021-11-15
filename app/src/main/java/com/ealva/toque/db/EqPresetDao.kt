@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package com.ealva.toque.db
 
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.EqPresetId
-import com.ealva.toque.common.runSuspendCatching
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -35,6 +34,7 @@ import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.andThen
+import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 
 interface EqPresetDao {
@@ -51,7 +51,7 @@ interface EqPresetDao {
   /**
    * Get all user defined presets
    */
-  suspend fun getAllUserPresets(): Result<List<EqPresetInfo>, DaoMessage>
+  suspend fun getAllUserPresets(): Result<List<EqPresetIdName>, DaoMessage>
 
   /**
    * Update all the preset data the preset with id=```presetData.id```. [duringTxn] is called
@@ -158,12 +158,12 @@ private class EqPresetDaoImpl(
     Array(bandColumns.size) { index -> Amp(cursor[bandColumns[index]]) }
   )
 
-  override suspend fun getAllUserPresets(): Result<List<EqPresetInfo>, DaoMessage> =
+  override suspend fun getAllUserPresets(): Result<List<EqPresetIdName>, DaoMessage> =
     runSuspendCatching {
       db.query {
         EqPresetTable
           .selectAll()
-          .sequence { EqPresetInfo(EqPresetId(it[id]), it[presetName]) }
+          .sequence { EqPresetIdName(EqPresetId(it[id]), it[presetName]) }
           .toList()
       }
     }.mapError { DaoExceptionMessage(it) }
@@ -266,7 +266,7 @@ private class EqPresetDaoImpl(
     EqPresetTable.select().where { id eq presetId.value }.count() > 0
 }
 
-data class EqPresetInfo(val id: EqPresetId, val name: String)
+data class EqPresetIdName(val id: EqPresetId, val name: String)
 
 data class EqPresetData(
   val id: EqPresetId,
@@ -318,7 +318,9 @@ object NullEqPresetDao : EqPresetDao {
     id: EqPresetId
   ): Result<EqPresetData, DaoMessage> = NotImplemented
 
-  override suspend fun getAllUserPresets(): Result<List<EqPresetInfo>, DaoMessage> = NotImplemented
+  override suspend fun getAllUserPresets(): Result<List<EqPresetIdName>, DaoMessage> =
+    NotImplemented
+
   override suspend fun updatePreset(
     presetData: EqPresetData,
     duringTxn: () -> Unit

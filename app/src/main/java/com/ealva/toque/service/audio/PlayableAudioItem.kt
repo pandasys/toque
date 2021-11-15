@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,10 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
+import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.Rating
+import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
@@ -48,11 +50,11 @@ interface PlayableAudioItem : QueueAudioItem {
 
   var playbackRate: PlaybackRate
 
-  fun play(immediate: Boolean = false)
+  fun play(forceTransition: ForceTransition)
 
   fun stop()
 
-  fun pause(immediate: Boolean = false)
+  fun pause(forceTransition: ForceTransition)
 
   fun togglePlayPause()
 
@@ -171,9 +173,9 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override val isPlaying: Boolean = false
   override val isPausable: Boolean = false
   override val supportsFade: Boolean = false
-  override fun play(immediate: Boolean) = Unit
+  override fun play(forceTransition: ForceTransition) = Unit
   override fun stop() = Unit
-  override fun pause(immediate: Boolean) = Unit
+  override fun pause(forceTransition: ForceTransition) = Unit
   override fun togglePlayPause() = Unit
   override fun seekTo(position: Millis) = Unit
   override val position: Millis = Millis(0)
@@ -197,5 +199,5 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override fun setRating(newRating: Rating, allowFileUpdate: Boolean): Unit = Unit
   override fun previousShouldRewind(): Boolean = false
   override fun reset(playNow: PlayNow) = Unit
-  override val instanceId: Long = 0
+  override val instanceId: InstanceId = InstanceId.INVALID
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 eAlva.com
+ * Copyright 2021 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,9 +61,9 @@ interface PlayableAudioItemFactory {
       audioMediaDao: AudioMediaDao,
       mediaFileStore: MediaFileStore,
       libVlcSingleton: LibVlcSingleton,
-      libVlcPrefsSingleton: LibVlcPrefsSingleton,
+      wakeLockFactory: WakeLockFactory,
       appPrefsSingleton: AppPrefsSingleton,
-      wakeLockFactory: WakeLockFactory
+      libVlcPrefsSingleton: LibVlcPrefsSingleton
     ): PlayableAudioItemFactory = PlayableAudioItemFactoryImpl(
       audioMediaDao,
       mediaFileStore,
