@@ -18,16 +18,17 @@ package com.ealva.toque.ui.library
 
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -116,7 +117,13 @@ private fun AllComposers(
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
 
-  LibraryScrollBar(listState = listState) {
+  LibraryScrollBar(
+    listState = listState,
+    modifier = Modifier
+      .statusBarsPadding()
+      .navigationBarsPadding(bottom = false)
+      .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
+  ) {
     LazyColumn(
       state = listState,
       contentPadding = PaddingValues(
@@ -158,7 +165,7 @@ private fun ComposerItem(
         onLongClick = { itemLongClicked(composerInfo.id) }
       ),
     icon = {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_person),
         contentDescription = "Composer icon",
         modifier = Modifier.size(40.dp)
@@ -178,6 +185,7 @@ private fun ComposerItem(
 }
 
 private interface ComposersViewModel {
+  @Immutable
   data class ComposerInfo(
     val id: ComposerId,
     val name: ComposerName,
@@ -210,7 +218,10 @@ private class ComposersViewModelImpl(
   override val selectedItems = SelectedItemsFlow<ComposerId>()
 
   private fun goToComposersSongs(composerId: ComposerId) {
-    backstack.goTo(ComposerSongsScreen(composerId))
+    val name = allComposers.value
+      .find { it.id == composerId }
+      ?.name ?: ComposerName("")
+    backstack.goTo(ComposerSongsScreen(composerId, name))
   }
 
   override fun onServiceActive() {
@@ -243,11 +254,11 @@ private class ComposersViewModelImpl(
   }
 
   override fun itemClicked(composerId: ComposerId) =
-    selectedItems.hasSelectionToggleElse(composerId) { goToComposersSongs(composerId) }
+    selectedItems.ifInSelectionModeToggleElse(composerId) { goToComposersSongs(composerId) }
 
   override fun itemLongClicked(composerId: ComposerId) = selectedItems.toggleSelection(composerId)
 
-  override fun onBackEvent(): Boolean = selectedItems.hasSelectionThenClear()
+  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 
   override fun onServiceInactive() {
     scope.cancel()

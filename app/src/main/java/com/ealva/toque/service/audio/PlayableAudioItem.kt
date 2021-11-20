@@ -19,7 +19,7 @@ package com.ealva.toque.service.audio
 import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.audio.QueueAudioItem
+import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.StartPaused
@@ -33,7 +33,7 @@ import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
-interface PlayableAudioItem : QueueAudioItem {
+interface PlayableAudioItem : AudioItem {
   val eventFlow: Flow<PlayableItemEvent>
 
   val metadata: Metadata

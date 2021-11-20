@@ -83,10 +83,10 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
 
     setupLogging()
     //val logger = logger(ToqueImpl::class)
-    debug {
-      WeLiteLog.logQueryPlans = true
-      WeLiteLog.logSql = true
-    }
+//    debug {
+//      WeLiteLog.logQueryPlans = true
+//      WeLiteLog.logSql = true
+//    }
 
 //    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 //      StrictMode.VmPolicy.Builder()

@@ -18,6 +18,7 @@ package com.ealva.toque.ui.library
 
 import android.os.Parcelable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import com.ealva.toque.common.alsoIf
@@ -37,31 +38,73 @@ typealias MutableSelectedItemsFlow<E> = MutableStateFlow<SelectedItems<E>>
  * correctly defined equals and hashCode functions.
  *
  * As this is immutable, [toggleSelection] returns a new SelectedItems instance
+ *
+ * SelectedItems makes no guarantees on ordering of keys. To maintain order use SelectedItems to
+ * filter the original list
  */
+@Immutable
 interface SelectedItems<E : Parcelable> : Parcelable {
   /** Does this set contain any keys */
   val hasSelection: Boolean
+
+  /**
+   * This class enters selection mode during construction, when the first [toggleSelection]
+   * returns an instance containing a key. Since this class is immutable, the only way to exit
+   * selection mode is via [turnOffSelectionMode] which returns an instance with no keys selected.
+   */
+  val inSelectionMode: Boolean
+
+  /**
+   * Set [inSelectionMode] to false and clear any selection
+   */
+  fun turnOffSelectionMode(): SelectedItems<E>
+
   /** If this [key] is currently selected, remove it, else add it */
   fun toggleSelection(key: E): SelectedItems<E>
+
+  /** Clears any selection but does not [turnOffSelectionMode]  */
+  fun clearSelection(): SelectedItems<E>
+
   /** Is this [key] selected */
   fun isSelected(key: E): Boolean
 
+  val selectedCount: Int
+
   companion object {
     operator fun <E : Parcelable> invoke(keySet: Set<E> = emptySet()): SelectedItems<E> =
-      SelectedItemsImpl(keySet)
+      SelectedItemsImpl(keySet = keySet, inSelectionMode = keySet.isNotEmpty())
   }
+}
+
+/**
+ * Given a sequence of type T and a function [getKey] which can produce a key of type E possibly
+ * in [selectedItems], filter this matching only elements whose key appears in [selectedItems].
+ * If [selectedItems] has no selection, the original sequence is returned
+ */
+inline fun <T, E : Parcelable> Sequence<T>.filterWith(
+  selectedItems: SelectedItems<E>, crossinline getKey: (T) -> E
+): Sequence<T> {
+  return if (selectedItems.hasSelection) {
+    filter { selectedItems.isSelected(getKey(it)) }
+  } else this
 }
 
 @Parcelize
 private class SelectedItemsImpl<E : Parcelable>(
-  private val keySet: Set<E>
+  private val keySet: Set<E>,
+  override val inSelectionMode: Boolean
 ) : SelectedItems<E>, Parcelable {
   override val hasSelection: Boolean
     get() = keySet.isNotEmpty()
 
+  override fun turnOffSelectionMode(): SelectedItems<E> = SelectedItemsImpl(emptySet(), false)
+
   override fun toggleSelection(key: E): SelectedItems<E> {
-    return SelectedItemsImpl(keySet.removeIfContainsElseAdd(key))
+    val newSet = keySet.removeIfContainsElseAdd(key)
+    return SelectedItemsImpl(newSet, inSelectionMode || newSet.isNotEmpty())
   }
+
+  override fun clearSelection(): SelectedItems<E> = SelectedItemsImpl(emptySet(), inSelectionMode)
 
   override fun isSelected(key: E): Boolean = keySet.contains(key)
   override fun equals(other: Any?): Boolean {
@@ -69,13 +112,21 @@ private class SelectedItemsImpl<E : Parcelable>(
     if (other !is SelectedItemsImpl<*>) return false
 
     if (keySet != other.keySet) return false
+    if (inSelectionMode != other.inSelectionMode) return false
 
     return true
   }
 
   override fun hashCode(): Int {
-    return keySet.hashCode()
+    var result = keySet.hashCode()
+    result = 31 * result + inSelectionMode.hashCode()
+    return result
   }
+
+
+  override val selectedCount: Int
+    get() = keySet.size
+
 }
 
 @Suppress("FunctionName")
@@ -98,18 +149,35 @@ fun <E : Parcelable> SelectedItemsFlow<E>.asState(
 ): State<SelectedItems<E>> = collectAsState(value, context)
 
 /**
- * If there is a selection (set not empty) then clear the selection
+ * If in selection mode returns true and turns off selection mode. Otherwise returns false.
+ * Useful for "onBack"
  */
-fun <E : Parcelable> MutableSelectedItemsFlow<E>.hasSelectionThenClear(): Boolean =
-  hasSelection.alsoIf { value = SelectedItems() }
+fun <E : Parcelable> MutableSelectedItemsFlow<E>.inSelectionModeThenTurnOff(): Boolean =
+  inSelectionMode.alsoIf { turnOffSelectionMode() }
+
+
+/** Clear any selection. Doesn't turn off selection mode */
+fun <E : Parcelable> MutableSelectedItemsFlow<E>.clearSelection() {
+  value = value.clearSelection()
+}
+
+/** Clears any selection and turns off selection mode */
+fun <E : Parcelable> MutableSelectedItemsFlow<E>.turnOffSelectionMode() {
+  value = value.turnOffSelectionMode()
+}
 
 /**
- * If these is a selection (set not empty), add or remove the [key] as appropriate, else
- * call [block] with the [key]
+ * If in selection mode, toggle the selection of [key], else call [block] with
+ * the [key]. Useful to toggle selection when in selection mode else perform an action
  */
-inline fun <E : Parcelable> MutableSelectedItemsFlow<E>.hasSelectionToggleElse(
+inline fun <E : Parcelable> MutableSelectedItemsFlow<E>.ifInSelectionModeToggleElse(
   key: E, block: (E) -> Unit
-) = if (hasSelection) toggleSelection(key) else block(key)
+) = if (inSelectionMode) toggleSelection(key) else block(key)
 
-inline val <E : Parcelable> MutableSelectedItemsFlow<E>.hasSelection: Boolean
-  get() = value.hasSelection
+inline val <E : Parcelable> MutableSelectedItemsFlow<E>.inSelectionMode: Boolean
+  get() = value.inSelectionMode
+
+/** Creates a SelectedItems with every item in [keySet] selected and sets that instance. */
+fun <E : Parcelable> MutableSelectedItemsFlow<E>.selectAll(keySet: Set<E>) {
+  value = SelectedItems(keySet)
+}

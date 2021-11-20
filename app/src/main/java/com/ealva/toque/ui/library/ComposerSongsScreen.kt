@@ -17,17 +17,27 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioDescrResult
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.NamedSongListType
+import com.ealva.toque.db.SongListType
 import com.ealva.toque.persist.ComposerId
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.config.LocalScreenConfig
+import com.google.accompanist.insets.navigationBarsPadding
+import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.parcelize.Parcelize
@@ -38,10 +48,11 @@ import javax.annotation.concurrent.Immutable
 @Immutable
 @Parcelize
 data class ComposerSongsScreen(
-  private val composerId: ComposerId
+  private val composerId: ComposerId,
+  private val composerName: ComposerName,
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(ComposerSongsViewModel(composerId, get())) }
+    with(serviceBinder) { add(ComposerSongsViewModel(composerId, composerName, get(), lookup())) }
   }
 
   @OptIn(ExperimentalFoundationApi::class)
@@ -50,20 +61,30 @@ data class ComposerSongsScreen(
     val viewModel = rememberService<ComposerSongsViewModel>()
     val songs = viewModel.allSongs.collectAsState()
     val selected = viewModel.selectedItems.asState()
+    val config = LocalScreenConfig.current
     SongItemList(
       list = songs.value,
       selectedItems = selected.value,
       itemClicked = { viewModel.mediaClicked(it) },
-      itemLongClicked = { viewModel.mediaLongClicked(it) }
+      itemLongClicked = { viewModel.mediaLongClicked(it) },
+      modifier = Modifier
+        .statusBarsPadding()
+        .navigationBarsPadding(bottom = false)
+        .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
     )
   }
 }
 
 private class ComposerSongsViewModel(
   private val composerId: ComposerId,
+  private val composerName: ComposerName,
   audioMediaDao: AudioMediaDao,
+  localAudioQueueModel: LocalAudioQueueModel,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : BaseSongsViewModel(audioMediaDao, dispatcher), ScopedServices.Activated {
+) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, dispatcher), ScopedServices.Activated {
+  override val namedSongListType: NamedSongListType
+    get() = NamedSongListType(composerName.value, SongListType.Composer)
+
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter

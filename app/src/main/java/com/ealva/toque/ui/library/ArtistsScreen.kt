@@ -28,11 +28,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -138,7 +140,13 @@ private fun AllArtistsList(
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
 
-  LibraryScrollBar(listState = listState) {
+  LibraryScrollBar(
+    listState = listState,
+    modifier = Modifier
+      .statusBarsPadding()
+      .navigationBarsPadding(bottom = false)
+      .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
+  ) {
     LazyColumn(
       state = listState,
       contentPadding = PaddingValues(
@@ -182,17 +190,25 @@ private fun ArtistItem(
         onLongClick = { itemLongClicked(artistInfo.artistId) }
       ),
     icon = {
-      Image(
-        painter = rememberImagePainter(
-          data = artistInfo.artwork,
-          builder = {
-            error(artistType.typeIcon)
-            placeholder(artistType.typeIcon)
-          }
-        ),
-        contentDescription = stringResource(R.string.ArtistImage),
-        modifier = Modifier.size(40.dp)
-      )
+      if (artistInfo.artwork != Uri.EMPTY) {
+        Image(
+          painter = rememberImagePainter(
+            data = artistInfo.artwork,
+            builder = {
+              error(artistType.typeIcon)
+              placeholder(artistType.typeIcon)
+            }
+          ),
+          contentDescription = stringResource(R.string.ArtistImage),
+          modifier = Modifier.size(40.dp)
+        )
+      } else {
+        Icon(
+          painter = rememberImagePainter(data = artistType.typeIcon),
+          contentDescription = stringResource(R.string.ArtistImage),
+          modifier = Modifier.size(40.dp)
+        )
+      }
     },
     text = { Text(text = artistInfo.name.value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
     secondaryText = { AlbumAndSongCount(artistInfo = artistInfo) },
@@ -227,6 +243,7 @@ private fun AlbumAndSongCount(artistInfo: ArtistInfo) {
 }
 
 private interface ArtistsViewModel {
+  @Immutable
   @Parcelize
   data class ArtistInfo(
     val artistId: ArtistId,
@@ -274,8 +291,12 @@ private class ArtistsViewModelImpl(
     filterFlow.value = search.wrapAsFilter()
   }
 
-  private fun goToArtistAlbums(artistId: ArtistId, songCount: Int) =
-    backstack.goTo(ArtistAlbumsScreen(artistId, artistType, songCount))
+  private fun goToArtistAlbums(artistId: ArtistId, songCount: Int) {
+    val name = allArtists.value
+      .find { it.artistId == artistId }
+      ?.name ?: ArtistName("")
+    backstack.goTo(ArtistAlbumsScreen(artistId, artistType, name, songCount))
+  }
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)
@@ -319,11 +340,11 @@ private class ArtistsViewModelImpl(
   }
 
   override fun itemClicked(artistId: ArtistId, songCount: Int) =
-    selectedItems.hasSelectionToggleElse(artistId) { goToArtistAlbums(it, songCount) }
+    selectedItems.ifInSelectionModeToggleElse(artistId) { goToArtistAlbums(it, songCount) }
 
   override fun itemLongClicked(artistId: ArtistId) = selectedItems.toggleSelection(artistId)
 
-  override fun onBackEvent(): Boolean = selectedItems.hasSelectionThenClear()
+  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 
   override fun onServiceInactive() {
     scope.cancel()

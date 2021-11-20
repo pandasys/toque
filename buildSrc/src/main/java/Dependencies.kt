@@ -105,6 +105,10 @@ object Libs {
     const val COIL_COMPOSE = "io.coil-kt:coil-compose:1.4.0"
   }
 
+  object ComposeReorder {
+    const val REORDERABLE = "org.burnoutcrew.composereorderable:reorderable:0.7.4"
+  }
+
   object Datastore {
     const val PREFERENCES = "androidx.datastore:datastore-preferences:1.0.0"
   }

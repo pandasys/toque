@@ -20,8 +20,6 @@ import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.test.shared.toNotBe
 import com.nhaarman.expect.expect
 import org.junit.Test
-import android.os.Parcel
-import android.os.Parcelable
 
 class SelectedItemsTest {
 
@@ -106,36 +104,76 @@ class SelectedItemsTest {
     second = second.toggleSelection(InstanceId(3))
     expect(first).toNotBe(second)
   }
-}
 
-class ParcelWrap<T>(val value: T)
+  @Test
+  fun testClearSelection() {
+    val list = listOf(InstanceId(1), InstanceId(2), InstanceId(3))
 
-val <T> T.parcel: ParcelWrap<T> get() = ParcelWrap(this)
+    var before = SelectedItems<InstanceId>()
+    list.forEach {
+      before = before.toggleSelection(it)
+    }
+    expect(before.inSelectionMode).toBe(true)
+    expect(before.hasSelection).toBe(true)
+    list.forEach { expect(before.isSelected(it)).toBe(true) }
 
-inline fun <reified T: Parcelable> ParcelWrap<T>.test(
-  flags: Int = 0,
-  classLoader: ClassLoader = T::class.java.classLoader!!,
-  checks: (T) -> Unit
-): T {
-  // Create the parcel
-  val parcel: Parcel = Parcel.obtain()
-  parcel.writeParcelable(this.value, flags)
+    before = before.toggleSelection(InstanceId(2))
+    expect(before.inSelectionMode).toBe(true)
+    expect(before.hasSelection).toBe(true)
+    expect(before.isSelected(InstanceId(1))).toBe(true)
+    expect(before.isSelected(InstanceId(2))).toBe(false)
+    expect(before.isSelected(InstanceId(1))).toBe(true)
 
-  // Record dataPosition
-  val eop = parcel.dataPosition()
-
-  // Reset the parcel
-  parcel.setDataPosition(0)
-
-  // Read from the parcel
-  val newObject = parcel.readParcelable<T>(classLoader)
-
-  // Perform the checks provided in the lambda
-  checks(newObject!!)
-
-  // Verify dataPosition
-  expect(eop).toBe(parcel.dataPosition()) {
-    "writeToParcel wrote too much data or read didn't finish reading"
+    before = before.clearSelection()
+    expect(before.inSelectionMode).toBe(true)
+    expect(before.hasSelection).toBe(false)
+    expect(before.isSelected(InstanceId(1))).toBe(false)
+    expect(before.isSelected(InstanceId(2))).toBe(false)
+    expect(before.isSelected(InstanceId(1))).toBe(false)
   }
-  return newObject
+
+  @Test
+  fun testInSelectionMode() {
+    val list = listOf(InstanceId(1), InstanceId(2), InstanceId(3))
+
+    var before = SelectedItems<InstanceId>()
+    list.forEach {
+      before = before.toggleSelection(it)
+    }
+    expect(before.inSelectionMode).toBe(true)
+    expect(before.hasSelection).toBe(true)
+    list.forEach { expect(before.isSelected(it)).toBe(true) }
+
+    before = before.toggleSelection(InstanceId(2))
+    expect(before.inSelectionMode).toBe(true)
+    expect(before.hasSelection).toBe(true)
+    expect(before.isSelected(InstanceId(1))).toBe(true)
+    expect(before.isSelected(InstanceId(2))).toBe(false)
+    expect(before.isSelected(InstanceId(1))).toBe(true)
+
+    before = before.turnOffSelectionMode()
+    expect(before.inSelectionMode).toBe(false)
+    expect(before.hasSelection).toBe(false)
+    expect(before.isSelected(InstanceId(1))).toBe(false)
+    expect(before.isSelected(InstanceId(2))).toBe(false)
+    expect(before.isSelected(InstanceId(1))).toBe(false)
+
+    before = SelectedItems()
+    expect(before.inSelectionMode).toBe(false)
+    before = before.turnOffSelectionMode()
+    expect(before.inSelectionMode).toBe(false)
+  }
+
+  @Test
+  fun testMakeWithSet() {
+    val keySet = setOf(InstanceId(1), InstanceId(2), InstanceId(3))
+    var before = SelectedItems(keySet)
+    expect(before.inSelectionMode).toBe(true)
+    expect(before.hasSelection).toBe(true)
+    keySet.forEach { expect(before.isSelected(it)).toBe(true) }
+
+    before = SelectedItems()
+    expect(before.inSelectionMode).toBe(false)
+    expect(before.hasSelection).toBe(false)
+  }
 }

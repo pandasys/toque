@@ -48,11 +48,16 @@ import kotlin.math.roundToInt
 fun MainScreen(
   composeStateChanger: ComposeStateChanger,
   topOfStack: ComposeKey,
-  goToSettings: () -> Unit,
   goToNowPlaying: () -> Unit,
   goToLibrary: () -> Unit,
+  goToQueue: () -> Unit,
+  goToSearch: () -> Unit,
+  goToSettings: () -> Unit,
 ) {
-  Surface(modifier = Modifier.fillMaxSize()) {
+  Surface(
+    modifier = Modifier.fillMaxSize(),
+    color = Color.Transparent
+  ) {
 
     val scaffoldState = rememberScaffoldState()
     val (isBottomSheetExpanded, expandBottomSheet) = remember { mutableStateOf(false) }
@@ -98,10 +103,11 @@ fun MainScreen(
             MainBottomSheet(
               topOfStack = topOfStack,
               isExpanded = isBottomSheetExpanded,
-              goToSettings = goToSettings,
               goToNowPlaying = goToNowPlaying,
               goToLibrary = goToLibrary,
-              config = screenConfig,
+              goToQueue = goToQueue,
+              goToSearch = goToSearch,
+              goToSettings = goToSettings,
               modifier = Modifier
                 .fillMaxWidth()
                 .height(bottomBarHeight)
@@ -110,7 +116,6 @@ fun MainScreen(
                 .offset { IntOffset(x = 0, y = -bottomBarOffsetHeightPx.value.roundToInt()) }
             )
           },
-          backgroundColor = Color.Transparent,
         ) {
           composeStateChanger.RenderScreen(modifier = Modifier.fillMaxSize())
         }

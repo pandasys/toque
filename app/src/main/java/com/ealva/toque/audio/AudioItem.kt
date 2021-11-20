@@ -39,5 +39,3 @@ interface AudioItem : HasId {
   val location: Uri
   val fileUri: Uri
 }
-
-interface QueueAudioItem : AudioItem

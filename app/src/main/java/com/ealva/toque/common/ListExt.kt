@@ -16,6 +16,13 @@
 
 package com.ealva.toque.common
 
+
+fun <E> MutableList<E>.swap(index1: Int, index2: Int) = apply {
+  val tmp = this[index1]
+  this[index1] = this[index2]
+  this[index2] = tmp
+}
+
 /**
  * Returns a sublist of max size 15, which is a window around [currentItemIndex]
  */

@@ -26,6 +26,11 @@
     <item quantity="other">%1$d albums</item>
   </plurals>
 
+  <plurals name="UpNextActionPrompt">
+    <item quantity="one">"You are going to add %1$d song to Up Next. Clear the songs already in Up Next?"</item>
+    <item quantity="other">"You are going to add %1$d songs to Up Next. Clear the songs already in Up Next?"</item>
+  </plurals>
+
   <string name="app_name">Toque</string>
 
   <string name="None">None</string>
@@ -179,4 +184,10 @@
   <string name="ScanInternalTitle">Scan Internal Storage</string>
   <string name="ScanInternalOnSummary">Scan Internal Storage for media. This typically includes Ringtones, Notifications, etc.</string>
   <string name="ScanInternalOffSummary">Do not scan Internal Storage for media.</string>
+    <string name="Shuffle">Shuffle</string>
+    <string name="AddToUpNext">Add to up next</string>
+  <string name="AddToPlaylist">Add to playlist</string>
+    <string name="MediaInfo">Media Information</string>
+  <string name="Search">Search</string>
+  <string name="UpNextActionPrompt">"You are going to add  song to Up Next. Clear the songs already in Up Next?"</string>
 </resources>

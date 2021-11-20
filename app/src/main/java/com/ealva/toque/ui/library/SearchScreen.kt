@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.common
+package com.ealva.toque.ui.library
 
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.navigation.ComposeKey
+import kotlinx.parcelize.Parcelize
+import javax.annotation.concurrent.Immutable
 
-@Composable
-fun LibraryScrollBar(
-  listState: LazyListState,
-  modifier: Modifier,
-  content: @Composable () -> Unit
-) {
-  val config = LocalScreenConfig.current
+@Immutable
+@Parcelize
+data class SearchScreen(private val noArg: String = "") : ComposeKey() {
 
-  LazyColumnScrollbar(
-    listState = listState,
-    modifier = modifier,
-    thumbMinHeight = if (config.inPortrait) 0.1F else 0.15F,
-    content = content
-  )
+  @Composable
+  override fun ScreenComposable(modifier: Modifier) {
+    Column(modifier = Modifier.fillMaxSize()) {
+      Text(text = "Search")
+    }
+  }
 }

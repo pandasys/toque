@@ -19,6 +19,7 @@ package com.ealva.toque.prefs
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasTitle
+import com.ealva.toque.service.queue.ClearQueue
 
 enum class PlayUpNextAction(
   override val id: Int,
@@ -27,4 +28,9 @@ enum class PlayUpNextAction(
   ClearUpNext(1, R.string.ClearUpNext),
   PlayNext(2, R.string.PlayNext),
   Prompt(3, R.string.Prompt);
+
+  val shouldPrompt: Boolean get() = this === Prompt
+
+  val clearUpNext: ClearQueue
+    get() = if (this === ClearUpNext) ClearQueue(true) else ClearQueue(false)
 }

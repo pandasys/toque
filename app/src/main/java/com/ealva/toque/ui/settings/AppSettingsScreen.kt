@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.SwitchDefaults
@@ -88,6 +89,7 @@ import com.ealva.toque.ui.settings.SettingScreenKeys.LookAndFeel
 import com.ealva.toque.ui.settings.SettingScreenKeys.MediaScannerSettings
 import com.ealva.toque.ui.settings.SettingScreenKeys.NowPlayingLookAndFeel
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
+import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
@@ -584,11 +586,11 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
   ) {
     TopAppBar(
       title = { if (subtitle == null) AppBarTitle(title) else TitleAndSubtitle(title, subtitle) },
-      backgroundColor = Color(0xFF_00_00_00),
+      backgroundColor = MaterialTheme.colors.surface,
       modifier = Modifier.fillMaxWidth(),
       navigationIcon = {
         IconButton(onClick = back) {
-          Image(
+          Icon(
             painter = rememberImagePainter(data = R.drawable.ic_arrow_left),
             contentDescription = "Toggle Equalizer",
             modifier = Modifier.size(26.dp)

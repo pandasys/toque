@@ -69,7 +69,6 @@ import com.ealva.toque.R
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.audio.QueueAudioItem
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.asCompat
@@ -99,7 +98,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.ArrayList
+import java.util.*
 import kotlin.math.roundToInt
 import androidx.core.app.NotificationCompat.Builder as NotificationBuilder
 
@@ -171,7 +170,7 @@ interface MediaSessionState {
    * queue changed and not because the queue contents changes. This is checked so that if the entire
    * queue is being sent, and not just a window, we don't need to send the queue again
    */
-  fun setQueue(queue: List<QueueAudioItem>, currentItemIndex: Int, indexChange: Boolean = false)
+  fun setQueue(queue: List<AudioItem>, currentItemIndex: Int, indexChange: Boolean = false)
 
   /** Sets the title of the play queue, eg. "Now Playing" */
   fun setQueueTitle(title: String)
@@ -379,8 +378,8 @@ private class MediaSessionImpl(
     postStartOrUpdateNotification()
   }
 
-  private var lastQueueWindow: List<QueueAudioItem> = emptyList()
-  override fun setQueue(queue: List<QueueAudioItem>, currentItemIndex: Int, indexChange: Boolean) {
+  private var lastQueueWindow: List<AudioItem> = emptyList()
+  override fun setQueue(queue: List<AudioItem>, currentItemIndex: Int, indexChange: Boolean) {
     if (ctx.isCarMode()) {
       // Don't set same queue again. Not really an optimization because this is very fast, but
       // let's not unnecessarily give the client new lists
@@ -676,7 +675,7 @@ fun Metadata.toCompat(): MediaMetadataCompat {
     .build()
 }
 
-private fun List<QueueAudioItem>.toCompat(): List<MediaSessionCompat.QueueItem> =
+private fun List<AudioItem>.toCompat(): List<MediaSessionCompat.QueueItem> =
   ArrayList<MediaSessionCompat.QueueItem>(size).apply {
     this@toCompat.forEach { audioItem ->
       add(MediaSessionCompat.QueueItem(audioItem.toDescriptionCompat(), audioItem.instanceId.value))

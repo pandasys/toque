@@ -44,10 +44,13 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.annotation.concurrent.Immutable
 
 private val LOG by lazyLogger(LocalAudioMiniPlayerViewModel::class)
 
+@Immutable
 data class MiniPlayerState(
   val queue: List<AudioItem>,
   val queueIndex: Int,
@@ -147,13 +150,14 @@ private class LocalAudioMiniPlayerViewModelImpl(
     audioQueue = NullLocalAudioQueue
   }
 
-  private suspend fun handleServiceState(queueState: LocalAudioQueueState) {
-    val newState = miniPlayerState.value.copy(
-      queue = queueState.queue,
-      queueIndex = queueState.queueIndex,
-      playingState = queueState.playingState,
-    )
-    miniPlayerState.emit(newState)
+  private fun handleServiceState(queueState: LocalAudioQueueState) {
+    miniPlayerState.update {
+      it.copy(
+        queue = queueState.queue,
+        queueIndex = queueState.queueIndex,
+        playingState = queueState.playingState,
+      )
+    }
   }
 
   override fun togglePlayPause() {

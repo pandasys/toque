@@ -30,7 +30,6 @@ import com.ealva.prefstore.store.StorePref
 import com.ealva.toque.R
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.audio.QueueAudioItem
 import com.ealva.toque.audioout.AudioOutputState
 import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
@@ -42,6 +41,7 @@ import com.ealva.toque.common.debug
 import com.ealva.toque.common.debugCheck
 import com.ealva.toque.common.ensureUiThread
 import com.ealva.toque.common.fetch
+import com.ealva.toque.common.swap
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.QueueDao
@@ -49,6 +49,7 @@ import com.ealva.toque.db.QueuePositionState
 import com.ealva.toque.db.QueuePositionStateDao
 import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.SongListType
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaIdList
@@ -125,7 +126,7 @@ import org.koin.core.component.inject
 typealias QueueList = List<PlayableAudioItem>
 
 data class LocalAudioQueueState(
-  val queue: List<QueueAudioItem>,
+  val queue: List<AudioItem>,
   val queueIndex: Int,
   val position: Millis,
   val duration: Millis,
@@ -208,10 +209,16 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   fun prepareNext(audioIdList: AudioIdList)
   fun nextRepeatMode()
   fun nextShuffleMode()
+
   /** This method is necessary for MediaSession callback */
   fun setRepeatMode(mode: RepeatMode)
+
   /** This method is necessary for MediaSession callback */
   fun setShuffleMode(mode: ShuffleMode)
+
+  fun removeFromQueue(index: Int, item: AudioItem)
+
+  fun moveQueueItem(from: Int, to: Int)
 
   companion object {
     suspend fun make(
@@ -656,7 +663,7 @@ private class LocalAudioQueueImpl(
   }
 
   override fun goToIndexMaybePlay(index: Int) {
-    if (index != currentItemIndex) {
+    if (index != currentItemIndex && index in queue.indices) {
       scope.launch { doGoToIndex(index, PlayNow(currentItem.isPlaying), Manual) }
     }
   }
@@ -758,6 +765,126 @@ private class LocalAudioQueueImpl(
     }
   }
 
+  override fun removeFromQueue(index: Int, item: AudioItem) {
+    scope.launch {
+      val prevCurrentIndex = currentItemIndex
+      val prevCurrent = currentItem
+
+      var newQueue: MutableList<PlayableAudioItem> = upNextQueue.toMutableList()
+      var newShuffled: MutableList<PlayableAudioItem> = upNextShuffled.toMutableList()
+      var newIndex = index
+
+      // Index to remove can't be current item, so result cannot be < 0 if index < prevCurrentIndex
+      fun adjustNewIndex(index: Int, prevCurrentIndex: Int): Int =
+        if (index < prevCurrentIndex) prevCurrentIndex - 1 else prevCurrentIndex
+
+      if (index != prevCurrentIndex && index in upNextQueue.indices) {
+        if (shuffle.shuffleMedia) {
+          if (index in newShuffled.indices) {
+            val removed: PlayableAudioItem = newShuffled.removeAt(index)
+            if (removed.instanceId == item.instanceId) {
+              val queueIndex = newQueue.indexOfFirst { it.instanceId == removed.instanceId }
+              if (queueIndex >= 0) newQueue.removeAt(queueIndex)
+              newIndex = adjustNewIndex(index, prevCurrentIndex)
+            } else {
+              newShuffled = upNextShuffled.toMutableList()
+            }
+          }
+        } else {
+          val removed = newQueue.removeAt(index)
+          if (removed.instanceId == item.instanceId) {
+            newIndex = adjustNewIndex(index, prevCurrentIndex)
+          } else {
+            newQueue = upNextQueue.toMutableList()
+          }
+        }
+        try {
+          persistIfCurrentUnchanged(
+            newQueue = newQueue,
+            newShuffled = newShuffled,
+            prevCurrent = prevCurrent,
+            prevCurrentIndex = prevCurrentIndex
+          )
+        } catch (e: Exception) {
+          LOG.e(e) { it("Could not persist new queue") }
+          // fatal error persisting, revert to original queues and invoke establish so update is
+          // sent to clients
+          newQueue = upNextQueue.toMutableList()
+          newShuffled = upNextShuffled.toMutableList()
+          newIndex = prevCurrentIndex
+        }
+      }
+      // We want to send an state update even if nothing changed to ensure the UI is consistent
+      establishNewQueues(newQueue, newShuffled, newIndex)
+    }
+  }
+
+  override fun moveQueueItem(from: Int, to: Int) {
+    LOG._e { it("moveQueueItem from:%d to:%d", from, to) }
+    if (from == to) return
+    scope.launch {
+      val prevCurrentIndex = currentItemIndex
+      val prevCurrent = currentItem
+
+      val indexRange = upNextQueue.indices
+      var newQueue = upNextQueue.toMutableList()
+      var newShuffled = upNextShuffled.toMutableList()
+      var newIndex = prevCurrentIndex
+
+      LOG._e { it("indexRange=%s", indexRange) }
+
+      if (from in indexRange && to in indexRange) {
+        if (shuffle.shuffleMedia) {
+          LOG._e { it("from=%s to=%s", newShuffled[from], newShuffled[to]) }
+          LOG._e { it("swap shuffled") }
+          newShuffled.swap(from, to)
+          LOG._e { it("from=%s to=%s", newShuffled[from], newShuffled[to]) }
+        } else {
+          LOG._e { it("from=%s to=%s", newQueue[from], newQueue[to]) }
+          LOG._e { it("swap up next") }
+          newQueue.swap(from, to)
+          LOG._e { it("from=%s to=%s", newQueue[from], newQueue[to]) }
+        }
+
+        newIndex = if (from == prevCurrentIndex) {
+          to
+        } else if (from < prevCurrentIndex) {
+          if (to >= prevCurrentIndex) {
+            prevCurrentIndex - 1
+          } else {
+            prevCurrentIndex
+          }
+        } else if (to <= prevCurrentIndex) {
+          if (from > prevCurrentIndex) {
+            prevCurrentIndex + 1
+          } else {
+            prevCurrentIndex
+          }
+        } else prevCurrentIndex
+
+        LOG._e { it("newIndex=%d", newIndex) }
+
+        try {
+          persistIfCurrentUnchanged(
+            newQueue = newQueue,
+            newShuffled = newShuffled,
+            prevCurrent = prevCurrent,
+            prevCurrentIndex = prevCurrentIndex
+          )
+        } catch (e: Exception) {
+          LOG.e(e) { it("Could not persist new queue") }
+          // fatal error persisting, revert to original queues and invoke establish so update is
+          // sent to clients
+          newQueue = upNextQueue.toMutableList()
+          newShuffled = upNextShuffled.toMutableList()
+          newIndex = prevCurrentIndex
+        }
+      }
+      // We want to send an state update even if nothing changed to ensure the UI is consistent
+      establishNewQueues(newQueue, newShuffled, newIndex)
+    }
+  }
+
   private suspend fun toggleShuffleMedia(prevMode: ShuffleMode, newMode: ShuffleMode) {
     if (prevMode.shuffleMedia == newMode.shuffleMedia) {
       LOG.e { it("Incorrectly called toggleShuffleMedia with old=%s new=%s", prevMode, newMode) }
@@ -775,7 +902,7 @@ private class LocalAudioQueueImpl(
 
         if (newMode.shuffleMedia) {
           newShuffled = ArrayList(prevQueue)
-          newShuffled.removeWithInstanceId(prevCurrentItem)
+          newShuffled.removeWithInstanceId(prevCurrentItem.instanceId)
           newShuffled.shuffle()
           newShuffled.add(0, prevCurrentItem)
           queueIndex = 0
@@ -800,11 +927,8 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  override fun goToQueueItem(instanceId: InstanceId) {
-    val activeQueue = queue
-    val index = activeQueue.indexOfFirst { it.instanceId == instanceId }
-    if (index in activeQueue.indices) goToIndexMaybePlay(index)
-  }
+  override fun goToQueueItem(instanceId: InstanceId) =
+    goToIndexMaybePlay(queue.indexOfFirst { it.instanceId == instanceId })
 
   private fun queueContainsMedia(): Boolean = queue.isNotEmpty()
   private fun atEndOfQueue(): Boolean = currentItemIndex >= queue.size - 1
@@ -1347,6 +1471,7 @@ private class LocalAudioQueueImpl(
 }
 
 class QueueChangedException(message: String) : Exception(message)
+
 /**
  * From Roman Elizarov https://stackoverflow.com/a/46890009/2660904
  */
@@ -1433,8 +1558,8 @@ fun <E> List<E>.sublistFromStartTo(toIndex: Int): List<E> =
 fun <E> List<E>.sublistToEndFrom(fromIndex: Int): List<E> =
   if (isNotEmpty() && fromIndex in 1..size) subList(fromIndex, size) else emptyList()
 
-private fun MutableList<PlayableAudioItem>.removeWithInstanceId(queueMediaItem: PlayableAudioItem) {
-  removeAt(indexOfFirst { it.instanceId == queueMediaItem.instanceId })
+private fun MutableList<PlayableAudioItem>.removeWithInstanceId(instanceId: InstanceId) {
+  removeAt(indexOfFirst { it.instanceId == instanceId })
 }
 
 fun TelecomManager.isIdle(requestPermission: Boolean): Boolean {

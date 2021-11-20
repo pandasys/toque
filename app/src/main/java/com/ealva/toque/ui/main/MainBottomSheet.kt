@@ -32,9 +32,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Card
+import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -54,8 +55,10 @@ import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.ui.config.ScreenConfig
+import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.library.BaseLibraryItemsScreen
+import com.ealva.toque.ui.library.SearchScreen
+import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.BaseAppSettingsScreen
 import com.ealva.toque.ui.theme.shapes
 import com.google.accompanist.pager.ExperimentalPagerApi
@@ -67,60 +70,54 @@ import kotlinx.coroutines.flow.collect
 private const val ALPHA_ON = 1.0F
 private const val ALPHA_OFF = 0.3F
 
-private val backgroundColor = Color(0xFF151515)
-
 @OptIn(ExperimentalCoilApi::class, ExperimentalAnimationApi::class)
 @Composable
 fun MainBottomSheet(
   topOfStack: ComposeKey,
   isExpanded: Boolean,
-  goToSettings: () -> Unit,
   goToNowPlaying: () -> Unit,
   goToLibrary: () -> Unit,
-  config: ScreenConfig,
+  goToQueue: () -> Unit,
+  goToSearch: () -> Unit,
+  goToSettings: () -> Unit,
   modifier: Modifier
 ) {
-  Card(
-    modifier = modifier,
-    shape = shapes.medium,
-    backgroundColor = Color.Transparent,
-    elevation = 8.dp
+  val config = LocalScreenConfig.current
+
+  Column(
+    modifier = modifier
   ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-      if (isExpanded) {
-        CurrentItemPager(
-          goToNowPlaying = goToNowPlaying,
-          config,
+    Card(
+      shape = shapes.medium,
+      elevation = 8.dp
+    ) {
+      Column(modifier = Modifier.fillMaxWidth()) {
+        if (isExpanded) {
+          CurrentItemPager(
+            goToNowPlaying = goToNowPlaying,
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(config.getMiniPlayerHeight())
+          )
+        }
+        MainBottomSheetButtonRow(
+          topOfStack = topOfStack,
+          goToLibrary = goToLibrary,
+          goToQueue = goToQueue,
+          goToSearch = goToSearch,
+          goToSettings = goToSettings,
           modifier = Modifier
             .fillMaxWidth()
-            .background(
-              color = backgroundColor,
-              shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-            )
-            .height(config.getMiniPlayerHeight())
+            .height(config.getBottomSheetButtonBarHeight())
         )
       }
-      val bottomShape = if (isExpanded)
-        RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
-      else
-        RoundedCornerShape(8.dp)
-
-      MainBottomSheetButtonRow(
-        topOfStack,
-        goToSettings,
-        goToLibrary,
-        config,
-        Modifier
-          .fillMaxWidth()
-          .background(color = backgroundColor, shape = bottomShape)
-          .height(config.getButtonBarHeight())
-      )
-      Spacer(
-        modifier = Modifier
-          .height(config.navBottom)
-          .fillMaxWidth()
-      )
     }
+    Spacer(
+      modifier = Modifier
+        .background(Color.Transparent)
+        .height(config.navBottom)
+        .fillMaxWidth()
+    )
   }
 }
 
@@ -129,15 +126,18 @@ private fun doNothing() = Unit
 @Composable
 private fun MainBottomSheetButtonRow(
   topOfStack: ComposeKey,
-  goToSettings: () -> Unit,
   goToLibrary: () -> Unit,
-  config: ScreenConfig,
+  goToQueue: () -> Unit,
+  goToSearch: () -> Unit,
+  goToSettings: () -> Unit,
   modifier: Modifier
 ) {
   val onSettingScreen = topOfStack is BaseAppSettingsScreen
   val onLibraryScreen = topOfStack is BaseLibraryItemsScreen
+  val onQueueScreen = topOfStack is QueueScreen
+  val onSearchScreen = topOfStack is SearchScreen
 
-  val imageSize = config.getButtonBarHeight() - 12.dp
+  val imageSize = LocalScreenConfig.current.getBottomSheetButtonBarHeight() - 12.dp
 
   Row(
     modifier = modifier,
@@ -149,11 +149,37 @@ private fun MainBottomSheetButtonRow(
         .fillMaxHeight()
         .weight(1.0F)
     ) {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_map),
         contentDescription = "Library",
-        alpha = if (onLibraryScreen) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(imageSize)
+        modifier = Modifier.size(imageSize),
+        tint = LocalContentColor.current.copy(alpha = if (onLibraryScreen) ALPHA_ON else ALPHA_OFF)
+      )
+    }
+    IconButton(
+      onClick = if (!onQueueScreen) goToQueue else ::doNothing,
+      modifier = Modifier
+        .fillMaxHeight()
+        .weight(1.0F)
+    ) {
+      Icon(
+        painter = rememberImagePainter(data = R.drawable.ic_queue),
+        contentDescription = "Queue",
+        modifier = Modifier.size(imageSize),
+        tint = LocalContentColor.current.copy(alpha = if (onQueueScreen) ALPHA_ON else ALPHA_OFF)
+      )
+    }
+    IconButton(
+      onClick = if (!onSearchScreen) goToSearch else ::doNothing,
+      modifier = Modifier
+        .fillMaxHeight()
+        .weight(1.0F)
+    ) {
+      Icon(
+        painter = rememberImagePainter(data = R.drawable.ic_search),
+        contentDescription = "Search",
+        modifier = Modifier.size(imageSize),
+        tint = LocalContentColor.current.copy(alpha = if (onSearchScreen) ALPHA_ON else ALPHA_OFF)
       )
     }
     IconButton(
@@ -162,11 +188,11 @@ private fun MainBottomSheetButtonRow(
         .height(48.dp)
         .weight(1.0F)
     ) {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_settings),
         contentDescription = "Settings",
-        alpha = if (onSettingScreen) ALPHA_ON else ALPHA_OFF,
-        modifier = Modifier.size(imageSize)
+        modifier = Modifier.size(imageSize),
+        tint = LocalContentColor.current.copy(alpha = if (onSettingScreen) ALPHA_ON else ALPHA_OFF)
       )
     }
   }
@@ -174,7 +200,7 @@ private fun MainBottomSheetButtonRow(
 
 @OptIn(ExperimentalPagerApi::class)
 @Composable
-private fun CurrentItemPager(goToNowPlaying: () -> Unit, config: ScreenConfig, modifier: Modifier) {
+private fun CurrentItemPager(goToNowPlaying: () -> Unit, modifier: Modifier) {
   val viewModel = rememberService<LocalAudioMiniPlayerViewModel>()
   val nowPlayingState = viewModel.miniPlayerState.collectAsState()
 
@@ -206,8 +232,7 @@ private fun CurrentItemPager(goToNowPlaying: () -> Unit, config: ScreenConfig, m
       item = queue[page],
       playState = playingState,
       togglePlayPause = { viewModel.togglePlayPause() },
-      goToNowPlaying = goToNowPlaying,
-      config = config
+      goToNowPlaying = goToNowPlaying
     )
   }
 }
@@ -218,10 +243,9 @@ private fun CurrentItemPagerCard(
   item: AudioItem,
   playState: PlayState,
   togglePlayPause: () -> Unit,
-  goToNowPlaying: () -> Unit,
-  config: ScreenConfig
+  goToNowPlaying: () -> Unit
 ) {
-  val miniPlayerHeight = config.getMiniPlayerHeight()
+  val miniPlayerHeight = LocalScreenConfig.current.getMiniPlayerHeight()
   BoxWithConstraints(
     modifier = Modifier
       .fillMaxWidth()
@@ -295,7 +319,7 @@ private fun CurrentItemPagerCard(
             bottom.linkTo(parent.bottom)
           }
       ) {
-        Image(
+        Icon(
           painter = rememberImagePainter(
             data = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
           ),

@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.audio
 
+import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
@@ -49,6 +50,8 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override fun nextShuffleMode() = Unit
   override fun setRepeatMode(mode: RepeatMode) = Unit
   override fun setShuffleMode(mode: ShuffleMode) = Unit
+  override fun removeFromQueue(index: Int, item: AudioItem) = Unit
+  override fun moveQueueItem(from: Int, to: Int) = Unit
   override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override suspend fun activate(resume: Boolean, playNow: PlayNow) = Unit
   override fun deactivate() = Unit

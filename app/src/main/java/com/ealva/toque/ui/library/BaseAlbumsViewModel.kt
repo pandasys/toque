@@ -61,7 +61,7 @@ abstract class BaseAlbumsViewModel(
   override val albumList = MutableStateFlow<List<AlbumsViewModel.AlbumInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<AlbumId>()
   override val searchFlow = MutableStateFlow("")
-  private val escapedFilterFlow = MutableStateFlow<Filter>(NoFilter)
+  private val escapedFilterFlow = MutableStateFlow(NoFilter)
 
   override fun setSearch(search: String) {
     searchFlow.value = search
@@ -108,13 +108,13 @@ abstract class BaseAlbumsViewModel(
     }
   }
 
-  override fun itemClicked(albumId: AlbumId) = selectedItems.hasSelectionToggleElse(albumId) {
+  override fun itemClicked(albumId: AlbumId) = selectedItems.ifInSelectionModeToggleElse(albumId) {
     goToAlbumSongs(albumId)
   }
 
   override fun itemLongClicked(albumId: AlbumId) = selectedItems.toggleSelection(albumId)
 
-  override fun onBackEvent(): Boolean = selectedItems.hasSelectionThenClear()
+  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 
   protected open val stateKey: String
     get() = javaClass.name

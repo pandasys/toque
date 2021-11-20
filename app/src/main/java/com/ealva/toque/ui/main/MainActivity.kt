@@ -37,17 +37,22 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.haveReadPermission
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.ealva.toque.ui.config.ProvideScreenConfig
 import com.ealva.toque.ui.config.makeScreenConfig
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
+import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.nav.goToAboveRoot
 import com.ealva.toque.ui.now.NowPlayingScreen
+import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.AppSettingsScreen
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
 import com.ealva.toque.ui.theme.ToqueTheme
@@ -71,10 +76,11 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import org.koin.android.ext.android.inject
 
 private val LOG by lazyLogger(MainActivity::class)
 
-private val backstackKeyFlow: MutableState<ComposeKey> = mutableStateOf(SplashScreen())
+private val topOfStackState: MutableState<ComposeKey> = mutableStateOf(SplashScreen())
 
 private val KEY_BACKSTACK = "${MainActivity::class.java.name}_BACK_STACK"
 
@@ -84,6 +90,7 @@ class MainActivity : ComponentActivity() {
   private val composeStateChanger = makeAppComposeStateChanger()
   private lateinit var backstack: Backstack
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
+  private val appPrefsSingleton: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
   private var mediaController: ToqueMediaController = NullMediaController
   private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
   private var currentQueueJob: Job? = null
@@ -96,7 +103,7 @@ class MainActivity : ComponentActivity() {
 
     backstack = Navigator.configure()
       .addStateChangeCompletionListener { stateChange ->
-        backstackKeyFlow.value = stateChange.topNewKey()
+        topOfStackState.value = stateChange.topNewKey()
       }
       .setGlobalServices(getGlobalServicesBuilder().build())
       .setScopedServices(DefaultServiceProvider())
@@ -115,13 +122,15 @@ class MainActivity : ComponentActivity() {
           )
           {
             BackstackProvider(backstack) {
-              val topOfStack: ComposeKey by remember { backstackKeyFlow }
+              val topOfStack: ComposeKey by remember { topOfStackState }
               MainScreen(
                 composeStateChanger = composeStateChanger,
                 topOfStack = topOfStack,
-                goToSettings = { backstack.goTo(AppSettingsScreen(PrimarySettings)) },
                 goToNowPlaying = { backstack.jumpToRoot() },
-                goToLibrary = { backstack.goToAboveRoot(LibraryCategoriesScreen()) }
+                goToLibrary = { backstack.goToAboveRoot(LibraryCategoriesScreen()) },
+                goToQueue = { backstack.goToAboveRoot(QueueScreen()) },
+                goToSearch = { backstack.goToAboveRoot(SearchScreen()) },
+                goToSettings = { backstack.goTo(AppSettingsScreen(PrimarySettings)) }
               )
             }
           }
@@ -198,7 +207,7 @@ class MainActivity : ComponentActivity() {
 
   private fun handleAudioQueue() {
 
-    if (backstackKeyFlow.value is SplashScreen)
+    if (topOfStackState.value is SplashScreen)
       backstack.setHistory(History.of(NowPlayingScreen()), REPLACE)
   }
 
@@ -209,6 +218,7 @@ class MainActivity : ComponentActivity() {
   private fun getGlobalServicesBuilder() = GlobalServices.builder().apply {
     add(this@MainActivity)
     add(playerServiceConnection)
+    add(LocalAudioQueueModel(playerServiceConnection, appPrefsSingleton))
     add(LocalAudioMiniPlayerViewModel(playerServiceConnection))
   }
 

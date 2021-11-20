@@ -29,18 +29,24 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
 import com.ealva.toque.db.AudioDescrResult
 import com.ealva.toque.db.AudioDescription
+import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
+import com.ealva.toque.db.NamedSongListType
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
+import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.service.media.Rating
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueModel.PlayResult
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.statebundle.StateBundle
+import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,10 +62,12 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
+import javax.annotation.concurrent.Immutable
 
 private val LOG by lazyLogger(BaseSongsViewModel::class)
 
 interface SongsViewModel {
+  @Immutable
   @Parcelize
   data class SongInfo(
     val id: MediaId,
@@ -79,14 +87,22 @@ interface SongsViewModel {
 
   val searchFlow: StateFlow<String>
   fun setSearch(search: String)
+
+  fun play(): PlayResult
+  fun shuffle(): PlayResult
+  fun playNext()
+  fun addToUpNext()
 }
 
 abstract class BaseSongsViewModel(
   private val audioMediaDao: AudioMediaDao,
+  private val localAudioQueueModel: LocalAudioQueueModel,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : SongsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private var requestJob: Job? = null
+
+  protected abstract val namedSongListType: NamedSongListType
 
   override val allSongs = MutableStateFlow<List<SongInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<MediaId>(SelectedItems())
@@ -146,11 +162,36 @@ abstract class BaseSongsViewModel(
     }
   }
 
-  override fun mediaClicked(mediaId: MediaId) = selectedItems.hasSelectionToggleElse(mediaId) {}
-
+  override fun mediaClicked(mediaId: MediaId) = selectedItems.ifInSelectionModeToggleElse(mediaId) {}
   override fun mediaLongClicked(mediaId: MediaId) = selectedItems.toggleSelection(mediaId)
 
-  override fun onBackEvent(): Boolean = selectedItems.hasSelectionThenClear()
+  private fun makeAudioIdList(): AudioIdList = AudioIdList(
+    MediaIdList(
+      allSongs.value
+        .asSequence()
+        .filterWith(selectedItems.value) { it.id }
+        .mapTo(LongArrayList(512)) { it.id.value }
+    ),
+    namedSongListType
+  )
+
+  override fun play(): PlayResult =
+    localAudioQueueModel.play(makeAudioIdList()) { selectedItems.turnOffSelectionMode() }
+
+  override fun shuffle(): PlayResult =
+    localAudioQueueModel.shuffle(makeAudioIdList()) { selectedItems.turnOffSelectionMode() }
+
+  override fun playNext() {
+    localAudioQueueModel.playNext(makeAudioIdList())
+    selectedItems.turnOffSelectionMode()
+  }
+
+  override fun addToUpNext() {
+    localAudioQueueModel.addToUpNext(makeAudioIdList())
+    selectedItems.turnOffSelectionMode()
+  }
+
+  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 
   /**
    * Defaults to the [javaClass] name of the implementation of this class and is used to save and
@@ -173,6 +214,12 @@ abstract class BaseSongsViewModel(
     scope.cancel()
     allSongs.value = emptyList()
   }
+
+  fun selectAll() = selectedItems.selectAll(getSongKeys())
+
+  private fun getSongKeys() = allSongs.value.mapTo(mutableSetOf()) { it.id }
+
+  fun clearSelection() = selectedItems.clearSelection()
 }
 
 @Parcelize

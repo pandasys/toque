@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.GridCells
 import androidx.compose.foundation.lazy.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.Icon
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -89,10 +91,11 @@ private fun LibraryItem(
       .clickable(onClick = { goToItem(item.key) }),
     verticalAlignment = Alignment.CenterVertically
   ) {
-    Image(
+    Icon(
       painter = rememberImagePainter(data = item.icon),
       contentDescription = item.title,
-      modifier = Modifier.size(38.dp)
+      modifier = Modifier.size(38.dp),
+      tint = LocalContentColor.current
     )
     Text(
       text = item.title,
@@ -105,7 +108,7 @@ private fun LibraryItem(
 }
 
 private interface LibraryItemsViewModel {
-
+  @Immutable
   data class LibraryItem(
     @DrawableRes val icon: Int,
     val title: String,

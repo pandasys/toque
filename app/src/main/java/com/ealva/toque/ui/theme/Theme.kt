@@ -46,7 +46,7 @@ private val DarkColorPalette = ToqueColors(
     primaryVariant = blue700,
     secondary = cyan200,
     background = black,
-    surface = black
+//    surface = black
   ),
   warning = Amber700,
   onWarning = Color.White,
@@ -61,14 +61,11 @@ fun ToqueTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   content: @Composable () -> Unit,
 ) {
-  //val colors = if (darkTheme) {
-  //  DarkColorPalette
-  //} else {
-  //  LightColorPalette
-  //}
-
-  // Need a setting to allow light color theme
-  val colors = DarkColorPalette
+  val colors = if (darkTheme) {
+    DarkColorPalette
+  } else {
+    LightColorPalette
+  }
 
   CompositionLocalProvider(LocalColors provides colors) {
     MaterialTheme(

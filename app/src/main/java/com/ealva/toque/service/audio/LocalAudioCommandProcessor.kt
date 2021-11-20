@@ -24,6 +24,7 @@ import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.app.Toque
+import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.LoggingCoroutineExceptionHandler
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
@@ -38,11 +39,28 @@ import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.scanner.MediaScannerService
 import com.ealva.toque.service.audio.LocalAudioCommand.AddToUpNext
+import com.ealva.toque.service.audio.LocalAudioCommand.FastForward
+import com.ealva.toque.service.audio.LocalAudioCommand.GoToIndex
 import com.ealva.toque.service.audio.LocalAudioCommand.GoToQueueItem
+import com.ealva.toque.service.audio.LocalAudioCommand.MoveQueueItem
+import com.ealva.toque.service.audio.LocalAudioCommand.Next
+import com.ealva.toque.service.audio.LocalAudioCommand.NextList
+import com.ealva.toque.service.audio.LocalAudioCommand.NextRepeatMode
+import com.ealva.toque.service.audio.LocalAudioCommand.NextShuffleMode
 import com.ealva.toque.service.audio.LocalAudioCommand.Pause
 import com.ealva.toque.service.audio.LocalAudioCommand.Play
+import com.ealva.toque.service.audio.LocalAudioCommand.PlayNext
+import com.ealva.toque.service.audio.LocalAudioCommand.PrepareNext
+import com.ealva.toque.service.audio.LocalAudioCommand.Previous
+import com.ealva.toque.service.audio.LocalAudioCommand.PreviousList
+import com.ealva.toque.service.audio.LocalAudioCommand.RemoveQueueItem
+import com.ealva.toque.service.audio.LocalAudioCommand.Rewind
+import com.ealva.toque.service.audio.LocalAudioCommand.SeekTo
+import com.ealva.toque.service.audio.LocalAudioCommand.SetRating
 import com.ealva.toque.service.audio.LocalAudioCommand.SetRepeatMode
 import com.ealva.toque.service.audio.LocalAudioCommand.SetShuffleMode
+import com.ealva.toque.service.audio.LocalAudioCommand.Stop
+import com.ealva.toque.service.audio.LocalAudioCommand.TogglePlayPause
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.queue.ClearQueue
@@ -108,21 +126,21 @@ class LocalAudioCommandProcessor(
   }
 
   override fun goToQueueItem(instanceId: InstanceId) = emitCommand(GoToQueueItem(instanceId))
-  override fun seekTo(position: Millis) = emitCommand(LocalAudioCommand.SeekTo(position))
+  override fun seekTo(position: Millis) = emitCommand(SeekTo(position))
   override fun play(forceTransition: ForceTransition) = emitCommand(Play(forceTransition))
   override fun pause(forceTransition: ForceTransition) = emitCommand(Pause(forceTransition))
-  override fun stop() = emitCommand(LocalAudioCommand.Stop)
-  override fun togglePlayPause() = emitCommand(LocalAudioCommand.TogglePlayPause)
-  override fun next() = emitCommand(LocalAudioCommand.Next)
-  override fun previous() = emitCommand(LocalAudioCommand.Previous)
-  override fun nextList() = emitCommand(LocalAudioCommand.NextList)
-  override fun previousList() = emitCommand(LocalAudioCommand.PreviousList)
-  override fun fastForward() = emitCommand(LocalAudioCommand.FastForward)
-  override fun rewind() = emitCommand(LocalAudioCommand.Rewind)
-  override fun goToIndexMaybePlay(index: Int) = emitCommand(LocalAudioCommand.GoToIndex(index))
-  override fun nextRepeatMode() = emitCommand(LocalAudioCommand.NextRepeatMode)
+  override fun stop() = emitCommand(Stop)
+  override fun togglePlayPause() = emitCommand(TogglePlayPause)
+  override fun next() = emitCommand(Next)
+  override fun previous() = emitCommand(Previous)
+  override fun nextList() = emitCommand(NextList)
+  override fun previousList() = emitCommand(PreviousList)
+  override fun fastForward() = emitCommand(FastForward)
+  override fun rewind() = emitCommand(Rewind)
+  override fun goToIndexMaybePlay(index: Int) = emitCommand(GoToIndex(index))
+  override fun nextRepeatMode() = emitCommand(NextRepeatMode)
   override fun setRepeatMode(mode: RepeatMode) = emitCommand(SetRepeatMode(mode))
-  override fun nextShuffleMode() = emitCommand(LocalAudioCommand.NextShuffleMode)
+  override fun nextShuffleMode() = emitCommand(NextShuffleMode)
   override fun setShuffleMode(mode: ShuffleMode) = emitCommand(SetShuffleMode(mode))
   override fun addToUpNext(audioIdList: AudioIdList) = emitCommand(AddToUpNext(audioIdList))
   private suspend fun prepareFromId(id: String, extras: Bundle) = try {
@@ -142,17 +160,25 @@ class LocalAudioCommandProcessor(
   }
 
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) =
-    emitCommand(LocalAudioCommand.SetRating(rating, allowFileUpdate))
+    emitCommand(SetRating(rating, allowFileUpdate))
 
   override fun playNext(
     audioIdList: AudioIdList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ) = emitCommand(LocalAudioCommand.PlayNext(audioIdList, clearUpNext, playNow, transitionType))
+  ) = emitCommand(PlayNext(audioIdList, clearUpNext, playNow, transitionType))
 
   override fun prepareNext(audioIdList: AudioIdList) =
-    emitCommand(LocalAudioCommand.PrepareNext(audioIdList))
+    emitCommand(PrepareNext(audioIdList))
+
+  override fun removeFromQueue(index: Int, item: AudioItem) {
+    emitCommand(RemoveQueueItem(index, item))
+  }
+
+  override fun moveQueueItem(from: Int, to: Int) {
+    emitCommand(MoveQueueItem(from, to))
+  }
 
   private fun collectMediaSessionEventFlow(mediaSession: MediaSessionControl) {
     mediaSession.eventFlow
@@ -441,6 +467,22 @@ private sealed interface LocalAudioCommand {
   ) : LocalAudioCommand {
     override suspend fun process(localAudioQueue: LocalAudioQueue) =
       localAudioQueue.setRating(rating, allowFileUpdate)
+  }
+
+  data class RemoveQueueItem(
+    private val index: Int,
+    private val item: AudioItem
+  ) : LocalAudioCommand {
+    override suspend fun process(localAudioQueue: LocalAudioQueue) =
+      localAudioQueue.removeFromQueue(index, item)
+  }
+
+  data class MoveQueueItem(
+    private val fromIndex: Int,
+    private val toIndex: Int
+  ) : LocalAudioCommand {
+    override suspend fun process(localAudioQueue: LocalAudioQueue) =
+      localAudioQueue.moveQueueItem(fromIndex, toIndex)
   }
 }
 

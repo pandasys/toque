@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
@@ -67,10 +68,16 @@ fun AlbumsList(
   itemLongClicked: (AlbumId) -> Unit,
   header: (@Composable LazyItemScope.() -> Unit)? = null
 ) {
-  val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
+  val listState = rememberLazyListState()
 
-  LibraryScrollBar(listState = listState) {
+  LibraryScrollBar(
+    listState = listState,
+    modifier = Modifier
+      .statusBarsPadding()
+      .navigationBarsPadding(bottom = false)
+      .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
+  ) {
     LazyColumn(
       state = listState,
       contentPadding = PaddingValues(
@@ -130,6 +137,7 @@ private fun AlbumItem(
     secondaryText = { ArtistAndSongCount(albumInfo = albumInfo) },
   )
 }
+
 @Composable
 private fun ArtistAndSongCount(albumInfo: AlbumsViewModel.AlbumInfo) {
   ConstraintLayout(modifier = Modifier.fillMaxWidth()) {

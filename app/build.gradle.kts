@@ -129,6 +129,8 @@ dependencies {
   implementation(Libs.AndroidX.Activity.COMPOSE)
   implementation(Libs.AndroidX.Constraint.LAYOUT_COMPOSE)
 
+  implementation(Libs.ComposeReorder.REORDERABLE)
+
   implementation(Libs.LibVLC.ALL)
   implementation(Libs.PreferenceStore.STORE)
   implementation(Libs.PreferenceStore.COMPOSE)

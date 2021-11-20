@@ -19,6 +19,7 @@ package com.ealva.toque.ui.config
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -26,6 +27,10 @@ import androidx.compose.ui.unit.dp
 import com.ealva.toque.android.content.inPortrait
 import com.google.accompanist.insets.WindowInsets
 
+private val PORTRAIT_ACTION_BTN_HEIGHT = 28.dp
+private val LANDSCAPE_ACTION_BTN_HEIGHT = 26.dp
+
+@Immutable
 data class ScreenConfig(
   val inPortrait: Boolean,
   val screenWidthDp: Dp,
@@ -45,7 +50,10 @@ data class ScreenConfig(
   val navOnLeft: Boolean
     get() = navLeft > navRight
 
-  fun getButtonBarHeight(): Dp = MainBottomSheet.getButtonBarHeight(inPortrait)
+  val actionBarButtonHeight: Dp
+    get() = if (inPortrait) PORTRAIT_ACTION_BTN_HEIGHT else LANDSCAPE_ACTION_BTN_HEIGHT
+
+  fun getBottomSheetButtonBarHeight(): Dp = MainBottomSheet.getButtonBarHeight(inPortrait)
 
   fun getMiniPlayerHeight(): Dp = MainBottomSheet.getMiniPlayerHeight(inPortrait)
 

@@ -19,6 +19,7 @@ package com.ealva.toque.ui.now
 import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +35,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.Card
+import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Slider
 import androidx.compose.material.SnackbarResult
@@ -124,7 +127,6 @@ object NowPlayingScreenIds {
   const val ID_TITLE_SPACE = 11
   const val ID_TOP_SPACE = 12
   const val ID_RATING_BAR_ROW = 13
-  const val ID_QUEUE_INFO = 14
 }
 
 @Immutable
@@ -175,16 +177,17 @@ private fun NowPlaying(
   nextShuffleMode: () -> Unit,
   modifier: Modifier
 ) {
-  val useDarkIcons = MaterialTheme.colors.isLight
   val screenConfig = LocalScreenConfig.current
 
+  val useDarkIcons = MaterialTheme.colors.isLight
   val systemUiController = rememberSystemUiController()
   SideEffect {
     systemUiController.setSystemBarsColor(
-      color = Color(0x66000000),
+      color = Color(0x44000000),
       darkIcons = useDarkIcons,
     )
   }
+
   Box(modifier = modifier.navigationBarsPadding()) {
     val isPortrait = screenConfig.inPortrait
     ConstraintLayout(modifier = Modifier.fillMaxSize()) {
@@ -263,7 +266,7 @@ private fun NowPlaying(
 }
 
 private const val ALPHA_ON = 1.0F
-private const val ALPHA_OFF = 0.2F
+private const val ALPHA_OFF = 0.3F
 
 @OptIn(ExperimentalUnitApi::class, ExperimentalCoilApi::class)
 @Composable
@@ -287,7 +290,9 @@ private fun PlayerControls(
   val snackbarHostState = LocalSnackbarHostState.current
   val scope = rememberCoroutineScope()
 
-  BoxWithConstraints(modifier = modifier) {
+  BoxWithConstraints(
+    modifier = modifier
+  ) {
     ConstraintLayout(constraintSet = constraintSet, modifier = Modifier.fillMaxSize()) {
 
       Spacer(modifier = Modifier.layoutId(ID_TOP_SPACE)) // can't top align rating bar without this
@@ -424,7 +429,10 @@ private fun MediaArtPager(
 private fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
   if (currentPage in queue.indices) {
     val item = queue[currentPage]
-    Card(modifier = Modifier.fillMaxSize()) {
+    Card(
+      modifier = Modifier.fillMaxSize(),
+      backgroundColor = Color.Transparent
+    ) {
       Image(
         painter = rememberImagePainter(
           data = if (item.localAlbumArt !== Uri.EMPTY) item.localAlbumArt else item.albumArt,
@@ -479,11 +487,11 @@ private fun RatingBarRow(
       verticalAlignment = Alignment.CenterVertically
     ) {
       IconButton(onClick = toggleEqMode, modifier = Modifier.size(26.dp)) {
-        Image(
+        Icon(
           painter = rememberImagePainter(data = R.drawable.ic_audio_equalizer),
           contentDescription = "Toggle Equalizer",
-          alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF,
-          modifier = Modifier.size(26.dp)
+          modifier = Modifier.size(26.dp),
+          tint = LocalContentColor.current.copy(alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF)
         )
       }
       Spacer(modifier = Modifier.height(26.dp))
@@ -494,7 +502,7 @@ private fun RatingBarRow(
           maxLines = 1,
           style = MaterialTheme.typography.caption,
           modifier = Modifier
-            .border(1.dp, Color.White)
+            .border(1.dp, LocalContentColor.current)
             .padding(2.dp)
             .clickable(onClick = setPlaybackRate)
         )
@@ -506,28 +514,32 @@ private fun RatingBarRow(
         size = 22.dp,
         padding = 2.dp,
         isIndicator = true,
-        activeColor = Color.White,
-        inactiveColor = Color.White,
+        activeColor = LocalContentColor.current,
+        inactiveColor = LocalContentColor.current,
         ratingBarStyle = RatingBarStyle.HighLighted,
         onValueChange = {},
         onRatingChanged = {},
       )
       Spacer(modifier = Modifier.height(26.dp))
       IconButton(onClick = nextRepeatMode, modifier = Modifier.size(26.dp)) {
-        Image(
+        Icon(
           painter = rememberImagePainter(data = repeatMode.drawable),
           contentDescription = stringResource(id = repeatMode.titleRes),
-          alpha = if (repeatMode.isOn()) ALPHA_ON else ALPHA_OFF,
-          modifier = Modifier.size(26.dp)
+          modifier = Modifier.size(26.dp),
+          tint = LocalContentColor.current.copy(
+            alpha = if (repeatMode.isOn()) ALPHA_ON else ALPHA_OFF
+          )
         )
       }
       Spacer(modifier = Modifier.height(26.dp))
       IconButton(onClick = nextShuffleMode, modifier = Modifier.size(26.dp)) {
-        Image(
+        Icon(
           painter = rememberImagePainter(data = shuffleMode.drawable),
           contentDescription = stringResource(id = shuffleMode.titleRes),
-          alpha = if (shuffleMode.isOn()) ALPHA_ON else ALPHA_OFF,
-          modifier = Modifier.size(26.dp)
+          modifier = Modifier.size(26.dp),
+          tint = LocalContentColor.current.copy(
+            alpha = if (shuffleMode.isOn()) ALPHA_ON else ALPHA_OFF
+          )
         )
       }
     }
@@ -564,21 +576,21 @@ private fun ButtonRow(
     horizontalArrangement = Arrangement.SpaceEvenly
   ) {
     IconButton(onClick = prevList, modifier = Modifier.size(50.dp)) {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_prev_list),
         contentDescription = "Play previous list",
         modifier = Modifier.size(38.dp)
       )
     }
     IconButton(onClick = prev, modifier = Modifier.size(50.dp)) {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_previous),
         contentDescription = "Rewind or previous",
-        modifier = Modifier.size(44.dp)
+        modifier = Modifier.size(44.dp),
       )
     }
     IconButton(onClick = togglePlayPause, modifier = Modifier.size(50.dp)) {
-      Image(
+      Icon(
         painter = rememberImagePainter(
           data = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
         ),
@@ -587,14 +599,14 @@ private fun ButtonRow(
       )
     }
     IconButton(onClick = next, modifier = Modifier.size(50.dp)) {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_next),
         contentDescription = "Play next",
         modifier = Modifier.size(44.dp)
       )
     }
     IconButton(onClick = nextList, modifier = Modifier.size(50.dp)) {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_next_list),
         contentDescription = "Play next list",
         modifier = Modifier.size(38.dp)

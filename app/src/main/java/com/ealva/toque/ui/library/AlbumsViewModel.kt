@@ -21,8 +21,10 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.persist.AlbumId
 import kotlinx.coroutines.flow.StateFlow
+import javax.annotation.concurrent.Immutable
 
 interface AlbumsViewModel {
+  @Immutable
   data class AlbumInfo(
     val id: AlbumId,
     val title: AlbumTitle,

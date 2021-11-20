@@ -18,16 +18,17 @@ package com.ealva.toque.ui.library
 
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -119,7 +120,13 @@ private fun AllGenres(
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
 
-  LibraryScrollBar(listState = listState) {
+  LibraryScrollBar(
+    listState = listState,
+    modifier = Modifier
+      .statusBarsPadding()
+      .navigationBarsPadding(bottom = false)
+      .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
+  ) {
     LazyColumn(
       state = listState,
       contentPadding = PaddingValues(
@@ -161,7 +168,7 @@ private fun GenreItem(
         onLongClick = { itemLongClicked(genreInfo.id) }
       ),
     icon = {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = R.drawable.ic_guitar_acoustic),
         contentDescription = "Genre icon",
         modifier = Modifier.size(40.dp)
@@ -181,6 +188,7 @@ private fun GenreItem(
 }
 
 private interface GenresViewModel {
+  @Immutable
   @Parcelize
   data class GenreInfo(
     val id: GenreId,
@@ -223,7 +231,12 @@ private class GenresViewModelImpl(
     filterFlow.value = search.wrapAsFilter()
   }
 
-  private fun goToGenreSongs(genreId: GenreId) = backstack.goTo(GenreSongsScreen(genreId))
+  private fun goToGenreSongs(genreId: GenreId) {
+    val name = allGenres.value
+      .find { it.id == genreId }
+      ?.name ?: GenreName("")
+    backstack.goTo(GenreSongsScreen(genreId, name))
+  }
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)
@@ -260,11 +273,11 @@ private class GenresViewModelImpl(
   }
 
   override fun itemClicked(genreId: GenreId) =
-    selectedItems.hasSelectionToggleElse(genreId) { goToGenreSongs(it) }
+    selectedItems.ifInSelectionModeToggleElse(genreId) { goToGenreSongs(it) }
 
   override fun itemLongClicked(genreId: GenreId) = selectedItems.toggleSelection(genreId)
 
-  override fun onBackEvent(): Boolean = selectedItems.hasSelectionThenClear()
+  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 
   override fun onServiceInactive() {
     scope.cancel()

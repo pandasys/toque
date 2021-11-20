@@ -16,12 +16,12 @@
 
 package com.ealva.toque.ui.library
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +34,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
+import com.ealva.ealvabrainz.common.AlbumTitle
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
@@ -55,10 +57,13 @@ import org.koin.core.component.get
 data class ArtistAlbumsScreen(
   private val artistId: ArtistId,
   private val artistType: ArtistType,
+  private val artistName: ArtistName,
   private val songCount: Int
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(ArtistAlbumsViewModel(artistId, artistType, get(), backstack)) }
+    with(serviceBinder) {
+      add(ArtistAlbumsViewModel(artistId, artistType, artistName, get(), backstack))
+    }
   }
 
   @Composable
@@ -94,7 +99,7 @@ private fun AllArtistSongsHeader(
       .background(Color.Black)
       .clickable(onClick = { doAllSongsSelected() }),
     icon = {
-      Image(
+      Icon(
         painter = rememberImagePainter(data = artistType.typeIcon),
         contentDescription = stringResource(id = artistType.allSongsRes),
         modifier = Modifier.size(40.dp)
@@ -122,6 +127,7 @@ private fun AllArtistSongsHeader(
 private class ArtistAlbumsViewModel(
   private val artistId: ArtistId,
   private val artistType: ArtistType,
+  private val artistName: ArtistName,
   albumDao: AlbumDao,
   backstack: Backstack
 ) : BaseAlbumsViewModel(albumDao, backstack) {
@@ -129,10 +135,14 @@ private class ArtistAlbumsViewModel(
     albumDao: AlbumDao,
     filter: Filter
   ): Result<List<AlbumDescription>, DaoMessage> =
-    albumDao.getAllAlbumsFor(artistId, artistType,)
+    albumDao.getAllAlbumsFor(artistId, artistType)
 
-  override fun goToAlbumSongs(albumId: AlbumId) =
-    backstack.goTo(AlbumSongsForArtistScreen(albumId, artistId))
+  override fun goToAlbumSongs(albumId: AlbumId) {
+    val title = albumList.value
+      .find { it.id == albumId }
+      ?.title ?: AlbumTitle("")
+    backstack.goTo(AlbumSongsForArtistScreen(albumId, artistId, title))
+  }
 
-  fun goToArtistSongs() = backstack.goTo(ArtistSongsScreen(artistId, artistType))
+  fun goToArtistSongs() = backstack.goTo(ArtistSongsScreen(artistId, artistType, artistName))
 }

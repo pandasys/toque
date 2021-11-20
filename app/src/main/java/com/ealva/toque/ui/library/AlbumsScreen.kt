@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
@@ -65,5 +66,10 @@ private class AllAlbumsViewModel(
     filter: Filter
   ): Result<List<AlbumDescription>, DaoMessage> = albumDao.getAllAlbums(filter)
 
-  override fun goToAlbumSongs(albumId: AlbumId) = backstack.goTo(AlbumSongsScreen(albumId))
+  override fun goToAlbumSongs(albumId: AlbumId) {
+    val title = albumList.value
+      .find { it.id == albumId }
+      ?.title ?: AlbumTitle("")
+    backstack.goTo(AlbumSongsScreen(albumId, title))
+  }
 }

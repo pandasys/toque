@@ -37,8 +37,29 @@ class SelectedItemsTest {
     }
     before.parcelize { selection ->
       expect(selection).toBe(before)
+      expect(selection.inSelectionMode).toBe(true)
       expect(selection.hasSelection).toBe(true)
       list.forEach { expect(selection.isSelected(it)).toBe(true) }
+    }
+
+    before = before.toggleSelection(InstanceId(2))
+    before.parcelize { selection ->
+      expect(selection).toBe(before)
+      expect(selection.inSelectionMode).toBe(true)
+      expect(selection.hasSelection).toBe(true)
+      expect(selection.isSelected(InstanceId(1))).toBe(true)
+      expect(selection.isSelected(InstanceId(2))).toBe(false)
+      expect(selection.isSelected(InstanceId(1))).toBe(true)
+    }
+
+    before = before.turnOffSelectionMode()
+    before.parcelize { selection ->
+      expect(selection).toBe(before)
+      expect(selection.inSelectionMode).toBe(false)
+      expect(selection.hasSelection).toBe(false)
+      expect(selection.isSelected(InstanceId(1))).toBe(false)
+      expect(selection.isSelected(InstanceId(2))).toBe(false)
+      expect(selection.isSelected(InstanceId(1))).toBe(false)
     }
   }
 }
