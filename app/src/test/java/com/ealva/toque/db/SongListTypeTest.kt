@@ -23,7 +23,6 @@ import com.ealva.toque.db.SongListType.Composer
 import com.ealva.toque.db.SongListType.External
 import com.ealva.toque.db.SongListType.Genre
 import com.ealva.toque.db.SongListType.PlayList
-import com.ealva.toque.db.SongListType.SmartPlaylist
 import com.nhaarman.expect.expect
 import org.junit.Test
 
@@ -35,21 +34,12 @@ class SongListTypeTest {
       with(type) {
         expectNext(
           when (this) {
-            //All -> Album
-            //Album -> Artist
-            //Artist -> Composer
-            //Composer -> Genre
-            //Genre -> PlayList
-            //PlayList -> SmartPlaylist
-            //SmartPlaylist -> Album
-            //External -> Album
             All -> Album
             Album -> Artist
             Artist -> Composer
             Composer -> Genre
-            Genre -> Album
+            Genre -> PlayList
             PlayList -> Album
-            SmartPlaylist -> Album
             External -> Album
           }
         )
@@ -63,23 +53,13 @@ class SongListTypeTest {
       with(type) {
         expectPrevious(
           when (this) {
-            //All -> SmartPlaylist
-            //Album -> SmartPlaylist
-            //Artist -> Album
-            //Composer -> Artist
-            //Genre -> Composer
-            //PlayList -> Genre
-            //SmartPlaylist -> PlayList
-            //External -> SmartPlaylist
-            All -> Genre
-            Album -> Genre
+            All -> PlayList
+            Album -> PlayList
             Artist -> Album
             Composer -> Artist
             Genre -> Composer
             PlayList -> Genre
-            SmartPlaylist -> Genre
-            External -> Genre
-
+            External -> PlayList
           }
         )
       }

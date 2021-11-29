@@ -16,33 +16,18 @@
 
 package com.ealva.toque.ui.library
 
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.GridCells
 import androidx.compose.foundation.lazy.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.Icon
-import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
-import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.config.LocalScreenConfig
-import com.ealva.toque.ui.library.ArtistType.AlbumArtist
-import com.ealva.toque.ui.library.ArtistType.SongArtist
-import com.ealva.toque.ui.library.LibraryItemsViewModel.LibraryItem
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -74,48 +59,20 @@ data class LibraryCategoriesScreen(private val noArg: String = "") : BaseLibrary
       contentPadding = PaddingValues(horizontal = 12.dp)
     ) {
       items(viewModel.getItems()) { item ->
-        LibraryItem(item = item) { viewModel.goToItem(item.key) }
+        LibraryCategory(
+          item = item,
+          iconSize = 36.dp,
+          textStyle = MaterialTheme.typography.subtitle1,
+          textStartPadding = 4.dp,
+          onClick = { viewModel.goToItem(item.key) }
+        )
       }
     }
   }
 }
 
-@Composable
-private fun LibraryItem(
-  item: LibraryItem,
-  goToItem: (ComposeKey) -> Unit
-) {
-  Row(
-    modifier = Modifier
-      .padding(vertical = 8.dp)
-      .clickable(onClick = { goToItem(item.key) }),
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    Icon(
-      painter = rememberImagePainter(data = item.icon),
-      contentDescription = item.title,
-      modifier = Modifier.size(38.dp),
-      tint = LocalContentColor.current
-    )
-    Text(
-      text = item.title,
-      style = MaterialTheme.typography.h6,
-      modifier = Modifier
-        .align(Alignment.CenterVertically)
-        .padding(start = 4.dp)
-    )
-  }
-}
-
 private interface LibraryItemsViewModel {
-  @Immutable
-  data class LibraryItem(
-    @DrawableRes val icon: Int,
-    val title: String,
-    val key: ComposeKey
-  )
-
-  fun getItems(): List<LibraryItem>
+  fun getItems(): List<LibraryCategories.CategoryItem>
   fun goToItem(key: ComposeKey)
 
   companion object {
@@ -125,17 +82,10 @@ private interface LibraryItemsViewModel {
 }
 
 private class LibraryItemsViewModelImpl(private val backstack: Backstack) : LibraryItemsViewModel {
+  val categories = LibraryCategories()
   override fun goToItem(key: ComposeKey) {
     backstack.goTo(key)
   }
 
-  override fun getItems(): List<LibraryItem> = listOf(
-    LibraryItem(R.drawable.ic_treble_clef, "All Songs", LibrarySongsScreen()),
-    LibraryItem(R.drawable.ic_album, "Albums", AlbumsScreen()),
-    LibraryItem(R.drawable.ic_microphone, "Artists", ArtistsScreen(SongArtist)),
-    LibraryItem(R.drawable.ic_account_box, "Album Artists", ArtistsScreen(AlbumArtist)),
-    LibraryItem(R.drawable.ic_guitar_acoustic, "Genres", GenresScreen()),
-    LibraryItem(R.drawable.ic_person, "Composers", ComposersScreen()),
-    LibraryItem(R.drawable.ic_list, "Playlists", LibrarySongsScreen()),
-  )
+  override fun getItems(): List<LibraryCategories.CategoryItem> = categories.getItems()
 }

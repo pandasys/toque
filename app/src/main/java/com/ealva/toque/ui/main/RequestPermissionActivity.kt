@@ -37,6 +37,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,6 +58,7 @@ import com.ealva.toque.ui.theme.ToqueTheme
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionRequired
 import com.google.accompanist.permissions.rememberPermissionState
+import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.parcelize.Parcelize
 
@@ -79,7 +81,10 @@ class RequestPermissionActivity : ComponentActivity() {
     }
 
     setContent {
-      ToqueTheme {
+      val themeViewModel = rememberService<ThemeViewModel>()
+      val themeChoice by themeViewModel.themeChoice.collectAsState()
+
+      ToqueTheme(themeChoice) {
         var userExit by rememberSaveable { mutableStateOf(false) }
         val readPhoneState = rememberPermissionState(data.permissionString)
 

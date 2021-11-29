@@ -25,7 +25,7 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.toDurationString
-import com.ealva.toque.log._i
+import com.ealva.toque.log._e
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.audio.LocalAudioQueue
@@ -44,7 +44,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -152,7 +151,7 @@ private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
 private class NowPlayingViewModelImpl(
   private val localAudioQueueModel: LocalAudioQueueModel,
   private val appPrefsSingleton: AppPrefsSingleton
-) : NowPlayingViewModel, ScopedServices.Activated, ScopedServices.Registered {
+) : NowPlayingViewModel, ScopedServices.Activated {
   private lateinit var scope: CoroutineScope
   private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
@@ -160,7 +159,9 @@ private class NowPlayingViewModelImpl(
 
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
 
-  override fun onServiceRegistered() {
+  private suspend fun appPrefs(): AppPrefs = appPrefsSingleton.instance()
+
+  override fun onServiceActive() {
     scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     scope.launch {
       appPrefs().showTimeRemaining
@@ -168,15 +169,8 @@ private class NowPlayingViewModelImpl(
         .onEach { remaining -> nowPlayingState.update { it.copy(showTimeRemaining = remaining) } }
         .launchIn(scope)
     }
-  }
 
-  private suspend fun appPrefs(): AppPrefs = appPrefsSingleton.instance()
 
-  override fun onServiceUnregistered() {
-    scope.cancel()
-  }
-
-  override fun onServiceActive() {
     currentQueueJob = localAudioQueueModel.localAudioQueue
       .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)
@@ -186,6 +180,8 @@ private class NowPlayingViewModelImpl(
     currentQueueJob?.cancel()
     currentQueueJob = null
     handleQueueChange(NullLocalAudioQueue)
+
+
   }
 
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
@@ -201,7 +197,7 @@ private class NowPlayingViewModelImpl(
     queueStateJob = audioQueue.queueState
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("") } }
-      .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
+      .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }
 

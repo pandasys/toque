@@ -18,17 +18,20 @@ package com.ealva.toque.ui.queue
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.DismissDirection
+import androidx.compose.material.DismissState
+import androidx.compose.material.DismissValue
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FractionalThreshold
 import androidx.compose.material.Icon
@@ -56,17 +59,32 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.log._e
-import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.InstanceId
+import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.scrollToFirst
+import com.ealva.toque.ui.common.scrollToPosition
+import com.ealva.toque.ui.common.visibleIndices
 import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.library.QueueItemsActionBar
+import com.ealva.toque.ui.library.SelectedItems
+import com.ealva.toque.ui.library.SelectedItemsFlow
 import com.ealva.toque.ui.library.SongListItem
+import com.ealva.toque.ui.library.asState
+import com.ealva.toque.ui.library.clearSelection
+import com.ealva.toque.ui.library.deselect
+import com.ealva.toque.ui.library.filterIfHasSelection
+import com.ealva.toque.ui.library.ifInSelectionModeToggleElse
+import com.ealva.toque.ui.library.inSelectionModeThenTurnOff
+import com.ealva.toque.ui.library.selectAll
+import com.ealva.toque.ui.library.toggleSelection
+import com.ealva.toque.ui.library.turnOffSelectionMode
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.ScopedServices
@@ -74,6 +92,7 @@ import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
+import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -88,8 +107,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
-import org.burnoutcrew.reorderable.ItemPosition
-import org.burnoutcrew.reorderable.detectReorderAfterLongPress
+import org.burnoutcrew.reorderable.ReorderableState
+import org.burnoutcrew.reorderable.detectReorder
 import org.burnoutcrew.reorderable.draggedItem
 import org.burnoutcrew.reorderable.rememberReorderState
 import org.burnoutcrew.reorderable.reorderable
@@ -111,53 +130,80 @@ data class QueueScreen(private val noArg: String = "") : ComposeKey() {
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<QueueViewModel>()
     val queueState = viewModel.queueState.collectAsState()
+    val selectedItems = viewModel.selectedFlow.asState()
+    val reorderState = rememberReorderState()
 
-    QueueContents(
-      queue = queueState.value.queue,
-      index = queueState.value.queueIndex,
-      swapItems = { from, to ->
-        viewModel.swapQueueItemsInView(from.toQueueItemPosition(), to.toQueueItemPosition())
-      },
-      moveQueueItem = { index1, index2 -> viewModel.moveQueueItem(index1, index2)},
-      onDelete = { viewModel.deleteQueueItem(it) },
-      onClick = { viewModel.goToQueueItemMaybePlay(it) }
-    )
+    val listState = reorderState.listState
+    val scope = rememberCoroutineScope()
+
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .statusBarsPadding()
+        .navigationBarsPadding(bottom = false)
+    ) {
+      val state = queueState.value
+      val queue = state.queue
+      val queueIndex = state.queueIndex
+      val selected = selectedItems.value
+
+      QueueItemsActionBar(
+        itemCount = queue.size,
+        inSelectionMode = selected.inSelectionMode,
+        selectedCount = selected.selectedCount,
+        goToCurrent = { listState.scrollToPosition(scope, queueIndex) },
+        goToTop = { listState.scrollToFirst(scope) },
+        goToBottom = { listState.scrollToPosition(scope, queue.indices.last) },
+        addToPlaylist = { viewModel.addToPlaylist() },
+        selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
+      )
+
+      QueueContents(
+        queue = queue,
+        index = state.queueIndex,
+        selectedItems = selected,
+        reorderState = reorderState,
+        swapItems = { index1, index2 -> viewModel.swapViewItems(index1, index2) },
+        moveQueueItem = { from, to -> viewModel.moveQueueItem(from, to) },
+        onDelete = { queueItem -> viewModel.deleteQueueItem(queueItem) },
+        onClick = { queueItem -> viewModel.itemClicked(queueItem) },
+        onLongClick = { queueItem -> viewModel.itemLongClicked(queueItem) },
+        scrollToPosition = { position -> listState.scrollToPosition(scope, position) }
+      )
+    }
   }
 }
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun QueueContents(
   queue: List<QueueAudioItem>,
   index: Int,
-  swapItems: (ItemPosition, ItemPosition) -> Unit,
+  selectedItems: SelectedItems<InstanceId>,
+  reorderState: ReorderableState,
+  swapItems: (Int, Int) -> Unit,
   moveQueueItem: (Int, Int) -> Unit,
   onDelete: (QueueAudioItem) -> Unit,
-  onClick: (QueueAudioItem) -> Unit
+  onClick: (QueueAudioItem) -> Unit,
+  onLongClick: (QueueAudioItem) -> Unit,
+  scrollToPosition: (Int) -> Unit
 ) {
   var scrollToCurrent by remember { mutableStateOf(true) }
-  val state = rememberReorderState()
-  val listState = state.listState
+  val listState = reorderState.listState
   val config = LocalScreenConfig.current
-  val coroutineScope = rememberCoroutineScope()
 
-  fun scrollToCurrent(scope: CoroutineScope, state: LazyListState, position: Int) {
-    scope.launch { state.scrollToItem(position) }
+  fun scrollToCurrent(position: Int) {
+    scrollToCurrent = false
+    scrollToPosition(position)
   }
 
-  LOG._e { it("Recomposing QueueContents") }
-
   if (scrollToCurrent && index in queue.indices && index !in listState.visibleIndices) {
-    scrollToCurrent = false
-    listState.firstVisibleItemIndex
-    listState.layoutInfo.visibleItemsInfo
-    scrollToCurrent(coroutineScope, listState, index)
+    scrollToCurrent(index)
   }
 
   LibraryScrollBar(
     listState = listState,
     modifier = Modifier
-      .statusBarsPadding()
       .navigationBarsPadding(bottom = false)
       .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
   ) {
@@ -171,56 +217,85 @@ private fun QueueContents(
       ),
       modifier = Modifier
         .reorderable(
-          state = state,
-          onMove = { from, to -> swapItems(from, to) },
+          state = reorderState,
+          onMove = { from, to -> swapItems(from.index, to.index) },
           onDragEnd = { start, end -> moveQueueItem(start, end) }
         )
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
       items(items = queue, key = { it.instanceId }) { queueItem ->
         val dismissState = rememberDismissState()
-        val dismissDirection = dismissState.dismissDirection
-        val isDismissed = dismissState.isDismissed(DismissDirection.EndToStart)
-
-        if (isDismissed && dismissDirection == DismissDirection.EndToStart) {
+        if (dismissState.isDismissed(DismissDirection.EndToStart)) {
           val scope = rememberCoroutineScope()
           scope.launch {
             onDelete(queueItem)
+            // Need to reset dismiss state so swipe doesn't occur again when undoing onDelete
+            dismissState.snapTo(DismissValue.Default)
           }
         }
-        SwipeToDismiss(
-          state = dismissState,
-          directions = setOf(DismissDirection.EndToStart),
-          dismissThresholds = { FractionalThreshold(0.55f) },
-          background = {
-            if (dismissState.offset.value.roundToInt() < -50) {
-              Box(
-                Modifier
-                  .background(Color.Red.copy(alpha = .5F))
-                  .fillMaxSize()
-              )
-            }
-          },
-          modifier = Modifier
-            .draggedItem(state.offsetByKey(queueItem.instanceId))
-            .detectReorderAfterLongPress(state)
+
+        val currentId =
+          if (index in queue.indices) queue[index].instanceId else InstanceId.INVALID
+        val isCurrent = queueItem.item.instanceId == currentId
+        val isSelected = selectedItems.isSelected(queueItem.instanceId)
+
+        DraggableQueueItem(
+          dismissState = dismissState,
+          modifier = Modifier.draggedItem(reorderState.offsetByKey(queueItem.instanceId))
         ) {
-          val currentId =
-            if (index in queue.indices) queue[index].instanceId else InstanceId.INVALID
-          val isCurrent = queueItem.item.instanceId == currentId
           QueueItem(
             audioItem = queueItem,
             isCurrent = isCurrent,
-            modifier = Modifier
-              .clickable(
-                enabled = !isCurrent,
-                onClick = { onClick(queueItem) }
-              )
-          )
+            isSelected = isSelected,
+            modifier = Modifier.combinedClickable(
+              onLongClick = { onLongClick(queueItem) },
+              onClick = { onClick(queueItem) }
+            )
+          ) {
+            DragHandle(
+              index = queueItem.position,
+              modifier = Modifier.detectReorder(reorderState)
+            )
+          }
         }
       }
     }
+  }
+}
+
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+private fun DraggableQueueItem(
+  dismissState: DismissState,
+  modifier: Modifier,
+  queueItem: @Composable () -> Unit,
+) {
+  SwipeToDismiss(
+    state = dismissState,
+    directions = setOf(DismissDirection.EndToStart),
+    dismissThresholds = { FractionalThreshold(0.55f) },
+    background = {
+      if (dismissState.offset.value.roundToInt() < -50) {
+        Row(
+          modifier = Modifier
+            .background(Color.Red)
+            .fillMaxSize(),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Spacer(modifier = Modifier.weight(1F))
+          Icon(
+            painter = rememberImagePainter(data = R.drawable.ic_trashcan),
+            contentDescription = "Delete indicator",
+            modifier = Modifier.size(38.dp),
+            tint = LocalContentColor.current
+          )
+          Spacer(modifier = Modifier.width(18.dp))
+        }
+      }
+    },
+    modifier = modifier
+  ) {
+    queueItem()
   }
 }
 
@@ -229,7 +304,9 @@ private fun QueueContents(
 private fun QueueItem(
   audioItem: QueueAudioItem,
   isCurrent: Boolean,
-  modifier: Modifier = Modifier
+  isSelected: Boolean,
+  modifier: Modifier = Modifier,
+  icon: @Composable () -> Unit,
 ) {
   with(audioItem) {
     SongListItem(
@@ -238,16 +315,18 @@ private fun QueueItem(
       artistName = artist,
       songDuration = duration,
       rating = rating,
-      highlightBackground = isCurrent,
-      icon = { DragHandle(position) },
-      modifier = modifier
+      highlightBackground = isSelected,
+      icon = icon,
+      modifier = modifier,
+      textColor = if (isCurrent) Color.Green else Color.Unspecified
     )
   }
 }
 
 @Composable
-private fun DragHandle(index: Int) {
+private fun DragHandle(index: Int, modifier: Modifier) {
   Column(
+    modifier = modifier,
     horizontalAlignment = Alignment.End
   ) {
     Text(
@@ -274,23 +353,27 @@ data class QueueState(
   val queueIndex: Int,
 )
 
-fun ItemPosition.toQueueItemPosition(): QueueItemPosition =
-  QueueItemPosition(position = index, id = key as? InstanceId ?: InstanceId.INVALID)
-
-data class QueueItemPosition(
-  val position: Int,
-  val id: InstanceId
-)
-
 interface QueueViewModel {
   val queueState: StateFlow<QueueState>
-
+  val selectedFlow: SelectedItemsFlow<InstanceId>
   val inDragMode: StateFlow<Boolean>
 
-  fun swapQueueItemsInView(fromItemPos: QueueItemPosition, toItemPos: QueueItemPosition)
+  fun selectAll()
+  fun clearSelection()
+
+  fun swapViewItems(index1: Int, index2: Int)
   fun moveQueueItem(from: Int, to: Int)
   fun deleteQueueItem(item: QueueAudioItem)
   fun goToQueueItemMaybePlay(item: QueueAudioItem)
+
+  fun itemClicked(item: QueueAudioItem)
+  fun itemLongClicked(item: QueueAudioItem)
+
+  /**
+   * Gathers either the selected queue items, or all items if there is no selection, and
+   * adds them to a playlist. The user is asked to select a playlist or create one.
+   */
+  fun addToPlaylist()
 
   companion object {
     operator fun invoke(localAudioQueueModel: LocalAudioQueueModel): QueueViewModel =
@@ -300,32 +383,36 @@ interface QueueViewModel {
 
 private class QueueViewModelImpl(
   private val localAudioQueueModel: LocalAudioQueueModel,
-) : QueueViewModel, ScopedServices.Registered, ScopedServices.Activated {
+) : QueueViewModel, ScopedServices.Activated, ScopedServices.HandlesBack {
   private lateinit var scope: CoroutineScope
   private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
-  private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
+  private var localAudioQueue: LocalAudioQueue = NullLocalAudioQueue
 
   override val queueState = MutableStateFlow(QueueState(emptyList(), -1))
+  override val selectedFlow = SelectedItemsFlow<InstanceId>(SelectedItems())
   override val inDragMode = MutableStateFlow(false)
 
-  override fun swapQueueItemsInView(fromItemPos: QueueItemPosition, toItemPos: QueueItemPosition) {
+  override fun selectAll() = selectedFlow.selectAll(getSongKeys())
+  private fun getSongKeys() = queueState.value.queue.mapTo(mutableSetOf()) { it.instanceId }
+  override fun clearSelection() = selectedFlow.clearSelection()
+  override fun onBackEvent(): Boolean = selectedFlow.inSelectionModeThenTurnOff()
+
+  override fun swapViewItems(index1: Int, index2: Int) {
     inDragMode.value = true
     queueState.update {
-      val from = fromItemPos.position
-      val to = toItemPos.position
       val queue = it.queue
       val prevCurrentIndex = it.queueIndex
-      val newIndex = if (from == prevCurrentIndex) {
-        to
-      } else if (from < prevCurrentIndex) {
-        if (to >= prevCurrentIndex) {
+      val newIndex = if (index1 == prevCurrentIndex) {
+        index2
+      } else if (index1 < prevCurrentIndex) {
+        if (index2 >= prevCurrentIndex) {
           prevCurrentIndex - 1
         } else {
           prevCurrentIndex
         }
-      } else if (to <= prevCurrentIndex) {
-        if (from > prevCurrentIndex) {
+      } else if (index2 <= prevCurrentIndex) {
+        if (index1 > prevCurrentIndex) {
           prevCurrentIndex + 1
         } else {
           prevCurrentIndex
@@ -335,7 +422,7 @@ private class QueueViewModelImpl(
       it.copy(
         queue = queue
           .toMutableList()
-          .swapQueueItems(from, to),
+          .swapQueueItems(index1, index2),
         queueIndex = newIndex
       )
     }
@@ -343,26 +430,40 @@ private class QueueViewModelImpl(
 
   override fun moveQueueItem(from: Int, to: Int) {
     inDragMode.value = false
-    if (from != to)  audioQueue.moveQueueItem(from, to)
+    if (from != to) localAudioQueue.moveQueueItem(from, to)
   }
 
   override fun deleteQueueItem(item: QueueAudioItem) {
-    audioQueue.removeFromQueue(item.position, item)
+    selectedFlow.deselect(item.instanceId)
+    scope.launch { localAudioQueue.removeFromQueue(item.position, item) }
   }
 
   override fun goToQueueItemMaybePlay(item: QueueAudioItem) {
-    audioQueue.goToIndexMaybePlay(item.position)
+    localAudioQueue.goToIndexMaybePlay(item.position)
   }
 
-  override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+  override fun itemClicked(item: QueueAudioItem) =
+    selectedFlow.ifInSelectionModeToggleElse(item.instanceId) { goToQueueItemMaybePlay(item) }
+
+  override fun itemLongClicked(item: QueueAudioItem) =
+    selectedFlow.toggleSelection(item.instanceId)
+
+  override fun addToPlaylist() {
+    val queue = queueState.value.queue
+    val mediaIdList = getSelectedItems(queue)
+      .mapTo(LongArrayList(queue.size)) { queueAudioItem -> queueAudioItem.id.value }
+      .asMediaIdList
+    scope.launch {
+      if (localAudioQueueModel.addToPlaylist(mediaIdList).wasExecuted)
+        selectedFlow.turnOffSelectionMode()
+    }
   }
 
-  override fun onServiceUnregistered() {
-    scope.cancel()
-  }
+  private fun getSelectedItems(queue: List<QueueAudioItem>) =
+    queue.filterIfHasSelection(selectedFlow.value) { it.instanceId }
 
   override fun onServiceActive() {
+    scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     currentQueueJob = localAudioQueueModel.localAudioQueue
       .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)
@@ -372,6 +473,7 @@ private class QueueViewModelImpl(
     currentQueueJob?.cancel()
     currentQueueJob = null
     handleQueueChange(NullLocalAudioQueue)
+    scope.cancel()
   }
 
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
@@ -383,22 +485,21 @@ private class QueueViewModelImpl(
   }
 
   private fun queueActive(queue: LocalAudioQueue) {
-    audioQueue = queue
-    queueStateJob = audioQueue.queueState
+    localAudioQueue = queue
+    queueStateJob = queue.queueState
       .onEach { state -> handleServiceState(state) }
-      .catch { cause -> LOG.e(cause) { it("") } }
-      .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
+      .catch { cause -> LOG.e(cause) { it("Error with LocalAudioQueueState flow") } }
+      .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }
 
   private fun queueInactive() {
     queueStateJob?.cancel()
     queueStateJob = null
-    audioQueue = NullLocalAudioQueue
+    localAudioQueue = NullLocalAudioQueue
   }
 
   private fun handleServiceState(localAudioQueueState: LocalAudioQueueState) {
-    val currentIndex = queueState.value.queueIndex
     if (!inDragMode.value) {
       queueState.update {
         it.copy(
@@ -412,9 +513,6 @@ private class QueueViewModelImpl(
 
 private fun List<AudioItem>.toQueueList(): List<QueueAudioItem> =
   mapIndexedTo(ArrayList(size)) { index, item -> QueueAudioItem(item, index) }
-
-val LazyListState.visibleIndices: IntRange
-  get() = firstVisibleItemIndex..(layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1)
 
 fun MutableList<QueueAudioItem>.swapQueueItems(index1: Int, index2: Int) = apply {
   val atIndex1 = this[index1]

@@ -25,10 +25,13 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
+import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -53,7 +56,8 @@ private val LOG by lazyLogger(BaseAlbumsViewModel::class)
 
 abstract class BaseAlbumsViewModel(
   private val albumDao: AlbumDao,
-  protected val backstack: Backstack
+  protected val backstack: Backstack,
+  private val localAudioQueueModel: LocalAudioQueueModel
 ) : AlbumsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private var requestJob: Job? = null
@@ -69,6 +73,10 @@ abstract class BaseAlbumsViewModel(
   }
 
   protected abstract fun goToAlbumSongs(albumId: AlbumId)
+
+  protected abstract suspend fun makeAudioIdList(
+    albumList: List<AlbumsViewModel.AlbumInfo>
+  ): Result<AudioIdList, DaoMessage>
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + Dispatchers.Main)
@@ -133,6 +141,20 @@ abstract class BaseAlbumsViewModel(
       selectedItems.value = it.selected
     }
   }
+
+  fun play() {
+    scope.launch {
+      when (val result = makeAudioIdList(getSelectedAlbums())) {
+        is Ok -> if (localAudioQueueModel.play(result.value).wasExecuted)
+          selectedItems.turnOffSelectionMode()
+        is Err -> LOG._e { it("Error getting media list. %s", result.error) }
+      }
+    }
+  }
+
+  /** Get selected albums, or all if no selection */
+  private fun getSelectedAlbums() = albumList.value
+    .filterIfHasSelection(selectedItems.value) { it.id }
 }
 
 @Parcelize

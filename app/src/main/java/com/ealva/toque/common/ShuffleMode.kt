@@ -31,15 +31,19 @@ import kotlinx.parcelize.Parcelize
 enum class ShuffleMode(
   override val id: Int,
   /** Should the media in a list be randomly shuffled */
-  val shuffleMedia: Boolean,
+  private val media: Boolean,
   /** Should list selection be random */
-  val shuffleLists: Boolean,
+  private val lists: Boolean,
   @StringRes override val titleRes: Int
 ) : HasConstId, HasTitle, Parcelable {
   None(1, false, false, R.string.ShuffleNone),
   Media(2, true, false, R.string.ShuffleMedia),
   Lists(3, false, true, R.string.ShuffleLists),
   MediaAndLists(4, true, true, R.string.ShuffleMediaAndLists);
+
+  fun shuffleMedia(): ShuffleMedia = ShuffleMedia(media)
+
+  fun shuffleLists(): ShuffleLists = ShuffleLists(lists)
 
   fun isOn(): Boolean = this !== None
 
@@ -54,9 +58,9 @@ enum class ShuffleMode(
     MediaAndLists -> None
   }
 
-  fun shuffleListsDiffers(other: ShuffleMode): Boolean = shuffleLists != other.shuffleLists
+  fun shuffleListsDiffers(other: ShuffleMode): Boolean = lists != other.lists
 
-  fun shuffleMediaDiffers(other: ShuffleMode): Boolean = shuffleMedia != other.shuffleMedia
+  fun shuffleMediaDiffers(other: ShuffleMode): Boolean = media != other.media
 }
 
 fun Int.compatToShuffleMode(): ShuffleMode = when (this) {
@@ -73,3 +77,9 @@ val ShuffleMode.asCompat
     ShuffleMode.Lists -> PlaybackStateCompat.SHUFFLE_MODE_GROUP
     ShuffleMode.MediaAndLists -> PlaybackStateCompat.SHUFFLE_MODE_GROUP
   }
+
+@JvmInline
+value class ShuffleMedia(val value: Boolean)
+
+@JvmInline
+value class ShuffleLists(val value: Boolean)

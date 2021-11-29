@@ -25,7 +25,7 @@ import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.persist.toMediaId
+import com.ealva.toque.persist.asMediaId
 import com.ealva.toque.service.audio.NullPlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableItemEvent
@@ -39,7 +39,7 @@ import kotlinx.coroutines.flow.emptyFlow
 
 class PlayableAudioItemFake(
   override val eventFlow: Flow<PlayableItemEvent> = emptyFlow(),
-  override val id: MediaId = 1.toMediaId(),
+  override val id: MediaId = 1.asMediaId,
   override val instanceId: InstanceId = InstanceId(1),
   override var title: Title = Title.UNKNOWN,
   override var trackNumber: Int = 1,

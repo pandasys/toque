@@ -16,6 +16,8 @@
 
 package com.ealva.toque.ui.library
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
@@ -24,13 +26,24 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
+import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.SongListType
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.asAlbumIdList
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.map
+import com.google.accompanist.insets.navigationBarsPadding
+import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.simplestackextensions.servicesktx.lookup
+import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -41,26 +54,57 @@ data class AlbumsScreen(
   private val noArg: String = ""
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(AllAlbumsViewModel(get(), backstack)) }
+    val key = this
+    with(serviceBinder) { add(AllAlbumsViewModel(key, get(), get(), backstack, lookup())) }
   }
+
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AllAlbumsViewModel>()
     val albums = viewModel.albumList.collectAsState()
-    val selectedAlbums = viewModel.selectedItems.asState()
-    AlbumsList(
-      list = albums.value,
-      selectedItems = selectedAlbums.value,
-      itemClicked = { viewModel.itemClicked(it) },
-      itemLongClicked = { viewModel.itemLongClicked(it) }
-    )
+    val selected = viewModel.selectedItems.asState()
+
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .statusBarsPadding()
+        .navigationBarsPadding(bottom = false)
+    ) {
+      CategoryTitleBar(viewModel.categoryItem)
+      LibraryItemsActions(
+        itemCount = albums.value.size,
+        inSelectionMode = selected.value.inSelectionMode,
+        selectedCount = selected.value.selectedCount,
+        play = { viewModel.play() },
+        shuffle = { /*viewModel.shuffle()*/ },
+        playNext = { /*viewModel.playNext()*/ },
+        addToUpNext = { /*viewModel.addToUpNext()*/ },
+        addToPlaylist = { },
+        selectAllOrNone = { /*all -> if (all) viewModel.selectAll() else viewModel.clearSelection()*/ },
+        startSearch = {}
+      )
+      AlbumsList(
+        list = albums.value,
+        selectedItems = selected.value,
+        itemClicked = { viewModel.itemClicked(it) },
+        itemLongClicked = { viewModel.itemLongClicked(it) }
+      )
+    }
   }
 }
 
 private class AllAlbumsViewModel(
+  private val key: ComposeKey,
   albumDao: AlbumDao,
-  backstack: Backstack
-) : BaseAlbumsViewModel(albumDao, backstack) {
+  private val audioMediaDao: AudioMediaDao,
+  backstack: Backstack,
+  localAudioQueueModel: LocalAudioQueueModel
+) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel) {
+  private val categories = LibraryCategories()
+
+  val categoryItem: LibraryCategories.CategoryItem
+    get() = categories[key]
+
   override suspend fun doGetAlbums(
     albumDao: AlbumDao,
     filter: Filter
@@ -71,5 +115,18 @@ private class AllAlbumsViewModel(
       .find { it.id == albumId }
       ?.title ?: AlbumTitle("")
     backstack.goTo(AlbumSongsScreen(albumId, title))
+  }
+
+  override suspend fun makeAudioIdList(
+    albumList: List<AlbumsViewModel.AlbumInfo>
+  ): Result<AudioIdList, DaoMessage> {
+    val title = albumList.lastOrNull()?.title ?: AlbumTitle.UNKNOWN
+    return audioMediaDao
+      .getMediaForAlbums(
+        albumList
+          .mapTo(LongArrayList(512)) { it.id.value }
+          .asAlbumIdList
+      )
+      .map { mediaIdList -> AudioIdList(mediaIdList, title.value, SongListType.Album) }
   }
 }

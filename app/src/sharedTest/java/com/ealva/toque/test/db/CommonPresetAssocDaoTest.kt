@@ -22,8 +22,8 @@ import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetAssociationTable
 import com.ealva.toque.db.PresetAssociation
-import com.ealva.toque.persist.toAlbumId
-import com.ealva.toque.persist.toMediaId
+import com.ealva.toque.persist.asAlbumId
+import com.ealva.toque.persist.asMediaId
 import com.ealva.toque.test.shared.withTestDatabase
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.get
@@ -71,8 +71,8 @@ object CommonPresetAssocDaoTest {
       val dao = EqPresetAssociationDao(this)
       val preset = EqPresetStub(EqPresetId(1)).apply { name = "NewDefault" }
 
-      val mediaId = 100L.toMediaId()
-      val albumId = 10L.toAlbumId()
+      val mediaId = 100L.asMediaId
+      val albumId = 10L.asAlbumId
       val output = AudioOutputRoute.Speaker
 
       val assocs = listOf(
@@ -97,8 +97,8 @@ object CommonPresetAssocDaoTest {
       val dao = EqPresetAssociationDao(this)
       val preset1 = EqPresetStub(EqPresetId(1)).apply { name = "Preset1" }
 
-      val mediaId1 = 100L.toMediaId()
-      val albumId1 = 10L.toAlbumId()
+      val mediaId1 = 100L.asMediaId
+      val albumId1 = 10L.asAlbumId
       val output1 = AudioOutputRoute.Speaker
 
       val firstAssocs = listOf(
@@ -121,8 +121,8 @@ object CommonPresetAssocDaoTest {
       val preset2 = EqPresetStub(EqPresetId(2)).apply { name = "Preset2" }
       dao.setAsDefault(preset2)
 
-      val mediaId2 = 500L.toMediaId()
-      val albumId2 = 50L.toAlbumId()
+      val mediaId2 = 500L.asMediaId
+      val albumId2 = 50L.asAlbumId
       val output2 = AudioOutputRoute.Bluetooth
       val secondAssocs = listOf(
         PresetAssociation.makeForOutput(output2),
@@ -152,8 +152,8 @@ object CommonPresetAssocDaoTest {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
       dao.getPreferredId(
-        10L.toMediaId(),
-        11L.toAlbumId(),
+        10L.asMediaId,
+        11L.asAlbumId,
         AudioOutputRoute.Speaker,
         EqPresetId(-1)
       ).let { result ->
@@ -168,8 +168,8 @@ object CommonPresetAssocDaoTest {
       val dao = EqPresetAssociationDao(this)
       val preset = EqPresetStub(EqPresetId(1000)).apply { name = "A Preset" }
 
-      val mediaId = 100L.toMediaId()
-      val albumId = 10L.toAlbumId()
+      val mediaId = 100L.asMediaId
+      val albumId = 10L.asAlbumId
       val output = AudioOutputRoute.Speaker
 
       val assocs = listOf(

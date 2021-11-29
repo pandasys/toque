@@ -51,8 +51,8 @@ import com.google.accompanist.insets.statusBarsPadding
 fun SongItemList(
   list: List<SongsViewModel.SongInfo>,
   selectedItems: SelectedItems<MediaId>,
-  itemClicked: (MediaId) -> Unit,
-  itemLongClicked: (MediaId) -> Unit,
+  itemClicked: (SongsViewModel.SongInfo) -> Unit,
+  itemLongClicked: (SongsViewModel.SongInfo) -> Unit,
   modifier: Modifier = Modifier
 ) {
   val listState = rememberLazyListState()
@@ -72,7 +72,6 @@ fun SongItemList(
         bottom = config.getListBottomContentPadding(isExpanded = true),
         end = 8.dp
       ),
-      modifier = modifier
     ) {
       items(items = list, key = { it.id }) { songInfo ->
         SongListItem(
@@ -84,8 +83,8 @@ fun SongItemList(
           highlightBackground = selectedItems.isSelected(songInfo.id),
           icon = { SongListItemIcon(songInfo.artwork) },
           modifier = Modifier.combinedClickable(
-            onClick = { itemClicked(songInfo.id) },
-            onLongClick = { itemLongClicked(songInfo.id) }
+            onClick = { itemClicked(songInfo) },
+            onLongClick = { itemLongClicked(songInfo) }
           )
         )
       }

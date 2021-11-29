@@ -38,7 +38,6 @@ import com.ealva.toque.log._i
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.scanner.MediaScannerService
-import com.ealva.toque.service.audio.LocalAudioCommand.AddToUpNext
 import com.ealva.toque.service.audio.LocalAudioCommand.FastForward
 import com.ealva.toque.service.audio.LocalAudioCommand.GoToIndex
 import com.ealva.toque.service.audio.LocalAudioCommand.GoToQueueItem
@@ -49,7 +48,6 @@ import com.ealva.toque.service.audio.LocalAudioCommand.NextRepeatMode
 import com.ealva.toque.service.audio.LocalAudioCommand.NextShuffleMode
 import com.ealva.toque.service.audio.LocalAudioCommand.Pause
 import com.ealva.toque.service.audio.LocalAudioCommand.Play
-import com.ealva.toque.service.audio.LocalAudioCommand.PlayNext
 import com.ealva.toque.service.audio.LocalAudioCommand.PrepareNext
 import com.ealva.toque.service.audio.LocalAudioCommand.Previous
 import com.ealva.toque.service.audio.LocalAudioCommand.PreviousList
@@ -69,6 +67,8 @@ import com.ealva.toque.service.queue.ForceTransition.AllowFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.server.MediaSessionBrowser
 import com.ealva.toque.service.session.server.MediaSessionControl
+import com.github.michaelbull.result.Result
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,7 +142,17 @@ class LocalAudioCommandProcessor(
   override fun setRepeatMode(mode: RepeatMode) = emitCommand(SetRepeatMode(mode))
   override fun nextShuffleMode() = emitCommand(NextShuffleMode)
   override fun setShuffleMode(mode: ShuffleMode) = emitCommand(SetShuffleMode(mode))
-  override fun addToUpNext(audioIdList: AudioIdList) = emitCommand(AddToUpNext(audioIdList))
+
+  override suspend fun addToUpNext(
+    audioIdList: AudioIdList
+  ): Result<QueueSize, QueueMessage> {
+    val deferred = CompletableDeferred<Result<QueueSize, QueueMessage>>()
+    scope.launch {
+      commandFlow.emit(LocalAudioCommand.AddToUpNext2(audioIdList, deferred))
+    }
+    return deferred.await()
+  }
+
   private suspend fun prepareFromId(id: String, extras: Bundle) = try {
     MediaSessionBrowser.handleMedia(id, extras, PrepareMediaFromId(this, audioMediaDao))
   } catch (e: Exception) {
@@ -162,17 +172,25 @@ class LocalAudioCommandProcessor(
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) =
     emitCommand(SetRating(rating, allowFileUpdate))
 
-  override fun playNext(
+  override suspend fun playNext(
     audioIdList: AudioIdList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ) = emitCommand(PlayNext(audioIdList, clearUpNext, playNow, transitionType))
+  ): Result<QueueSize, QueueMessage> {
+    val deferred = CompletableDeferred<Result<QueueSize, QueueMessage>>()
+    scope.launch {
+      commandFlow.emit(
+        LocalAudioCommand.PlayNext2(audioIdList, clearUpNext, playNow, transitionType, deferred)
+      )
+    }
+    return deferred.await()
+  }
 
-  override fun prepareNext(audioIdList: AudioIdList) =
+  override suspend fun prepareNext(audioIdList: AudioIdList) =
     emitCommand(PrepareNext(audioIdList))
 
-  override fun removeFromQueue(index: Int, item: AudioItem) {
+  override suspend fun removeFromQueue(index: Int, item: AudioItem) {
     emitCommand(RemoveQueueItem(index, item))
   }
 
@@ -273,7 +291,7 @@ class LocalAudioCommandProcessor(
 
   private fun handleScannerEvent(addToQueueCount: Int, event: AudioDaoEvent): Int =
     if (addToQueueCount > 0 && event is AudioDaoEvent.MediaCreated) {
-      addToUpNext(AudioIdList(event.id, SongListType.All, ""))
+      scope.launch { addToUpNext(AudioIdList(event.id, "", SongListType.All)) }
       addToQueueCount - 1
     } else 0
 
@@ -411,19 +429,27 @@ private sealed interface LocalAudioCommand {
     override fun toString(): String = "Rewind"
   }
 
-  data class AddToUpNext(val audioIdList: AudioIdList) : LocalAudioCommand {
-    override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.addToUpNext(audioIdList)
+  data class AddToUpNext2(
+    val audioIdList: AudioIdList,
+    val deferred: CompletableDeferred<Result<QueueSize, QueueMessage>>
+  ) : LocalAudioCommand {
+    override suspend fun process(localAudioQueue: LocalAudioQueue) {
+      deferred.complete(localAudioQueue.addToUpNext(audioIdList))
+    }
   }
 
-  data class PlayNext(
+  data class PlayNext2(
     val audioIdList: AudioIdList,
     val clearUpNext: ClearQueue,
     val playNow: PlayNow,
-    val transitionType: TransitionType
+    val transitionType: TransitionType,
+    val deferred: CompletableDeferred<Result<QueueSize, QueueMessage>>
   ) : LocalAudioCommand {
-    override suspend fun process(localAudioQueue: LocalAudioQueue) =
-      localAudioQueue.playNext(audioIdList, clearUpNext, playNow, transitionType)
+    override suspend fun process(localAudioQueue: LocalAudioQueue) {
+      deferred.complete(
+        localAudioQueue.playNext(audioIdList, clearUpNext, playNow, transitionType)
+      )
+    }
   }
 
   data class PrepareNext(val audioIdList: AudioIdList) : LocalAudioCommand {

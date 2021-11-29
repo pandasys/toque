@@ -27,22 +27,23 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
-import com.ealva.toque.db.AudioDescrResult
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
+import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.NamedSongListType
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
+import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
-import com.ealva.toque.ui.audio.LocalAudioQueueModel.PlayResult
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.statebundle.StateBundle
@@ -79,8 +80,10 @@ interface SongsViewModel {
     val artwork: Uri
   ) : Parcelable
 
-  val allSongs: StateFlow<List<SongInfo>>
+  val songsFlow: StateFlow<List<SongInfo>>
   val selectedItems: SelectedItemsFlow<MediaId>
+  fun selectAll()
+  fun clearSelection()
 
   fun mediaClicked(mediaId: MediaId)
   fun mediaLongClicked(mediaId: MediaId)
@@ -88,10 +91,11 @@ interface SongsViewModel {
   val searchFlow: StateFlow<String>
   fun setSearch(search: String)
 
-  fun play(): PlayResult
-  fun shuffle(): PlayResult
+  fun play()
+  fun shuffle()
   fun playNext()
   fun addToUpNext()
+  fun addToPlaylist()
 }
 
 abstract class BaseSongsViewModel(
@@ -104,10 +108,15 @@ abstract class BaseSongsViewModel(
 
   protected abstract val namedSongListType: NamedSongListType
 
-  override val allSongs = MutableStateFlow<List<SongInfo>>(emptyList())
+  override val songsFlow = MutableStateFlow<List<SongInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<MediaId>(SelectedItems())
   override val searchFlow = MutableStateFlow("")
   private val filterFlow = MutableStateFlow(NoFilter)
+
+
+  override fun selectAll() = selectedItems.selectAll(getSongKeys())
+  private fun getSongKeys() = songsFlow.value.mapTo(mutableSetOf()) { it.id }
+  override fun clearSelection() = selectedItems.clearSelection()
 
   override fun setSearch(search: String) {
     searchFlow.value = search
@@ -117,7 +126,7 @@ abstract class BaseSongsViewModel(
   protected abstract suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): AudioDescrResult
+  ): Result<List<AudioDescription>, DaoMessage>
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)
@@ -139,7 +148,6 @@ abstract class BaseSongsViewModel(
     if (requestJob?.isActive == true) requestJob?.cancel()
 
     requestJob = scope.launch {
-      LOG._e { it("getAudioList") }
       when (val result = getAudioList(audioMediaDao, filterFlow.value)) {
         is Ok -> handleAudioList(result.value)
         is Err -> LOG.e { it("%s", result.error) }
@@ -149,7 +157,7 @@ abstract class BaseSongsViewModel(
 
   private fun handleAudioList(list: List<AudioDescription>) {
     LOG._e { it("handleAudioList") }
-    allSongs.value = list.mapTo(ArrayList(list.size)) {
+    songsFlow.value = list.mapTo(ArrayList(list.size)) {
       SongInfo(
         id = it.mediaId,
         title = it.title,
@@ -162,24 +170,35 @@ abstract class BaseSongsViewModel(
     }
   }
 
-  override fun mediaClicked(mediaId: MediaId) = selectedItems.ifInSelectionModeToggleElse(mediaId) {}
+  override fun mediaClicked(mediaId: MediaId) =
+    selectedItems.ifInSelectionModeToggleElse(mediaId) {}
+
   override fun mediaLongClicked(mediaId: MediaId) = selectedItems.toggleSelection(mediaId)
 
   private fun makeAudioIdList(): AudioIdList = AudioIdList(
-    MediaIdList(
-      allSongs.value
-        .asSequence()
-        .filterWith(selectedItems.value) { it.id }
-        .mapTo(LongArrayList(512)) { it.id.value }
-    ),
+    makeMediaIdList(),
     namedSongListType
   )
 
-  override fun play(): PlayResult =
-    localAudioQueueModel.play(makeAudioIdList()) { selectedItems.turnOffSelectionMode() }
+  private fun makeMediaIdList(): MediaIdList = songsFlow.value
+    .asSequence()
+    .filterIfHasSelection(selectedItems.value) { it.id }
+    .mapTo(LongArrayList(512)) { it.id.value }
+    .asMediaIdList
 
-  override fun shuffle(): PlayResult =
-    localAudioQueueModel.shuffle(makeAudioIdList()) { selectedItems.turnOffSelectionMode() }
+  override fun play() {
+    scope.launch {
+      if (localAudioQueueModel.play(makeAudioIdList()).wasExecuted)
+        selectedItems.turnOffSelectionMode()
+    }
+  }
+
+  override fun shuffle() {
+    scope.launch {
+      if (localAudioQueueModel.shuffle(makeAudioIdList()).wasExecuted)
+        selectedItems.turnOffSelectionMode()
+    }
+  }
 
   override fun playNext() {
     localAudioQueueModel.playNext(makeAudioIdList())
@@ -189,6 +208,13 @@ abstract class BaseSongsViewModel(
   override fun addToUpNext() {
     localAudioQueueModel.addToUpNext(makeAudioIdList())
     selectedItems.turnOffSelectionMode()
+  }
+
+  override fun addToPlaylist() {
+    scope.launch {
+      if (localAudioQueueModel.addToPlaylist(makeMediaIdList()).wasExecuted)
+        selectedItems.turnOffSelectionMode()
+    }
   }
 
   override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
@@ -212,14 +238,8 @@ abstract class BaseSongsViewModel(
 
   override fun onServiceInactive() {
     scope.cancel()
-    allSongs.value = emptyList()
+    songsFlow.value = emptyList()
   }
-
-  fun selectAll() = selectedItems.selectAll(getSongKeys())
-
-  private fun getSongKeys() = allSongs.value.mapTo(mutableSetOf()) { it.id }
-
-  fun clearSelection() = selectedItems.clearSelection()
 }
 
 @Parcelize

@@ -20,12 +20,8 @@ package com.ealva.toque.db
 
 import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.db.QueueStateTable.id
-import com.ealva.welite.db.expr.eq
-import com.ealva.welite.db.expr.neq
 import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
-import com.ealva.welite.db.trigger.Trigger
-import com.ealva.welite.db.trigger.deleteTrigger
 
 val setOfAllTables = setOf(
   ArtistTable,
@@ -40,6 +36,7 @@ val setOfAllTables = setOf(
   EqPresetTable,
   EqPresetAssociationTable,
   QueueTable,
+  QueueItemsTable,
   QueueStateTable,
   PlayListTable,
   PlayListMediaTable
@@ -180,6 +177,7 @@ object MediaTable : Table() {
   init {
     // several of these indices exist for faster smart playlist functionality
     uniqueIndex(location) // media may appear only once
+    uniqueIndex(fileUri)
     /*
      * Note: Adding all of the following indices resulted in a worst case cost of approx 3-4%
      * inserting over 2500 during initial scanning, which includes parsing all metadata (on a Galaxy
@@ -368,12 +366,14 @@ object QueueStateTable : Table() {
 }
 
 object PlayListTable : Table() {
-  val id = integer("PlayListID") { primaryKey() }
+  val id = long("PlayListID") { primaryKey() }
   val playListName = text("PlayListName") { collateNoCase() }
+
   /** [PlayListType] */
   val playListType = integer("PlayListType")
   val createdTime = long("PlayListTimeCreated")
   val updatedTime = long("PlayListUpdated") { default(0) }
+
   /** This column should be equal to [PlayListType.sortPosition] */
   val sort = integer("PlayListSort")
 
@@ -390,7 +390,7 @@ object PlayListTable : Table() {
 }
 
 object PlayListMediaTable : Table() {
-  val id = integer("PlayListMediaId") { primaryKey() }
+  val id = long("PlayListMediaId") { primaryKey() }
   val playListId = reference(
     name = "PlayListMedia_PlayListId",
     refColumn = PlayListTable.id,
@@ -401,11 +401,12 @@ object PlayListMediaTable : Table() {
     refColumn = MediaTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
+
   /**
    * Position within the playlist - no contract that it starts at 0 or 1, just that it sorts
    * properly based on song position. Query result row index indicates actual playlist index
    */
-  val sort = integer("PlayListMedia_Sort")
+  val sort = long("PlayListMedia_Sort")
 
   init {
     /** For quickly getting the playlist entries */

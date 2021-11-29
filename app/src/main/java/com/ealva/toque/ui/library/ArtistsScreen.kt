@@ -25,8 +25,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -56,11 +58,18 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
-import com.ealva.toque.db.ArtistDao
 import com.ealva.toque.db.ArtistDescription
+import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
+import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.SongListType
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.asArtistIdList
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -70,6 +79,8 @@ import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.map
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -79,7 +90,9 @@ import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.simplestackextensions.servicesktx.lookup
 import com.zhuinden.statebundle.StateBundle
+import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,25 +120,47 @@ enum class ArtistType(@StringRes val allSongsRes: Int, @DrawableRes val typeIcon
 
 @Immutable
 @Parcelize
-class ArtistsScreen(
+data class ArtistsScreen(
   private val artistType: ArtistType
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(ArtistsViewModel(get(), artistType, backstack)) }
+    val key = this
+    with(serviceBinder) { add(ArtistsViewModel(key, get(), lookup(), artistType, backstack)) }
   }
 
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<ArtistsViewModel>()
-    val artists = viewModel.allArtists.collectAsState()
+    val artists = viewModel.artists.collectAsState()
     val selected = viewModel.selectedItems.asState()
-    AllArtistsList(
-      list = artists.value,
-      selectedItems = selected.value,
-      artistType = artistType,
-      itemClicked = { artistId, songCount -> viewModel.itemClicked(artistId, songCount) },
-      itemLongClicked = { viewModel.itemLongClicked(it) }
-    )
+
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .statusBarsPadding()
+        .navigationBarsPadding(bottom = false)
+    ) {
+      CategoryTitleBar(viewModel.categoryItem)
+      LibraryItemsActions(
+        itemCount = artists.value.size,
+        inSelectionMode = selected.value.inSelectionMode,
+        selectedCount = selected.value.selectedCount,
+        play = { viewModel.play() },
+        shuffle = { /*viewModel.shuffle()*/ },
+        playNext = { /*viewModel.playNext()*/ },
+        addToUpNext = { /*viewModel.addToUpNext()*/ },
+        addToPlaylist = { },
+        selectAllOrNone = { /*all -> if (all) viewModel.selectAll() else viewModel.clearSelection()*/ },
+        startSearch = {}
+      )
+      AllArtistsList(
+        list = artists.value,
+        selectedItems = selected.value,
+        artistType = artistType,
+        itemClicked = { artistId, songCount -> viewModel.itemClicked(artistId, songCount) },
+        itemLongClicked = { viewModel.itemLongClicked(it) }
+      )
+    }
   }
 }
 
@@ -143,8 +178,6 @@ private fun AllArtistsList(
   LibraryScrollBar(
     listState = listState,
     modifier = Modifier
-      .statusBarsPadding()
-      .navigationBarsPadding(bottom = false)
       .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
   ) {
     LazyColumn(
@@ -154,10 +187,7 @@ private fun AllArtistsList(
         top = 8.dp,
         bottom = config.getListBottomContentPadding(isExpanded = true),
         end = 8.dp
-      ),
-      modifier = Modifier
-        .statusBarsPadding()
-        .navigationBarsPadding(bottom = false)
+      )
     ) {
       items(items = list, key = { it.artistId }) { artistInfo ->
         ArtistItem(
@@ -253,7 +283,8 @@ private interface ArtistsViewModel {
     val songCount: Int
   ) : Parcelable
 
-  val allArtists: StateFlow<List<ArtistInfo>>
+  val categoryItem: LibraryCategories.CategoryItem
+  val artists: StateFlow<List<ArtistInfo>>
   val selectedItems: SelectedItemsFlow<ArtistId>
 
   fun itemClicked(artistId: ArtistId, songCount: Int)
@@ -262,26 +293,37 @@ private interface ArtistsViewModel {
   val searchFlow: StateFlow<String>
   fun setSearch(search: String)
 
+  fun play()
+
   companion object {
     operator fun invoke(
-      artistDao: ArtistDao,
+      key: ComposeKey,
+      audioDao: AudioMediaDao,
+      localAudioQueueModel: LocalAudioQueueModel,
       artistType: ArtistType,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ArtistsViewModel =
-      ArtistsViewModelImpl(artistDao, artistType, backstack, dispatcher)
+      ArtistsViewModelImpl(key, audioDao, localAudioQueueModel, artistType, backstack, dispatcher)
   }
 }
 
 private class ArtistsViewModelImpl(
-  private val artistDao: ArtistDao,
+  private val key: ComposeKey,
+  private val audioMediaDao: AudioMediaDao,
+  private val localAudioQueueModel: LocalAudioQueueModel,
   private val artistType: ArtistType,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : ArtistsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
+  private val artistDao = audioMediaDao.artistDao
+  private val categories = LibraryCategories()
 
-  override val allArtists = MutableStateFlow<List<ArtistInfo>>(emptyList())
+  override val categoryItem: LibraryCategories.CategoryItem
+    get() = categories[key]
+
+  override val artists = MutableStateFlow<List<ArtistInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<ArtistId>()
   override val searchFlow = MutableStateFlow("")
   private val filterFlow = MutableStateFlow(Filter.NoFilter)
@@ -291,8 +333,32 @@ private class ArtistsViewModelImpl(
     filterFlow.value = search.wrapAsFilter()
   }
 
+  override fun play() {
+    scope.launch {
+      when (val result = makeAudioIdList(getSelectedArtists())) {
+        is Ok -> if (localAudioQueueModel.play(result.value).wasExecuted)
+          selectedItems.turnOffSelectionMode()
+        is Err -> LOG._e { it("Error getting media list. %s", result.error) }
+      }
+    }
+  }
+
+  suspend fun makeAudioIdList(artistList: List<ArtistInfo>): Result<AudioIdList, DaoMessage> {
+    val title = artistList.lastOrNull()?.name ?: ArtistName.UNKNOWN
+    return audioMediaDao
+      .getMediaForArtists(
+        artistList
+          .mapTo(LongArrayList(512)) { it.artistId.value }
+          .asArtistIdList
+      )
+      .map { mediaIdList -> AudioIdList(mediaIdList, title.value, SongListType.Artist) }
+  }
+
+  private fun getSelectedArtists() = artists.value
+    .filterIfHasSelection(selectedItems.value) { it.artistId }
+
   private fun goToArtistAlbums(artistId: ArtistId, songCount: Int) {
-    val name = allArtists.value
+    val name = artists.value
       .find { it.artistId == artistId }
       ?.name ?: ArtistName("")
     backstack.goTo(ArtistAlbumsScreen(artistId, artistType, name, songCount))
@@ -328,7 +394,7 @@ private class ArtistsViewModelImpl(
   }
 
   private fun handleArtistList(list: List<ArtistDescription>) {
-    allArtists.value = list.mapTo(ArrayList(list.size)) {
+    artists.value = list.mapTo(ArrayList(list.size)) {
       ArtistInfo(
         artistId = it.artistId,
         name = it.name,
@@ -348,7 +414,7 @@ private class ArtistsViewModelImpl(
 
   override fun onServiceInactive() {
     scope.cancel()
-    allArtists.value = emptyList()
+    artists.value = emptyList()
   }
 
   private val stateKey: String

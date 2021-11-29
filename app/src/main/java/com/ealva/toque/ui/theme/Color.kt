@@ -31,3 +31,24 @@ val cyan200 = Color(0xFF80CBC4)
 val cyan700 = Color(0xFF0097A7)
 
 val toque = Color(0xFF3399FF)
+
+val Color.Companion.AllSongs: Color
+  get() = Color(0xFF_1E_51_28)
+
+val Color.Companion.Albums: Color
+  get() = Color(0xFF_3F_33_51)
+
+val Color.Companion.Artists: Color
+  get() = Color(0xFF_7D_19_35)
+
+val Color.Companion.AlbumArtists: Color
+  get() = Color(0xFF_2C_39_4B)
+
+val Color.Companion.Genres: Color
+  get() = Color(0xFF_5C_3D_2E)
+
+val Color.Companion.Composers: Color
+  get() = Color(0xFF_13_3B_5C)
+
+val Color.Companion.Playlists: Color
+  get() = Color(0xFF_3B5249)

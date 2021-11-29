@@ -31,7 +31,7 @@ import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.service.vlc.VlcAudioItem
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import it.unimi.dsi.fastutil.longs.LongList
+import it.unimi.dsi.fastutil.longs.LongCollection
 
 private val LOG by lazyLogger(PlayableAudioItemFactory::class)
 
@@ -51,7 +51,7 @@ interface PlayableAudioItemFactory {
   suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
 
   suspend fun makeNewQueueItems(
-    idList: LongList,
+    idList: LongCollection,
     request: AvPlayer.FocusRequest,
     sharedPlayerState: SharedPlayerState
   ): QueueList
@@ -134,7 +134,7 @@ private class PlayableAudioItemFactoryImpl(
     audioMediaDao.makeShuffledQueue(upNextQueue)
 
   override suspend fun makeNewQueueItems(
-    idList: LongList,
+    idList: LongCollection,
     request: AvPlayer.FocusRequest,
     sharedPlayerState: SharedPlayerState
   ): QueueList {

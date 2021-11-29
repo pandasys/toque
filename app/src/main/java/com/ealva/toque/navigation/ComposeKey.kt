@@ -17,9 +17,13 @@
 package com.ealva.toque.navigation
 
 import android.os.Parcelable
+import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.core.DefaultComposeKey
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
+import kotlinx.parcelize.Parcelize
 
 abstract class ComposeKey : DefaultComposeKey(), Parcelable, DefaultServiceProvider.HasServices {
   override val saveableStateProviderKey: Any
@@ -28,5 +32,13 @@ abstract class ComposeKey : DefaultComposeKey(), Parcelable, DefaultServiceProvi
   override fun getScopeTag(): String = javaClass.name
 
   override fun bindServices(serviceBinder: ServiceBinder) {
+  }
+}
+
+@Parcelize
+object NullComposeKey : ComposeKey() {
+  @Composable
+  override fun ScreenComposable(modifier: Modifier) {
+    Text(text = "NULL")
   }
 }

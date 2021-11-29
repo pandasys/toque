@@ -32,7 +32,7 @@ typealias SelectedItemsFlow<E> = StateFlow<SelectedItems<E>>
 typealias MutableSelectedItemsFlow<E> = MutableStateFlow<SelectedItems<E>>
 
 /**
- * Represents items marks as "selected" within another container. This is basically an immutables
+ * Represents items marked as "selected" within another container. This is basically an immutables
  * set of item keys. If a key is in the set [hasSelection] is true and [isSelected] for that
  * particular key is true. As this is a set, no duplicates are allowed. The key class [E] must have
  * correctly defined equals and hashCode functions.
@@ -59,6 +59,8 @@ interface SelectedItems<E : Parcelable> : Parcelable {
    */
   fun turnOffSelectionMode(): SelectedItems<E>
 
+  fun toggleSelectionMode(): SelectedItems<E>
+
   /** If this [key] is currently selected, remove it, else add it */
   fun toggleSelection(key: E): SelectedItems<E>
 
@@ -67,6 +69,8 @@ interface SelectedItems<E : Parcelable> : Parcelable {
 
   /** Is this [key] selected */
   fun isSelected(key: E): Boolean
+
+  fun deselect(instanceId: E): SelectedItems<E>
 
   val selectedCount: Int
 
@@ -81,11 +85,19 @@ interface SelectedItems<E : Parcelable> : Parcelable {
  * in [selectedItems], filter this matching only elements whose key appears in [selectedItems].
  * If [selectedItems] has no selection, the original sequence is returned
  */
-inline fun <T, E : Parcelable> Sequence<T>.filterWith(
+inline fun <T, E : Parcelable> Sequence<T>.filterIfHasSelection(
   selectedItems: SelectedItems<E>, crossinline getKey: (T) -> E
 ): Sequence<T> {
   return if (selectedItems.hasSelection) {
-    filter { selectedItems.isSelected(getKey(it)) }
+    filter { element -> selectedItems.isSelected(getKey(element)) }
+  } else this
+}
+
+inline fun <T, E : Parcelable> List<T>.filterIfHasSelection(
+  selectedItems: SelectedItems<E>, crossinline getKey: (T) -> E
+): List<T> {
+  return if (selectedItems.hasSelection) {
+    filter { element -> selectedItems.isSelected(getKey(element)) }
   } else this
 }
 
@@ -93,11 +105,14 @@ inline fun <T, E : Parcelable> Sequence<T>.filterWith(
 private class SelectedItemsImpl<E : Parcelable>(
   private val keySet: Set<E>,
   override val inSelectionMode: Boolean
-) : SelectedItems<E>, Parcelable {
+) : SelectedItems<E> {
   override val hasSelection: Boolean
     get() = keySet.isNotEmpty()
 
   override fun turnOffSelectionMode(): SelectedItems<E> = SelectedItemsImpl(emptySet(), false)
+
+  override fun toggleSelectionMode(): SelectedItems<E> =
+    SelectedItemsImpl(emptySet(), !inSelectionMode)
 
   override fun toggleSelection(key: E): SelectedItems<E> {
     val newSet = keySet.removeIfContainsElseAdd(key)
@@ -107,6 +122,10 @@ private class SelectedItemsImpl<E : Parcelable>(
   override fun clearSelection(): SelectedItems<E> = SelectedItemsImpl(emptySet(), inSelectionMode)
 
   override fun isSelected(key: E): Boolean = keySet.contains(key)
+
+  override fun deselect(instanceId: E): SelectedItems<E> =
+    SelectedItemsImpl(keySet - instanceId, inSelectionMode)
+
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (other !is SelectedItemsImpl<*>) return false
@@ -161,10 +180,18 @@ fun <E : Parcelable> MutableSelectedItemsFlow<E>.clearSelection() {
   value = value.clearSelection()
 }
 
+fun <E : Parcelable> MutableSelectedItemsFlow<E>.deselect(key: E) {
+  value = value.deselect(key)
+}
+
 /** Clears any selection and turns off selection mode */
 fun <E : Parcelable> MutableSelectedItemsFlow<E>.turnOffSelectionMode() {
   value = value.turnOffSelectionMode()
 }
+
+//fun <E : Parcelable> MutableSelectedItemsFlow<E>.toggleSelectionMode() {
+//  value = value.toggleSelectionMode()
+//}
 
 /**
  * If in selection mode, toggle the selection of [key], else call [block] with

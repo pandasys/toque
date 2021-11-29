@@ -21,10 +21,6 @@ package com.ealva.toque.common
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
-inline fun String?.toTitle(): Title {
-  return this?.let { Title(trim()) } ?: Title.EMPTY
-}
-
 @Parcelize
 @JvmInline
 value class Title(val value: String) : Parcelable {
@@ -35,3 +31,5 @@ value class Title(val value: String) : Parcelable {
     val EMPTY: Title = Title("")
   }
 }
+
+inline val String?.asTitle: Title get() = Title(this?.trim() ?: "")

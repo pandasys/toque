@@ -43,6 +43,7 @@ import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE_LENGTH
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SCROBBLER_PACKAGE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SELECT_MEDIA_ACTION
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_THEME_CHOICE
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MARK_PLAYED_PERCENTAGE_RANGE
@@ -73,6 +74,7 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val playUpNextAction: StorePref<Int, PlayUpNextAction>
   val endOfQueueAction: StorePref<Int, EndOfQueueAction>
   val selectMediaAction: StorePref<Int, SelectMediaAction>
+  val themeChoice: StorePref<Int, ThemeChoice>
 
   /**
    * This represents a percentage of media which needs to be played before it is marked as played.
@@ -109,6 +111,7 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
     val DEFAULT_PLAY_UP_NEXT_ACTION = PlayUpNextAction.Prompt
     val DEFAULT_END_OF_QUEUE_ACTION = EndOfQueueAction.PlayNextList
     val DEFAULT_SELECT_MEDIA_ACTION = SelectMediaAction.Play
+    val DEFAULT_THEME_CHOICE = ThemeChoice.System
     val DEFAULT_DUCK_ACTION = DuckAction.Duck
     val DUCK_VOLUME_RANGE: ClosedRange<Volume> = Volume.NONE..Volume.MAX
     val DEFAULT_DUCK_VOLUME: Volume = DUCK_VOLUME_RANGE.endInclusive / 2
@@ -152,6 +155,7 @@ private class AppPrefsImpl(
   override val playUpNextAction by enumPref(DEFAULT_PLAY_UP_NEXT_ACTION)
   override val endOfQueueAction by enumPref(DEFAULT_END_OF_QUEUE_ACTION)
   override val selectMediaAction by enumPref(DEFAULT_SELECT_MEDIA_ACTION)
+  override val themeChoice by enumPref(DEFAULT_THEME_CHOICE)
   override val markPlayedPercentage by preference(DEFAULT_MARK_PLAYED_PERCENTAGE) { percentage ->
     percentage.coerceIn(MARK_PLAYED_PERCENTAGE_RANGE)
   }

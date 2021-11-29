@@ -21,6 +21,7 @@ package com.ealva.toque.persist
 import android.os.Parcelable
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
+import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
@@ -31,24 +32,28 @@ value class AlbumId(override val value: Long) : PersistentId, Parcelable {
   }
 }
 
-inline fun Long.toAlbumId(): AlbumId = AlbumId(this)
-inline fun Int.toAlbumId(): AlbumId = toLong().toAlbumId()
+inline val Long.asAlbumId: AlbumId get() = AlbumId(this)
 
 @JvmInline
-value class AlbumIdList(val prop: LongList) : Iterable<AlbumId> {
+value class AlbumIdList(val value: LongList) : Iterable<AlbumId> {
   inline val size: Int
-    get() = prop.size
+    get() = value.size
 
   inline operator fun plusAssign(genreId: AlbumId) {
-    prop.add(genreId.value)
+    value.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): AlbumId = AlbumId(prop.getLong(index))
+  inline operator fun get(index: Int): AlbumId = AlbumId(value.getLong(index))
 
   companion object {
     inline operator fun invoke(capacity: Int = 16): AlbumIdList =
       AlbumIdList(LongArrayList(capacity))
+
+    operator fun invoke(albumId: AlbumId): AlbumIdList =
+      AlbumIdList(LongLists.singleton(albumId.value))
   }
 
-  override fun iterator(): Iterator<AlbumId> = idIterator(prop, ::AlbumId)
+  override fun iterator(): Iterator<AlbumId> = idIterator(value, ::AlbumId)
 }
+
+inline val LongList.asAlbumIdList: AlbumIdList get() = AlbumIdList(this)

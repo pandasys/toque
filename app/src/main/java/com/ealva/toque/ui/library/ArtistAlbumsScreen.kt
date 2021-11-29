@@ -40,14 +40,22 @@ import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
+import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.SongListType
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.asAlbumIdList
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.map
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.simplestackextensions.servicesktx.lookup
+import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -62,7 +70,17 @@ data class ArtistAlbumsScreen(
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(ArtistAlbumsViewModel(artistId, artistType, artistName, get(), backstack))
+      add(
+        ArtistAlbumsViewModel(
+          artistId = artistId,
+          artistType = artistType,
+          artistName = artistName,
+          albumDao = get(),
+          audioMediaDao = get(),
+          localAudioQueueModel = lookup(),
+          backstack = backstack
+        )
+      )
     }
   }
 
@@ -129,8 +147,10 @@ private class ArtistAlbumsViewModel(
   private val artistType: ArtistType,
   private val artistName: ArtistName,
   albumDao: AlbumDao,
+  private val audioMediaDao: AudioMediaDao,
+  localAudioQueueModel: LocalAudioQueueModel,
   backstack: Backstack
-) : BaseAlbumsViewModel(albumDao, backstack) {
+) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel) {
   override suspend fun doGetAlbums(
     albumDao: AlbumDao,
     filter: Filter
@@ -142,6 +162,19 @@ private class ArtistAlbumsViewModel(
       .find { it.id == albumId }
       ?.title ?: AlbumTitle("")
     backstack.goTo(AlbumSongsForArtistScreen(albumId, artistId, title))
+  }
+
+  override suspend fun makeAudioIdList(
+    albumList: List<AlbumsViewModel.AlbumInfo>
+  ): Result<AudioIdList, DaoMessage> {
+    val longList = LongArrayList(512)
+    val title = albumList
+      .onEach { longList.add(it.id.value) }
+      .lastOrNull()
+      ?.title ?: AlbumTitle.UNKNOWN
+    return audioMediaDao
+      .getMediaForAlbums(longList.asAlbumIdList, artistId)
+      .map { mediaIdList -> AudioIdList(mediaIdList, title.value, SongListType.Album) }
   }
 
   fun goToArtistSongs() = backstack.goTo(ArtistSongsScreen(artistId, artistType, artistName))

@@ -27,8 +27,23 @@
   </plurals>
 
   <plurals name="UpNextActionPrompt">
-    <item quantity="one">"You are going to add %1$d song to Up Next. Clear the songs already in Up Next?"</item>
-    <item quantity="other">"You are going to add %1$d songs to Up Next. Clear the songs already in Up Next?"</item>
+    <item quantity="one">"You are going to add %1$d song to Up Next. Clear the %2$d already in Up Next?"</item>
+    <item quantity="other">"You are going to add %1$d songs to Up Next. Clear the %2$d already in Up Next?"</item>
+  </plurals>
+
+  <plurals name="AddedToUpNextNewSize">
+    <item quantity="one">Added %1$d song to Up Next. Queue size %2$d</item>
+    <item quantity="other">Added %1$d songs to Up Next. Queue size %2$d</item>
+  </plurals>
+
+  <plurals name="AddedToUpNextNewSizeLessDuplicates">
+    <item quantity="one">Added %1$d song to Up Next, less duplicates. Queue size %2$d</item>
+    <item quantity="other">Added %1$d songs to Up Next, less duplicates. Queue size %2$d</item>
+  </plurals>
+
+  <plurals name="FailedAddingToUpNext">
+    <item quantity="one">Failed adding %1$d song to Up Next</item>
+    <item quantity="other">Failed adding %1$d songs to Up Next</item>
   </plurals>
 
   <string name="app_name">Toque</string>
@@ -184,10 +199,27 @@
   <string name="ScanInternalTitle">Scan Internal Storage</string>
   <string name="ScanInternalOnSummary">Scan Internal Storage for media. This typically includes Ringtones, Notifications, etc.</string>
   <string name="ScanInternalOffSummary">Do not scan Internal Storage for media.</string>
-    <string name="Shuffle">Shuffle</string>
-    <string name="AddToUpNext">Add to up next</string>
+  <string name="Shuffle">Shuffle</string>
+  <string name="AddToUpNext">Add to up next</string>
   <string name="AddToPlaylist">Add to playlist</string>
-    <string name="MediaInfo">Media Information</string>
+  <string name="MediaInfo">Media Information</string>
   <string name="Search">Search</string>
   <string name="UpNextActionPrompt">"You are going to add  song to Up Next. Clear the songs already in Up Next?"</string>
+  <string name="Dark">Dark</string>
+  <string name="Light">Light</string>
+  <string name="System">System</string>
+  <string name="TitleRemovedFromQueue">%1$s removed from Up Next queue</string>
+  <string name="Undo">Undo</string>
+  <string name="UndoFailed">Undo failed</string>
+  <string name="CouldNotUndoItem">Could not undo remove \"%1$s\". Up Next queue changed.</string>
+  <string name="GoToCurrent">Go to current</string>
+  <string name="GoToTop">Go to top</string>
+  <string name="GoToBottom">Go to bottom</string>
+  <string name="ToggleSelectionMode">Toggle selection mode</string>
+  <string name="RemoveFailed">Remove \"%1$s\" at index %2$d failed</string>
+  <string name="NewPlaylist">New Playlist</string>
+  <string name="Cancel">Cancel</string>
+  <string name="Playlist">Playlist</string>
+  <string name="UnknownError">Unknown Error</string>
+  <string name="PlusNewPlaylist">+ New Playlist</string>
 </resources>

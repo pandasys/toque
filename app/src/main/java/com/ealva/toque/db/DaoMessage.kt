@@ -18,6 +18,7 @@ package com.ealva.toque.db
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.fetch
 import com.github.michaelbull.result.Result
 import java.io.PrintWriter
@@ -34,6 +35,7 @@ private fun Throwable.stackTraceToString(): String {
 typealias DaoResult<T> = Result<T, DaoMessage>
 typealias BoolResult = DaoResult<Boolean>
 typealias LongResult = DaoResult<Long>
+typealias MillisResult = DaoResult<Millis>
 
 /**
  * A Dao persistent operation failed. See [message] for specifics

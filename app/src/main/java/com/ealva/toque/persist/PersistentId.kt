@@ -64,8 +64,8 @@ inline fun <reified T : PersistentId> idIterator(
   }
 }
 
-inline fun Long.toMediaId(): MediaId = MediaId(this)
-inline fun Int.toMediaId() = toLong().toMediaId()
+inline val Long.asMediaId: MediaId get() = MediaId(this)
+inline val Int.asMediaId get() = toLong().asMediaId
 
 @Parcelize
 @JvmInline
@@ -90,7 +90,7 @@ value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parc
     value.add(mediaId.value)
   }
 
-  inline operator fun get(index: Int): MediaId = value.getLong(index).toMediaId()
+  inline operator fun get(index: Int): MediaId = value.getLong(index).asMediaId
 
   override fun iterator(): Iterator<MediaId> = idIterator(value, ::MediaId)
 
@@ -109,6 +109,8 @@ value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parc
     val EMPTY_LIST = MediaIdList(LongLists.EMPTY_LIST)
   }
 }
+
+inline val LongList.asMediaIdList: MediaIdList get() = MediaIdList(this)
 
 /**
  * Represents a unique instance of an item in a collection. As a collection may contain duplicate

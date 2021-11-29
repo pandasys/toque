@@ -233,7 +233,7 @@ class LocalAudioQueueTest {
       queueInfo.queue.let { queue ->
         expect(queue.size).toBe(expectedInstanceIdList.size)
         queue.expectInstanceIds(expectedInstanceIdList)
-        if (shuffleMode.shuffleMedia) {
+        if (shuffleMode.shuffleMedia().value) {
           expect(shufflerFake.shuffleCalled)
         }
       }

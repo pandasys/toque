@@ -62,14 +62,14 @@ data class AlbumSongsForArtistScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AlbumSongsForArtistViewModel>()
-    val songs = viewModel.allSongs.collectAsState()
+    val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
     val config = LocalScreenConfig.current
     SongItemList(
       list = songs.value,
       selectedItems = selected.value,
-      itemClicked = { viewModel.mediaClicked(it) },
-      itemLongClicked = { viewModel.mediaLongClicked(it) },
+      itemClicked = { viewModel.mediaClicked(it.id) },
+      itemLongClicked = { viewModel.mediaLongClicked(it.id) },
       modifier = Modifier
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false)

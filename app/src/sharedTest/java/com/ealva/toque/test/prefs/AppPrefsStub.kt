@@ -20,6 +20,7 @@ import com.ealva.prefstore.store.BoolPref
 import com.ealva.prefstore.store.MutablePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.StoreHolder
+import com.ealva.prefstore.store.StorePref
 import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
@@ -30,6 +31,7 @@ import com.ealva.toque.prefs.EndOfQueueAction
 import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.prefs.ScrobblerPackage
 import com.ealva.toque.prefs.SelectMediaAction
+import com.ealva.toque.prefs.ThemeChoice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -66,6 +68,7 @@ class AppPrefsStub : AppPrefs {
   override val playUpNextAction = PrefStub<Int, PlayUpNextAction>()
   override val endOfQueueAction = PrefStub<Int, EndOfQueueAction>()
   override val selectMediaAction = PrefStub<Int, SelectMediaAction>()
+  override val themeChoice = PrefStub<Int, ThemeChoice>()
   override val markPlayedPercentage = PrefStub<Double, Double>()
   override val rewindThenPrevious: BoolPref = BoolPrefStub()
   override val scanAfterMediaScanner: BoolPref = BoolPrefStub()

@@ -17,6 +17,10 @@
 package com.ealva.toque.common
 
 import ealvatag.utils.TimeUnits
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.math.abs
@@ -55,3 +59,10 @@ fun Millis.toDurationString(): String = BUILDER.run {
   }
   append(seconds)
 }.toString()
+
+private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+fun Millis.toDateTime(): String {
+  val instant = Instant.ofEpochMilli(value)
+  val date = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+  return dateTimeFormatter.format(date)
+}

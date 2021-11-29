@@ -17,7 +17,6 @@
 package com.ealva.toque.test.db
 
 import android.content.Context
-import android.database.sqlite.SQLiteConstraintException
 import com.ealva.toque.common.Amp
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage

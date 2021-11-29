@@ -18,13 +18,7 @@
 
 package com.ealva.toque.common
 
-inline fun String?.toPackageName(): PackageName {
-  return this?.let { PackageName(trim()) } ?: PackageName.NONE
-}
-
 @JvmInline
-value class PackageName(val prop: String) {
-  companion object {
-    val NONE: PackageName = PackageName("NONE")
-  }
-}
+value class PackageName(val value: String)
+
+val String?.asPackageName: PackageName get() = PackageName(this?.trim() ?: "")

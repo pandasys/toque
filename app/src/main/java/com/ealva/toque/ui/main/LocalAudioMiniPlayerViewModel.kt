@@ -20,7 +20,7 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.log._i
+import com.ealva.toque.log._e
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
@@ -31,15 +31,16 @@ import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
+import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
@@ -82,23 +83,31 @@ interface LocalAudioMiniPlayerViewModel {
 @OptIn(ExperimentalCoroutinesApi::class)
 private class LocalAudioMiniPlayerViewModelImpl(
   private val serviceConnection: MediaPlayerServiceConnection
-) : LocalAudioMiniPlayerViewModel {
-  private var scope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+) : LocalAudioMiniPlayerViewModel, ScopedServices.Activated {
+  private lateinit var scope: CoroutineScope
   private var mediaController: ToqueMediaController = NullMediaController
   private var controllerJob: Job? = null
   private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
   private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
 
-  override val miniPlayerState = MutableStateFlow(MiniPlayerState.NONE).apply {
-    scope.launch {
-      subscriptionCount.collect { count ->
+  override val miniPlayerState = MutableStateFlow(MiniPlayerState.NONE)
+
+  override fun onServiceActive() {
+    scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    miniPlayerState
+      .subscriptionCount
+      .onEach { count ->
         when (count) {
           0 -> noSubscribers()
           else -> haveSubscriber()
         }
       }
-    }
+      .launchIn(scope)
+  }
+
+  override fun onServiceInactive() {
+    scope.cancel()
   }
 
   private fun haveSubscriber() {
@@ -137,10 +146,10 @@ private class LocalAudioMiniPlayerViewModelImpl(
   private fun queueActive(queue: LocalAudioQueue) {
     audioQueue = queue
     queueStateJob = audioQueue.queueState
-      .onStart { LOG._i { it("MiniPlayer start collecting queueState") } }
+      .onStart { LOG._e { it("MiniPlayer start collecting queueState") } }
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("") } }
-      .onCompletion { LOG._i { it("MiniPlayer completed collecting queueState") } }
+      .onCompletion { LOG._e { it("MiniPlayer completed collecting queueState") } }
       .launchIn(scope)
   }
 

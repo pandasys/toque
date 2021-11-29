@@ -16,11 +16,13 @@
 
 package com.ealva.toque.log
 
+import com.ealva.toque.common.Millis
+
 
 inline fun <T> logExecTime(loggingFunction: (Long) -> Unit,
                            function: () -> T): T {
-  val startTime = System.currentTimeMillis()
+  val startTime = Millis.currentTime().value
   val result: T = function.invoke()
-  loggingFunction.invoke(System.currentTimeMillis() - startTime)
+  loggingFunction.invoke(Millis.currentTime().value - startTime)
   return result
 }

@@ -74,8 +74,6 @@ fun AlbumsList(
   LibraryScrollBar(
     listState = listState,
     modifier = Modifier
-      .statusBarsPadding()
-      .navigationBarsPadding(bottom = false)
       .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
   ) {
     LazyColumn(
@@ -85,10 +83,7 @@ fun AlbumsList(
         top = 8.dp,
         bottom = config.getListBottomContentPadding(isExpanded = true),
         end = 8.dp
-      ),
-      modifier = Modifier
-        .statusBarsPadding()
-        .navigationBarsPadding(bottom = false)
+      )
     ) {
       if (header != null) item(key = "UnchangingHeader", content = header)
       items(items = list, key = { it.id }) { albumInfo ->

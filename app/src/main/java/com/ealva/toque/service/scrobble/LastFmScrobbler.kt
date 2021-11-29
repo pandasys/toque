@@ -89,7 +89,7 @@ internal class LastFmScrobbler(
       .putExtra(EXTRA_DURATION, item.duration.value)
       .putExtra(EXTRA_POSITION, item.position.value)
       .putExtra(EXTRA_PLAYING, isPlaying)
-      .putExtra(EXTRA_PLAYER, pkgName.prop)
+      .putExtra(EXTRA_PLAYER, pkgName.value)
     debug { logIntent(intent) }
     intentBroadcaster.broadcast(intent)
   }

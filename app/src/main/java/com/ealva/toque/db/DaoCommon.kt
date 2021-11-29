@@ -17,7 +17,7 @@
 package com.ealva.toque.db
 
 import com.ealva.toque.common.Filter
-import com.ealva.toque.common.toFilter
+import com.ealva.toque.common.asFilter
 
 object DaoCommon {
   const val ESC_CHAR = '\\'
@@ -26,15 +26,15 @@ object DaoCommon {
    * Wrap with LIKE operator '%' wildcards and escape any necessary characters within the string
    */
   fun String.wrapAsFilter(): Filter = trim().let { toWrap ->
-    if (toWrap.isEmpty()) toWrap else buildString {
-      append('%')
-      toWrap.forEach { ch ->
-        when (ch) {
-          '%', '_', ESC_CHAR -> append(ESC_CHAR)
+      if (toWrap.isEmpty()) toWrap else buildString {
+        append('%')
+        toWrap.forEach { ch ->
+          when (ch) {
+            '%', '_', ESC_CHAR -> append(ESC_CHAR)
+          }
+          append(ch)
         }
-        append(ch)
+        append('%')
       }
-      append('%')
-    }
-  }.toFilter()
+    }.asFilter
 }

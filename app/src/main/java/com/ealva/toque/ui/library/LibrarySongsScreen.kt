@@ -17,35 +17,23 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.fetch
-import com.ealva.toque.db.AudioDescrResult
+import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.NamedSongListType
 import com.ealva.toque.db.SongListType
-import com.ealva.toque.service.queue.ClearQueue
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
-import com.ealva.toque.ui.audio.LocalAudioQueueModel.PlayResult
+import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.ScopedServices
@@ -65,19 +53,16 @@ data class LibrarySongsScreen(
   private val noArg: String = ""
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(AllSongsViewModel(get(), lookup())) }
+    val key = this
+    with(serviceBinder) { add(AllSongsViewModel(key, get(), lookup())) }
   }
 
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AllSongsViewModel>()
-    val songs = viewModel.allSongs.collectAsState()
+    val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
-
-    var promptResult by remember {
-      mutableStateOf<PlayResult>(PlayResult.Executed)
-    }
 
     Column(
       modifier = Modifier
@@ -85,103 +70,46 @@ data class LibrarySongsScreen(
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
+      CategoryTitleBar(viewModel.categoryItem)
       LibraryItemsActions(
-        songs.value.size,
-        selected.value.inSelectionMode,
-        selected.value.selectedCount,
-        play = { promptResult = viewModel.play() },
-        shuffle = { promptResult = viewModel.shuffle() },
+        itemCount = songs.value.size,
+        inSelectionMode = selected.value.inSelectionMode,
+        selectedCount = selected.value.selectedCount,
+        play = { viewModel.play() },
+        shuffle = { viewModel.shuffle() },
         playNext = { viewModel.playNext() },
         addToUpNext = { viewModel.addToUpNext() },
-        addToPlaylist = { },
+        addToPlaylist = { viewModel.addToPlaylist() },
         selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
         startSearch = {}
       )
       SongItemList(
         list = songs.value,
         selectedItems = selected.value,
-        itemClicked = { viewModel.mediaClicked(it) },
-        itemLongClicked = { viewModel.mediaLongClicked(it) }
+        itemClicked = { viewModel.mediaClicked(it.id) },
+        itemLongClicked = { viewModel.mediaLongClicked(it.id) }
       )
-      if (promptResult.needPrompt) {
-        val prompt = promptResult as PlayResult.PromptRequired
-        val itemCount = prompt.itemCount
-        fun dismiss() { promptResult = PlayResult.Executed }
-        fun execute(clearQueue: ClearQueue) {
-          prompt.execute(clearQueue)
-          dismiss()
-        }
-        PlayUpNextPrompt(
-          itemCount = itemCount,
-          onDismiss = ::dismiss,
-          onClear = { execute(ClearQueue(true)) },
-          onDoNotClear = { execute(ClearQueue(true)) },
-          onCancel = ::dismiss,
-        )
-      }
     }
   }
 }
 
 private class AllSongsViewModel(
+  private val key: ComposeKey,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueModel,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, dispatcher), ScopedServices.Activated {
+  private val categories = LibraryCategories()
+
+  val categoryItem: LibraryCategories.CategoryItem
+    get() = categories[key]
+
   override val namedSongListType: NamedSongListType =
     NamedSongListType(fetch(R.string.All), SongListType.All)
 
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): AudioDescrResult = audioMediaDao.getAllAudio(filter)
-}
-
-@Composable
-fun PlayUpNextPrompt(
-  itemCount: Int,
-  onDismiss: () -> Unit,
-  onClear: () -> Unit,
-  onDoNotClear: () -> Unit,
-  onCancel: () -> Unit
-) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    text = {
-      Text(
-        text = LocalContext.current.resources.getQuantityString(
-          R.plurals.UpNextActionPrompt,
-          itemCount,
-          itemCount,
-        )
-      )
-    },
-    buttons = {
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(all = 8.dp),
-        horizontalArrangement = Arrangement.SpaceAround
-      ) {
-        Button(
-          modifier = Modifier,
-          onClick = onClear
-        ) {
-          Text("Clear")
-        }
-        Button(
-          modifier = Modifier,
-          onClick = onDoNotClear
-        ) {
-          Text("Add")
-        }
-        Button(
-          modifier = Modifier,
-          onClick = onCancel
-        ) {
-          Text("Cancel")
-        }
-      }
-    }
-  )
+  ): Result<List<AudioDescription>, DaoMessage> =
+    audioMediaDao.getAllAudio(filter)
 }

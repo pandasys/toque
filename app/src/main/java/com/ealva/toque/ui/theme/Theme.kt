@@ -25,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.ealva.toque.prefs.ThemeChoice
 
 private val Amber500 = Color(0xFFFFC107)
 private val Amber700 = Color(0xFFFF8F00)
@@ -37,7 +38,7 @@ private val LightColorPalette = ToqueColors(
   ),
   warning = Amber500,
   onWarning = Color.Black,
-  selectedBackground = Color(0xFF_D0_D0_D0)
+  selectedBackground = Color(0xFF_D0_D0_D0),
 )
 
 private val DarkColorPalette = ToqueColors(
@@ -50,21 +51,20 @@ private val DarkColorPalette = ToqueColors(
   ),
   warning = Amber700,
   onWarning = Color.White,
-  selectedBackground = Color(0xFF_30_30_30)
+  selectedBackground = Color(0xFF_30_30_30),
 )
 
 private val LocalColors = staticCompositionLocalOf { DarkColorPalette }
 
 @Composable
 fun ToqueTheme(
-  @Suppress("UNUSED_PARAMETER")
-  darkTheme: Boolean = isSystemInDarkTheme(),
+  themeChoice: ThemeChoice,
   content: @Composable () -> Unit,
 ) {
-  val colors = if (darkTheme) {
-    DarkColorPalette
-  } else {
-    LightColorPalette
+  val colors = when (themeChoice) {
+    ThemeChoice.Dark -> DarkColorPalette
+    ThemeChoice.Light -> LightColorPalette
+    ThemeChoice.System -> if (isSystemInDarkTheme()) DarkColorPalette else LightColorPalette
   }
 
   CompositionLocalProvider(LocalColors provides colors) {

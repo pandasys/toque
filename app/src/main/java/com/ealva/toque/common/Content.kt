@@ -16,6 +16,7 @@
 
 package com.ealva.toque.common
 
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import com.ealva.toque.app.Toque
 
@@ -23,3 +24,10 @@ fun fetch(@StringRes stringRes: Int): String = Toque.appContext.getString(string
 
 fun fetch(@StringRes stringRes: Int, vararg formatArgs: Any): String =
   Toque.appContext.getString(stringRes, *formatArgs)
+
+fun fetchPlural(@PluralsRes pluralRes: Int, quantity: Int): String =
+  Toque.appContext.resources.getQuantityString(pluralRes, quantity, quantity)
+
+fun fetchPlural(@PluralsRes pluralRes: Int, quantity: Int, vararg formatArgs: Any): String =
+  Toque.appContext.resources.getQuantityString(pluralRes, quantity, quantity, *formatArgs)
+

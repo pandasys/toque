@@ -23,7 +23,7 @@ data class ToqueColors(
   val material: Colors,
   val warning: Color,
   val onWarning: Color,
-  val selectedBackground: Color
+  val selectedBackground: Color,
 ) {
   val primary: Color get() = material.primary
   val primaryVariant: Color get() = material.primaryVariant

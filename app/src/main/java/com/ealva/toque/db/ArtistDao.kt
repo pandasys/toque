@@ -30,12 +30,15 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.ArtistId
-import com.ealva.toque.persist.toArtistId
+import com.ealva.toque.persist.asArtistId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.compound.union
+import com.ealva.welite.db.expr.BindExpression
+import com.ealva.welite.db.expr.Expression
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.escape
@@ -44,6 +47,7 @@ import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
+import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.statements.DeleteStatement
 import com.ealva.welite.db.statements.deleteWhere
@@ -134,6 +138,13 @@ interface ArtistDao {
   suspend fun getAllArtistNames(limit: Limit = NoLimit): Result<List<ArtistIdName>, DaoMessage>
   suspend fun getNextArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
   suspend fun getPreviousArtist(name: ArtistName): Result<ArtistIdName, DaoMessage>
+
+  suspend fun getNext(id: ArtistId): Result<ArtistId, DaoMessage>
+  suspend fun getPrevious(id: ArtistId): Result<ArtistId, DaoMessage>
+  suspend fun getMin(): Result<ArtistId, DaoMessage>
+  suspend fun getMax(): Result<ArtistId, DaoMessage>
+  suspend fun getRandom(): Result<ArtistId, DaoMessage>
+
   suspend fun getRandomArtist(): Result<ArtistIdName, DaoMessage>
   suspend fun getArtistName(id: ArtistId): Result<ArtistName, DaoMessage>
 
@@ -187,7 +198,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       it[createdTime] = createUpdateTime()
       it[updatedTime] = createUpdateTime()
     }
-      .toArtistId()
+      .asArtistId
       .also { id -> upsertResults.alwaysEmit { emit(ArtistDaoEvent.ArtistCreated(id)) } }
   } catch (e: Exception) {
     LOG.e(e) { it("Exception with artist='%s'", newArtist) }
@@ -240,7 +251,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
   ): ArtistUpdateInfo? = QUERY_ARTIST_UPDATE_INFO
     .sequence({ it[queryArtistBind] = artistName }) {
       ArtistUpdateInfo(
-        it[id].toArtistId(),
+        it[id].asArtistId,
         it[this.artistName],
         it[artistSort],
         ArtistMbid(it[artistMbid])
@@ -362,6 +373,52 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     db.query { if (name.isEmpty()) doGetMaxArtist() else doGetPreviousArtist(name) }
   }.mapError { DaoExceptionMessage(it) }
 
+  override suspend fun getNext(id: ArtistId) = runSuspendCatching {
+    db.query {
+      ArtistTable
+        .select(ArtistTable.id)
+        .where { artistName greater SELECT_NAME_FROM_BIND_ID }
+        .orderByAsc { artistName }
+        .limit(1)
+        .longForQuery { it[BIND_ARTIST_ID] = id.value}
+        .asArtistId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getPrevious(id: ArtistId) = runSuspendCatching {
+    db.query {
+      ArtistTable
+        .select(ArtistTable.id)
+        .where { artistName greater SELECT_NAME_FROM_BIND_ID }
+        .orderBy { artistName by Order.DESC }
+        .limit(1)
+        .longForQuery { it[BIND_ARTIST_ID] = id.value}
+        .asArtistId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getMin() = runSuspendCatching {
+    db.query {
+      ArtistTable
+        .selects { listOf(id, artistMin) }
+        .all()
+        .limit(1)
+        .sequence { ArtistId(it[id]) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getMax() = runSuspendCatching {
+    db.query {
+      ArtistTable
+        .selects { listOf(id, artistMax) }
+        .all()
+        .limit(1)
+        .sequence { ArtistId(it[id]) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
   /**
    * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
    */
@@ -401,12 +458,24 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           .single()
       }
     }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getRandom(): Result<ArtistId, DaoMessage> = runSuspendCatching {
+      db.query {
+        ArtistTable
+          .select(ArtistTable.id)
+          .where { id inSubQuery ArtistTable.select(id).all().orderByRandom().limit(1) }
+          .longForQuery()
+          .asArtistId
+      }
+    }.mapError { DaoExceptionMessage(it) }
+
 }
 
 private val songCountColumn = MediaTable.id.countDistinct()
 private val songArtistAlbumCountColumn = AlbumTable.id.countDistinct()
 private val albumArtistAlbumCountColumn = ArtistAlbumTable.albumId.countDistinct()
 private val artistMax by lazy { ArtistTable.artistName.max().alias("artist_max_alias") }
+private val artistMin by lazy { ArtistTable.artistName.min().alias("artist_min_alias") }
 
 private val INSERT_STATEMENT = ArtistTable.insertValues {
   it[artistName].bindArg()
@@ -441,3 +510,10 @@ private val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistT
 }
 
 fun ArtistName.isEmpty(): Boolean = value.isEmpty()
+
+private val BIND_ARTIST_ID: BindExpression<Long> = bindLong()
+private val SELECT_NAME_FROM_BIND_ID: Expression<String> = ArtistTable
+  .select(ArtistTable.artistName)
+  .where { id eq BIND_ARTIST_ID }
+  .limit(1)
+  .asExpression()

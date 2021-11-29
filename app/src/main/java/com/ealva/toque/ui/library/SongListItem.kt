@@ -29,6 +29,8 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
@@ -58,17 +60,23 @@ fun SongListItem(
   rating: Rating,
   highlightBackground: Boolean,
   icon: @Composable () -> Unit,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
+  textColor: Color = Color.Unspecified
 ) {
   ListItem(
     modifier = modifier
       .fillMaxWidth()
       .modifyIf(highlightBackground) { background(MaterialTheme.toqueColors.selectedBackground) },
     icon = icon,
-    text = { Text(text = songTitle.value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-    secondaryText = { ArtistAndDuration(artistName, songDuration) },
-    overlineText = { AlbumAndRating(albumTitle, rating) }
+    text = { TitleText(songTitle, textColor) },
+    secondaryText = { ArtistAndDuration(artistName, songDuration, textColor) },
+    overlineText = { AlbumAndRating(albumTitle, rating, textColor) }
   )
+}
+
+@Composable
+private fun TitleText(songTitle: Title, textColor: Color) {
+  Text(text = songTitle.value, maxLines = 1, overflow = TextOverflow.Ellipsis, color = textColor)
 }
 
 @Composable
@@ -87,13 +95,14 @@ fun SongListItemIcon(artwork: Uri) {
 }
 
 @Composable
-private fun ArtistAndDuration(artistName: ArtistName, songDuration: Millis) {
+private fun ArtistAndDuration(artistName: ArtistName, songDuration: Millis, textColor: Color) {
   ConstraintLayout(modifier = Modifier.fillMaxWidth()) {
     val (artist, duration) = createRefs()
     Text(
       text = artistName.value,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
+      color = textColor,
       modifier = Modifier.constrainAs(artist) {
         start.linkTo(parent.start)
         end.linkTo(duration.start)
@@ -104,6 +113,7 @@ private fun ArtistAndDuration(artistName: ArtistName, songDuration: Millis) {
       text = songDuration.toDurationString(),
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
+      color = textColor,
       modifier = Modifier.constrainAs(duration) {
         start.linkTo(artist.end)
         end.linkTo(parent.end)
@@ -114,13 +124,14 @@ private fun ArtistAndDuration(artistName: ArtistName, songDuration: Millis) {
 }
 
 @Composable
-private fun AlbumAndRating(albumTitle: AlbumTitle, rating: Rating) {
+private fun AlbumAndRating(albumTitle: AlbumTitle, rating: Rating, textColor: Color) {
   ConstraintLayout(modifier = Modifier.fillMaxWidth()) {
     val (text, ratingBar) = createRefs()
     Text(
       text = albumTitle.value,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
+      color = textColor,
       modifier = Modifier.constrainAs(text) {
         start.linkTo(parent.start)
         end.linkTo(ratingBar.start)
@@ -132,8 +143,8 @@ private fun AlbumAndRating(albumTitle: AlbumTitle, rating: Rating) {
       size = 8.dp,
       padding = 2.dp,
       isIndicator = true,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
+      activeColor = if (textColor.isUnspecified) LocalContentColor.current else textColor,
+      inactiveColor = if (textColor.isUnspecified) LocalContentColor.current else textColor,
       ratingBarStyle = RatingBarStyle.HighLighted,
       onValueChange = {},
       onRatingChanged = {},

@@ -18,6 +18,7 @@ package com.ealva.toque.db
 
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.common.Millis
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -122,7 +123,7 @@ private class EqPresetDaoImpl(
     db.transaction {
       EqPresetId(INSERT_PRESET.insert {
         it[presetName] = name
-        it[updatedTime] = System.currentTimeMillis()
+        it[updatedTime] = Millis.currentTime().value
         it[preAmp] = preAmpAndBands.preAmp()
         with(preAmpAndBands) {
           it[band0] = bands[0]()
@@ -176,7 +177,7 @@ private class EqPresetDaoImpl(
 
   private fun TransactionInProgress.doUpdatePreset(presetData: EqPresetData) = UPDATE_ALL.update {
     it[BIND_PRESET_ID] = presetData.id.value
-    it[updatedTime] = System.currentTimeMillis()
+    it[updatedTime] = Millis.currentTime().value
     it[preAmp] = presetData.preAmpAndBands.preAmp()
     with(presetData.preAmpAndBands) {
       it[band0] = bands[0]()
@@ -200,7 +201,7 @@ private class EqPresetDaoImpl(
       EqPresetTable
         .updateColumns {
           it[preAmp] = amplitude()
-          it[updatedTime] = System.currentTimeMillis()
+          it[updatedTime] = Millis.currentTime().value
         }
         .where { this.id eq id.value }
         .update()
@@ -218,7 +219,7 @@ private class EqPresetDaoImpl(
       require(index in columnIndices) { "Index $index not in bounds $columnIndices" }
       EqPresetTable.updateColumns {
         it[bandColumns[index]] = amplitude()
-        it[updatedTime] = System.currentTimeMillis()
+        it[updatedTime] = Millis.currentTime().value
       }.where {
         this.id eq id.value
       }.update()

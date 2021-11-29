@@ -20,7 +20,7 @@ import android.content.Context
 import com.ealva.toque.R
 import com.ealva.toque.android.content.IntentBroadcaster
 import com.ealva.toque.common.PackageName
-import com.ealva.toque.common.toPackageName
+import com.ealva.toque.common.asPackageName
 import com.ealva.toque.prefs.ScrobblerPackage
 
 /**
@@ -38,7 +38,7 @@ interface ScrobblerFactory {
     operator fun invoke(context: Context): ScrobblerFactory =
       ScrobblerFactoryImpl(
         context.getString(R.string.app_name),
-        context.packageName.toPackageName(),
+        context.packageName.asPackageName,
         IntentBroadcaster(context)
       )
   }

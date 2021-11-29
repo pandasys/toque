@@ -24,8 +24,8 @@ import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.reify
-import com.ealva.toque.persist.toAlbumId
-import com.ealva.toque.persist.toMediaId
+import com.ealva.toque.persist.asAlbumId
+import com.ealva.toque.persist.asMediaId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Transaction
@@ -292,8 +292,8 @@ class PresetAssociation {
 
   override fun toString(): String = when (type) {
     PresetAssociationType.Default -> "PresetAssociation[${type.name}, $id]"
-    PresetAssociationType.Media -> "PresetAssociation[${type.name}, ${id.toMediaId()}]"
-    PresetAssociationType.Album -> "PresetAssociation[${type.name}, ${id.toAlbumId()}]"
+    PresetAssociationType.Media -> "PresetAssociation[${type.name}, ${id.asMediaId}]"
+    PresetAssociationType.Album -> "PresetAssociation[${type.name}, ${id.asAlbumId}]"
     PresetAssociationType.Output -> "PresetAssociation[${type.name}, ${outputRoute.name}]"
   }
 

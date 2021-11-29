@@ -17,6 +17,10 @@
 package com.ealva.toque.common
 
 
+fun <E> MutableList<E>.moveItem(from: Int, to: Int) = apply {
+  if (from != to) add(to, removeAt(from))
+}
+
 fun <E> MutableList<E>.swap(index1: Int, index2: Int) = apply {
   val tmp = this[index1]
   this[index1] = this[index2]

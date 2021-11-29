@@ -16,22 +16,42 @@
 
 package com.ealva.toque.ui.audio
 
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
+import com.ealva.toque.common.PlaylistName
+import com.ealva.toque.common.ShuffleMedia
+import com.ealva.toque.common.fetch
+import com.ealva.toque.common.fetchPlural
+import com.ealva.toque.common.isValidAndUnique
 import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.PlaylistDao
+import com.ealva.toque.db.PlaylistIdName
+import com.ealva.toque.log._e
+import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.NullLocalAudioQueue
-import com.ealva.toque.service.audio.TransitionType
+import com.ealva.toque.service.audio.TransitionType.Manual
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
+import com.ealva.toque.ui.audio.LocalAudioQueueModel.PromptResult
+import com.ealva.toque.ui.common.DialogPrompt
+import com.ealva.toque.ui.library.PlayUpNextPrompt
+import com.ealva.toque.ui.main.MainViewModel
+import com.ealva.toque.ui.main.Notification
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Ok
 import com.zhuinden.simplestack.ScopedServices
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,39 +64,50 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import java.util.regex.Pattern
 
 private val LOG by lazyLogger(LocalAudioQueueModel::class)
 
 interface LocalAudioQueueModel {
-  sealed interface PlayResult {
-    val needPrompt: Boolean
-
-    object Executed : PlayResult {
-      override val needPrompt = false
-    }
-
-    interface PromptRequired : PlayResult {
-      val itemCount: Int
-      fun execute(clearUpNext: ClearQueue)
-    }
-  }
-
   val localAudioQueue: StateFlow<LocalAudioQueue>
-
   val playUpNextAction: StateFlow<PlayUpNextAction>
+  val queueSize: Int
 
-  fun play(audioIdList: AudioIdList, onPlay: () -> Unit): PlayResult
-  fun shuffle(audioIdList: AudioIdList, onShuffle: () -> Unit): PlayResult
+  fun emitNotification(notification: Notification)
+
+  suspend fun play(audioIdList: AudioIdList): PromptResult
+  suspend fun shuffle(audioIdList: AudioIdList): PromptResult
   fun playNext(audioIdList: AudioIdList)
   fun addToUpNext(audioIdList: AudioIdList)
+
+  enum class PromptResult {
+    Dismissed,
+    Executed;
+
+    inline val wasExecuted: Boolean get() = this == Executed
+    inline val wasDismissed: Boolean get() = this == Dismissed
+  }
+
+  suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult
+
+  fun showPrompt(prompt: DialogPrompt)
+  fun clearPrompt()
 
   companion object {
     operator fun invoke(
       serviceConnection: MediaPlayerServiceConnection,
+      mainViewModel: MainViewModel,
       appPrefsSingleton: AppPrefsSingleton,
+      playlistDao: PlaylistDao,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): LocalAudioQueueModel =
-      LocalAudioQueueModelImpl(serviceConnection, appPrefsSingleton, dispatcher)
+      LocalAudioQueueModelImpl(
+        serviceConnection,
+        mainViewModel,
+        appPrefsSingleton,
+        playlistDao,
+        dispatcher
+      )
   }
 }
 
@@ -84,83 +115,210 @@ private data class PrefsHolder(val appPrefs: AppPrefs? = null)
 
 class LocalAudioQueueModelImpl(
   private val serviceConnection: MediaPlayerServiceConnection,
+  private val mainViewModel: MainViewModel,
   private val appPrefsSingleton: AppPrefsSingleton,
+  private val playlistDao: PlaylistDao,
   private val dispatcher: CoroutineDispatcher
-) : LocalAudioQueueModel, ScopedServices.Registered, ScopedServices.Activated {
+) : LocalAudioQueueModel, ScopedServices.Registered {
   private lateinit var scope: CoroutineScope
   private var controllerJob: Job? = null
 
   private val prefsHolder = MutableStateFlow(PrefsHolder())
 
   override val localAudioQueue = MutableStateFlow<LocalAudioQueue>(NullLocalAudioQueue)
-
   override val playUpNextAction = MutableStateFlow(PlayUpNextAction.Prompt)
+  override var queueSize: Int = 0
 
-  private inner class PromptRequiredImpl(
-    private val audioIdList: AudioIdList,
-    private val shuffle: Boolean,
-    private val onPlay: () -> Unit
-  ) : LocalAudioQueueModel.PlayResult.PromptRequired {
-    override val itemCount: Int
-      get() = audioIdList.size
-
-    override fun execute(clearUpNext: ClearQueue) {
-      doPlay(audioIdList, clearUpNext, shuffle, onPlay)
-    }
-
-    override val needPrompt: Boolean = true
+  override fun emitNotification(notification: Notification) {
+    mainViewModel.notify(notification)
   }
 
-  override fun play(
-    audioIdList: AudioIdList,
-    onPlay: () -> Unit
-  ): LocalAudioQueueModel.PlayResult = playOrPrompt(audioIdList, false, onPlay)
+  override suspend fun play(audioIdList: AudioIdList): PromptResult =
+    playOrPrompt(audioIdList, ShuffleMedia(false))
 
-  private fun playOrPrompt(audioIdList: AudioIdList, shuffle: Boolean, onPlay: () -> Unit) =
+  override suspend fun shuffle(audioIdList: AudioIdList): PromptResult =
+    playOrPrompt(audioIdList, ShuffleMedia(true))
+
+  private suspend fun playOrPrompt(audioIdList: AudioIdList, shuffle: ShuffleMedia): PromptResult {
+    val result = CompletableDeferred<PromptResult>()
+    val idList = if (shuffle.value) audioIdList.shuffled() else audioIdList
+    fun onDismiss() {
+      clearPrompt()
+      result.complete(PromptResult.Dismissed)
+    }
+
+    fun playNext(
+      idList: AudioIdList,
+      clearQueue: ClearQueue,
+      result: CompletableDeferred<PromptResult>
+    ) {
+      clearPrompt()
+      try {
+        scope.launch {
+          doPlayNext(idList, clearQueue, PlayNow(true))
+          result.complete(PromptResult.Executed)
+        }
+      } catch (e: Exception) {
+        result.completeExceptionally(e)
+      }
+    }
+
     if (playUpNextAction.value.shouldPrompt) {
-      PromptRequiredImpl(audioIdList = audioIdList, shuffle = shuffle, onPlay)
-    } else {
-      doPlay(
-        audioIdList,
-        playUpNextAction.value.clearUpNext,
-        shuffleMedia = shuffle,
-        onPlay = onPlay
+      showPrompt(
+        DialogPrompt(
+          prompt = {
+            PlayUpNextPrompt(
+              itemCount = idList.size,
+              queueSize = queueSize,
+              onDismiss = ::onDismiss,
+              onClear = { playNext(idList, ClearQueue(true), result) },
+              onDoNotClear = { playNext(idList, ClearQueue(false), result) },
+              onCancel = ::onDismiss
+            )
+          }
+        )
       )
-      LocalAudioQueueModel.PlayResult.Executed
+    } else {
+      playNext(idList, playUpNextAction.value.clearUpNext, result)
+      result.complete(PromptResult.Executed)
     }
-
-  private fun doPlay(
-    audioIdList: AudioIdList,
-    clearUpNext: ClearQueue,
-    shuffleMedia: Boolean,
-    onPlay: () -> Unit
-  ) {
-    if (shuffleMedia) audioIdList.shuffled()
-    localAudioQueue.value.playNext(
-      if (shuffleMedia) audioIdList.shuffled() else audioIdList,
-      clearUpNext,
-      PlayNow(true),
-      TransitionType.Manual
-    )
-    onPlay()
+    return result.await()
   }
-
-  override fun shuffle(
-    audioIdList: AudioIdList,
-    onShuffle: () -> Unit
-  ): LocalAudioQueueModel.PlayResult = playOrPrompt(audioIdList, true, onShuffle)
 
   override fun playNext(audioIdList: AudioIdList) {
-    localAudioQueue.value.playNext(
-      audioIdList,
-      ClearQueue(false),
-      PlayNow(false),
-      TransitionType.Manual
+    scope.launch { doPlayNext(audioIdList, ClearQueue(false), PlayNow(false)) }
+  }
+
+  private suspend fun doPlayNext(
+    audioIdList: AudioIdList,
+    clear: ClearQueue,
+    playNow: PlayNow
+  ) {
+    val size = audioIdList.size
+    mainViewModel.notify(
+      when (val result = localAudioQueue.value.playNext(audioIdList, clear, playNow, Manual)) {
+        is Ok -> {
+          val plural = if (appPrefsSingleton.instance().allowDuplicates() || clear()) {
+            R.plurals.AddedToUpNextNewSize
+          } else {
+            R.plurals.AddedToUpNextNewSizeLessDuplicates
+          }
+          Notification(fetchPlural(plural, size, result.value.value))
+        }
+        is Err -> Notification(fetchPlural(R.plurals.FailedAddingToUpNext, size))
+      }
     )
   }
 
   override fun addToUpNext(audioIdList: AudioIdList) {
-    localAudioQueue.value.addToUpNext(audioIdList)
+    scope.launch {
+      val quantity = audioIdList.size
+      mainViewModel.notify(
+        when (val result = localAudioQueue.value.addToUpNext(audioIdList)) {
+          is Ok -> Notification(
+            fetchPlural(R.plurals.AddedToUpNextNewSize, quantity, result.value.value)
+          )
+          is Err -> Notification(fetchPlural(R.plurals.FailedAddingToUpNext, quantity))
+        }
+      )
+    }
+  }
+
+  override fun showPrompt(prompt: DialogPrompt) {
+    mainViewModel.prompt(prompt)
+  }
+
+  override fun clearPrompt() {
+    showPrompt(DialogPrompt.None)
+  }
+
+  override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
+    val deferred = CompletableDeferred<PromptResult>()
+    // get list of user playlists. If Empty return CreatePlaylist
+    val playlists: List<PlaylistIdName> =
+      when (val result = playlistDao.getUserPlaylistNames()) {
+        is Ok -> result.value
+        is Err -> {
+          LOG.e { it("Error retrieving user playlists. %s", result.error) }
+          emptyList()
+        }
+      }
+
+    fun onDismiss() {
+      clearPrompt()
+      deferred.complete(PromptResult.Dismissed)
+    }
+
+    fun addToPlaylist(mediaIdList: MediaIdList, playlistIdName: PlaylistIdName) {
+      clearPrompt()
+      addAudioToPlaylist(mediaIdList, playlistIdName)
+      deferred.complete(PromptResult.Executed)
+    }
+
+    fun createPlaylist(mediaIdList: MediaIdList, playlistName: PlaylistName) {
+      clearPrompt()
+      createPlaylistWithAudio(mediaIdList, playlistName)
+      deferred.complete(PromptResult.Executed)
+    }
+
+    fun showCreatePrompt() {
+      showPrompt(
+        DialogPrompt(
+          prompt = {
+            CreatePlaylistPrompt(
+              suggestedName = getSuggestedNewPlaylistName(playlists),
+              checkValidName = { isValidName(playlists, it) },
+              dismiss = ::onDismiss,
+              createPlaylist = { playlistName -> createPlaylist(mediaIdList, playlistName) }
+            )
+          }
+        )
+      )
+    }
+
+    if (playlists.isEmpty()) {
+      showCreatePrompt()
+    } else {
+      showPrompt(
+        DialogPrompt(
+          prompt = {
+            SelectPlaylistPrompt(
+              playlists = playlists,
+              onDismiss = ::onDismiss,
+              listSelected = { addToPlaylist(mediaIdList, it) },
+              createPlaylist = { showCreatePrompt() }
+            )
+          }
+        )
+      )
+    }
+    return deferred.await()
+  }
+
+  private fun getSuggestedNewPlaylistName(playlists: List<PlaylistIdName>): String =
+    getSuggestedName(playlists.asSequence().map { it.name.value })
+
+  private fun isValidName(playlists: List<PlaylistIdName>, name: PlaylistName): Boolean =
+    name.isValidAndUnique(playlists.asSequence().map { it.name })
+
+  private fun addAudioToPlaylist(mediaIdList: MediaIdList, playlistIdName: PlaylistIdName) {
+    LOG._e { it("addPlaylist audioList.size:%d playlistId=%s", mediaIdList.size, playlistIdName) }
+    scope.launch {
+      when (val result = playlistDao.addToUserPlaylist(playlistIdName.id, mediaIdList)) {
+        is Ok -> LOG._e { it("Added %d to %s", result.value, playlistIdName.name.value) }
+        is Err -> LOG.e { it("Error adding %s. %s", playlistIdName.name.value, result.error) }
+      }
+    }
+  }
+
+  private fun createPlaylistWithAudio(mediaIdList: MediaIdList, playlistName: PlaylistName) {
+    LOG._e { it("createPlaylist audioList.size:%d name=%s", mediaIdList.size, playlistName) }
+    scope.launch {
+      when (val result = playlistDao.createUserPlaylist(playlistName, mediaIdList)) {
+        is Ok -> LOG._e { it("created %s", result.value) }
+        is Err -> LOG.e { it("Error creating %s. %s", playlistName, result.error) }
+      }
+    }
   }
 
   override fun onServiceRegistered() {
@@ -173,9 +331,7 @@ class LocalAudioQueueModelImpl(
         .onEach { playUpNextAction.value = it }
         .launchIn(scope)
     }
-  }
 
-  override fun onServiceActive() {
     controllerJob = serviceConnection.mediaController
       .onEach { controller -> handleControllerChange(controller) }
       .onCompletion { handleControllerChange(NullMediaController) }
@@ -204,15 +360,42 @@ class LocalAudioQueueModelImpl(
 
   private fun queueActive(queue: LocalAudioQueue) {
     localAudioQueue.value = queue
-  }
+    queue.queueState
+      .onEach { queueSize = it.queue.size }
+      .launchIn(scope)
 
-  override fun onServiceInactive() {
-    controllerJob?.cancel()
-    controllerJob = null
-    handleControllerChange(NullMediaController)
+    queue.notification
+      .onEach { serviceNotification -> mainViewModel.notify(serviceNotification) }
+      .launchIn(scope)
   }
 
   override fun onServiceUnregistered() {
+    controllerJob?.cancel()
+    controllerJob = null
+    handleControllerChange(NullMediaController)
     scope.cancel()
   }
+}
+
+private fun getSuggestedName(
+  existingNames: Sequence<String>,
+  start: String = fetch(R.string.Playlist),
+): String {
+  var suffix = 0
+  val prefix = if (start.endsWith(' ')) start else "$start "
+  existingNames.forEach { name ->
+    if (name.startsWith(prefix)) {
+      suffix = suffix.coerceAtLeast(prefix.getNumAtEndOfString(name))
+    }
+  }
+  return prefix + (suffix + 1)
+}
+
+private fun String.getNumAtEndOfString(input: String): Int {
+  val lastIntPattern = Pattern.compile("${this}([0-9]+)$")
+  val matcher = lastIntPattern.matcher(input)
+  if (matcher.find()) {
+    return matcher.group(1)?.let { someNumberStr -> Integer.parseInt(someNumberStr) } ?: -1
+  }
+  return -1
 }

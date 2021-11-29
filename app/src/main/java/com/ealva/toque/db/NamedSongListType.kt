@@ -22,10 +22,11 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data class NamedSongListType(
   val listName: String,
-  val listType: SongListType
+  val listType: SongListType,
 ) : Parcelable {
   companion object {
     val EMPTY_ALL = NamedSongListType("", SongListType.All)
     val EXTERNAL_ALL = NamedSongListType("External", SongListType.All)
   }
 }
+

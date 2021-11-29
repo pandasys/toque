@@ -23,9 +23,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarResult
 import androidx.compose.material.Surface
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -36,12 +40,18 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.ui.common.SwipeableSnackbarHost
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
+import com.zhuinden.simplestackcomposeintegration.services.rememberService
+import kotlinx.coroutines.flow.collect
 import kotlin.math.roundToInt
+
+private val LOG by lazyLogger("MainScreen")
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -58,8 +68,10 @@ fun MainScreen(
     modifier = Modifier.fillMaxSize(),
     color = Color.Transparent
   ) {
+    val mainModel: MainViewModel = rememberService()
 
     val scaffoldState = rememberScaffoldState()
+    val snackbarHostState = scaffoldState.snackbarHostState
     val (isBottomSheetExpanded, expandBottomSheet) = remember { mutableStateOf(false) }
     expandBottomSheet(topOfStack !is SplashScreen && topOfStack !is NowPlayingScreen)
 
@@ -83,6 +95,8 @@ fun MainScreen(
       }
     }
 
+    val dialogPrompt by mainModel.promptFlow.collectAsState()
+
     ProvideSnackbarHostState(snackbarHostState = scaffoldState.snackbarHostState) {
       if (topOfStack is SplashScreen) {
         Scaffold(
@@ -90,6 +104,7 @@ fun MainScreen(
             .fillMaxSize()
             .navigationBarsPadding(),
           scaffoldState = scaffoldState,
+          snackbarHost = { SwipeableSnackbarHost(hostState = it) }
         ) {
           composeStateChanger.RenderScreen(modifier = Modifier.fillMaxSize())
         }
@@ -99,6 +114,7 @@ fun MainScreen(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection),
           scaffoldState = scaffoldState,
+          snackbarHost = { SwipeableSnackbarHost(hostState = it) },
           bottomBar = {
             MainBottomSheet(
               topOfStack = topOfStack,
@@ -118,6 +134,24 @@ fun MainScreen(
           },
         ) {
           composeStateChanger.RenderScreen(modifier = Modifier.fillMaxSize())
+        }
+
+        dialogPrompt.prompt?.let { showDialog -> showDialog() }
+
+        LaunchedEffect(Unit) {
+          mainModel.notificationFlow
+            .collect { notification ->
+              when (
+                snackbarHostState.showSnackbar(
+                  message = notification.msg,
+                  actionLabel = notification.action.label,
+                  duration = notification.duration
+                )
+              ) {
+                SnackbarResult.ActionPerformed -> notification.action.action()
+                SnackbarResult.Dismissed -> notification.action.expired()
+              }
+            }
         }
       }
     }

@@ -19,7 +19,6 @@ package com.ealva.toque.ui.now
 import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,14 +39,12 @@ import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Slider
-import androidx.compose.material.SnackbarResult
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +60,6 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
@@ -71,7 +67,6 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.media.EqMode
@@ -79,8 +74,8 @@ import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.vlc.toFloat
+import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.ealva.toque.ui.config.LocalScreenConfig
-import com.ealva.toque.ui.main.LocalSnackbarHostState
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ARTIST
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_BUTTON_ROW
@@ -107,7 +102,6 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -133,7 +127,10 @@ object NowPlayingScreenIds {
 @Parcelize
 data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(NowPlayingViewModel(lookup(), get(AppPrefs.QUALIFIER))) }
+    with(serviceBinder) {
+      add(LocalAudioQueueModel(lookup(), lookup(), get(AppPrefs.QUALIFIER), get()))
+      add(NowPlayingViewModel(lookup(), get(AppPrefs.QUALIFIER)))
+    }
   }
 
   @OptIn(ExperimentalPagerApi::class)
@@ -287,9 +284,6 @@ private fun PlayerControls(
 ) {
   val item = state.currentItem
 
-  val snackbarHostState = LocalSnackbarHostState.current
-  val scope = rememberCoroutineScope()
-
   BoxWithConstraints(
     modifier = modifier
   ) {
@@ -306,12 +300,6 @@ private fun PlayerControls(
         shuffleMode = state.shuffleMode,
         toggleEqMode = toggleEqMode,
         setPlaybackRate = {
-          scope.launch {
-            when (snackbarHostState.showSnackbar("Snackbar it is", "Label")) {
-              SnackbarResult.Dismissed -> LOG._e { it("dismissed") }
-              SnackbarResult.ActionPerformed -> LOG._e { it("action") }
-            }
-          }
         },
         nextRepeatMode = nextRepeatMode,
         nextShuffleMode = nextShuffleMode,

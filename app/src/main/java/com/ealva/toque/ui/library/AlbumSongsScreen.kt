@@ -24,13 +24,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.toque.common.Filter
-import com.ealva.toque.db.AudioDescrResult
+import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.NamedSongListType
 import com.ealva.toque.db.SongListType
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.ealva.toque.ui.config.LocalScreenConfig
+import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.ScopedServices
@@ -59,14 +61,14 @@ data class AlbumSongsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AlbumSongsViewModel>()
-    val songs = viewModel.allSongs.collectAsState()
+    val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
     val config = LocalScreenConfig.current
     SongItemList(
       list = songs.value,
       selectedItems = selected.value,
-      itemClicked = { viewModel.mediaClicked(it) },
-      itemLongClicked = { viewModel.mediaLongClicked(it) },
+      itemClicked = { viewModel.mediaClicked(it.id) },
+      itemLongClicked = { viewModel.mediaLongClicked(it.id) },
       modifier = Modifier
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
@@ -88,5 +90,6 @@ private class AlbumSongsViewModel(
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): AudioDescrResult = audioMediaDao.getAlbumAudio(id = albumId, filter = filter)
+  ): Result<List<AudioDescription>, DaoMessage> =
+    audioMediaDao.getAlbumAudio(id = albumId, filter = filter)
 }

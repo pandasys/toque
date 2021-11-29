@@ -109,7 +109,7 @@ internal class SimpleLastFmScrobbler(
       .putExtra(EXTRA_TRACK_NUMBER, item.trackNumber)
       .putExtra(EXTRA_STATE, state.value)
       .putExtra(EXTRA_APP_NAME, appName)
-      .putExtra(EXTRA_APP_PKG, pkgName.prop)
+      .putExtra(EXTRA_APP_PKG, pkgName.value)
       .putExtra(EXTRA_SOURCE, "P")
     debug { logIntent(intent) }
     intentBroadcaster.broadcast(intent)

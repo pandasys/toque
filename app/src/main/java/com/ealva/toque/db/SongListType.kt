@@ -106,19 +106,19 @@ enum class SongListType(override val id: Int) : HasConstId {
       return nextType().getRandomList(dao)
     }
   },
-  SmartPlaylist(8) {
-    override suspend fun getNextList(dao: AudioMediaDao, name: String): AudioIdList {
-      return nextType().getNextList(dao, "")
-    }
-
-    override suspend fun getPreviousList(dao: AudioMediaDao, name: String): AudioIdList {
-      return previousType().getPreviousList(dao, "")
-    }
-
-    override suspend fun doGetRandomList(dao: AudioMediaDao): AudioIdList {
-      return nextType().getRandomList(dao)
-    }
-  },
+//  SmartPlaylist(8) {
+//    override suspend fun getNextList(dao: AudioMediaDao, name: String): AudioIdList {
+//      return nextType().getNextList(dao, "")
+//    }
+//
+//    override suspend fun getPreviousList(dao: AudioMediaDao, name: String): AudioIdList {
+//      return previousType().getPreviousList(dao, "")
+//    }
+//
+//    override suspend fun doGetRandomList(dao: AudioMediaDao): AudioIdList {
+//      return nextType().getRandomList(dao)
+//    }
+//  },
   @Suppress("unused") External(9) {
     override suspend fun getNextList(dao: AudioMediaDao, name: String): AudioIdList {
       return nextType().getNextList(dao, "")
@@ -185,8 +185,7 @@ enum class SongListType(override val id: Int) : HasConstId {
       Artist,
       Composer,
       Genre,
-      //PlayList,  TODO Add these back in when they are producing items
-      //SmartPlaylist
+      PlayList
     )
 
     fun getRandomType(): SongListType = generatingLists.random().also { type ->

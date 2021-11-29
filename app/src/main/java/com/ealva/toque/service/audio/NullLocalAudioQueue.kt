@@ -23,34 +23,41 @@ import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.media.StarRating
+import com.ealva.toque.service.notify.ServiceNotification
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.NullStreamVolume
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.StreamVolume
+import com.github.michaelbull.result.Err
+import com.github.michaelbull.result.Result
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 
 object NullLocalAudioQueue : LocalAudioQueue {
-  override val queueState: StateFlow<LocalAudioQueueState> =
-    MutableStateFlow(LocalAudioQueueState.NONE)
+  override val queueState = MutableStateFlow(LocalAudioQueueState.NONE)
+  override val notification = emptyFlow<ServiceNotification>()
   override fun toggleEqMode() = Unit
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
-  override fun addToUpNext(audioIdList: AudioIdList) = Unit
-  override fun playNext(
+  override suspend fun addToUpNext(audioIdList: AudioIdList): Result<QueueSize, QueueMessage> =
+    Err(UnknownError)
+
+  override suspend fun playNext(
     audioIdList: AudioIdList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ) = Unit
+  ): Result<QueueSize, QueueMessage> = Err(UnknownError)
+
 
   override fun goToQueueItem(instanceId: InstanceId) = Unit
-  override fun prepareNext(audioIdList: AudioIdList) = Unit
+  override suspend fun prepareNext(audioIdList: AudioIdList) = Unit
   override fun nextRepeatMode() = Unit
   override fun nextShuffleMode() = Unit
   override fun setRepeatMode(mode: RepeatMode) = Unit
   override fun setShuffleMode(mode: ShuffleMode) = Unit
-  override fun removeFromQueue(index: Int, item: AudioItem) = Unit
+  override suspend fun removeFromQueue(index: Int, item: AudioItem) = Unit
   override fun moveQueueItem(from: Int, to: Int) = Unit
   override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override suspend fun activate(resume: Boolean, playNow: PlayNow) = Unit

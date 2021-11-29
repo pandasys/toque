@@ -30,5 +30,4 @@ value class Filter(val value: String) : Parcelable {
   }
 }
 
-@Suppress("NOTHING_TO_INLINE")
-inline fun String.toFilter(): Filter = Filter(this)
+inline val String.asFilter: Filter get() = Filter(this.trim())

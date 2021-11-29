@@ -40,11 +40,15 @@ data class AudioIdList(
 
     operator fun invoke(
       mediaId: MediaId,
-      listType: SongListType,
-      listName: String
-    ): AudioIdList {
-      return AudioIdList(MediaIdList(mediaId), NamedSongListType(listName, listType))
-    }
+      listName: String,
+      listType: SongListType
+    ): AudioIdList = AudioIdList(MediaIdList(mediaId), NamedSongListType(listName, listType))
+
+    operator fun invoke(
+      mediaIdList: MediaIdList,
+      listName: String,
+      listType: SongListType
+    ): AudioIdList = AudioIdList(mediaIdList, NamedSongListType(listName, listType))
   }
 
   /**

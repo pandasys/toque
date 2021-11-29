@@ -114,7 +114,7 @@ object Libs {
   }
 
   object EAlvaBrainz {
-    private const val VERSION = "0.7.3-SNAPSHOT"
+    private const val VERSION = "0.8.0-SNAPSHOT"
     const val BRAINZ = "com.ealva:ealvabrainz:$VERSION"
     const val BRAINZ_SERVICE = "com.ealva:ealvabrainz-service:$VERSION"
   }

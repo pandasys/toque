@@ -26,11 +26,14 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ComposerDaoEvent.ComposerCreatedOrUpdated
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.isValid
-import com.ealva.toque.persist.toComposerId
+import com.ealva.toque.persist.asComposerId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.expr.BindExpression
+import com.ealva.welite.db.expr.Expression
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.count
 import com.ealva.welite.db.expr.eq
@@ -38,6 +41,7 @@ import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
+import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.JoinType
@@ -112,6 +116,12 @@ interface ComposerDao {
   suspend fun getNextComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
   suspend fun getPreviousComposer(name: ComposerName): Result<ComposerIdName, DaoMessage>
   suspend fun getRandomComposer(): Result<ComposerIdName, DaoMessage>
+
+  suspend fun getNext(composerId: ComposerId): Result<ComposerId, DaoMessage>
+  suspend fun getPrevious(composerId: ComposerId): Result<ComposerId, DaoMessage>
+  suspend fun getMin(): Result<ComposerId, DaoMessage>
+  suspend fun getMax(): Result<ComposerId, DaoMessage>
+  suspend fun getRandom(): Result<ComposerId, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -208,6 +218,64 @@ private class ComposerDaoImpl(
       }
     }.mapError { DaoExceptionMessage(it) }
 
+  override suspend fun getNext(composerId: ComposerId) = runSuspendCatching {
+    db.query {
+      ComposerTable
+        .select(ComposerTable.id)
+        .where { composer greater SELECT_COMPOSER_FROM_BIND_ID }
+        .orderByAsc { composer }
+        .limit(1)
+        .longForQuery { it[BIND_COMPOSER_ID] = composerId.value }
+        .asComposerId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getPrevious(composerId: ComposerId) = runSuspendCatching {
+    db.query {
+      ComposerTable
+        .select(ComposerTable.id)
+        .where { composer less SELECT_COMPOSER_FROM_BIND_ID }
+        .orderBy { composer by Order.DESC }
+        .limit(1)
+        .longForQuery { it[BIND_COMPOSER_ID] = composerId.value }
+        .asComposerId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  private val composerMin by lazy { ComposerTable.composer.min().alias("composer_min_alias") }
+  override suspend fun getMin() = runSuspendCatching {
+    db.query {
+      ComposerTable
+        .selects { listOf(id, composerMin) }
+        .all()
+        .limit(1)
+        .sequence { ComposerId(it[id]) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  private val composerMax by lazy { ComposerTable.composer.max().alias("composer_max_alias") }
+  override suspend fun getMax() = runSuspendCatching {
+    db.query {
+      ComposerTable
+        .selects { listOf(id, composerMax) }
+        .all()
+        .limit(1)
+        .sequence { ComposerId(it[id]) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getRandom(): Result<ComposerId, DaoMessage> = runSuspendCatching {
+    db.query {
+      ComposerTable
+        .select(ComposerTable.id)
+        .where { id inSubQuery ComposerTable.select(id).all().orderByRandom().limit(1) }
+        .longForQuery()
+        .asComposerId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
   override suspend fun getPreviousComposer(
     name: ComposerName
   ): Result<ComposerIdName, DaoMessage> = runSuspendCatching {
@@ -225,7 +293,6 @@ private class ComposerDaoImpl(
     .sequence { ComposerIdName(ComposerId(it[id]), ComposerName(it[composer])) }
     .single()
 
-  private val composerMax by lazy { ComposerTable.composer.max().alias("composer_max_alias") }
   private fun Queryable.doGetMaxComposer(): ComposerIdName = ComposerTable
     .selects { listOf(id, composerMax) }
     .all()
@@ -262,7 +329,7 @@ private class ComposerDaoImpl(
   private fun Queryable.getComposer(composer: String): ComposerId? = QUERY_COMPOSER_ID
     .sequence({ it[composerNameBind] = composer }) { it[id] }
     .singleOrNull()
-    ?.toComposerId()
+    ?.asComposerId
 
   private fun TransactionInProgress.getOrInsertComposer(
     newComposer: String,
@@ -273,8 +340,15 @@ private class ComposerDaoImpl(
       it[composer] = newComposer
       it[composerSort] = newComposerSort
       it[createdTime] = createTime()
-    }.toComposerId()
+    }.asComposerId
   }
 }
 
 fun ComposerName.isEmpty(): Boolean = value.isEmpty()
+
+private val BIND_COMPOSER_ID: BindExpression<Long> = bindLong()
+private val SELECT_COMPOSER_FROM_BIND_ID: Expression<String> = ComposerTable
+  .select(ComposerTable.composer)
+  .where { id eq BIND_COMPOSER_ID }
+  .limit(1)
+  .asExpression()

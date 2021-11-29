@@ -21,17 +21,21 @@ package com.ealva.toque.persist
 import android.os.Parcelable
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
+import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
 @JvmInline
-value class GenreId(override val value: Long) : PersistentId, Parcelable
+value class GenreId(override val value: Long) : PersistentId, Parcelable {
+  companion object {
+    val INVALID = GenreId(PersistentId.ID_INVALID)
+  }
+}
 
-inline fun Long.toGenreId(): GenreId = GenreId(this)
-inline fun Int.toGenreId(): GenreId = toLong().toGenreId()
+inline val Long.asGenreId: GenreId get() = GenreId(this)
 
 @JvmInline
-value class GenreIdList(val prop: LongList) : Iterable<GenreId> {
+value class GenreIdList(val value: LongList) : Iterable<GenreId> {
   inline val isEmpty: Boolean
     get() = size == 0
 
@@ -39,18 +43,23 @@ value class GenreIdList(val prop: LongList) : Iterable<GenreId> {
     get() = !isEmpty
 
   inline val size: Int
-    get() = prop.size
+    get() = value.size
 
   inline operator fun plusAssign(genreId: GenreId) {
-    prop.add(genreId.value)
+    value.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): GenreId = GenreId(prop.getLong(index))
+  inline operator fun get(index: Int): GenreId = GenreId(value.getLong(index))
 
   companion object {
     inline operator fun invoke(capacity: Int = 16): GenreIdList =
       GenreIdList(LongArrayList(capacity))
+
+    operator fun invoke(genreId: GenreId): GenreIdList =
+      GenreIdList(LongLists.singleton(genreId.value))
   }
 
-  override fun iterator(): Iterator<GenreId> = idIterator(prop, ::GenreId)
+  override fun iterator(): Iterator<GenreId> = idIterator(value, ::GenreId)
 }
+
+inline val LongList.asGenreIdList: GenreIdList get() = GenreIdList(this)

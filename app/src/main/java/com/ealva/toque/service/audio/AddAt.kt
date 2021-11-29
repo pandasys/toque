@@ -31,7 +31,7 @@ enum class AddAt {
         ArrayList<PlayableAudioItem>(newItems.size + queueItems.size).apply {
           addAll(newItems)
           addAll(queueItems)
-          if (shuffleMode.shuffleMedia) shuffler.shuffleInPlace(this)
+          if (shuffleMode.shuffleMedia().value) shuffler.shuffleInPlace(this)
         }
       )
     }
@@ -48,7 +48,7 @@ enum class AddAt {
         ArrayList<PlayableAudioItem>(newItems.size + queueItems.size).apply {
           addAll(queueItems)
           addAll(newItems)
-          if (shuffleMode.shuffleMedia) shuffler.shuffleInPlace(this)
+          if (shuffleMode.shuffleMedia().value) shuffler.shuffleInPlace(this)
         }
       )
     }

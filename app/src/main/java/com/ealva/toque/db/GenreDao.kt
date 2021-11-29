@@ -29,11 +29,14 @@ import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.GenreDaoEvent.GenresCreatedOrUpdated
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.GenreIdList
-import com.ealva.toque.persist.toGenreId
+import com.ealva.toque.persist.asGenreId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.expr.BindExpression
+import com.ealva.welite.db.expr.Expression
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.escape
@@ -42,6 +45,7 @@ import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
+import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.JoinType
@@ -121,6 +125,12 @@ interface GenreDao {
   suspend fun getNextGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
   suspend fun getPreviousGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
   suspend fun getRandomGenre(): Result<GenreIdName, DaoMessage>
+
+  suspend fun getNext(genreId: GenreId): Result<GenreId, DaoMessage>
+  suspend fun getPrevious(genreId: GenreId): Result<GenreId, DaoMessage>
+  suspend fun getMin(): Result<GenreId, DaoMessage>
+  suspend fun getMax(): Result<GenreId, DaoMessage>
+  suspend fun getRandom(): Result<GenreId, DaoMessage>
 
   companion object {
     operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
@@ -205,7 +215,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
           .all()
           .orderByAsc { genre }
           .limit(limit.value)
-          .sequence { GenreIdName(it[id].toGenreId(), GenreName(it[genre])) }
+          .sequence { GenreIdName(it[id].asGenreId, GenreName(it[genre])) }
           .toList()
       }
     }.mapError { DaoExceptionMessage(it) }
@@ -240,7 +250,6 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .sequence { GenreIdName(GenreId(it[id]), GenreName(it[genre])) }
     .single()
 
-  private val genreMax by lazy { GenreTable.genre.max().alias("genre_max_alias") }
   private fun Queryable.doGetMaxGenre(): GenreIdName = GenreTable
     .selects { listOf(id, genreMax) }
     .all()
@@ -254,6 +263,64 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .selects { listOf(id, genre) }
         .where { id inSubQuery GenreTable.select(id).all().orderByRandom().limit(1) }
         .sequence { GenreIdName(GenreId(it[id]), GenreName(it[genre])) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getRandom(): Result<GenreId, DaoMessage> = runSuspendCatching {
+    db.query {
+      GenreTable
+        .select(GenreTable.id)
+        .where { id inSubQuery GenreTable.select(id).all().orderByRandom().limit(1) }
+        .longForQuery()
+        .asGenreId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getNext(genreId: GenreId) = runSuspendCatching {
+    db.query {
+      GenreTable
+        .select(GenreTable.id)
+        .where { genre greater SELECT_GENRE_FROM_BIND_ID }
+        .orderByAsc { genre }
+        .limit(1)
+        .longForQuery { it[BIND_GENRE_ID] = genreId.value }
+        .asGenreId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  override suspend fun getPrevious(genreId: GenreId) = runSuspendCatching {
+    db.query {
+      GenreTable
+        .select(GenreTable.id)
+        .where { genre less SELECT_GENRE_FROM_BIND_ID }
+        .orderBy { genre by Order.DESC }
+        .limit(1)
+        .longForQuery { it[BIND_GENRE_ID] = genreId.value }
+        .asGenreId
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  private val genreMin by lazy { GenreTable.genre.min().alias("genre_min_alias") }
+  override suspend fun getMin() = runSuspendCatching {
+    db.query {
+      GenreTable
+        .selects { listOf(id, genreMin) }
+        .all()
+        .limit(1)
+        .sequence { GenreId(it[id]) }
+        .single()
+    }
+  }.mapError { DaoExceptionMessage(it) }
+
+  private val genreMax by lazy { GenreTable.genre.max().alias("genre_max_alias") }
+  override suspend fun getMax() = runSuspendCatching {
+    db.query {
+      GenreTable
+        .selects { listOf(id, genreMax) }
+        .all()
+        .limit(1)
+        .sequence { GenreId(it[id]) }
         .single()
     }
   }.mapError { DaoExceptionMessage(it) }
@@ -278,7 +345,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   ): GenreId? = QUERY_GENRE_ID
     .sequence({ it[queryGenreNameBind] = genre }) { it[id] }
     .singleOrNull()
-    ?.toGenreId()
+    ?.asGenreId
     ?.also { genreId -> genreIdList += genreId }
 
   private fun TransactionInProgress.getOrInsert(
@@ -289,7 +356,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     getGenreId(newGenre, genreIdList) ?: INSERT_GENRE.insert {
       it[genre] = newGenre
       it[createdTime] = createTime()
-    }.toGenreId().also { id -> genreIdList += id }
+    }.asGenreId.also { id -> genreIdList += id }
   }
 }
 
@@ -306,3 +373,10 @@ private val QUERY_GENRE_ID = Query(
 )
 
 fun GenreName.isEmpty(): Boolean = value.isEmpty()
+
+private val BIND_GENRE_ID: BindExpression<Long> = bindLong()
+private val SELECT_GENRE_FROM_BIND_ID: Expression<String> = AlbumTable
+  .select(GenreTable.genre)
+  .where { id eq BIND_GENRE_ID }
+  .limit(1)
+  .asExpression()

@@ -21,30 +21,39 @@ package com.ealva.toque.persist
 import android.os.Parcelable
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
+import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
 @JvmInline
-value class ComposerId(override val value: Long) : PersistentId, Parcelable
+value class ComposerId(override val value: Long) : PersistentId, Parcelable {
+  companion object {
+    val INVALID = ComposerId(PersistentId.ID_INVALID)
+  }
+}
 
-inline fun Long.toComposerId(): ComposerId = ComposerId(this)
-inline fun Int.toComposerId(): ComposerId = toLong().toComposerId()
+inline val Long.asComposerId: ComposerId get() = ComposerId(this)
 
 @JvmInline
-value class ComposerIdList(val prop: LongList) : Iterable<ComposerId> {
+value class ComposerIdList(val value: LongList) : Iterable<ComposerId> {
   inline val size: Int
-    get() = prop.size
+    get() = value.size
 
   inline operator fun plusAssign(genreId: ComposerId) {
-    prop.add(genreId.value)
+    value.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): ComposerId = ComposerId(prop.getLong(index))
+  inline operator fun get(index: Int): ComposerId = ComposerId(value.getLong(index))
 
   companion object {
     operator fun invoke(capacity: Int = 16): ComposerIdList =
       ComposerIdList(LongArrayList(capacity))
+
+    operator fun invoke(composerId: ComposerId): ComposerIdList =
+      ComposerIdList(LongLists.singleton(composerId.value))
   }
 
-  override fun iterator(): Iterator<ComposerId> = idIterator(prop, ::ComposerId)
+  override fun iterator(): Iterator<ComposerId> = idIterator(value, ::ComposerId)
 }
+
+inline val LongList.asComposerIdList: ComposerIdList get() = ComposerIdList(this)

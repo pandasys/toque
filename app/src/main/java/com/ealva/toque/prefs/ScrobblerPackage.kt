@@ -19,7 +19,7 @@ package com.ealva.toque.prefs
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.common.PackageName
-import com.ealva.toque.common.toPackageName
+import com.ealva.toque.common.asPackageName
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasTitle
 
@@ -31,7 +31,7 @@ enum class ScrobblerPackage(
   val packageName: PackageName,
   @StringRes override val titleRes: Int
 ) : HasConstId, HasTitle {
-  None(0, PackageName.NONE, R.string.None),
-  LastFm(1, "fm.last.android".toPackageName(), R.string.LastFm),
-  SimpleLastFm(2, "com.adam.aslfms".toPackageName(), R.string.SimpleLastFm);
+  None(0, PackageName("NONE"), R.string.None),
+  LastFm(1, "fm.last.android".asPackageName, R.string.LastFm),
+  SimpleLastFm(2, "com.adam.aslfms".asPackageName, R.string.SimpleLastFm);
 }

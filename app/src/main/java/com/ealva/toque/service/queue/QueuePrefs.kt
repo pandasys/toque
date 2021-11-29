@@ -35,8 +35,9 @@ interface QueuePrefs : PreferenceStore<QueuePrefs> {
   val repeatMode: PreferenceStore.Preference<Int, RepeatMode>
   val shuffleMode: PreferenceStore.Preference<Int, ShuffleMode>
   val eqMode: PreferenceStore.Preference<Int, EqMode>
-  val lastListType: PreferenceStore.Preference<Int, SongListType>
+  val lastCategoryType: PreferenceStore.Preference<Int, SongListType>
   val lastListName: PreferenceStore.Preference<String, String>
+  val lastCategoryId: PreferenceStore.Preference<Long, Long>
   val playbackRate: PreferenceStore.Preference<Float, PlaybackRate>
   suspend fun setLastList(idList: AudioIdList)
 
@@ -52,8 +53,9 @@ private class QueuePrefsImpl(
   override val repeatMode by enumPref(RepeatMode.None)
   override val shuffleMode by enumPref(ShuffleMode.None)
   override val eqMode by enumPref(EqMode.Off)
-  override val lastListType by enumPref(SongListType.All)
+  override val lastCategoryType by enumPref(SongListType.All)
   override val lastListName by preference("")
+  override val lastCategoryId by preference(0L)
   override val playbackRate by asTypePref(
     default = PlaybackRate.NORMAL,
     maker = { PlaybackRate(it) },
@@ -62,7 +64,7 @@ private class QueuePrefsImpl(
   )
 
   override suspend fun setLastList(idList: AudioIdList) = edit {
-    it[lastListType] = idList.listType
+    it[lastCategoryType] = idList.listType
     it[lastListName] = idList.listName
   }
 }

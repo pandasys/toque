@@ -20,6 +20,7 @@ import android.content.Context
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.OpenParams
+import com.ealva.welite.db.TransactionInProgress
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -39,6 +40,7 @@ object DbModule {
     single { ComposerMediaDao() }
     single { EqPresetDao(db = get()) }
     single { EqPresetAssociationDao(db = get()) }
+    single { PlaylistDao(db = get()) }
     single {
       AudioMediaDao(
         db = get(),
@@ -51,6 +53,7 @@ object DbModule {
         artistMediaDao = get(),
         genreMediaDao = get(),
         composerMediaDao = get(),
+        playlistDao = get(),
         eqPresetAssociationDao = get(),
         appPrefsSingleton = get(AppPrefs.QUALIFIER)
       )
@@ -70,7 +73,14 @@ object DbModule {
       enableForeignKeyConstraints = true
     )
   ) {
-    onOpen { EqPresetDao.establishMinimumRowId(this) }
+    onCreate {
+      establishQueueIds(this)
+      EqPresetDao.establishMinimumRowId(this)
+    }
+  }
+
+  private fun establishQueueIds(txn: TransactionInProgress) {
+    AudioMediaDao.establishQueueId(txn)
   }
 }
 

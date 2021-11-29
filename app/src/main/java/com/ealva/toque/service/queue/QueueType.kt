@@ -22,6 +22,5 @@ enum class QueueType(override val id: Int) : HasConstId {
   NullQueue(0),
   Audio(1),
   Video(2),
-  Radio(3),
-  AudioCast(4);
+  Radio(3);
 }

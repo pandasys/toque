@@ -20,8 +20,7 @@ package com.ealva.toque.common
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
-import java.util.Date
-import kotlin.math.abs
+import java.util.*
 
 typealias MillisRange = ClosedRange<Millis>
 
@@ -59,6 +58,8 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
     operator fun invoke(value: Int): Millis = Millis(value.toLong())
     operator fun invoke(value: Float): Millis = Millis(value.toLong())
 
+    inline fun currentTime(): Millis = Millis(System.currentTimeMillis())
+
     val ONE_SECOND = Millis(1000)
     val TWO_SECONDS = Millis(2000)
     val THREE_SECONDS = Millis(3000)
@@ -68,3 +69,5 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
     val FOUR_MINUTES = Millis(240000)
   }
 }
+
+fun Long.asMillis(): Millis = Millis(this)

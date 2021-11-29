@@ -23,6 +23,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,13 +33,17 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.haveReadPermission
+import com.ealva.toque.db.PlaylistDao
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
+import com.ealva.toque.prefs.ThemeChoice
 import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
@@ -62,20 +67,30 @@ import com.zhuinden.simplestack.AsyncStateChanger
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.GlobalServices
 import com.zhuinden.simplestack.History
+import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.StateChange.REPLACE
 import com.zhuinden.simplestack.navigator.Navigator
 import com.zhuinden.simplestackcomposeintegration.core.BackstackProvider
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
+import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.statebundle.StateBundle
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 private val LOG by lazyLogger(MainActivity::class)
@@ -91,6 +106,7 @@ class MainActivity : ComponentActivity() {
   private lateinit var backstack: Backstack
   private val playerServiceConnection = MediaPlayerServiceConnection(this)
   private val appPrefsSingleton: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
+  private val playlistDao: PlaylistDao by inject()
   private var mediaController: ToqueMediaController = NullMediaController
   private var currentQueue: PlayableMediaQueue<*> = NullPlayableMediaQueue
   private var currentQueueJob: Job? = null
@@ -111,17 +127,19 @@ class MainActivity : ComponentActivity() {
       .install(this, androidContentFrame, makeInitialHistory())
 
     setContent {
-      ToqueTheme {
-        ProvideWindowInsets(windowInsetsAnimationsEnabled = true) {
-          ProvideScreenConfig(
-            screenConfig = makeScreenConfig(
-              LocalConfiguration.current,
-              LocalDensity.current,
-              LocalWindowInsets.current
-            )
-          )
-          {
-            BackstackProvider(backstack) {
+      BackstackProvider(backstack) {
+        val themeViewModel = rememberService<ThemeViewModel>()
+        val themeChoice by themeViewModel.themeChoice.collectAsState()
+
+        ToqueTheme(themeChoice) {
+          ProvideWindowInsets(windowInsetsAnimationsEnabled = true) {
+            ProvideScreenConfig(
+              screenConfig = makeScreenConfig(
+                LocalConfiguration.current,
+                LocalDensity.current,
+                LocalWindowInsets.current
+              )
+            ) {
               val topOfStack: ComposeKey by remember { topOfStackState }
               MainScreen(
                 composeStateChanger = composeStateChanger,
@@ -183,7 +201,8 @@ class MainActivity : ComponentActivity() {
       currentQueueJob = controller.currentQueue
         .onStart { LOG._i { it("start currentQueue flow") } }
         .onEach { queue -> handleQueueChange(queue) }
-        .onCompletion { cause -> LOG._i(cause) { it("currentQueue flow completed") } }
+        .catch { cause -> LOG.e(cause) { it("currentQueue flow error") } }
+        .onCompletion { LOG._e { it("currentQueue flow completed") } }
         .launchIn(scope)
     } else {
       currentQueueJob?.cancel()
@@ -200,7 +219,6 @@ class MainActivity : ComponentActivity() {
         QueueType.NullQueue -> handleNullQueue()
         QueueType.Video -> TODO()
         QueueType.Radio -> TODO()
-        QueueType.AudioCast -> TODO()
       }
     }
   }
@@ -218,8 +236,9 @@ class MainActivity : ComponentActivity() {
   private fun getGlobalServicesBuilder() = GlobalServices.builder().apply {
     add(this@MainActivity)
     add(playerServiceConnection)
-    add(LocalAudioQueueModel(playerServiceConnection, appPrefsSingleton))
+    add(MainViewModel())
     add(LocalAudioMiniPlayerViewModel(playerServiceConnection))
+    add(ThemeViewModel(appPrefsSingleton))
   }
 
   override fun onBackPressed() {
@@ -239,3 +258,36 @@ private fun makeAppComposeStateChanger() = ComposeStateChanger(
     }
   )
 )
+
+interface ThemeViewModel {
+  val themeChoice: StateFlow<ThemeChoice>
+
+  companion object {
+    operator fun invoke(appPrefsSingleton: AppPrefsSingleton): ThemeViewModel =
+      ThemeViewModelImpl(appPrefsSingleton)
+  }
+}
+
+private class ThemeViewModelImpl(
+  private val appPrefsSingleton: AppPrefsSingleton,
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Main
+) : ThemeViewModel, ScopedServices.Activated {
+  private lateinit var scope: CoroutineScope
+
+  override val themeChoice = MutableStateFlow(ThemeChoice.System)
+
+  override fun onServiceActive() {
+    scope = CoroutineScope(SupervisorJob() + dispatcher)
+    scope.launch {
+      appPrefsSingleton.instance()
+        .themeChoice
+        .asFlow()
+        .onEach { themeChoice.value = it }
+        .launchIn(scope)
+    }
+  }
+
+  override fun onServiceInactive() {
+    scope.cancel()
+  }
+}

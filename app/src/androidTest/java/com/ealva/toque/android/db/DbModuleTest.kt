@@ -42,6 +42,9 @@ import com.ealva.toque.db.GenreTable
 import com.ealva.toque.db.MediaTable
 import com.ealva.toque.db.PlayListMediaTable
 import com.ealva.toque.db.PlayListTable
+import com.ealva.toque.db.PlaylistDao
+import com.ealva.toque.db.QueueDao
+import com.ealva.toque.db.QueueItemsTable
 import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.QueueStateTable
 import com.ealva.welite.db.Database
@@ -79,6 +82,7 @@ class DbModuleTest : KoinTest {
         EqPresetTable,
         EqPresetAssociationTable,
         QueueTable,
+        QueueItemsTable,
         QueueStateTable,
         PlayListTable,
         PlayListMediaTable,
@@ -99,6 +103,8 @@ class DbModuleTest : KoinTest {
     expect(get<EqPresetDao>()).toNotBeNull()
     expect(get<EqPresetAssociationDao>()).toNotBeNull()
     expect(get<AudioMediaDao>()).toNotBeNull()
+    expect(get<QueueDao>()).toNotBeNull()
     expect(get<QueuePositionStateDaoFactory>()).toNotBeNull()
+    expect(get<PlaylistDao>()).toNotBeNull()
   }
 }
