@@ -17,24 +17,22 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.NamedSongListType
-import com.ealva.toque.db.SongListType
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
-import com.ealva.toque.ui.config.LocalScreenConfig
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
+import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -51,10 +49,9 @@ import javax.annotation.concurrent.Immutable
 @Parcelize
 data class GenreSongsScreen(
   private val genreId: GenreId,
-  private val genreName: GenreName,
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    with(serviceBinder) { add(GenreSongsViewModel(genreId, genreName, get(), lookup())) }
+    with(serviceBinder) { add(GenreSongsViewModel(genreId, get(), lookup(), backstack)) }
   }
 
   @OptIn(ExperimentalFoundationApi::class)
@@ -63,29 +60,38 @@ data class GenreSongsScreen(
     val viewModel = rememberService<GenreSongsViewModel>()
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
-    val config = LocalScreenConfig.current
-    SongItemList(
-      list = songs.value,
-      selectedItems = selected.value,
-      itemClicked = { viewModel.mediaClicked(it.id) },
-      itemLongClicked = { viewModel.mediaLongClicked(it.id) },
+
+    Column(
       modifier = Modifier
+        .fillMaxSize()
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
-        .padding(top = 18.dp, bottom = config.getNavPlusBottomSheetHeight(isExpanded = true))
-    )
+    ) {
+      SongsItemsActions(
+        itemCount = songs.value.size,
+        selectedItems = selected.value,
+        viewModel = viewModel
+      )
+      SongItemList(
+        list = songs.value,
+        selectedItems = selected.value,
+        itemClicked = { viewModel.mediaClicked(it.id) },
+        itemLongClicked = { viewModel.mediaLongClicked(it.id) },
+      )
+    }
   }
 }
 
 private class GenreSongsViewModel(
   private val genreId: GenreId,
-  private val genreName: GenreName,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueModel,
+  backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, dispatcher), ScopedServices.Activated {
-  override val namedSongListType: NamedSongListType
-    get() = NamedSongListType(genreName.value, SongListType.Genre)
+) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),
+  ScopedServices.Activated {
+  override val categoryToken: CategoryToken
+    get() = CategoryToken(genreId)
 
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,

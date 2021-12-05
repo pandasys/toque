@@ -50,7 +50,8 @@ fun QueueItemsActionBar(
   goToBottom: () -> Unit,
   addToPlaylist: () -> Unit,
   startSearch: () -> Unit = {},
-  selectAllOrNone: (Boolean) -> Unit = {}
+  selectAllOrNone: (Boolean) -> Unit = {},
+  mediaInfoClicked: () -> Unit,
 ) {
   val config = LocalScreenConfig.current
   val buttonHeight = config.actionBarButtonHeight
@@ -129,7 +130,7 @@ fun QueueItemsActionBar(
           modifier = Modifier.height(24.dp),
           drawable = R.drawable.ic_info,
           description = R.string.MediaInfo,
-          onClick = { },
+          onClick = mediaInfoClicked,
           enabled = selectedCount == 1
         )
         Spacer(
@@ -165,7 +166,8 @@ fun QueueItemsActionBarPreview() {
       goToBottom = {},
       addToPlaylist = {},
       startSearch = {},
-      selectAllOrNone = {}
+      selectAllOrNone = {},
+      mediaInfoClicked = {}
     )
   }
 }

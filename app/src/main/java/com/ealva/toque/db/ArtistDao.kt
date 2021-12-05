@@ -249,12 +249,12 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
   private fun Queryable.queryArtistUpdateInfo(
     artistName: String
   ): ArtistUpdateInfo? = QUERY_ARTIST_UPDATE_INFO
-    .sequence({ it[queryArtistBind] = artistName }) {
+    .sequence({ bindings -> bindings[queryArtistBind] = artistName }) { cursor ->
       ArtistUpdateInfo(
-        it[id].asArtistId,
-        it[this.artistName],
-        it[artistSort],
-        ArtistMbid(it[artistMbid])
+        cursor[id].asArtistId,
+        cursor[this.artistName],
+        cursor[artistSort],
+        ArtistMbid(cursor[artistMbid])
       )
     }.singleOrNull()
 
@@ -271,7 +271,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     limit: Limit
   ): Result<List<ArtistDescription>, DaoMessage> = runSuspendCatching {
     db.query { doGetAlbumArtists(filter, limit) }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Queryable.doGetAlbumArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
     return ArtistTable
@@ -291,13 +291,13 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       .groupBy { ArtistTable.artistSort }
       .orderByAsc { ArtistTable.artistSort }
       .limit(limit.value)
-      .sequence {
+      .sequence { cursor ->
         ArtistDescription(
-          ArtistId(it[ArtistTable.id]),
-          ArtistName(it[ArtistTable.artistName]),
-          it[ArtistTable.artistImage].toUriOrEmpty(),
-          it[albumArtistAlbumCountColumn],
-          it[songCountColumn]
+          ArtistId(cursor[ArtistTable.id]),
+          ArtistName(cursor[ArtistTable.artistName]),
+          cursor[ArtistTable.artistImage].toUriOrEmpty(),
+          cursor[albumArtistAlbumCountColumn],
+          cursor[songCountColumn]
         )
       }
       .toList()
@@ -308,7 +308,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     limit: Limit
   ): Result<List<ArtistDescription>, DaoMessage> = runSuspendCatching {
     db.query { doGetSongArtists(filter, limit) }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Queryable.doGetSongArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
     return ArtistTable
@@ -328,13 +328,13 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       .groupBy { ArtistTable.artistSort }
       .orderByAsc { ArtistTable.artistSort }
       .limit(limit.value)
-      .sequence {
+      .sequence { cursor ->
         ArtistDescription(
-          ArtistId(it[ArtistTable.id]),
-          ArtistName(it[ArtistTable.artistName]),
-          it[ArtistTable.artistImage].toUriOrEmpty(),
-          it[songArtistAlbumCountColumn],
-          it[songCountColumn]
+          ArtistId(cursor[ArtistTable.id]),
+          ArtistName(cursor[ArtistTable.artistName]),
+          cursor[ArtistTable.artistImage].toUriOrEmpty(),
+          cursor[songArtistAlbumCountColumn],
+          cursor[songCountColumn]
         )
       }
       .toList()
@@ -351,10 +351,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           .all()
           .orderByAsc { artistSort }
           .limit(limit.value)
-          .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+          .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
           .toList()
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getNextArtist(name: ArtistName): Result<ArtistIdName, DaoMessage> =
     runSuspendCatching {
@@ -364,14 +364,14 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           .where { artistName greater name.value }
           .orderByAsc { artistSort }
           .limit(1)
-          .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+          .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
           .single()
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getPreviousArtist(name: ArtistName) = runSuspendCatching {
     db.query { if (name.isEmpty()) doGetMaxArtist() else doGetPreviousArtist(name) }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getNext(id: ArtistId) = runSuspendCatching {
     db.query {
@@ -383,7 +383,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         .longForQuery { it[BIND_ARTIST_ID] = id.value}
         .asArtistId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getPrevious(id: ArtistId) = runSuspendCatching {
     db.query {
@@ -395,7 +395,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         .longForQuery { it[BIND_ARTIST_ID] = id.value}
         .asArtistId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getMin() = runSuspendCatching {
     db.query {
@@ -403,10 +403,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         .selects { listOf(id, artistMin) }
         .all()
         .limit(1)
-        .sequence { ArtistId(it[id]) }
+        .sequence { cursor -> ArtistId(cursor[id]) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getMax() = runSuspendCatching {
     db.query {
@@ -414,10 +414,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         .selects { listOf(id, artistMax) }
         .all()
         .limit(1)
-        .sequence { ArtistId(it[id]) }
+        .sequence { cursor -> ArtistId(cursor[id]) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   /**
    * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
@@ -427,14 +427,14 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     .where { artistName less previousArtist.value }
     .orderBy { artistName by Order.DESC }
     .limit(1)
-    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+    .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
     .single()
 
   private fun Queryable.doGetMaxArtist(): ArtistIdName = ArtistTable
     .selects { listOf(id, artistMax) }
     .all()
     .limit(1)
-    .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistMax])) }
+    .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistMax])) }
     .single()
 
   override suspend fun getArtistName(id: ArtistId): Result<ArtistName, DaoMessage> =
@@ -443,10 +443,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         ArtistTable
           .select { artistName }
           .where { this.id eq id.value }
-          .sequence { ArtistName(it[artistName]) }
+          .sequence { cursor -> ArtistName(cursor[artistName]) }
           .single()
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getRandomArtist(): Result<ArtistIdName, DaoMessage> =
     runSuspendCatching {
@@ -454,10 +454,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         ArtistTable
           .selects { listOf<Column<out Any>>(id, artistName) }
           .where { id inSubQuery ArtistTable.select(id).all().orderByRandom().limit(1) }
-          .sequence { ArtistIdName(ArtistId(it[id]), ArtistName(it[artistName])) }
+          .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
           .single()
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getRandom(): Result<ArtistId, DaoMessage> = runSuspendCatching {
       db.query {
@@ -467,7 +467,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           .longForQuery()
           .asArtistId
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
 }
 

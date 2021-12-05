@@ -143,6 +143,11 @@ object MediaTable : Table() {
   /** Primary track artist. Primary = first in the list of artists */
   val artistId = reference("Media_ArtistId", ArtistTable.id)
 
+  /**
+   * For fast display of genres not parsed, ie. could have several genres joined in 1 string
+   */
+  val genre = text("MediaGenre") { default("") }
+
   val year = integer("MediaYear") { default(0) }
   val rating = integer("MediaRating") { default(-1) }
   val duration = long("MediaDuration") { default(0) }

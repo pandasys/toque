@@ -222,8 +222,8 @@ class MediaScannerService : LifecycleService() {
     audioMediaDao.deleteEntitiesWithNoMedia()
     debug {
       when (val result = audioMediaDao.getCountAllAudio()) {
-        is Ok -> LOG._e { it("audio count=%d", result.value) }
-        is Err -> LOG._e { it("%s", result.error) }
+        is Ok -> LOG._i { it("audio count=%d", result.value) }
+        is Err -> LOG._i { it("%s", result.error) }
       }
     }
     LOG.i { it("Elapsed:%d end scan", stopWatch.stop().elapsed(TimeUnit.MILLISECONDS)) }

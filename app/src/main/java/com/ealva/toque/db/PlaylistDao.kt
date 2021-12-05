@@ -22,6 +22,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.asPlaylistId
@@ -101,14 +102,12 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
       db.query {
         PlayListTable.selects { listOf(id, playListName) }
           .all()
-          .sequence {
-            PlaylistIdName(
-              it[id].asPlaylistId,
-              it[playListName].asPlaylistName
-            )
-          }.toList()
+          .sequence { cursor ->
+            PlaylistIdName(cursor[id].asPlaylistId, cursor[playListName].asPlaylistName)
+          }
+          .toList()
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun createUserPlaylist(
     name: PlaylistName,
@@ -127,14 +126,14 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
       } else throw IllegalStateException("Could not create $name")
       PlaylistIdName(playlistId, name)
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun addToUserPlaylist(
     id: PlaylistId,
     mediaIdList: MediaIdList
   ): Result<Long, DaoMessage> = runSuspendCatching {
     db.transaction { doAddMediaToPlaylist(mediaIdList, id, getNextSortValue(id)) }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getAllPlaylists(): Result<List<PlaylistDescription>, DaoMessage> =
     runSuspendCatching {
@@ -154,18 +153,18 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
             .where { PlayListTable.playListType eq PlayListType.UserCreated.id }
             .orderByAsc { PlayListTable.playListName }
             .groupBy { PlayListTable.playListName }
-            .sequence {
+            .sequence { cursor ->
               PlaylistDescription(
-                PlaylistId(it[PlayListTable.id]),
-                it[PlayListTable.playListName].asPlaylistName,
+                PlaylistId(cursor[PlayListTable.id]),
+                cursor[PlayListTable.playListName].asPlaylistName,
                 PlayListType.UserCreated,
-                it[songCountColumn]
+                cursor[songCountColumn]
               )
             }
             .forEach { add(it) }
         }
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getNext(playlistId: PlaylistId) = runSuspendCatching {
     db.query {
@@ -174,10 +173,10 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
         .where { playListName greater SELECT_PLAYLIST_FROM_BIND_ID }
         .orderByAsc { playListName }
         .limit(1)
-        .longForQuery { it[BIND_PLAYLIST_ID] = playlistId.value }
+        .longForQuery { bindings -> bindings[BIND_PLAYLIST_ID] = playlistId.value }
         .asPlaylistId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getPrevious(playlistId: PlaylistId) = runSuspendCatching {
     db.query {
@@ -186,10 +185,10 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
         .where { playListName less SELECT_PLAYLIST_FROM_BIND_ID }
         .orderBy { playListName by Order.DESC }
         .limit(1)
-        .longForQuery { it[BIND_PLAYLIST_ID] = playlistId.value }
+        .longForQuery { bindings -> bindings[BIND_PLAYLIST_ID] = playlistId.value }
         .asPlaylistId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private val playlistMin by lazy { PlayListTable.playListName.min().alias("playlist_min_alias") }
   override suspend fun getMin(): Result<PlaylistId, DaoExceptionMessage> = runSuspendCatching {
@@ -198,22 +197,22 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
         .selects { listOf(id, playlistMin) }
         .all()
         .limit(1)
-        .sequence { PlaylistId(it[id]) }
+        .sequence { cursor -> PlaylistId(cursor[id]) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private val playlistMax by lazy { PlayListTable.playListName.max().alias("playlist_max_alias") }
   override suspend fun getMax() = runSuspendCatching {
     db.query {
-      AlbumTable
+      PlayListTable
         .selects { listOf(id, playlistMax) }
         .all()
         .limit(1)
-        .sequence { PlaylistId(it[id]) }
+        .sequence { cursor -> PlaylistId(cursor[id]) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getRandom(): Result<PlaylistId, DaoMessage> = runSuspendCatching {
     db.query {
@@ -223,7 +222,7 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
         .longForQuery()
         .asPlaylistId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun TransactionInProgress.doAddMediaToPlaylist(
     mediaIdList: MediaIdList,
@@ -247,7 +246,8 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
   }
 
   private fun Queryable.getNextSortValue(id: PlaylistId): Long {
-    val max = PlayListMediaTable.select(PlayListMediaTable.sort.max())
+    val max = PlayListMediaTable
+      .select(PlayListMediaTable.sort.max())
       .where { playListId eq id.value }
       .longForQuery()
     return if (max <= 0) 1 else max

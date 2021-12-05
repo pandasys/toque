@@ -178,7 +178,6 @@ abstract class BaseAudioFocusManager(
   protected abstract fun doAbandonFocus(contentType: ContentType): Int
 
   override fun requestFocus(contentType: ContentType, playState: PlayState): Boolean {
-    LOG._e { it("requestFocus type=%s state=%s", contentType, playState) }
     return when {
       released -> {
         LOG.e { it("Requested focus after release") }
@@ -218,10 +217,8 @@ abstract class BaseAudioFocusManager(
   }
 
   override fun onAudioFocusChange(focusChange: Int) {
-    LOG._e { it("onAudioFocusChange") }
     when (focusChange) {
       AudioManager.AUDIOFOCUS_GAIN -> {
-        LOG._e { it("AUDIOFOCUS_GAIN") }
         if (playbackDelayed || resumeOnFocusGain) {
           focusLock.withLock {
             haveAudioFocus = true
@@ -237,7 +234,6 @@ abstract class BaseAudioFocusManager(
         }
       }
       AudioManager.AUDIOFOCUS_LOSS -> {
-        LOG._e { it("AUDIOFOCUS_LOSS") }
         focusLock.withLock {
           haveAudioFocus = false
           resumeOnFocusGain = false
@@ -247,7 +243,6 @@ abstract class BaseAudioFocusManager(
         emitReaction(FocusReaction.StopForeground)
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-        LOG._e { it("AUDIOFOCUS_LOSS_TRANSIENT") }
         val isPlaying = playState?.isPlaying() ?: false
         focusLock.withLock {
           // only resume if playback is being interrupted
@@ -257,7 +252,6 @@ abstract class BaseAudioFocusManager(
         if (isPlaying) emitReaction(FocusReaction.Pause)
       }
       AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-        LOG._e { it("AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK") }
         val isPlaying = playState?.isPlaying() ?: false
         focusLock.withLock {
           endDuckOnFocusGain = isPlaying

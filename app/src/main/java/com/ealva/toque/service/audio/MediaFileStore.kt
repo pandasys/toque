@@ -155,7 +155,7 @@ private class MediaFileStoreImpl(
         beforeFileWrite,
         afterFileWrite
       )
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
   }
 
   private suspend fun doWriteToFile(

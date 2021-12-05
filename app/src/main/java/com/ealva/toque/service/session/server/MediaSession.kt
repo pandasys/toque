@@ -144,7 +144,7 @@ interface MediaSessionState {
    */
   var isActive: Boolean
 
-  val isPlaying: Boolean
+//  val isPlaying: Boolean
 
   var contentType: AudioFocusManager.ContentType
 
@@ -294,13 +294,19 @@ private class MediaSessionImpl(
   dispatcher: CoroutineDispatcher
 ) : MediaSession, DefaultLifecycleObserver {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+
   private var allowNotifications = false
+  /** Primary (only?) purpose of [lastMetadata] is for fast recent media query at startup */
   private var lastMetadata: Metadata = Metadata.NullMetadata
+  /** [msgHandler] for async notification update and bitmap retrieval */
   private var msgHandler = makeHandler()
   private var isNotificationStarted = false
-  private var lastState: PlaybackState = NullPlaybackState
+
+//  private var lastState: PlaybackState = NullPlaybackState
+
   private val playbackStateFlow = MutableStateFlow(NullPlaybackState)
 
+  /** Replay a small number in case we get an initial burst at startup before completely active */
   override val eventFlow: MutableSharedFlow<SessionControlEvent> = MutableSharedFlow(replay = 4)
   private val sessionCallback = SessionCallback(scope, eventFlow)
 
@@ -314,8 +320,8 @@ private class MediaSessionImpl(
     set(value) {
       session.isActive = value
     }
-  override val isPlaying: Boolean
-    get() = lastState.playState.isPlaying
+//  override val isPlaying: Boolean
+//    get() = lastState.playState.isPlaying
 
   override var contentType: AudioFocusManager.ContentType
     get() = sessionCallback.contentType
@@ -358,7 +364,7 @@ private class MediaSessionImpl(
   }
 
   private fun handleState(state: PlaybackState) {
-    lastState = state
+//    lastState = state
     if (state !== NullPlaybackState) {
       if (state.playState.isPlaying) {
         allowNotifications = true

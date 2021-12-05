@@ -19,6 +19,7 @@ package com.ealva.toque.db
 import android.os.Parcelable
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
+import com.ealva.toque.persist.PersistentId
 import it.unimi.dsi.fastutil.longs.LongList
 import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
@@ -39,6 +40,8 @@ import java.util.Random
  */
 @Parcelize
 data class CategoryMediaList(val idList: MediaIdList, val token: CategoryToken) : Parcelable {
+  inline val categoryType: SongListType get() = token.songListType
+  inline val categoryId: PersistentId get() = token.persistentId
 
   companion object {
     val EMPTY_ALL_LIST = CategoryMediaList(MediaIdList.EMPTY_LIST, CategoryToken.All)

@@ -216,6 +216,6 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.2.10-SNAPSHOT"
+    const val CORE = "com.ealva:welite-core:0.2.11-0"
   }
 }

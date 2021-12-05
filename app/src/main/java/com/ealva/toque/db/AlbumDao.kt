@@ -32,6 +32,7 @@ import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumId
@@ -243,19 +244,19 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .groupsBy { listOf(AlbumTable.albumTitle, AlbumTable.albumArtist) }
         .orderByAsc { AlbumTable.albumSort }
         .limit(limit.value)
-        .sequence {
+        .sequence { cursor ->
           AlbumDescription(
-            it[AlbumTable.id].asAlbumId,
-            it[AlbumTable.albumTitle].asAlbumTitle,
-            it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-            it[AlbumTable.albumArtUri].toUriOrEmpty(),
-            ArtistName(it[ArtistTable.artistName]),
-            it[songCountColumn]
+            cursor[AlbumTable.id].asAlbumId,
+            cursor[AlbumTable.albumTitle].asAlbumTitle,
+            cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+            cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
+            ArtistName(cursor[ArtistTable.artistName]),
+            cursor[songCountColumn]
           )
         }
         .toList()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Filter.whereCondition() =
     if (isEmpty) null else (AlbumTable.albumTitle like value escape ESC_CHAR) or
@@ -273,7 +274,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         ArtistType.SongArtist -> doGetArtistAlbums(artistId, limit)
       }
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Queryable.doGetAlbumArtistAlbums(artistId: ArtistId, limit: Limit) = ArtistAlbumTable
     .join(AlbumTable, JoinType.INNER, ArtistAlbumTable.albumId, AlbumTable.id)
@@ -293,14 +294,14 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .groupBy { AlbumTable.albumSort }
     .orderByAsc { AlbumTable.albumSort }
     .limit(limit.value)
-    .sequence {
+    .sequence { cursor ->
       AlbumDescription(
-        it[AlbumTable.id].asAlbumId,
-        it[AlbumTable.albumTitle].asAlbumTitle,
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty(),
-        ArtistName(it[ArtistTable.artistName]),
-        it[songCountColumn]
+        cursor[AlbumTable.id].asAlbumId,
+        cursor[AlbumTable.albumTitle].asAlbumTitle,
+        cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+        cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
+        ArtistName(cursor[ArtistTable.artistName]),
+        cursor[songCountColumn]
       )
     }
     .toList()
@@ -326,14 +327,14 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .groupBy { AlbumTable.albumTitle }
     .orderByAsc { AlbumTable.albumSort }
     .limit(limit.value)
-    .sequence {
+    .sequence { cursor ->
       AlbumDescription(
-        it[AlbumTable.id].asAlbumId,
-        it[AlbumTable.albumTitle].asAlbumTitle,
-        it[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
-        it[AlbumTable.albumArtUri].toUriOrEmpty(),
-        ArtistName(it[ArtistTable.artistName]),
-        it[songCountColumn]
+        cursor[AlbumTable.id].asAlbumId,
+        cursor[AlbumTable.albumTitle].asAlbumTitle,
+        cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
+        cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
+        ArtistName(cursor[ArtistTable.artistName]),
+        cursor[songCountColumn]
       )
     }
     .toList()
@@ -345,10 +346,10 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .where { albumTitle greater title.value }
         .orderByAsc { albumTitle }
         .limit(1)
-        .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+        .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle])) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getNextAlbumByTitle(albumId: AlbumId) = runSuspendCatching {
     db.query {
@@ -357,12 +358,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .where { albumTitle greater SELECT_TITLE_FROM_BIND_ID }
         .orderByAsc { albumTitle }
         .limit(1)
-        .sequence({ it[BIND_ALBUM_ID] = albumId.value }) {
-          AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle]))
+        .sequence({ bindings -> bindings[BIND_ALBUM_ID] = albumId.value }) { cursor ->
+          AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle]))
         }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getNext(albumId: AlbumId) = runSuspendCatching {
     db.query {
@@ -374,7 +375,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .longForQuery { it[BIND_ALBUM_ID] = albumId.value }
         .asAlbumId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getPrevious(albumId: AlbumId) = runSuspendCatching {
     db.query {
@@ -386,7 +387,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .longForQuery { it[BIND_ALBUM_ID] = albumId.value }
         .asAlbumId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private val albumMin by lazy { AlbumTable.albumTitle.min().alias("album_min_alias") }
   override suspend fun getMin(): Result<AlbumId, DaoMessage> = runSuspendCatching {
@@ -395,10 +396,10 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .selects { listOf(id, albumMin) }
         .all()
         .limit(1)
-        .sequence { AlbumId(it[id]) }
+        .sequence { cursor -> AlbumId(cursor[id]) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private val albumMax by lazy { AlbumTable.albumTitle.max().alias("album_max_alias") }
   override suspend fun getMax(): Result<AlbumId, DaoMessage> = runSuspendCatching {
@@ -407,10 +408,10 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .selects { listOf(id, albumMax) }
         .all()
         .limit(1)
-        .sequence { AlbumId(it[id]) }
+        .sequence { cursor -> AlbumId(cursor[id]) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Queryable.doGetPreviousAlbum(albumId: AlbumId): AlbumId = AlbumTable
     .select(AlbumTable.id)
@@ -422,7 +423,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
 
   override suspend fun getPrevious(title: AlbumTitle) = runSuspendCatching {
     db.query { if (title.isEmpty()) doGetMaxAlbum() else doGetPreviousAlbum(title) }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   /**
    * Throws NoSuchElementException if there is no album title > greater than [previousTitle]
@@ -432,14 +433,14 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .where { albumTitle less previousTitle.value }
     .orderBy { albumTitle by Order.DESC }
     .limit(1)
-    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+    .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle])) }
     .single()
 
   private fun Queryable.doGetMaxAlbum(): AlbumIdName = AlbumTable
     .selects { listOf(id, albumMax) }
     .all()
     .limit(1)
-    .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumMax])) }
+    .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumMax])) }
     .single()
 
   override suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage> = runSuspendCatching {
@@ -447,10 +448,10 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       AlbumTable
         .selects { listOf<Column<out Any>>(id, albumTitle) }
         .where { id inSubQuery AlbumTable.select(id).all().orderByRandom().limit(1) }
-        .sequence { AlbumIdName(AlbumId(it[id]), AlbumTitle(it[albumTitle])) }
+        .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle])) }
         .single()
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getRandom(): Result<AlbumId, DaoMessage>  = runSuspendCatching {
     db.query {
@@ -460,7 +461,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .longForQuery()
         .asAlbumId
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getAlbumId(title: AlbumTitle): AlbumId = db.query {
     AlbumTable
@@ -560,18 +561,18 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     artistName: String
   ): AlbumInfo? = QUERY_ALBUM_INFO
     .sequence(
-      {
-        it[0] = albumName
-        it[1] = artistName
+      { bindings ->
+        bindings[0] = albumName
+        bindings[1] = artistName
       }
-    ) {
+    ) { cursor ->
       AlbumInfo(
-        it[id].asAlbumId,
-        it[albumTitle],
-        it[albumSort],
-        it[albumArtist],
-        ReleaseMbid(it[releaseMbid]),
-        ReleaseGroupMbid(it[releaseGroupMbid])
+        cursor[id].asAlbumId,
+        cursor[albumTitle],
+        cursor[albumSort],
+        cursor[albumArtist],
+        ReleaseMbid(cursor[releaseMbid]),
+        ReleaseGroupMbid(cursor[releaseGroupMbid])
       )
     }.singleOrNull()
 }

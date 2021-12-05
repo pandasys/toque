@@ -24,8 +24,8 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.common.toDurationString
-import com.ealva.toque.log._e
+import com.ealva.toque.common.asDurationString
+import com.ealva.toque.log._i
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.audio.LocalAudioQueue
@@ -73,9 +73,9 @@ data class NowPlayingState(
     get() = if (queueIndex in queue.indices) queue[queueIndex] else NullPlayableAudioItem
 
   fun getDurationDisplay(): String =
-    (if (showTimeRemaining) position - duration else duration).toDurationString()
+    (if (showTimeRemaining) position - duration else duration).asDurationString
 
-  fun getPositionDisplay(): String = position.toDurationString()
+  fun getPositionDisplay(): String = position.asDurationString
 
   companion object {
     val NONE = NowPlayingState(
@@ -197,7 +197,7 @@ private class NowPlayingViewModelImpl(
     queueStateJob = audioQueue.queueState
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("") } }
-      .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
+      .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }
 

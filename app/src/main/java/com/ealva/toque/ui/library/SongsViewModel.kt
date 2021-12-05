@@ -18,21 +18,27 @@ package com.ealva.toque.ui.library
 
 import android.net.Uri
 import android.os.Parcelable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Title
 import com.ealva.toque.db.AudioDescription
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.NamedSongListType
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
@@ -40,10 +46,12 @@ import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.service.media.Rating
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
+import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.statebundle.StateBundle
@@ -67,7 +75,7 @@ import javax.annotation.concurrent.Immutable
 
 private val LOG by lazyLogger(BaseSongsViewModel::class)
 
-interface SongsViewModel {
+interface SongsViewModel : ActionsViewModel {
   @Immutable
   @Parcelize
   data class SongInfo(
@@ -82,8 +90,6 @@ interface SongsViewModel {
 
   val songsFlow: StateFlow<List<SongInfo>>
   val selectedItems: SelectedItemsFlow<MediaId>
-  fun selectAll()
-  fun clearSelection()
 
   fun mediaClicked(mediaId: MediaId)
   fun mediaLongClicked(mediaId: MediaId)
@@ -91,22 +97,20 @@ interface SongsViewModel {
   val searchFlow: StateFlow<String>
   fun setSearch(search: String)
 
-  fun play()
-  fun shuffle()
-  fun playNext()
-  fun addToUpNext()
-  fun addToPlaylist()
+  fun displayMediaInfo()
 }
 
 abstract class BaseSongsViewModel(
   private val audioMediaDao: AudioMediaDao,
-  private val localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueModel,
+  private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : SongsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private var requestJob: Job? = null
+  private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
-  protected abstract val namedSongListType: NamedSongListType
+  protected abstract val categoryToken: CategoryToken
 
   override val songsFlow = MutableStateFlow<List<SongInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<MediaId>(SelectedItems())
@@ -115,7 +119,7 @@ abstract class BaseSongsViewModel(
 
 
   override fun selectAll() = selectedItems.selectAll(getSongKeys())
-  private fun getSongKeys() = songsFlow.value.mapTo(mutableSetOf()) { it.id }
+  private fun getSongKeys(): Set<MediaId> = songsFlow.value.mapTo(mutableSetOf()) { it.id }
   override fun clearSelection() = selectedItems.clearSelection()
 
   override fun setSearch(search: String) {
@@ -156,7 +160,6 @@ abstract class BaseSongsViewModel(
   }
 
   private fun handleAudioList(list: List<AudioDescription>) {
-    LOG._e { it("handleAudioList") }
     songsFlow.value = list.mapTo(ArrayList(list.size)) {
       SongInfo(
         id = it.mediaId,
@@ -175,10 +178,16 @@ abstract class BaseSongsViewModel(
 
   override fun mediaLongClicked(mediaId: MediaId) = selectedItems.toggleSelection(mediaId)
 
-  private fun makeAudioIdList(): AudioIdList = AudioIdList(
-    makeMediaIdList(),
-    namedSongListType
-  )
+  /**
+   * LocalAudioQueueOps requires a CategoryMediaList, because LocalAudioQueue play, shuffle, and
+   * addToPlaylist, require it. So, just wrap the MediaIdList in a CategoryMediaList with an
+   * appropriate CategoryToken
+   */
+  private fun makeCategoryMediaList(): CategoryMediaList =
+    CategoryMediaList(makeMediaIdList(), categoryToken)
+
+  private fun makeMediaListResult(): Result<CategoryMediaList, DaoMessage> =
+    Ok(makeCategoryMediaList())
 
   private fun makeMediaIdList(): MediaIdList = songsFlow.value
     .asSequence()
@@ -186,34 +195,38 @@ abstract class BaseSongsViewModel(
     .mapTo(LongArrayList(512)) { it.id.value }
     .asMediaIdList
 
+  private fun offSelectMode() {
+    selectedItems.turnOffSelectionMode()
+  }
+
   override fun play() {
-    scope.launch {
-      if (localAudioQueueModel.play(makeAudioIdList()).wasExecuted)
-        selectedItems.turnOffSelectionMode()
-    }
+    scope.launch { localQueueOps.doOp(Op.Play, ::makeMediaListResult, ::offSelectMode) }
   }
 
   override fun shuffle() {
-    scope.launch {
-      if (localAudioQueueModel.shuffle(makeAudioIdList()).wasExecuted)
-        selectedItems.turnOffSelectionMode()
-    }
+    scope.launch { localQueueOps.doOp(Op.Shuffle, ::makeMediaListResult, ::offSelectMode) }
   }
 
   override fun playNext() {
-    localAudioQueueModel.playNext(makeAudioIdList())
-    selectedItems.turnOffSelectionMode()
+    scope.launch { localQueueOps.doOp(Op.PlayNext, ::makeMediaListResult, ::offSelectMode) }
   }
 
   override fun addToUpNext() {
-    localAudioQueueModel.addToUpNext(makeAudioIdList())
-    selectedItems.turnOffSelectionMode()
+    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::makeMediaListResult, ::offSelectMode) }
   }
 
   override fun addToPlaylist() {
-    scope.launch {
-      if (localAudioQueueModel.addToPlaylist(makeMediaIdList()).wasExecuted)
-        selectedItems.turnOffSelectionMode()
+    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::makeMediaListResult, ::offSelectMode) }
+  }
+
+  override fun displayMediaInfo() {
+    val selected = selectedItems.value
+    LOG._e { it("selectedCount:%d", selected.selectedCount) }
+
+    if (selected.selectedCount == 1) {
+      val mediaId = selected.single()
+      LOG._e { it("id=%s", mediaId) }
+      backstack.goTo(AudioMediaInfoScreen(mediaId))
     }
   }
 
@@ -246,3 +259,48 @@ abstract class BaseSongsViewModel(
 private data class SongsViewModelState(
   val selected: SelectedItems<MediaId>
 ) : Parcelable
+
+@Composable
+fun SongsItemsActions(
+  itemCount: Int,
+  selectedItems: SelectedItems<*>,
+  viewModel: SongsViewModel
+) {
+  LibraryActionBar(
+    itemCount = itemCount,
+    inSelectionMode = selectedItems.inSelectionMode,
+    selectedCount = selectedItems.selectedCount,
+    play = { viewModel.play() },
+    shuffle = { viewModel.shuffle() },
+    playNext = { viewModel.playNext() },
+    addToUpNext = { viewModel.addToUpNext() },
+    addToPlaylist = { viewModel.addToPlaylist() },
+    selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
+    startSearch = {},
+    selectActions = {
+      SongSelectActions(
+        selectedCount = selectedItems.selectedCount,
+        mediaInfoClick = { viewModel.displayMediaInfo() }
+      )
+    }
+  )
+}
+
+@Composable
+fun SongSelectActions(
+  selectedCount: Int,
+  mediaInfoClick: () -> Unit
+) {
+  Row(
+    modifier = Modifier
+  ) {
+    ActionButton(
+      buttonHeight = 24.dp,
+      modifier = Modifier.height(24.dp),
+      drawable = R.drawable.ic_info,
+      description = R.string.MediaInfo,
+      onClick = mediaInfoClick,
+      enabled = selectedCount == 1
+    )
+  }
+}

@@ -20,16 +20,15 @@ import android.os.Bundle
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Limit
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.NamedSongListType
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.PlayNow
@@ -43,7 +42,7 @@ class PlayMediaFromId(
 ) : OnMediaType<Unit> {
   override suspend fun onMedia(mediaId: MediaId, extras: Bundle, limit: Limit) {
     localAudioQueue.playNext(
-      AudioIdList(MediaIdList(mediaId), NamedSongListType.EXTERNAL_ALL),
+      CategoryMediaList(mediaId, CategoryToken.External),
       ClearQueue(false),
       PlayNow(true),
       TransitionType.Manual

@@ -91,7 +91,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       audioMediaDao = audioMediaDao,
       notificationListener = NotificationListener(),
       lifecycleOwner = this,
-      active = true
+      active = false // will set active after setting the current queue for the first time
     )
     packageManager?.getLaunchIntentForPackage(packageName)?.let { sessionIntent ->
       mediaSession.setSessionActivity(

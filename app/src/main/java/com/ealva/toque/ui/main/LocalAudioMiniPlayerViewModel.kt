@@ -21,7 +21,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.log._e
-import com.ealva.toque.service.MediaPlayerServiceConnection
+import com.ealva.toque.log._i
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
@@ -74,19 +74,17 @@ interface LocalAudioMiniPlayerViewModel {
 
   companion object {
     operator fun invoke(
-      serviceConnection: MediaPlayerServiceConnection
+      mainViewModel: MainViewModel
     ): LocalAudioMiniPlayerViewModel =
-      LocalAudioMiniPlayerViewModelImpl(serviceConnection)
+      LocalAudioMiniPlayerViewModelImpl(mainViewModel)
   }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 private class LocalAudioMiniPlayerViewModelImpl(
-  private val serviceConnection: MediaPlayerServiceConnection
+  private val mainViewModel: MainViewModel
 ) : LocalAudioMiniPlayerViewModel, ScopedServices.Activated {
   private lateinit var scope: CoroutineScope
-  private var mediaController: ToqueMediaController = NullMediaController
-  private var controllerJob: Job? = null
   private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
   private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
@@ -111,30 +109,33 @@ private class LocalAudioMiniPlayerViewModelImpl(
   }
 
   private fun haveSubscriber() {
-    controllerJob = serviceConnection.mediaController
-      .onEach { controller -> handleControllerChange(controller) }
-      .onCompletion { handleControllerChange(NullMediaController) }
+    currentQueueJob = mainViewModel.currentQueue
+      .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)
+//    controllerJob = mainViewModel.currentQueue
+//      .onEach { controller -> handleControllerChange(controller) }
+//      .onCompletion { handleControllerChange(NullMediaController) }
+//      .launchIn(scope)
   }
 
   private fun noSubscribers() {
-    controllerJob?.cancel()
-    controllerJob = null
-    handleControllerChange(NullMediaController)
+    currentQueueJob?.cancel()
+    currentQueueJob = null
+    handleQueueChange(NullPlayableMediaQueue)
   }
 
-  private fun handleControllerChange(controller: ToqueMediaController) {
-    mediaController = controller
-    if (controller !== NullMediaController) {
-      currentQueueJob = controller.currentQueue
-        .onEach { queue -> handleQueueChange(queue) }
-        .launchIn(scope)
-    } else {
-      currentQueueJob?.cancel()
-      currentQueueJob = null
-      handleQueueChange(NullPlayableMediaQueue)
-    }
-  }
+//  private fun handleControllerChange(controller: ToqueMediaController) {
+//    mediaController = controller
+//    if (controller !== NullMediaController) {
+//      currentQueueJob = controller.currentQueue
+//        .onEach { queue -> handleQueueChange(queue) }
+//        .launchIn(scope)
+//    } else {
+//      currentQueueJob?.cancel()
+//      currentQueueJob = null
+//      handleQueueChange(NullPlayableMediaQueue)
+//    }
+//  }
 
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
     when (queue.queueType) {
@@ -146,10 +147,10 @@ private class LocalAudioMiniPlayerViewModelImpl(
   private fun queueActive(queue: LocalAudioQueue) {
     audioQueue = queue
     queueStateJob = audioQueue.queueState
-      .onStart { LOG._e { it("MiniPlayer start collecting queueState") } }
+      .onStart { LOG._i { it("MiniPlayer start collecting queueState") } }
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("") } }
-      .onCompletion { LOG._e { it("MiniPlayer completed collecting queueState") } }
+      .onCompletion { LOG._i { it("MiniPlayer completed collecting queueState") } }
       .launchIn(scope)
   }
 

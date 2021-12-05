@@ -72,6 +72,7 @@ import com.ealva.toque.ui.common.scrollToFirst
 import com.ealva.toque.ui.common.scrollToPosition
 import com.ealva.toque.ui.common.visibleIndices
 import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.library.AudioMediaInfoScreen
 import com.ealva.toque.ui.library.QueueItemsActionBar
 import com.ealva.toque.ui.library.SelectedItems
 import com.ealva.toque.ui.library.SelectedItemsFlow
@@ -87,12 +88,14 @@ import com.ealva.toque.ui.library.toggleSelection
 import com.ealva.toque.ui.library.turnOffSelectionMode
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
+import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import it.unimi.dsi.fastutil.longs.LongArrayList
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -122,7 +125,7 @@ private val LOG by lazyLogger(QueueScreen::class)
 data class QueueScreen(private val noArg: String = "") : ComposeKey() {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(QueueViewModel(lookup()))
+      add(QueueViewModel(lookup(), backstack))
     }
   }
 
@@ -156,6 +159,7 @@ data class QueueScreen(private val noArg: String = "") : ComposeKey() {
         goToBottom = { listState.scrollToPosition(scope, queue.indices.last) },
         addToPlaylist = { viewModel.addToPlaylist() },
         selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
+        mediaInfoClicked = { viewModel.displayMediaInfo() }
       )
 
       QueueContents(
@@ -375,14 +379,22 @@ interface QueueViewModel {
    */
   fun addToPlaylist()
 
+  fun displayMediaInfo()
+
   companion object {
-    operator fun invoke(localAudioQueueModel: LocalAudioQueueModel): QueueViewModel =
-      QueueViewModelImpl(localAudioQueueModel)
+    operator fun invoke(
+      localAudioQueueModel: LocalAudioQueueModel,
+      backstack: Backstack,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): QueueViewModel =
+      QueueViewModelImpl(localAudioQueueModel, backstack, dispatcher)
   }
 }
 
 private class QueueViewModelImpl(
   private val localAudioQueueModel: LocalAudioQueueModel,
+  private val backstack: Backstack,
+  private val dispatcher: CoroutineDispatcher
 ) : QueueViewModel, ScopedServices.Activated, ScopedServices.HandlesBack {
   private lateinit var scope: CoroutineScope
   private var currentQueueJob: Job? = null
@@ -459,11 +471,29 @@ private class QueueViewModelImpl(
     }
   }
 
+  override fun displayMediaInfo() {
+    val selected = selectedFlow.value
+
+    if (selected.selectedCount == 1) {
+      val instanceId: InstanceId = selected.single()
+
+      backstack.goTo(
+        AudioMediaInfoScreen(
+          queueState.value
+            .queue
+            .first { item -> item.instanceId == instanceId }
+            .item
+            .id
+        )
+      )
+    }
+  }
+
   private fun getSelectedItems(queue: List<QueueAudioItem>) =
     queue.filterIfHasSelection(selectedFlow.value) { it.instanceId }
 
   override fun onServiceActive() {
-    scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    scope = CoroutineScope(SupervisorJob() + dispatcher)
     currentQueueJob = localAudioQueueModel.localAudioQueue
       .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)

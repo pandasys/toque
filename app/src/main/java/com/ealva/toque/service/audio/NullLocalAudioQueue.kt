@@ -20,7 +20,7 @@ import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.notify.ServiceNotification
@@ -40,11 +40,12 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val notification = emptyFlow<ServiceNotification>()
   override fun toggleEqMode() = Unit
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
-  override suspend fun addToUpNext(audioIdList: AudioIdList): Result<QueueSize, QueueMessage> =
-    Err(UnknownError)
+  override suspend fun addToUpNext(
+    categoryMediaList: CategoryMediaList
+  ): Result<QueueSize, QueueMessage> = Err(UnknownError)
 
   override suspend fun playNext(
-    audioIdList: AudioIdList,
+    categoryMediaList: CategoryMediaList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
@@ -52,7 +53,7 @@ object NullLocalAudioQueue : LocalAudioQueue {
 
 
   override fun goToQueueItem(instanceId: InstanceId) = Unit
-  override suspend fun prepareNext(audioIdList: AudioIdList) = Unit
+  override suspend fun prepareNext(categoryMediaList: CategoryMediaList) = Unit
   override fun nextRepeatMode() = Unit
   override fun nextShuffleMode() = Unit
   override fun setRepeatMode(mode: RepeatMode) = Unit

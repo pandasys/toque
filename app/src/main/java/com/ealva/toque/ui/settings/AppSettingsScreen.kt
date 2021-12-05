@@ -76,6 +76,7 @@ import com.ealva.toque.prefs.DuckAction
 import com.ealva.toque.prefs.EndOfQueueAction
 import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.prefs.ScrobblerPackage
+import com.ealva.toque.prefs.ThemeChoice
 import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
@@ -180,7 +181,7 @@ data class AppSettingsScreen(
   ): List<SettingItem> =
     when (key) {
       PrimarySettings -> makePrimaryItems(backstack)
-      LookAndFeel -> makeLookAndFeelItems(backstack)
+      LookAndFeel -> makeLookAndFeelItems(prefs, backstack)
       ListsLookAndFeel -> makeListsLookAndFeelItems(prefs)
       NowPlayingLookAndFeel -> makeNowPlayingItems()
       LibrarySettings -> makeLibraryItems(backstack, prefs)
@@ -351,6 +352,7 @@ data class AppSettingsScreen(
   )
 
   private fun makeLookAndFeelItems(
+    prefs: AppPrefs,
     backstack: Backstack
   ): List<SettingItem> = listOf(
     CallbackSettingItem(
@@ -364,6 +366,17 @@ data class AppSettingsScreen(
       summary = fetch(R.string.NowPlayingScreenOptions),
       iconDrawable = R.drawable.ic_presentation_play,
       onClick = { backstack.goTo(AppSettingsScreen(NowPlayingLookAndFeel)) }
+    ),
+    ListSettingItem(
+      preference = prefs.themeChoice,
+      title = fetch(R.string.Theme),
+      singleLineTitle = true,
+      enabled = true,
+      dialogItems = mapOf(
+        ThemeChoice.Dark.titleValuePair,
+        ThemeChoice.Light.titleValuePair,
+        ThemeChoice.System.titleValuePair
+      )
     ),
   )
 
@@ -592,7 +605,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
         IconButton(onClick = back) {
           Icon(
             painter = rememberImagePainter(data = R.drawable.ic_arrow_left),
-            contentDescription = "Toggle Equalizer",
+            contentDescription = "Back",
             modifier = Modifier.size(26.dp)
           )
         }
@@ -603,7 +616,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
 }
 
 @Composable
-private fun AppBarTitle(title: String) {
+fun AppBarTitle(title: String) {
   Text(
     text = title,
     textAlign = TextAlign.Start,
@@ -678,4 +691,7 @@ val ReplayGainMode.titleValuePair: Pair<String, ReplayGainMode>
   get() = Pair(fetch(titleRes), this)
 
 val AudioOutputModule.titleViewPair: Pair<String, AudioOutputModule>
+  get() = Pair(fetch(titleRes), this)
+
+val ThemeChoice.titleValuePair: Pair<String, ThemeChoice>
   get() = Pair(fetch(titleRes), this)

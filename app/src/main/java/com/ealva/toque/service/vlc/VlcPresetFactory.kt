@@ -98,7 +98,7 @@ class VlcPresetFactory(
           }
         }
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun makeFrom(eqPreset: EqPreset, name: String): Result<EqPreset, DaoMessage> {
     val preAmpAndBands = eqPreset.getAllValues()
@@ -112,7 +112,7 @@ class VlcPresetFactory(
             result.value,
             eqPresetDao
           )
-        }.mapError { DaoExceptionMessage(it) }
+        }.mapError { cause -> DaoExceptionMessage(cause) }
       }
       is Err -> Err(result.error)
     }

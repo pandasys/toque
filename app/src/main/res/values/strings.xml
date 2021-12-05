@@ -127,7 +127,6 @@
   <string name="Exit">Exit</string>
   <string name="OK">OK</string>
   <string name="Settings">Settings</string>
-  <string name="NotImplemented">Not Implemented</string>
   <string name="NowPlayingChannelName">Now Playing</string>
   <string name="Next">Next</string>
   <string name="Previous">Previous</string>
@@ -178,8 +177,8 @@
   <string name="GoToNowPlayingAfterSelection">Go to Now Playing after selection</string>
   <string name="StayInListAfterSelection">Stay in list after selection</string>
   <string name="UpNextActionOnPlay">Up Next Action on Play</string>
-  <string name="PlayNextList">Play Next List</string>
-  <string name="ShuffleNextList">Shuffle Next List</string>
+  <string name="PlayNextCategory">Play Next Category</string>
+  <string name="ShuffleNextCategory">Shuffle Next Category</string>
   <string name="EndOfQueueAction">End of Queue Action</string>
   <string name="ListItemActionsOptions">List item actions and options</string>
   <string name="NowPlayingScreenOptions">Now Playing screen options</string>
@@ -222,4 +221,15 @@
   <string name="Playlist">Playlist</string>
   <string name="UnknownError">Unknown Error</string>
   <string name="PlusNewPlaylist">+ New Playlist</string>
+  <string name="SongArtist">Song Artist</string>
+  <string name="Disc">Disc</string>
+  <string name="TagRating">Tag Rating</string>
+  <string name="Plays">Plays</string>
+  <string name="LastPlayed">Last Played</string>
+  <string name="Skips">Skips</string>
+  <string name="LastSkipped">Last Skipped</string>
+    <string name="Theme">Theme</string>
+  <string name="EmptyResult">Empty Result</string>
+    <string name="DateAdded">Date Added</string>
+  <string name="EmbeddedArtwork">Embedded Artwork</string>
 </resources>

@@ -26,12 +26,14 @@ interface MediaFileTagInfo : AutoCloseable {
   val duration: Millis
   val title: String
   val titleSort: String
+
   /**
    * An artist in a file Tag can be a comma delimited list of some sort. There can also be multiple
    * artist fields in a tag. This is all of the tag fields, which also may be further parsed into
    * separate strings.  TODO - clarify implementation
    */
   val artists: List<String>
+
   /**
    * This field is very much like [artists] in it's construction. If any artist does not have a
    * sort, one is created from the artist itself. TODO - clarify implementation
@@ -43,6 +45,7 @@ interface MediaFileTagInfo : AutoCloseable {
   val albumArtistSort: String
   val composer: String
   val composerSort: String
+  val genre: String
   val genres: List<String>
   val trackNumber: Int
   val totalTracks: Int
@@ -69,4 +72,29 @@ interface MediaFileTagInfo : AutoCloseable {
   val episode: String
   val showName: String
   val actors: String
+  val fullDescription: String
+  val embeddedArtwork: EmbeddedArtwork // read tag can ignore artwork, then this is empty
 }
+
+interface EmbeddedArtwork {
+  /** If [exists] is false there is no embedded data - other fields have no data */
+  val exists: Boolean
+
+  /** Is the artwork a Url - a pointer to artwork on the Internet */
+  val isUrl: Boolean
+
+  /** Does this contain binary data which can be converted to a bitmap */
+  val isBinary: Boolean
+
+  /** The data if [isBinary] is true, otherwise a zero length ByteArray */
+  val data: ByteArray
+
+  /** The data url if [isUrl] is true, otherwise an empty string */
+  val url: String
+
+  /** Describes artwork type if available - front cover, back cover, etc. */
+  val pictureType: String
+}
+
+val EmbeddedArtwork.asString: String
+  get() = "exists=$exists isUrl=$isUrl isBinary=$isBinary pictureType=$pictureType"

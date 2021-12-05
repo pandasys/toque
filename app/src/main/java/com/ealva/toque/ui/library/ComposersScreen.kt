@@ -47,12 +47,12 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.ComposerDescription
+import com.ealva.toque.db.DaoEmptyResult
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.SongListType
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ComposerId
@@ -62,11 +62,13 @@ import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
+import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -110,7 +112,7 @@ data class ComposersScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<ComposersViewModel>()
-    val composers = viewModel.composers.collectAsState()
+    val composers = viewModel.composerFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
     Column(
@@ -122,15 +124,8 @@ data class ComposersScreen(
       CategoryTitleBar(viewModel.categoryItem)
       LibraryItemsActions(
         itemCount = composers.value.size,
-        inSelectionMode = selected.value.inSelectionMode,
-        selectedCount = selected.value.selectedCount,
-        play = { viewModel.play() },
-        shuffle = { /*viewModel.shuffle()*/ },
-        playNext = { /*viewModel.playNext()*/ },
-        addToUpNext = { /*viewModel.addToUpNext()*/ },
-        addToPlaylist = { },
-        selectAllOrNone = { /*all -> if (all) viewModel.selectAll() else viewModel.clearSelection()*/ },
-        startSearch = {}
+        selectedItems = selected.value,
+        viewModel = viewModel
       )
       AllComposers(
         list = composers.value,
@@ -214,7 +209,7 @@ private fun ComposerItem(
   )
 }
 
-private interface ComposersViewModel {
+private interface ComposersViewModel : ActionsViewModel {
   @Immutable
   data class ComposerInfo(
     val id: ComposerId,
@@ -223,7 +218,7 @@ private interface ComposersViewModel {
   )
 
   val categoryItem: LibraryCategories.CategoryItem
-  val composers: StateFlow<List<ComposerInfo>>
+  val composerFlow: StateFlow<List<ComposerInfo>>
   val selectedItems: SelectedItemsFlow<ComposerId>
 
   fun itemClicked(composerId: ComposerId)
@@ -239,14 +234,12 @@ private interface ComposersViewModel {
     ): ComposersViewModel =
       ComposersViewModelImpl(key, audioMediaDao, localAudioQueueModel, backstack, dispatcher)
   }
-
-  fun play()
 }
 
 private class ComposersViewModelImpl(
   private val key: ComposeKey,
   private val audioMediaDao: AudioMediaDao,
-  private val localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : ComposersViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
@@ -257,40 +250,54 @@ private class ComposersViewModelImpl(
   override val categoryItem: LibraryCategories.CategoryItem
     get() = categories[key]
 
-  override val composers = MutableStateFlow<List<ComposerInfo>>(emptyList())
+  override val composerFlow = MutableStateFlow<List<ComposerInfo>>(emptyList())
 
   override val selectedItems = SelectedItemsFlow<ComposerId>()
+  private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
-  override fun play() {
-    scope.launch {
-      when (val result = makeAudioIdList(getSelectedComposers())) {
-        is Ok -> if (localAudioQueueModel.play(result.value).wasExecuted)
-          selectedItems.turnOffSelectionMode()
-        is Err -> LOG._e { it("Error getting media list. %s", result.error) }
-      }
-    }
-  }
+  override fun selectAll() = selectedItems.selectAll(getGenreKeys())
+  private fun getGenreKeys() = composerFlow.value.mapTo(mutableSetOf()) { it.id }
+  override fun clearSelection() = selectedItems.clearSelection()
 
-  suspend fun makeAudioIdList(composerList: List<ComposerInfo>): Result<AudioIdList, DaoMessage> {
-    val title = composerList.lastOrNull()?.name ?: ComposerName.UNKNOWN
-    return audioMediaDao
-      .getMediaForComposers(
-        composerList
-          .mapTo(LongArrayList(512)) { it.id.value }
-          .asComposerIdList
-      )
-      .map { mediaIdList -> AudioIdList(mediaIdList, title.value, SongListType.Artist) }
-  }
+  private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private fun getSelectedComposers() = composers.value
+  private suspend fun getMediaList(): Result<CategoryMediaList, DaoMessage> =
+    makeCategoryMediaList(getSelectedComposers())
+
+  suspend fun makeCategoryMediaList(composerList: List<ComposerInfo>) = audioMediaDao
+    .getMediaForComposers(
+      composerList
+        .mapTo(LongArrayList(512)) { it.id.value }
+        .asComposerIdList
+    )
+    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .map { idList -> CategoryMediaList(idList, CategoryToken(composerList.last().id)) }
+
+  private fun getSelectedComposers() = composerFlow.value
     .filterIfHasSelection(selectedItems.value) { it.id }
 
-  private fun goToComposersSongs(composerId: ComposerId) {
-    val name = composers.value
-      .find { it.id == composerId }
-      ?.name ?: ComposerName("")
-    backstack.goTo(ComposerSongsScreen(composerId, name))
+  override fun play() {
+    scope.launch { localQueueOps.doOp(Op.Play, ::getMediaList, ::offSelectMode) }
   }
+
+  override fun shuffle() {
+    scope.launch { localQueueOps.doOp(Op.Shuffle, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun playNext() {
+    scope.launch { localQueueOps.doOp(Op.PlayNext, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun addToUpNext() {
+    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun addToPlaylist() {
+    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
+  }
+
+  private fun goToComposersSongs(composerId: ComposerId) =
+    backstack.goTo(ComposerSongsScreen(composerId))
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)
@@ -312,7 +319,7 @@ private class ComposersViewModelImpl(
   }
 
   private fun handleList(list: List<ComposerDescription>) {
-    composers.value = list.mapTo(ArrayList(list.size)) {
+    composerFlow.value = list.mapTo(ArrayList(list.size)) {
       ComposerInfo(
         id = it.composerId,
         name = it.composerName,
@@ -330,7 +337,7 @@ private class ComposersViewModelImpl(
 
   override fun onServiceInactive() {
     scope.cancel()
-    composers.value = emptyList()
+    composerFlow.value = emptyList()
   }
 
   override fun toBundle(): StateBundle = StateBundle().apply {

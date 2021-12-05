@@ -184,19 +184,19 @@ private class QueuePositionStateDaoImpl(
         QueueStateTable
           .selects { listOf(mediaId, queueIndex, playbackPosition, timePlayed, countingFrom) }
           .where { id eq this@QueuePositionStateDaoImpl.queueId.value }
-          .sequence {
+          .sequence { cursor ->
             QueuePositionState(
-              MediaId(it[mediaId]),
-              it[queueIndex],
-              Millis(it[playbackPosition]),
-              Millis(it[timePlayed]),
-              Millis(it[countingFrom])
+              MediaId(cursor[mediaId]),
+              cursor[queueIndex],
+              Millis(cursor[playbackPosition]),
+              Millis(cursor[timePlayed]),
+              Millis(cursor[countingFrom])
             )
           }
           .singleOrNull()
           ?: QueuePositionState.INACTIVE_QUEUE_STATE
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
   }
 
   override fun persistState(state: QueuePositionState): QueuePositionState {

@@ -29,11 +29,13 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
 import com.ealva.toque.file.isNetworkScheme
+import com.ealva.toque.service.media.EmbeddedArtwork
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParser
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.tag.ArtistParser
+import com.ealva.toque.tag.ArtworkField
 import com.ealva.toque.tag.SongTag
 import com.ealva.toque.tag.toAlbumSort
 import com.ealva.toque.tag.toArtistSort
@@ -55,10 +57,14 @@ class VlcMediaMetadataParserFactory(
 }
 
 private class MediaMetadataParserImpl(private val libVlc: LibVlcSingleton) : MediaMetadataParser {
-  override suspend fun parseMetadata(uri: Uri, artistParser: ArtistParser): MediaFileTagInfo {
+  override suspend fun parseMetadata(
+    uri: Uri,
+    artistParser: ArtistParser,
+    ignoreArtwork: Boolean
+  ): MediaFileTagInfo {
     return if (uri.isFileScheme() && uri.tagCanParseExtension()) {
       try {
-        FileTagInfo(File(uri.path.orEmpty()), artistParser)
+        FileTagInfo(File(uri.path.orEmpty()), artistParser, ignoreArtwork)
       } catch (e: Exception) {
         LOG.e(e) { it("Could not open file '%s' uri=%s", uri.path.orEmpty(), uri) }
         libVlc.withInstance { VlcTagInfo(uri, it, artistParser) }
@@ -96,6 +102,8 @@ private class FileTagInfo private constructor(
     get() = tag.composer
   override val composerSort: String
     get() = tag.composerSort
+  override val genre: String
+    get() = tag.genre
   override val genres: List<String>
     get() = tag.genre
       .splitToSequence("/")
@@ -141,6 +149,10 @@ private class FileTagInfo private constructor(
   override val episode: String = ""
   override val showName: String = ""
   override val actors: String = ""
+  override val fullDescription: String
+    get() = tag.fullDescription
+  override val embeddedArtwork: EmbeddedArtwork
+    get() = SongTagEmbeddedArtwork(tag.artworkField)
 
   override fun toString(): String = asString()
   override fun close() {
@@ -150,16 +162,32 @@ private class FileTagInfo private constructor(
   companion object {
     operator fun invoke(
       file: File,
-      artistParser: ArtistParser
+      artistParser: ArtistParser,
+      ignoreArtwork: Boolean = true
     ): MediaFileTagInfo = FileTagInfo(
       SongTag(
         file,
-        ignoreArtwork = true,
+        ignoreArtwork = ignoreArtwork,
         createMissingTag = false
       ),
       artistParser
     )
   }
+}
+
+class SongTagEmbeddedArtwork(private val artwork: ArtworkField) : EmbeddedArtwork {
+  override val exists: Boolean
+    get() = artwork.exists()
+  override val isUrl: Boolean
+    get() = artwork.isUrl
+  override val isBinary: Boolean
+    get() = artwork.isBinaryData
+  override val data: ByteArray
+    get() = artwork.data
+  override val url: String
+    get() = artwork.url
+  override val pictureType: String
+    get() = artwork.pictureDescription
 }
 
 private const val END_OF_DATE_INDEX = 3
@@ -194,6 +222,8 @@ private class VlcTagInfo private constructor(
     get() = albumArtist.toArtistSort()
   override val composer: String = ""
   override val composerSort: String = ""
+  override val genre: String
+    get() = meta(IMedia.Meta.Genre).orUnknown()
   override val genres: List<String>
     get() = meta(IMedia.Meta.Genre)
       .orUnknown()
@@ -246,6 +276,10 @@ private class VlcTagInfo private constructor(
     get() = meta(IMedia.Meta.ShowName).orEmpty()
   override val actors: String
     get() = meta(IMedia.Meta.Actors).orEmpty()
+  override val fullDescription: String
+    get() = ""
+  override val embeddedArtwork: EmbeddedArtwork
+    get() = VlcEmbeddedArtwork()
 
   override fun close() {
     media.release()
@@ -335,3 +369,18 @@ fun String.toArtistMbid() = ArtistMbid(this)
 fun String.toReleaseMbid() = ReleaseMbid(this)
 fun String.toReleaseGroupMbid() = ReleaseGroupMbid(this)
 fun String.toTrackMbid() = TrackMbid(this)
+
+class VlcEmbeddedArtwork : EmbeddedArtwork{
+  override val exists: Boolean
+    get() = false
+  override val isUrl: Boolean
+    get() = false
+  override val isBinary: Boolean
+    get() = false
+  override val data: ByteArray
+    get() = ByteArray(0)
+  override val url: String
+    get() = ""
+  override val pictureType: String
+    get() = ""
+}

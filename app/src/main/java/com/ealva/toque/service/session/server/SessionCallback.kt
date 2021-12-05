@@ -68,10 +68,7 @@ internal class SessionCallback(
     }
   }
 
-  override fun onPrepare() {
-    LOG._e { it("onPrepare") }
-    emit(SessionControlEvent.Prepare)
-  }
+  override fun onPrepare() = emit(SessionControlEvent.Prepare)
 
   override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
     mediaId?.let { emit(SessionControlEvent.PrepareFromId(it, extras ?: Bundle.EMPTY)) }
@@ -88,10 +85,7 @@ internal class SessionCallback(
       ?: LOG.e { it("onPrepareFromUri null uri") }
   }
 
-  override fun onPlay() {
-    LOG._e { it("onPlay") }
-    emit(SessionControlEvent.Play)
-  }
+  override fun onPlay() = emit(SessionControlEvent.Play)
 
   override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
     mediaId?.let { emit(SessionControlEvent.PlayFromId(it, extras ?: Bundle.EMPTY)) }

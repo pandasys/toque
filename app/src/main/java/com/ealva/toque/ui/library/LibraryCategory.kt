@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,7 +65,7 @@ fun LibraryCategory(
         painter = rememberImagePainter(data = item.icon),
         contentDescription = item.title,
         modifier = Modifier.size(iconSize),
-        tint = LocalContentColor.current
+        tint = Color.White
       )
     }
     Text(

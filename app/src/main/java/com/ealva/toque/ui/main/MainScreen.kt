@@ -40,7 +40,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.common.SwipeableSnackbarHost
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -50,8 +49,6 @@ import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import kotlinx.coroutines.flow.collect
 import kotlin.math.roundToInt
-
-private val LOG by lazyLogger("MainScreen")
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable

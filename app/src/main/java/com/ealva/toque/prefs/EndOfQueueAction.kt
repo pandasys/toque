@@ -22,11 +22,11 @@ import com.ealva.toque.persist.HasConstId
 
 enum class EndOfQueueAction(
   override val id: Int,
-  val shouldGoToNextList: Boolean,
+  val shouldGoToNextCategory: Boolean,
   val shouldShuffle: Boolean,
   @StringRes val titleRes: Int
 ) : HasConstId {
-  PlayNextList(1, true, false,R.string.PlayNextList),
-  ShuffleNextList(2, true, true, R.string.ShuffleNextList),
+  PlayNextList(1, true, false,R.string.PlayNextCategory),
+  ShuffleNextList(2, true, true, R.string.ShuffleNextCategory),
   Stop(3, false, false, R.string.Stop);
 }

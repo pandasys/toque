@@ -23,19 +23,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import com.ealva.toque.R
 import com.ealva.toque.common.Filter
-import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.NamedSongListType
-import com.ealva.toque.db.SongListType
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
+import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -54,13 +52,13 @@ data class LibrarySongsScreen(
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
-    with(serviceBinder) { add(AllSongsViewModel(key, get(), lookup())) }
+    with(serviceBinder) { add(LibrarySongsViewModel(key, get(), lookup(), backstack)) }
   }
 
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-    val viewModel = rememberService<AllSongsViewModel>()
+    val viewModel = rememberService<LibrarySongsViewModel>()
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
@@ -71,17 +69,10 @@ data class LibrarySongsScreen(
         .navigationBarsPadding(bottom = false)
     ) {
       CategoryTitleBar(viewModel.categoryItem)
-      LibraryItemsActions(
+      SongsItemsActions(
         itemCount = songs.value.size,
-        inSelectionMode = selected.value.inSelectionMode,
-        selectedCount = selected.value.selectedCount,
-        play = { viewModel.play() },
-        shuffle = { viewModel.shuffle() },
-        playNext = { viewModel.playNext() },
-        addToUpNext = { viewModel.addToUpNext() },
-        addToPlaylist = { viewModel.addToPlaylist() },
-        selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
-        startSearch = {}
+        selectedItems = selected.value,
+        viewModel = viewModel
       )
       SongItemList(
         list = songs.value,
@@ -93,19 +84,24 @@ data class LibrarySongsScreen(
   }
 }
 
-private class AllSongsViewModel(
+private class LibrarySongsViewModel(
   private val key: ComposeKey,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueModel,
+  backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, dispatcher), ScopedServices.Activated {
+) : BaseSongsViewModel(
+  audioMediaDao,
+  localAudioQueueModel,
+  backstack,
+  dispatcher
+), ScopedServices.Activated {
   private val categories = LibraryCategories()
 
   val categoryItem: LibraryCategories.CategoryItem
     get() = categories[key]
 
-  override val namedSongListType: NamedSongListType =
-    NamedSongListType(fetch(R.string.All), SongListType.All)
+  override val categoryToken: CategoryToken = CategoryToken.All
 
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,

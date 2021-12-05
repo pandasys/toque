@@ -23,7 +23,6 @@ import com.ealva.prefstore.store.Storage
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.SongListType
 import com.ealva.toque.prefs.BaseToquePreferenceStore
 import com.ealva.toque.service.media.EqMode
@@ -39,7 +38,6 @@ interface QueuePrefs : PreferenceStore<QueuePrefs> {
   val lastListName: PreferenceStore.Preference<String, String>
   val lastCategoryId: PreferenceStore.Preference<Long, Long>
   val playbackRate: PreferenceStore.Preference<Float, PlaybackRate>
-  suspend fun setLastList(idList: AudioIdList)
 
   companion object {
     fun make(storage: Storage): QueuePrefs = QueuePrefsImpl(storage)
@@ -63,8 +61,4 @@ private class QueuePrefsImpl(
     sanitize = { playbackRate -> playbackRate.coerceIn(PlaybackRate.RANGE) }
   )
 
-  override suspend fun setLastList(idList: AudioIdList) = edit {
-    it[lastCategoryType] = idList.listType
-    it[lastListName] = idList.listName
-  }
 }

@@ -35,6 +35,9 @@ interface MediaPlayerServiceConnection {
    */
   val mediaController: StateFlow<ToqueMediaController>
 
+  val isBound: Boolean
+  val isNotBound: Boolean
+
   fun bind(): Boolean
   fun unbind()
 
@@ -51,7 +54,9 @@ private class MediaPlayerServiceConnectionImpl(
   private val context: Context
 ) : MediaPlayerServiceConnection {
   private var serviceConnection: ServiceConnection? = null
-  private var isBound: Boolean = false
+  override var isBound: Boolean = false
+  override val isNotBound: Boolean
+    get() = !isBound
 
   override val mediaController = MutableStateFlow<ToqueMediaController>(NullMediaController)
 

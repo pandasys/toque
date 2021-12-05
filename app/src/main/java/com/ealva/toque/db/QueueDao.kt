@@ -99,7 +99,7 @@ private class QueueDaoImpl(
       insertList(queue, queueItems, isShuffled = false)
       insertList(queue, shuffledItems, isShuffled = true)
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun replaceIfQueueUnchanged(
     queue: QueueId,
@@ -126,7 +126,7 @@ private class QueueDaoImpl(
         throw IllegalStateException("Queue has changed since ${lastUpdated.toDateTime()}")
       }
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun addQueueItems(
     queue: QueueId,
@@ -151,16 +151,16 @@ private class QueueDaoImpl(
       }
       true
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun lastUpdatedTime(queue: QueueId): MillisResult = runSuspendCatching {
     db.query { doGetLastUpdatedTime(queue) }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Queryable.doGetLastUpdatedTime(queue: QueueId): Millis = QueueTable
     .select(updatedTime)
     .where { queueId eq queue.value }
-    .sequence { it[updatedTime] }
+    .sequence { cursor -> cursor[updatedTime] }
     .singleOrNull()?.asMillis() ?: throw IllegalStateException("No update time found for $queue")
 
   private fun Transaction.setQueueLastUpdateTime(queue: QueueId, updateTime: Millis) {

@@ -25,13 +25,13 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
-import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -57,15 +57,16 @@ private val LOG by lazyLogger(BaseAlbumsViewModel::class)
 abstract class BaseAlbumsViewModel(
   private val albumDao: AlbumDao,
   protected val backstack: Backstack,
-  private val localAudioQueueModel: LocalAudioQueueModel
+  localAudioQueueModel: LocalAudioQueueModel
 ) : AlbumsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private var requestJob: Job? = null
 
-  override val albumList = MutableStateFlow<List<AlbumsViewModel.AlbumInfo>>(emptyList())
+  override val albumFlow = MutableStateFlow<List<AlbumsViewModel.AlbumInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<AlbumId>()
   override val searchFlow = MutableStateFlow("")
   private val escapedFilterFlow = MutableStateFlow(NoFilter)
+  private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
   override fun setSearch(search: String) {
     searchFlow.value = search
@@ -73,10 +74,6 @@ abstract class BaseAlbumsViewModel(
   }
 
   protected abstract fun goToAlbumSongs(albumId: AlbumId)
-
-  protected abstract suspend fun makeAudioIdList(
-    albumList: List<AlbumsViewModel.AlbumInfo>
-  ): Result<AudioIdList, DaoMessage>
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + Dispatchers.Main)
@@ -105,7 +102,7 @@ abstract class BaseAlbumsViewModel(
   ): Result<List<AlbumDescription>, DaoMessage>
 
   private fun handleAlbumList(list: List<AlbumDescription>) {
-    albumList.value = list.mapTo(ArrayList(list.size)) {
+    albumFlow.value = list.mapTo(ArrayList(list.size)) {
       AlbumsViewModel.AlbumInfo(
         id = it.albumId,
         title = it.albumTitle,
@@ -129,7 +126,7 @@ abstract class BaseAlbumsViewModel(
 
   override fun onServiceInactive() {
     scope.cancel()
-    albumList.value = emptyList()
+    albumFlow.value = emptyList()
   }
 
   override fun toBundle(): StateBundle = StateBundle().apply {
@@ -142,18 +139,41 @@ abstract class BaseAlbumsViewModel(
     }
   }
 
-  fun play() {
-    scope.launch {
-      when (val result = makeAudioIdList(getSelectedAlbums())) {
-        is Ok -> if (localAudioQueueModel.play(result.value).wasExecuted)
-          selectedItems.turnOffSelectionMode()
-        is Err -> LOG._e { it("Error getting media list. %s", result.error) }
-      }
-    }
+  override fun selectAll() = selectedItems.selectAll(getAlbumKeys())
+  private fun getAlbumKeys() = albumFlow.value.mapTo(mutableSetOf()) { it.id }
+  override fun clearSelection() = selectedItems.clearSelection()
+
+  protected abstract suspend fun makeCategoryMediaList(
+    albumList: List<AlbumsViewModel.AlbumInfo>
+  ): Result<CategoryMediaList, DaoMessage>
+
+  private fun offSelectMode() = selectedItems.turnOffSelectionMode()
+
+  private suspend fun getMediaList(): Result<CategoryMediaList, DaoMessage> =
+    makeCategoryMediaList(getSelectedAlbums())
+
+  override fun play() {
+    scope.launch { localQueueOps.doOp(Op.Play, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun shuffle() {
+    scope.launch { localQueueOps.doOp(Op.Shuffle, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun playNext() {
+    scope.launch { localQueueOps.doOp(Op.PlayNext, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun addToUpNext() {
+    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::getMediaList, ::offSelectMode) }
+  }
+
+  override fun addToPlaylist() {
+    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
   }
 
   /** Get selected albums, or all if no selection */
-  private fun getSelectedAlbums() = albumList.value
+  private fun getSelectedAlbums() = albumFlow.value
     .filterIfHasSelection(selectedItems.value) { it.id }
 }
 

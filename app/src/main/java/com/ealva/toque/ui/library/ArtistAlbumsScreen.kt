@@ -18,11 +18,14 @@ package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -34,22 +37,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
-import com.ealva.ealvabrainz.common.AlbumTitle
-import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
+import com.ealva.toque.db.DaoEmptyResult
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.SongListType
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.toErrorIf
+import com.google.accompanist.insets.navigationBarsPadding
+import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -65,7 +70,6 @@ import org.koin.core.component.get
 data class ArtistAlbumsScreen(
   private val artistId: ArtistId,
   private val artistType: ArtistType,
-  private val artistName: ArtistName,
   private val songCount: Int
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
@@ -74,7 +78,6 @@ data class ArtistAlbumsScreen(
         ArtistAlbumsViewModel(
           artistId = artistId,
           artistType = artistType,
-          artistName = artistName,
           albumDao = get(),
           audioMediaDao = get(),
           localAudioQueueModel = lookup(),
@@ -87,20 +90,33 @@ data class ArtistAlbumsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<ArtistAlbumsViewModel>()
-    val albums = viewModel.albumList.collectAsState()
+    val albums = viewModel.albumFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
-    AlbumsList(
-      list = albums.value,
-      selectedItems = selected.value,
-      itemClicked = { viewModel.itemClicked(it) },
-      itemLongClicked = { viewModel.itemLongClicked(it) },
-      header = {
-        AllArtistSongsHeader(
-          artistType = artistType,
-          songCount = songCount,
-          doAllSongsSelected = { viewModel.goToArtistSongs() })
-      }
-    )
+
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .statusBarsPadding()
+        .navigationBarsPadding(bottom = false)
+    ) {
+      LibraryItemsActions(
+        itemCount = albums.value.size,
+        selectedItems = selected.value,
+        viewModel = viewModel
+      )
+      AlbumsList(
+        list = albums.value,
+        selectedItems = selected.value,
+        itemClicked = { viewModel.itemClicked(it) },
+        itemLongClicked = { viewModel.itemLongClicked(it) },
+        header = {
+          AllArtistSongsHeader(
+            artistType = artistType,
+            songCount = songCount,
+            doAllSongsSelected = { viewModel.goToArtistSongs() })
+        }
+      )
+    }
   }
 }
 
@@ -114,20 +130,21 @@ private fun AllArtistSongsHeader(
   ListItem(
     modifier = Modifier
       .fillMaxWidth()
-      .background(Color.Black)
       .clickable(onClick = { doAllSongsSelected() }),
     icon = {
       Icon(
         painter = rememberImagePainter(data = artistType.typeIcon),
         contentDescription = stringResource(id = artistType.allSongsRes),
-        modifier = Modifier.size(40.dp)
+        modifier = Modifier.size(40.dp),
+        tint = LocalContentColor.current
       )
     },
     text = {
       Text(
         text = stringResource(id = artistType.allSongsRes),
         maxLines = 1,
-        overflow = TextOverflow.Ellipsis
+        overflow = TextOverflow.Ellipsis,
+        color = LocalContentColor.current
       )
     },
     secondaryText = {
@@ -136,7 +153,10 @@ private fun AllArtistSongsHeader(
           R.plurals.SongCount,
           songCount,
           songCount,
-        ), maxLines = 1, overflow = TextOverflow.Ellipsis
+        ),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        color = LocalContentColor.current
       )
     },
   )
@@ -145,7 +165,6 @@ private fun AllArtistSongsHeader(
 private class ArtistAlbumsViewModel(
   private val artistId: ArtistId,
   private val artistType: ArtistType,
-  private val artistName: ArtistName,
   albumDao: AlbumDao,
   private val audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueModel,
@@ -157,25 +176,20 @@ private class ArtistAlbumsViewModel(
   ): Result<List<AlbumDescription>, DaoMessage> =
     albumDao.getAllAlbumsFor(artistId, artistType)
 
-  override fun goToAlbumSongs(albumId: AlbumId) {
-    val title = albumList.value
-      .find { it.id == albumId }
-      ?.title ?: AlbumTitle("")
-    backstack.goTo(AlbumSongsForArtistScreen(albumId, artistId, title))
-  }
+  override fun goToAlbumSongs(albumId: AlbumId) =
+    backstack.goTo(AlbumSongsForArtistScreen(albumId, artistId))
 
-  override suspend fun makeAudioIdList(
+  override suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>
-  ): Result<AudioIdList, DaoMessage> {
-    val longList = LongArrayList(512)
-    val title = albumList
-      .onEach { longList.add(it.id.value) }
-      .lastOrNull()
-      ?.title ?: AlbumTitle.UNKNOWN
-    return audioMediaDao
-      .getMediaForAlbums(longList.asAlbumIdList, artistId)
-      .map { mediaIdList -> AudioIdList(mediaIdList, title.value, SongListType.Album) }
-  }
+  ) = audioMediaDao
+    .getMediaForAlbums(
+      albumList
+        .mapTo(LongArrayList(512)) { it.id.value }
+        .asAlbumIdList,
+      artistId
+    )
+    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .map { idList -> CategoryMediaList(idList, CategoryToken(albumList.last().id)) }
 
-  fun goToArtistSongs() = backstack.goTo(ArtistSongsScreen(artistId, artistType, artistName))
+  fun goToArtistSongs() = backstack.goTo(ArtistSongsScreen(artistId, artistType))
 }

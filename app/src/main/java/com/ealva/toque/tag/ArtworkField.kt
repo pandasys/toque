@@ -98,10 +98,12 @@ class ArtworkField(private val artwork: Artwork?) {
   val pictureDescription: String
     get() {
       var desc = ""
-      if (isBinaryData) {
-        desc = PictureTypes.getInstanceOf().getValue(artwork!!.pictureType)
-      } else if (isUrl) {
-        desc = url
+      if (artwork != null) {
+        if (isBinaryData) {
+          desc = PictureTypes.getInstanceOf().getValue(artwork!!.pictureType)
+        } else if (isUrl) {
+          desc = url
+        }
       }
       return if (desc.isEmpty()) "Unspecified" else desc
     }

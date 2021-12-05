@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE")
-
 package com.ealva.toque.persist
 
 import android.os.Parcelable
@@ -36,17 +34,18 @@ inline val Long.asAlbumId: AlbumId get() = AlbumId(this)
 
 @JvmInline
 value class AlbumIdList(val value: LongList) : Iterable<AlbumId> {
-  inline val size: Int
-    get() = value.size
+  inline val size: Int get() = value.size
 
-  inline operator fun plusAssign(genreId: AlbumId) {
+  inline val isNotEmpty: Boolean get() = value.size > 0
+
+  operator fun plusAssign(genreId: AlbumId) {
     value.add(genreId.value)
   }
 
-  inline operator fun get(index: Int): AlbumId = AlbumId(value.getLong(index))
+  operator fun get(index: Int): AlbumId = AlbumId(value.getLong(index))
 
   companion object {
-    inline operator fun invoke(capacity: Int = 16): AlbumIdList =
+    operator fun invoke(capacity: Int = 16): AlbumIdList =
       AlbumIdList(LongArrayList(capacity))
 
     operator fun invoke(albumId: AlbumId): AlbumIdList =

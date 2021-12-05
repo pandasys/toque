@@ -46,7 +46,6 @@ import com.ealva.toque.common.debugRequire
 import com.ealva.toque.common.ensureUiThread
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.moveItem
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
@@ -54,11 +53,8 @@ import com.ealva.toque.db.QueueDao
 import com.ealva.toque.db.QueuePositionState
 import com.ealva.toque.db.QueuePositionStateDao
 import com.ealva.toque.db.QueuePositionStateDaoFactory
-import com.ealva.toque.db.SongListType
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.InstanceId
-import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.DuckAction
@@ -111,7 +107,6 @@ import com.github.michaelbull.result.onFailure
 import it.unimi.dsi.fastutil.longs.LongCollection
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongList
-import it.unimi.dsi.fastutil.longs.LongLists
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongSet
 import kotlinx.coroutines.CoroutineScope
@@ -218,18 +213,18 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   /** Set the rating of the current AudioItem */
   fun setRating(rating: StarRating, allowFileUpdate: Boolean = false)
 
-  /** Add all media in [audioIdList] to the Up Next queue and return the new queue size*/
-  suspend fun addToUpNext(audioIdList: AudioIdList): Result<QueueSize, QueueMessage>
+  /** Add all media in [categoryMediaList] to the Up Next queue and return the new queue size*/
+  suspend fun addToUpNext(categoryMediaList: CategoryMediaList): Result<QueueSize, QueueMessage>
 
   /**
-   * Add all the media in [audioIdList] ot the Up Next queue and maybe play. If [clearUpNext] is
-   * true the queue is cleared before items are added, else the media are added after the current
+   * Add all the media in [categoryMediaList] ot the Up Next queue and maybe play. If [clearUpNext]
+   * is true the queue is cleared before items are added, else the media are added after the current
    * item. If [playNow] is true the first item in the list will be played, moving to the next song
    * if necessary. The [transitionType] determines if/how currently playing media fades into the
    * next media.
    */
   suspend fun playNext(
-    audioIdList: AudioIdList,
+    categoryMediaList: CategoryMediaList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
@@ -239,7 +234,7 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   fun goToQueueItem(instanceId: InstanceId)
 
   /** Same as [playNext] with [ClearQueue] false and [PlayNow] false */
-  suspend fun prepareNext(audioIdList: AudioIdList)
+  suspend fun prepareNext(categoryMediaList: CategoryMediaList)
 
   /** Go to the next logical [RepeatMode] which is then reflected in new state emission  */
   fun nextRepeatMode()
@@ -326,7 +321,6 @@ private class LocalAudioQueueImpl(
   private var playState: PlayState = PlayState.None
   private var positionState = initialState
   private var lastShuffle = prefs.shuffleMode()
-  private var nextPendingList: AudioIdList? = null
   private var nextPendingCategory: CategoryMediaList? = null
 
   override val queueState = MutableStateFlow(makeInitialState())
@@ -499,7 +493,7 @@ private class LocalAudioQueueImpl(
     audioFocusManager.reactionFlow
       .onEach { reaction -> handleFocusReaction(reaction) }
       .catch { cause -> LOG.e(cause) { it("Error in audio focus reaction flow") } }
-      .onCompletion { LOG._e { it("Audio focus reaction flow completed") } }
+      .onCompletion { LOG._i { it("Audio focus reaction flow completed") } }
       .launchIn(scope)
   }
 
@@ -576,7 +570,7 @@ private class LocalAudioQueueImpl(
     prefs.shuffleMode
       .asFlow()
       .onEach { newMode ->
-        if (lastShuffle.shuffleListsDiffers(newMode)) updateNextPendingList()
+        if (lastShuffle.shuffleListsDiffers(newMode)) updateNextPendingCategory()
         if (lastShuffle.shuffleMediaDiffers(newMode)) toggleShuffleMedia(lastShuffle, newMode)
         lastShuffle = newMode
         queueState.update { it.copy(shuffleMode = newMode) }
@@ -604,7 +598,7 @@ private class LocalAudioQueueImpl(
   } else Title.EMPTY
 
   private suspend fun getNextListFirstMediaTitle(): Title = try {
-    val nextList = getNextPendingList()
+    val nextList = getNextPendingCategory()
     if (nextList.idList.isNotEmpty()) {
       when (val result = audioMediaDao.getMediaTitle(nextList.idList[0])) {
         is Ok -> result.value
@@ -663,7 +657,7 @@ private class LocalAudioQueueImpl(
 
   override fun nextList() {
     scope.launch {
-      val nextList = getNextPendingList()
+      val nextList = getNextPendingCategory()
       if (nextList.isNotEmpty) {
         playNext(
           if (shuffle.shuffleMedia().value) nextList.shuffled() else nextList,
@@ -677,7 +671,9 @@ private class LocalAudioQueueImpl(
 
   override fun previousList() {
     scope.launch {
-      val prevList = getPreviousList(prefs.lastCategoryType(), prefs.lastListName())
+      val prevList = getPreviousCategory(
+        CategoryToken(prefs.lastCategoryType(), prefs.lastCategoryId())
+      )
       if (prevList.isNotEmpty) {
         playNext(
           if (shuffle.shuffleMedia().value) prevList.shuffled() else prevList,
@@ -709,9 +705,11 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  override suspend fun addToUpNext(audioIdList: AudioIdList): Result<QueueSize, QueueMessage> {
+  override suspend fun addToUpNext(
+    categoryMediaList: CategoryMediaList
+  ): Result<QueueSize, QueueMessage> {
     return if (upNextQueue.isEmpty()) {
-      playNext(audioIdList, ClearQueue(true), PlayNow(false), Manual)
+      playNext(categoryMediaList, ClearQueue(true), PlayNow(false), Manual)
     } else {
       runSuspendCatching {
         retryQueueChange {
@@ -720,7 +718,7 @@ private class LocalAudioQueueImpl(
 
           val allowDuplicates = AllowDuplicates(appPrefs.allowDuplicates())
 
-          val idList: LongCollection = audioIdList.list
+          val idList: LongCollection = categoryMediaList.list
             .removeDuplicatesIf(remove = !allowDuplicates())
             .removeItemIf(item = prevCurrent.id.value, remove = !allowDuplicates())
 
@@ -753,12 +751,12 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  override suspend fun prepareNext(audioIdList: AudioIdList) {
-    playNext(audioIdList, ClearQueue(false), PlayNow(false), Manual)
+  override suspend fun prepareNext(categoryMediaList: CategoryMediaList) {
+    playNext(categoryMediaList, ClearQueue(false), PlayNow(false), Manual)
   }
 
   override suspend fun playNext(
-    audioIdList: AudioIdList,
+    categoryMediaList: CategoryMediaList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
@@ -770,18 +768,18 @@ private class LocalAudioQueueImpl(
     retryQueueChange {
       val prevCurrentIndex = currentItemIndex
       val prevCurrent = currentItem
-      val firstIsCurrent = audioIdList.isNotEmpty && audioIdList.idList[0] == prevCurrent.id
+      val firstIsCurrent =
+        categoryMediaList.isNotEmpty && categoryMediaList.idList[0] == prevCurrent.id
 
       when {
-        audioIdList.isNotEmpty -> {
+        categoryMediaList.isNotEmpty -> {
           val upNextEmptyOrCleared = upNextQueue.isEmpty() || clearUpNext() || !prevCurrent.isValid
           val allowDuplicates = AllowDuplicates(appPrefs.allowDuplicates())
 
-          val idList: LongCollection = audioIdList.list
+          val idList: LongCollection = categoryMediaList.list
             .removeDuplicatesIf(!allowDuplicates())
             .removeItemIf(prevCurrent.id.value, !allowDuplicates() && !upNextEmptyOrCleared)
 
-          LOG._e { it("clear:%s", upNextEmptyOrCleared) }
           val (newQueue, newShuffled, newIndex) = addItemsToQueues(
             currentQueue = upNextQueue,
             currentShuffled = upNextShuffled,
@@ -809,7 +807,7 @@ private class LocalAudioQueueImpl(
             upNextEmptyOrCleared
           )
 
-          setLastList(audioIdList)
+          setLastList(categoryMediaList)
 
           if (upNextEmptyOrCleared || firstIsCurrent) {
             transitionToNext(prevCurrent, currentItem, select(transitionType), playNow, Millis(0))
@@ -1091,14 +1089,14 @@ private class LocalAudioQueueImpl(
           success = true
         } else {
           val endOfQueueAction = appPrefs.endOfQueueAction()
-          if (endOfQueueAction.shouldGoToNextList) {
+          if (endOfQueueAction.shouldGoToNextCategory) {
             // determine next list and play it, clearing the queue
             val currentListType = prefs.lastCategoryType()
-            val currentListName = prefs.lastListName()
-            val nextList = getNextPendingList()
+            val currentListName = prefs.lastCategoryId
+            val nextList = getNextPendingCategory()
             if (nextList.isNotEmpty) {
-              val shouldShuffle = currentListType != nextList.listType &&
-                currentListName != nextList.listName &&
+              val shouldShuffle = currentListType != nextList.categoryType &&
+                currentListName != nextList.categoryId &&
                 endOfQueueAction.shouldShuffle
               playNext(
                 if (shouldShuffle) nextList.shuffled() else nextList,
@@ -1115,97 +1113,22 @@ private class LocalAudioQueueImpl(
     return success
   }
 
-  private suspend fun getNextList(
-    currentType: SongListType,
-    currentName: String
-  ): AudioIdList {
-    val countResult = audioMediaDao.getCountAllAudio()
-    return if (countResult is Ok && countResult.value > 0) {
-      var nextList = if (shuffle.shuffleLists().value) {
-        SongListType.getRandomType().getRandomList(audioMediaDao)
-      } else {
-        currentType.getNextList(audioMediaDao, currentName)
-      }
-      while (nextList.isEmpty) {
-        nextList = nextList.listType.getNextList(audioMediaDao, nextList.listName)
-        if (currentType == nextList.listType && currentName == nextList.listName) {
-          // looped around and didn't find anything, quit and return an empty list
-          nextList = nextList.copy(idList = MediaIdList.EMPTY_LIST)
-          break
-        }
-      }
-      nextList
-    } else {
-      AudioIdList.EMPTY_ALL_LIST
-    }
-  }
+  private suspend fun getNextCategory(token: CategoryToken): CategoryMediaList =
+    audioMediaDao.getNextCategory(token, shuffle.shuffleLists())
 
-  private suspend fun getNextCategory(token: CategoryToken): CategoryMediaList {
-    var nextToken = if (shuffle.shuffleLists().value) {
-      token.getRandom(audioMediaDao)
-    } else {
-      token.nextToken(audioMediaDao)
-    }
-    var nextList = CategoryMediaList.EMPTY_ALL_LIST
-    if (nextToken !== CategoryToken.All) {
-      nextList = CategoryMediaList(token.getAllMedia(audioMediaDao), nextToken)
-      while (nextList.isEmpty && nextToken !== CategoryToken.All) {
-        nextToken = nextToken.nextToken(audioMediaDao)
-        nextList = CategoryMediaList(token.getAllMedia(audioMediaDao), nextToken)
-      }
-    }
-    return nextList
-  }
-
-  private suspend fun updateNextPendingList() {
-    nextPendingList = null
-    getNextPendingList()
-  }
-
-  private suspend fun getNextPendingList(): AudioIdList {
-    return nextPendingList ?: getNextList(
-      prefs.lastCategoryType(),
-      prefs.lastListName()
-    ).also { next ->
-      nextPendingList = next
-    }
+  private suspend fun updateNextPendingCategory() {
+    nextPendingCategory = null
+    getNextPendingCategory()
   }
 
   private suspend fun getNextPendingCategory(): CategoryMediaList {
     return nextPendingCategory ?: getNextCategory(
-      CategoryToken(
-        prefs.lastCategoryType(),
-        prefs.lastCategoryId()
-      )
-    ).also { next ->
-      nextPendingCategory = next
-    }
+      CategoryToken(songListType = prefs.lastCategoryType(), instanceId = prefs.lastCategoryId())
+    ).also { next -> nextPendingCategory = next }
   }
 
-  private suspend fun getPreviousList(
-    currentListType: SongListType,
-    currentListName: String
-  ): AudioIdList {
-    val countResult = audioMediaDao.getCountAllAudio()
-    return if (countResult is Ok && countResult.value > 0) {
-      var nextList = if (shuffle.shuffleLists().value) {
-        SongListType.getRandomType().getRandomList(audioMediaDao)
-      } else {
-        currentListType.getPreviousList(audioMediaDao, currentListName)
-      }
-      while (nextList.isEmpty) {
-        nextList = nextList.listType.getPreviousList(audioMediaDao, nextList.listName)
-        if (currentListType == nextList.listType && currentListName == nextList.listName) {
-          // looped around and didn't find anything, quit and return an empty list
-          nextList = nextList.copy(idList = MediaIdList.EMPTY_LIST)
-          break
-        }
-      }
-      nextList
-    } else {
-      AudioIdList.EMPTY_ALL_LIST
-    }
-  }
+  private suspend fun getPreviousCategory(token: CategoryToken): CategoryMediaList =
+    audioMediaDao.getPreviousCategory(token, shuffle.shuffleLists())
 
   private fun doGoToIndex(
     goToIndex: Int,
@@ -1344,7 +1267,7 @@ private class LocalAudioQueueImpl(
       updatePlaybackState(currentItem, currentItemIndex, queue, PlayState.Playing)
       if (event.shouldAutoAdvance()) doNextOrRepeat()
     } else {
-      updatePlaybackState(currentItem, currentItemIndex, queue, PlayState.Paused)
+      updatePlaybackState(PlayState.Paused)
     }
   }
 
@@ -1357,7 +1280,7 @@ private class LocalAudioQueueImpl(
     } else {
       scrobbler.resume(item)
     }
-    updatePlaybackState(currentItem, currentItemIndex, queue, PlayState.Playing)
+    updatePlaybackState(PlayState.Playing)
   }
 
   private suspend fun onPaused(event: PlayableItemEvent.Paused) {
@@ -1376,7 +1299,7 @@ private class LocalAudioQueueImpl(
       playState = PlayState.Stopped
       // TODO unsure our reported position is valid anymore, let's stick with last position for now
 //    updateQueueState(queueState.copy(mediaId = item.id, playbackPosition = event.currentPosition))
-      updatePlaybackState(current, currentItemIndex, queue, PlayState.Stopped)
+      updatePlaybackState(PlayState.Stopped)
     }
   }
 
@@ -1397,6 +1320,10 @@ private class LocalAudioQueueImpl(
     LOG.e { it("Playback error for item %s, %s", item.title.value, item.albumArtist.value) }
     nextSong(PlayNow(playState.isPlaying), Manual)
 //    getNotifier().onError(item) TODO
+  }
+
+  private suspend fun updatePlaybackState(playState: PlayState) {
+    updatePlaybackState(currentItem, currentItemIndex, queue, playState)
   }
 
   private suspend fun updatePlaybackState(
@@ -1501,24 +1428,6 @@ private class LocalAudioQueueImpl(
     return false
   }
 
-  private fun makeIdListLessCurrent(
-    audioIdList: AudioIdList,
-    prevCurrent: PlayableAudioItem
-  ): LongList = if (audioIdList.size == 1 && audioIdList.list.single() == prevCurrent.id.value) {
-    LongLists.EMPTY_LIST
-  } else {
-    audioIdList.list.apply { if (size > 1) rem(prevCurrent.id.value) }
-  }
-
-  private fun makeIdListLessCurrent(
-    list: CategoryMediaList,
-    prevCurrent: PlayableAudioItem
-  ): LongList = if (list.size == 1 && list.list.single() == prevCurrent.id.value) {
-    LongLists.EMPTY_LIST
-  } else {
-    list.list.apply { if (size > 1) rem(prevCurrent.id.value) }
-  }
-
   private fun establishNewQueues(
     newQueue: QueueList,
     newShuffled: QueueList,
@@ -1557,11 +1466,6 @@ private class LocalAudioQueueImpl(
     setSessionQueue(activeQueue)
   }
 
-  private suspend fun setLastList(audioIdList: AudioIdList) {
-    prefs.setLastList(audioIdList)
-    updateNextPendingList()
-  }
-
   private suspend fun setLastList(categoryMediaList: CategoryMediaList) {
     categoryMediaList.token.write { songListType, id ->
       prefs.edit {
@@ -1569,7 +1473,7 @@ private class LocalAudioQueueImpl(
         it[lastCategoryId] = id
       }
     }
-    updateNextPendingList()
+    updateNextPendingCategory()
   }
 
   private suspend fun addItemsToQueues(
@@ -1590,13 +1494,9 @@ private class LocalAudioQueueImpl(
     val newQueueItems =
       itemFactory.makeNewQueueItems(idList, focusRequest, sharedPlayerState)
 
-    LOG._e { it("idList.size:%d", idList.size) }
-
     if (clearAndRemakeQueues) {
-      LOG._e { it("clearAndRemake=%s", clearAndRemakeQueues) }
       // if the queue is empty OR we are supposed to clear the queue, just build new list(s)
       newQueue = newQueueItems
-      LOG._e { it("newQueue.size:%s", newQueue.size) }
       newShuffled = maybeMakeShuffled(shuffleMode, newQueue)
       newIndex = 0
     } else {

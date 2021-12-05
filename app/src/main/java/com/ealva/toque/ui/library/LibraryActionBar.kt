@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -41,7 +42,7 @@ import com.ealva.toque.ui.config.makeScreenConfig
 import com.google.accompanist.insets.LocalWindowInsets
 
 @Composable
-fun LibraryItemsActions(
+fun LibraryActionBar(
   itemCount: Int,
   inSelectionMode: Boolean,
   selectedCount: Int,
@@ -51,10 +52,12 @@ fun LibraryItemsActions(
   addToUpNext: () -> Unit,
   addToPlaylist: () -> Unit,
   startSearch: () -> Unit = {},
-  selectAllOrNone: (Boolean) -> Unit = {}
+  selectAllOrNone: (Boolean) -> Unit = {},
+  selectActions: (@Composable (Dp) -> Unit)? = null,
 ) {
   val config = LocalScreenConfig.current
   val buttonHeight = config.actionBarButtonHeight
+  val enabled = itemCount > 0
   Column(
     modifier = Modifier
       .fillMaxWidth()
@@ -76,44 +79,50 @@ fun LibraryItemsActions(
         drawable = R.drawable.ic_play,
         description = R.string.Play,
         onClick = play,
+        enabled = enabled
       )
       ActionButton(
         buttonHeight = buttonHeight,
         modifier = buttonModifier,
         drawable = R.drawable.ic_shuffle,
         description = R.string.Shuffle,
-        onClick = shuffle
+        onClick = shuffle,
+        enabled = enabled
       )
       ActionButton(
         buttonHeight = buttonHeight,
         modifier = buttonModifier,
         drawable = R.drawable.ic_queue_play_next,
         description = R.string.PlayNext,
-        onClick = playNext
+        onClick = playNext,
+        enabled = enabled
       )
       ActionButton(
         buttonHeight = buttonHeight,
         modifier = buttonModifier,
         drawable = R.drawable.ic_add_to_queue,
         description = R.string.AddToUpNext,
-        onClick = addToUpNext
+        onClick = addToUpNext,
+        enabled = enabled
       )
       ActionButton(
         buttonHeight = buttonHeight,
         modifier = buttonModifier,
         drawable = R.drawable.ic_playlist_add,
         description = R.string.AddToPlaylist,
-        onClick = addToPlaylist
+        onClick = addToPlaylist,
+        enabled = enabled
       )
       ActionButton(
         buttonHeight = buttonHeight,
         modifier = buttonModifier,
         drawable = R.drawable.ic_search,
         description = R.string.Search,
-        onClick = startSearch
+        onClick = startSearch,
+        enabled = enabled
       )
     }
-    if (inSelectionMode) {
+    if (inSelectionMode && enabled) {
       Row(
         modifier = Modifier
           .fillMaxWidth()
@@ -132,14 +141,7 @@ fun LibraryItemsActions(
           maxLines = 1,
           style = MaterialTheme.typography.caption,
         )
-        ActionButton(
-          buttonHeight = 24.dp,
-          modifier = Modifier.height(24.dp),
-          drawable = R.drawable.ic_info,
-          description = R.string.MediaInfo,
-          onClick = { },
-          enabled = selectedCount == 1
-        )
+        if (selectActions != null) selectActions(24.dp)
         Spacer(
           modifier = Modifier.weight(1F)
         )
@@ -164,7 +166,7 @@ private fun LibraryItemsActionRowPreview() {
       LocalWindowInsets.current
     )
   ) {
-    LibraryItemsActions(
+    LibraryActionBar(
       10,
       false,
       0,

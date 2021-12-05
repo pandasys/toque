@@ -128,7 +128,7 @@ object NowPlayingScreenIds {
 data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(LocalAudioQueueModel(lookup(), lookup(), get(AppPrefs.QUALIFIER), get()))
+      add(LocalAudioQueueModel(lookup(), get(AppPrefs.QUALIFIER), get()))
       add(NowPlayingViewModel(lookup(), get(AppPrefs.QUALIFIER)))
     }
   }

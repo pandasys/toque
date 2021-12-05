@@ -23,7 +23,7 @@ import com.ealva.toque.persist.AlbumId
 import kotlinx.coroutines.flow.StateFlow
 import javax.annotation.concurrent.Immutable
 
-interface AlbumsViewModel {
+interface AlbumsViewModel : ActionsViewModel {
   @Immutable
   data class AlbumInfo(
     val id: AlbumId,
@@ -33,7 +33,7 @@ interface AlbumsViewModel {
     val songCount: Int
   )
 
-  val albumList: StateFlow<List<AlbumInfo>>
+  val albumFlow: StateFlow<List<AlbumInfo>>
   val selectedItems: SelectedItemsFlow<AlbumId>
   val searchFlow: StateFlow<String>
 

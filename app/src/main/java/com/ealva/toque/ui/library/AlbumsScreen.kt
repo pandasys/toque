@@ -26,16 +26,18 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
+import com.ealva.toque.db.DaoEmptyResult
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.SongListType
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueModel
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -61,7 +63,7 @@ data class AlbumsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AllAlbumsViewModel>()
-    val albums = viewModel.albumList.collectAsState()
+    val albums = viewModel.albumFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
     Column(
@@ -73,15 +75,8 @@ data class AlbumsScreen(
       CategoryTitleBar(viewModel.categoryItem)
       LibraryItemsActions(
         itemCount = albums.value.size,
-        inSelectionMode = selected.value.inSelectionMode,
-        selectedCount = selected.value.selectedCount,
-        play = { viewModel.play() },
-        shuffle = { /*viewModel.shuffle()*/ },
-        playNext = { /*viewModel.playNext()*/ },
-        addToUpNext = { /*viewModel.addToUpNext()*/ },
-        addToPlaylist = { },
-        selectAllOrNone = { /*all -> if (all) viewModel.selectAll() else viewModel.clearSelection()*/ },
-        startSearch = {}
+        selectedItems = selected.value,
+        viewModel = viewModel
       )
       AlbumsList(
         list = albums.value,
@@ -110,23 +105,16 @@ private class AllAlbumsViewModel(
     filter: Filter
   ): Result<List<AlbumDescription>, DaoMessage> = albumDao.getAllAlbums(filter)
 
-  override fun goToAlbumSongs(albumId: AlbumId) {
-    val title = albumList.value
-      .find { it.id == albumId }
-      ?.title ?: AlbumTitle("")
-    backstack.goTo(AlbumSongsScreen(albumId, title))
-  }
+  override fun goToAlbumSongs(albumId: AlbumId) = backstack.goTo(AlbumSongsScreen(albumId))
 
-  override suspend fun makeAudioIdList(
+  override suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>
-  ): Result<AudioIdList, DaoMessage> {
-    val title = albumList.lastOrNull()?.title ?: AlbumTitle.UNKNOWN
-    return audioMediaDao
-      .getMediaForAlbums(
-        albumList
-          .mapTo(LongArrayList(512)) { it.id.value }
-          .asAlbumIdList
-      )
-      .map { mediaIdList -> AudioIdList(mediaIdList, title.value, SongListType.Album) }
-  }
+  ) = audioMediaDao
+    .getMediaForAlbums(
+      albumList
+        .mapTo(LongArrayList(512)) { it.id.value }
+        .asAlbumIdList
+    )
+    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .map { idList -> CategoryMediaList(idList, CategoryToken(albumList.last().id)) }
 }

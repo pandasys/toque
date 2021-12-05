@@ -25,7 +25,7 @@ import com.ealva.toque.common.ShuffleMedia
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.fetchPlural
 import com.ealva.toque.common.isValidAndUnique
-import com.ealva.toque.db.AudioIdList
+import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.PlaylistDao
 import com.ealva.toque.db.PlaylistIdName
 import com.ealva.toque.log._e
@@ -33,14 +33,10 @@ import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.PlayUpNextAction
-import com.ealva.toque.service.MediaPlayerServiceConnection
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.audio.TransitionType.Manual
-import com.ealva.toque.service.controller.NullMediaController
-import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.ClearQueue
-import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.ui.audio.LocalAudioQueueModel.PromptResult
@@ -55,14 +51,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.regex.Pattern
 
@@ -75,17 +70,20 @@ interface LocalAudioQueueModel {
 
   fun emitNotification(notification: Notification)
 
-  suspend fun play(audioIdList: AudioIdList): PromptResult
-  suspend fun shuffle(audioIdList: AudioIdList): PromptResult
-  fun playNext(audioIdList: AudioIdList)
-  fun addToUpNext(audioIdList: AudioIdList)
+  suspend fun play(mediaList: CategoryMediaList): PromptResult
+  suspend fun shuffle(mediaList: CategoryMediaList): PromptResult
+  fun playNext(mediaList: CategoryMediaList)
+  fun addToUpNext(categoryMediaList: CategoryMediaList)
 
   enum class PromptResult {
     Dismissed,
     Executed;
 
     inline val wasExecuted: Boolean get() = this == Executed
-    inline val wasDismissed: Boolean get() = this == Dismissed
+
+    @Suppress("unused")
+    inline val wasDismissed: Boolean
+      get() = this == Dismissed
   }
 
   suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult
@@ -95,14 +93,12 @@ interface LocalAudioQueueModel {
 
   companion object {
     operator fun invoke(
-      serviceConnection: MediaPlayerServiceConnection,
       mainViewModel: MainViewModel,
       appPrefsSingleton: AppPrefsSingleton,
       playlistDao: PlaylistDao,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): LocalAudioQueueModel =
       LocalAudioQueueModelImpl(
-        serviceConnection,
         mainViewModel,
         appPrefsSingleton,
         playlistDao,
@@ -114,14 +110,12 @@ interface LocalAudioQueueModel {
 private data class PrefsHolder(val appPrefs: AppPrefs? = null)
 
 class LocalAudioQueueModelImpl(
-  private val serviceConnection: MediaPlayerServiceConnection,
   private val mainViewModel: MainViewModel,
   private val appPrefsSingleton: AppPrefsSingleton,
   private val playlistDao: PlaylistDao,
   private val dispatcher: CoroutineDispatcher
 ) : LocalAudioQueueModel, ScopedServices.Registered {
   private lateinit var scope: CoroutineScope
-  private var controllerJob: Job? = null
 
   private val prefsHolder = MutableStateFlow(PrefsHolder())
 
@@ -133,29 +127,32 @@ class LocalAudioQueueModelImpl(
     mainViewModel.notify(notification)
   }
 
-  override suspend fun play(audioIdList: AudioIdList): PromptResult =
-    playOrPrompt(audioIdList, ShuffleMedia(false))
+  override suspend fun play(mediaList: CategoryMediaList): PromptResult =
+    playOrPrompt(mediaList, ShuffleMedia(false))
 
-  override suspend fun shuffle(audioIdList: AudioIdList): PromptResult =
-    playOrPrompt(audioIdList, ShuffleMedia(true))
+  override suspend fun shuffle(mediaList: CategoryMediaList): PromptResult =
+    playOrPrompt(mediaList, ShuffleMedia(true))
 
-  private suspend fun playOrPrompt(audioIdList: AudioIdList, shuffle: ShuffleMedia): PromptResult {
+  private suspend fun playOrPrompt(
+    mediaList: CategoryMediaList,
+    shuffle: ShuffleMedia
+  ): PromptResult {
     val result = CompletableDeferred<PromptResult>()
-    val idList = if (shuffle.value) audioIdList.shuffled() else audioIdList
+    val idList = if (shuffle.value) mediaList.shuffled() else mediaList
     fun onDismiss() {
       clearPrompt()
       result.complete(PromptResult.Dismissed)
     }
 
     fun playNext(
-      idList: AudioIdList,
+      mediaList: CategoryMediaList,
       clearQueue: ClearQueue,
       result: CompletableDeferred<PromptResult>
     ) {
       clearPrompt()
       try {
         scope.launch {
-          doPlayNext(idList, clearQueue, PlayNow(true))
+          doPlayNext(mediaList, clearQueue, PlayNow(true))
           result.complete(PromptResult.Executed)
         }
       } catch (e: Exception) {
@@ -185,18 +182,18 @@ class LocalAudioQueueModelImpl(
     return result.await()
   }
 
-  override fun playNext(audioIdList: AudioIdList) {
-    scope.launch { doPlayNext(audioIdList, ClearQueue(false), PlayNow(false)) }
+  override fun playNext(mediaList: CategoryMediaList) {
+    scope.launch { doPlayNext(mediaList, ClearQueue(false), PlayNow(false)) }
   }
 
   private suspend fun doPlayNext(
-    audioIdList: AudioIdList,
+    mediaList: CategoryMediaList,
     clear: ClearQueue,
     playNow: PlayNow
   ) {
-    val size = audioIdList.size
+    val size = mediaList.size
     mainViewModel.notify(
-      when (val result = localAudioQueue.value.playNext(audioIdList, clear, playNow, Manual)) {
+      when (val result = localAudioQueue.value.playNext(mediaList, clear, playNow, Manual)) {
         is Ok -> {
           val plural = if (appPrefsSingleton.instance().allowDuplicates() || clear()) {
             R.plurals.AddedToUpNextNewSize
@@ -210,11 +207,11 @@ class LocalAudioQueueModelImpl(
     )
   }
 
-  override fun addToUpNext(audioIdList: AudioIdList) {
+  override fun addToUpNext(categoryMediaList: CategoryMediaList) {
     scope.launch {
-      val quantity = audioIdList.size
+      val quantity = categoryMediaList.size
       mainViewModel.notify(
-        when (val result = localAudioQueue.value.addToUpNext(audioIdList)) {
+        when (val result = localAudioQueue.value.addToUpNext(categoryMediaList)) {
           is Ok -> Notification(
             fetchPlural(R.plurals.AddedToUpNextNewSize, quantity, result.value.value)
           )
@@ -302,7 +299,6 @@ class LocalAudioQueueModelImpl(
     name.isValidAndUnique(playlists.asSequence().map { it.name })
 
   private fun addAudioToPlaylist(mediaIdList: MediaIdList, playlistIdName: PlaylistIdName) {
-    LOG._e { it("addPlaylist audioList.size:%d playlistId=%s", mediaIdList.size, playlistIdName) }
     scope.launch {
       when (val result = playlistDao.addToUserPlaylist(playlistIdName.id, mediaIdList)) {
         is Ok -> LOG._e { it("Added %d to %s", result.value, playlistIdName.name.value) }
@@ -312,7 +308,6 @@ class LocalAudioQueueModelImpl(
   }
 
   private fun createPlaylistWithAudio(mediaIdList: MediaIdList, playlistName: PlaylistName) {
-    LOG._e { it("createPlaylist audioList.size:%d name=%s", mediaIdList.size, playlistName) }
     scope.launch {
       when (val result = playlistDao.createUserPlaylist(playlistName, mediaIdList)) {
         is Ok -> LOG._e { it("created %s", result.value) }
@@ -332,20 +327,9 @@ class LocalAudioQueueModelImpl(
         .launchIn(scope)
     }
 
-    controllerJob = serviceConnection.mediaController
-      .onEach { controller -> handleControllerChange(controller) }
-      .onCompletion { handleControllerChange(NullMediaController) }
+    mainViewModel.currentQueue
+      .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)
-  }
-
-  private fun handleControllerChange(controller: ToqueMediaController) {
-    if (controller !== NullMediaController) {
-      controller.currentQueue
-        .onEach { queue -> handleQueueChange(queue) }
-        .launchIn(scope)
-    } else {
-      handleQueueChange(NullPlayableMediaQueue)
-    }
   }
 
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) = when (queue) {
@@ -370,9 +354,6 @@ class LocalAudioQueueModelImpl(
   }
 
   override fun onServiceUnregistered() {
-    controllerJob?.cancel()
-    controllerJob = null
-    handleControllerChange(NullMediaController)
     scope.cancel()
   }
 }

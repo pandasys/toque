@@ -17,9 +17,6 @@
 package com.ealva.toque.ui.main
 
 import android.Manifest.permission.READ_EXTERNAL_STORAGE
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,31 +54,27 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import kotlinx.parcelize.Parcelize
 
-private val LOG by lazyLogger(SplashScreen::class)
-
 @Immutable
 @Parcelize
 data class SplashScreen(private val noArg: String = "") : ComposeKey() {
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-    val activity = rememberService<MainActivity>()
-    Splash(activity, startSettings(activity))
-  }
-
-  @Composable
-  private fun startSettings(activity: MainActivity): () -> Unit = {
-    activity.startActivity(
-      Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.fromParts("package", activity.packageName, null)
-      )
+    val mainViewModel = rememberService<MainViewModel>()
+    Splash(
+      exit = { mainViewModel.exit() },
+      navigateToSettingsScreen = { mainViewModel.startAppSettingsActivity() },
+      gainedPermission = { mainViewModel.gainedReadExternalPermission() }
     )
   }
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
+fun Splash(
+  exit: () -> Unit,
+  navigateToSettingsScreen: () -> Unit,
+  gainedPermission: () -> Unit
+) {
   var userExit by rememberSaveable { mutableStateOf(false) }
   val readExternalState = rememberPermissionState(READ_EXTERNAL_STORAGE)
   val imageSize = if (LocalScreenConfig.current.inPortrait) 200.dp else 120.dp
@@ -111,7 +104,7 @@ fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
       permissionState = readExternalState,
       permissionNotGrantedContent = {
         if (userExit) {
-          activity.finishAfterTransition()
+          exit()
         } else {
           Rationale(
             userExit = { userExit = true },
@@ -121,7 +114,7 @@ fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
       },
       permissionNotAvailableContent = {
         if (userExit) {
-          activity.finishAfterTransition()
+          exit()
         } else {
           PermissionDenied(
             userExit = { userExit = true },
@@ -130,7 +123,7 @@ fun Splash(activity: MainActivity, navigateToSettingsScreen: () -> Unit) {
         }
       }
     ) {
-      activity.gainedReadExternalPermission()
+      gainedPermission()
     }
   }
 }

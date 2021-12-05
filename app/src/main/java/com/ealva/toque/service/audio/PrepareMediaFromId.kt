@@ -21,11 +21,10 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Limit
-import com.ealva.toque.db.AudioIdList
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.NamedSongListType
-import com.ealva.toque.db.SongListType
 import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -47,15 +46,14 @@ class PrepareMediaFromId(
   private val audioMediaDao: AudioMediaDao
 ) : OnMediaType<Unit> {
   override suspend fun onMedia(mediaId: MediaId, extras: Bundle, limit: Limit) =
-    localAudioQueue.prepareNext(AudioIdList(MediaIdList(mediaId), NamedSongListType.EXTERNAL_ALL))
+    localAudioQueue.prepareNext(CategoryMediaList(mediaId, CategoryToken.External))
 
   override suspend fun onArtist(artistId: ArtistId, extras: Bundle, limit: Limit) {
-    when (val result = binding<AudioIdList, DaoMessage> {
-      val artistName = audioMediaDao.artistDao.getArtistName(artistId).bind()
+    when (val result = binding<CategoryMediaList, DaoMessage> {
       val list = audioMediaDao.getArtistAudio(artistId, limit = limit).bind()
-      AudioIdList(
+      CategoryMediaList(
         MediaIdList(list.mapTo(LongArrayList(list.size)) { it.mediaId.value }),
-        NamedSongListType(artistName.value, SongListType.Artist)
+        CategoryToken(artistId)
       )
     }) {
       is Ok -> localAudioQueue.prepareNext(result.value)

@@ -60,6 +60,8 @@ class DaoFailedToInsert(item: Any) : DaoStringMessage(R.string.FailedToInsertIte
 class DaoFailedToUpdate(item: Any) : DaoStringMessage(R.string.FailedToUpdateItem, item)
 class DaoFailedToDelete(item: Any) : DaoStringMessage(R.string.FailedToDeleteItem, item)
 
+object DaoEmptyResult : DaoStringMessage(R.string.EmptyResult)
+
 object DaoNotImplemented : DaoMessage() {
-  override fun toString(): String = fetch(R.string.NotImplemented)
+  override fun toString(): String = "Not Implemented"
 }

@@ -110,7 +110,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     preset: EqPreset,
     associations: List<PresetAssociation>
   ): BoolResult = runSuspendCatching { db.transaction { doMakeAssociations(preset, associations) } }
-    .mapError { DaoExceptionMessage(it) }
+    .mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Transaction.doMakeAssociations(
     preset: EqPreset,
@@ -127,13 +127,13 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     runSuspendCatching {
       db.query {
         QUERY_ASSOCIATIONS
-          .sequence(bind = {
-            it[BIND_PRESET_ID] = preset.id.value
-            it[BIND_IS_SYSTEM] = preset.isSystemPreset
-          }) { PresetAssociation.reify(it[associationType], it[associationId]) }
+          .sequence(bind = { bindings ->
+            bindings[BIND_PRESET_ID] = preset.id.value
+            bindings[BIND_IS_SYSTEM] = preset.isSystemPreset
+          }) { cursor -> PresetAssociation.reify(cursor[associationType], cursor[associationId]) }
           .toList()
       }
-    }.mapError { DaoExceptionMessage(it) }
+    }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getPreferredId(
     mediaId: MediaId,
@@ -143,14 +143,14 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
   ): DaoResult<EqPresetId> = runSuspendCatching {
     db.query {
       QUERY_DEFAULT
-        .sequence(bind = {
-          it[BIND_MEDIA_ID] = mediaId.value
-          it[BIND_ALBUM_ID] = albumId.value
-          it[BIND_ROUTE_ID] = route.longId
-        }) { EqPresetId(it[presetId]) }
+        .sequence(bind = { bindings ->
+          bindings[BIND_MEDIA_ID] = mediaId.value
+          bindings[BIND_ALBUM_ID] = albumId.value
+          bindings[BIND_ROUTE_ID] = route.longId
+        }) { cursor -> EqPresetId(cursor[presetId]) }
         .singleOrNull() ?: defaultValue
     }
-  }.mapError { DaoExceptionMessage(it) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Transaction.deletePresetAssociations(id: EqPresetId) =
     DELETE_PRESET.delete { it[BIND_PRESET_ID] = id.value }
@@ -179,7 +179,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
 
   override suspend fun setAsDefault(preset: EqPreset): BoolResult =
     runSuspendCatching { db.transaction { doSetAsDefault(preset) } }
-      .mapError { DaoExceptionMessage(it) }
+      .mapError { cause -> DaoExceptionMessage(cause) }
       .andThen { if (it > 0) Ok(true) else Err(DaoFailedToInsert("$preset")) }
 
   private fun Transaction.doSetAsDefault(preset: EqPreset): Long {

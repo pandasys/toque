@@ -74,6 +74,8 @@ interface SelectedItems<E : Parcelable> : Parcelable {
 
   val selectedCount: Int
 
+  fun single(): E
+
   companion object {
     operator fun <E : Parcelable> invoke(keySet: Set<E> = emptySet()): SelectedItems<E> =
       SelectedItemsImpl(keySet = keySet, inSelectionMode = keySet.isNotEmpty())
@@ -146,6 +148,7 @@ private class SelectedItemsImpl<E : Parcelable>(
   override val selectedCount: Int
     get() = keySet.size
 
+  override fun single(): E = keySet.single()
 }
 
 @Suppress("FunctionName")
@@ -208,3 +211,5 @@ inline val <E : Parcelable> MutableSelectedItemsFlow<E>.inSelectionMode: Boolean
 fun <E : Parcelable> MutableSelectedItemsFlow<E>.selectAll(keySet: Set<E>) {
   value = SelectedItems(keySet)
 }
+
+inline val <E : Parcelable> SelectedItemsFlow<E>.selectedCount: Int get() = value.selectedCount

@@ -41,7 +41,4 @@ inline val String?.asPlaylistName: PlaylistName get() =
 inline val PlaylistName.isValid: Boolean get() = value.isNotBlank()
 
 fun PlaylistName.isValidAndUnique(list: Sequence<PlaylistName>): Boolean =
-  isValid && list.none { element ->
-    LOG._e { it("element:%s this:%s", element, this) }
-    element.equalsIgnoreCase(this)
-  }
+  isValid && list.none { element -> element.equalsIgnoreCase(this) }
