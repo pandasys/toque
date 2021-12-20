@@ -22,7 +22,11 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
-import com.ealva.toque.log._e
+import com.ealva.toque.db.PlaylistDaoEvent.PlaylistCreated
+import com.ealva.toque.db.PlaylistDaoEvent.PlaylistUpdated
+import com.ealva.toque.db.smart.SmartPlaylist
+import com.ealva.toque.db.smart.SmartPlaylistDao
+import com.ealva.toque.db.smart.SmartPlaylistTable
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.asPlaylistId
@@ -31,6 +35,7 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.Expression
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.count
 import com.ealva.welite.db.expr.eq
@@ -39,6 +44,7 @@ import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.statements.insertValues
+import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.all
@@ -50,11 +56,21 @@ import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.orderByRandom
 import com.ealva.welite.db.table.select
+import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
+import com.ealva.welite.db.view.existingView
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.onSuccess
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 
 private val LOG by lazyLogger(PlaylistDao::class)
 
@@ -70,13 +86,29 @@ data class PlaylistDescription(
   val songCount: Long
 )
 
+
+sealed interface PlaylistDaoEvent {
+  data class PlaylistCreated(val playlistId: PlaylistId) : PlaylistDaoEvent
+  data class PlaylistUpdated(val playlistId: PlaylistId) : PlaylistDaoEvent
+  data class PlaylistDeleted(val playlistId: PlaylistId) : PlaylistDaoEvent
+}
+
 interface PlaylistDao {
+  val playlistDaoEvents: SharedFlow<PlaylistDaoEvent>
+
   suspend fun getUserPlaylistNames(): Result<List<PlaylistIdName>, DaoMessage>
+  suspend fun getAllPlaylistNames(): Result<List<PlaylistName>, DaoMessage>
 
   suspend fun createUserPlaylist(
     name: PlaylistName,
     mediaIdList: MediaIdList
   ): Result<PlaylistIdName, DaoMessage>
+
+  suspend fun createOrUpdateSmartPlaylist(
+    smartPlaylist: SmartPlaylist
+  ): Result<SmartPlaylist, DaoMessage>
+
+  suspend fun getSmartPlaylist(playlistId: PlaylistId): Result<SmartPlaylist, DaoMessage>
 
   suspend fun addToUserPlaylist(
     id: PlaylistId,
@@ -85,6 +117,8 @@ interface PlaylistDao {
 
   suspend fun getAllPlaylists(): Result<List<PlaylistDescription>, DaoMessage>
 
+  fun Queryable.getPlaylistName(playlistId: PlaylistId, type: PlayListType): PlaylistName
+
   suspend fun getNext(playlistId: PlaylistId): Result<PlaylistId, DaoMessage>
   suspend fun getPrevious(playlistId: PlaylistId): Result<PlaylistId, DaoMessage>
   suspend fun getMin(): Result<PlaylistId, DaoMessage>
@@ -92,11 +126,26 @@ interface PlaylistDao {
   suspend fun getRandom(): Result<PlaylistId, DaoMessage>
 
   companion object {
-    operator fun invoke(db: Database): PlaylistDao = PlaylistDaoImpl(db)
+    operator fun invoke(
+      db: Database,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): PlaylistDao = PlaylistDaoImpl(db, dispatcher)
   }
 }
 
-private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
+private class PlaylistDaoImpl(
+  private val db: Database,
+  dispatcher: CoroutineDispatcher
+) : PlaylistDao {
+  private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val smartPlaylistDao: SmartPlaylistDao = SmartPlaylistDao(db)
+
+  override val playlistDaoEvents = MutableSharedFlow<PlaylistDaoEvent>()
+
+  private fun emit(event: PlaylistDaoEvent) {
+    scope.launch { playlistDaoEvents.emit(event) }
+  }
+
   override suspend fun getUserPlaylistNames(): Result<List<PlaylistIdName>, DaoMessage> =
     runSuspendCatching {
       db.query {
@@ -108,6 +157,17 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
           .toList()
       }
     }.mapError { cause -> DaoExceptionMessage(cause) }
+
+  override suspend fun getAllPlaylistNames(): Result<List<PlaylistName>, DaoMessage> =
+    runSuspendCatching {
+      db.query {
+        PlayListTable.select { playListName }
+          .all()
+          .sequence { cursor -> cursor[playListName].asPlaylistName }
+          .toList()
+      }
+    }
+      .mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun createUserPlaylist(
     name: PlaylistName,
@@ -126,14 +186,69 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
       } else throw IllegalStateException("Could not create $name")
       PlaylistIdName(playlistId, name)
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
+    .mapError { cause -> DaoExceptionMessage(cause) }
+    .onSuccess { playlistIdName -> emit(PlaylistCreated(playlistId = playlistIdName.id)) }
+
+  override suspend fun createOrUpdateSmartPlaylist(
+    smartPlaylist: SmartPlaylist
+  ): Result<SmartPlaylist, DaoMessage> = runSuspendCatching {
+    db.transaction {
+      if (smartPlaylist.id.value < 1 || !playlistExists(smartPlaylist.id)) {
+        with(smartPlaylistDao) { createPlaylist(createRulesPlaylist(smartPlaylist)) }
+      } else {
+        updatePlaylistTime(smartPlaylist.id, Millis.currentTime())
+        with(smartPlaylistDao) { updatePlaylist(smartPlaylist) }
+      }
+    }
+  }.mapError { cause ->
+    DaoExceptionMessage(cause)
+  }.onSuccess { result ->
+    emit(if (smartPlaylist.id < 0) PlaylistCreated(result.id) else PlaylistUpdated(result.id))
+  }
+
+  private fun TransactionInProgress.playlistExists(playlistId: PlaylistId): Boolean {
+    return PlayListTable
+      .select { id }
+      .where { id eq playlistId.value }
+      .longForQuery() > 0
+  }
+
+  override suspend fun getSmartPlaylist(playlistId: PlaylistId): Result<SmartPlaylist, DaoMessage> =
+    smartPlaylistDao.getPlaylist(playlistId)
+
+  private fun TransactionInProgress.createRulesPlaylist(
+    playlist: SmartPlaylist
+  ): SmartPlaylist = playlist.copy(
+    id = PlayListTable.insert {
+      it[playListName] = playlist.name.value
+      it[playListType] = PlayListType.Rules.id
+      it[createdTime] = Millis.currentTime().value
+      it[sort] = PlayListType.UserCreated.sortPosition
+    }.asPlaylistId
+  )
+
+  private fun TransactionInProgress.updatePlaylistTime(
+    playlistId: PlaylistId,
+    updateTime: Millis
+  ): Long = PlayListTable
+    .updateColumns { it[updatedTime] = updateTime.value }
+    .where { id eq playlistId.value }
+    .update()
 
   override suspend fun addToUserPlaylist(
     id: PlaylistId,
     mediaIdList: MediaIdList
-  ): Result<Long, DaoMessage> = runSuspendCatching {
-    db.transaction { doAddMediaToPlaylist(mediaIdList, id, getNextSortValue(id)) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  ): Result<Long, DaoMessage> =
+    runSuspendCatching {
+      db.transaction {
+        doAddMediaToPlaylist(mediaIdList, id, getNextSortValue(id))
+        updatePlaylistTime(id, Millis.currentTime())
+      }
+    }
+      .mapError { cause -> DaoExceptionMessage(cause) }
+      .onSuccess { emit(PlaylistUpdated(id)) }
+
 
   override suspend fun getAllPlaylists(): Result<List<PlaylistDescription>, DaoMessage> =
     runSuspendCatching {
@@ -151,7 +266,6 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
               listOf(PlayListTable.id, PlayListTable.playListName, songCountColumn)
             }
             .where { PlayListTable.playListType eq PlayListType.UserCreated.id }
-            .orderByAsc { PlayListTable.playListName }
             .groupBy { PlayListTable.playListName }
             .sequence { cursor ->
               PlaylistDescription(
@@ -162,9 +276,57 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
               )
             }
             .forEach { add(it) }
+
+          PlayListTable
+            .join(
+              SmartPlaylistTable,
+              JoinType.INNER,
+              PlayListTable.id,
+              SmartPlaylistTable.smartId
+            )
+            .selects {
+              listOf(PlayListTable.id, PlayListTable.playListName, SmartPlaylistTable.smartName)
+            }
+            .where { PlayListTable.playListType eq PlayListType.Rules.id }
+            .sequence { cursor ->
+              SmartPlaylistDescription(
+                PlaylistId(cursor[PlayListTable.id]),
+                cursor[PlayListTable.playListName].asPlaylistName,
+                cursor[SmartPlaylistTable.smartName]
+              )
+            }
+            .map { smart -> getSmartPlaylistSongCount(smart) }
+            .forEach { add(it) }
         }
       }
     }.mapError { cause -> DaoExceptionMessage(cause) }
+
+  private fun Queryable.getSmartPlaylistSongCount(
+    smart: SmartPlaylistDescription
+  ): PlaylistDescription {
+    val view = existingView(smart.viewName)
+    val viewId = view.column(MediaTable.id, MediaTable.id.name)
+
+    return PlaylistDescription(
+      id = smart.id,
+      name = smart.name,
+      type = PlayListType.Rules,
+      songCount = view
+        .join(MediaTable, JoinType.INNER, viewId, MediaTable.id)
+        .selectCount()
+        .longForQuery()
+    )
+  }
+
+  override fun Queryable.getPlaylistName(
+    playlistId: PlaylistId,
+    type: PlayListType
+  ): PlaylistName = PlayListTable
+    .select(PlayListTable.playListName)
+    .where { (id eq playlistId.value) and (playListType eq type.id) }
+    .sequence { it[playListName] }
+    .single()
+    .asPlaylistName
 
   override suspend fun getNext(playlistId: PlaylistId) = runSuspendCatching {
     db.query {
@@ -242,6 +404,10 @@ private class PlaylistDaoImpl(private val db: Database) : PlaylistDao {
         LOG.e { it("Failed to insert %s %s sort:%d", playlistId, mediaId, sortValue - 1) }
       }
     }
+    PlayListTable
+      .updateColumns { it[updatedTime] = System.currentTimeMillis() }
+      .where { id eq playlistId.value }
+      .update()
     return count
   }
 
@@ -267,3 +433,10 @@ private val SELECT_PLAYLIST_FROM_BIND_ID: Expression<String> = AlbumTable
   .select(PlayListTable.playListName)
   .where { id eq BIND_PLAYLIST_ID }
   .asExpression()
+
+data class SmartPlaylistDescription(
+  val id: PlaylistId,
+  val name: PlaylistName,
+  val viewName: String
+)
+

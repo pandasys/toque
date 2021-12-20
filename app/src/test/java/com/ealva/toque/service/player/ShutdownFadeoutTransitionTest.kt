@@ -24,6 +24,7 @@ import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -48,7 +49,7 @@ class ShutdownFadeoutTransitionTest {
   }
 
   @Test
-  fun isPlaying() = run {
+  fun isPlaying() {
     player._isPlaying = true
     expect(transition.isPlaying).toBe(false) // shouldn't ask the player, always true
   }
@@ -62,21 +63,27 @@ class ShutdownFadeoutTransitionTest {
   @Test
   fun accept() {
     expect(transition.accept(PlayImmediateTransition())).toBe(true)
-    expect(transition.accept(
-      FadeInTransition(
-        Millis(0), false
-      ))).toBe(true)
-    expect(transition.accept(
-      ShutdownFadeOutTransition(
-        Millis(0)
-      ))).toBe(false)
+    expect(
+      transition.accept(
+        FadeInTransition(
+          Millis(0), false
+        )
+      )
+    ).toBe(true)
+    expect(
+      transition.accept(
+        ShutdownFadeOutTransition(
+          Millis(0)
+        )
+      )
+    ).toBe(false)
     expect(transition.accept(ShutdownImmediateTransition())).toBe(true)
     expect(transition.accept(PauseImmediateTransition())).toBe(false)
     expect(transition.accept(PauseFadeOutTransition(Millis(0)))).toBe(false)
   }
 
   @Test
-  fun execute() = coroutineRule.runBlockingTest {
+  fun execute() = runTest {
     // given
     player._volume = Volume.MAX
     player._isPlaying = true
@@ -100,7 +107,7 @@ class ShutdownFadeoutTransitionTest {
   }
 
   @Test
-  fun cancel() = coroutineRule.runBlockingTest {
+  fun cancel() = runTest {
     transition.setCancelled()
     transition.execute()
     player.verifyZeroInteractions()

@@ -17,13 +17,7 @@
 package com.ealva.toque.common
 
 import android.os.Parcelable
-import com.ealva.ealvabrainz.common.ComposerName
 import kotlinx.parcelize.Parcelize
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
-
-private val LOG by lazyLogger(PlaylistName::class)
 
 @Parcelize
 @JvmInline
@@ -35,8 +29,7 @@ value class PlaylistName(val value: String) : Parcelable {
   }
 }
 
-inline val String?.asPlaylistName: PlaylistName get() =
-  PlaylistName(this?.trim() ?: "")
+inline val String?.asPlaylistName: PlaylistName get() = PlaylistName(this?.trim() ?: "")
 
 inline val PlaylistName.isValid: Boolean get() = value.isNotBlank()
 

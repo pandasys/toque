@@ -16,7 +16,7 @@
 
 @file:Suppress("NOTHING_TO_INLINE")
 
-package com.ealva.toque.service.media
+package com.ealva.toque.common
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

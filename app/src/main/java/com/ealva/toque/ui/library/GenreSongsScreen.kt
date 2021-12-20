@@ -28,7 +28,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.persist.GenreId
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -85,7 +85,7 @@ data class GenreSongsScreen(
 private class GenreSongsViewModel(
   private val genreId: GenreId,
   audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),

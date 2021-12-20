@@ -28,7 +28,8 @@ import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.test.shared.CoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.test.TestCoroutineScope
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -54,7 +55,7 @@ class VlcMediaTest {
   private lateinit var appCtx: Context
   private lateinit var appPrefsFile: File
   private lateinit var vlcPrefsFile: File
-  private lateinit var dataStoreScope: TestCoroutineScope
+  private lateinit var dataStoreScope: TestScope
   private lateinit var appPrefsSingleton: AppPrefsSingleton
   private lateinit var vlcPrefsSingleton: LibVlcPrefsSingleton
   private lateinit var vlcSingleton: LibVlcSingleton
@@ -64,7 +65,7 @@ class VlcMediaTest {
   fun setup() {
     println("setup")
     appCtx = ApplicationProvider.getApplicationContext()
-    dataStoreScope = TestCoroutineScope(coroutineRule.testDispatcher + Job())
+    dataStoreScope = TestScope(coroutineRule.testDispatcher + Job())
     appPrefsFile = tempFolder.newFile("app_prefs.preferences_pb")
     vlcPrefsFile = tempFolder.newFile("vlc_prefs.preferences_pb")
 
@@ -95,8 +96,7 @@ class VlcMediaTest {
   }
 
   @Test
-  fun testMakeAudioMedia() = coroutineRule.runBlockingTest {
-//    val libVlc: LibVlc = vlcSingleton.instance()
+  fun testMakeAudioMedia() = //    val libVlc: LibVlc = vlcSingleton.instance()
 //    val dir = appCtx.getExternalFilesDir(DIRECTORY_MUSIC)
 //    val file = File(dir, fileName)
 //    expect(file.exists()).toBe(true)
@@ -114,5 +114,42 @@ class VlcMediaTest {
 //      coroutineRule.testDispatcher
 //    )
 //    expect(vlcMedia.uri).toBe(uri)
-  }
+    runTest {
+      //    val libVlc: LibVlc = vlcSingleton.instance()
+//    val dir = appCtx.getExternalFilesDir(DIRECTORY_MUSIC)
+//    val file = File(dir, fileName)
+//    expect(file.exists()).toBe(true)
+//    val uri = Uri.fromFile(file)
+//    val media = libVlc.makeAudioMedia(uri, Millis.ZERO, true, vlcPrefsSingleton.instance())
+//    expect(media.type).toBe(1)
+//    val vlcMedia = VlcMedia(
+//      media,
+//      uri,
+//      MediaId.INVALID,
+//      AlbumId.INVALID,
+//      NullEqPresetSelector,
+//      NullAvPlayerFactory,
+//      appPrefsSingleton.instance(),
+//      coroutineRule.testDispatcher
+//    )
+//    expect(vlcMedia.uri).toBe(uri)
+      //    val libVlc: LibVlc = vlcSingleton.instance()
+//    val dir = appCtx.getExternalFilesDir(DIRECTORY_MUSIC)
+//    val file = File(dir, fileName)
+//    expect(file.exists()).toBe(true)
+//    val uri = Uri.fromFile(file)
+//    val media = libVlc.makeAudioMedia(uri, Millis.ZERO, true, vlcPrefsSingleton.instance())
+//    expect(media.type).toBe(1)
+//    val vlcMedia = VlcMedia(
+//      media,
+//      uri,
+//      MediaId.INVALID,
+//      AlbumId.INVALID,
+//      NullEqPresetSelector,
+//      NullAvPlayerFactory,
+//      appPrefsSingleton.instance(),
+//      coroutineRule.testDispatcher
+//    )
+//    expect(vlcMedia.uri).toBe(uri)
+    }
 }

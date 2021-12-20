@@ -21,12 +21,12 @@ object SdkVersion {
 }
 
 object PluginsVersion {
-  const val AGP = "7.0.3"
-  const val DETEKT = "1.18.1"
-  const val DOKKA = "1.5.31"
-  const val KOTLIN = "1.5.31"
+  const val AGP = "7.0.4"
+  const val DETEKT = "1.19.0"
+  const val DOKKA = "1.6.0"
+  const val KOTLIN = "1.6.10"
   const val PUBLISH = "0.18.0"
-  const val SERIALIZATION = "1.5.31"
+  const val SERIALIZATION = "1.6.10"
   const val VERSIONS = "0.39.0"
 }
 
@@ -35,7 +35,7 @@ object Libs {
   const val DESUGAR = "com.android.tools:desugar_jdk_libs:1.1.5"
 
   object Accompanist {
-    private const val VERSION = "0.20.2"
+    private const val VERSION = "0.20.3"
     const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
     const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
     const val PERMISSIONS = "com.google.accompanist:accompanist-permissions:$VERSION"
@@ -47,7 +47,7 @@ object Libs {
   }
 
   object AndroidX {
-    const val APPCOMPAT = "androidx.appcompat:appcompat:1.3.1"
+    const val APPCOMPAT = "androidx.appcompat:appcompat:1.4.0"
     //const val PALETTE = "androidx.palette:palette:1.0.0"
 
     object Ktx {
@@ -64,7 +64,8 @@ object Libs {
 
     object Compose {
       @Suppress("MemberVisibilityCanBePrivate")
-      const val VERSION = "1.0.5"
+      const val COMPILER_VERSION = "1.1.0-rc02"
+      private const val VERSION = "1.1.0-rc01"
       //const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
       const val UI = "androidx.compose.ui:ui:$VERSION"
       const val MATERIAL = "androidx.compose.material:material:$VERSION"
@@ -92,7 +93,7 @@ object Libs {
       const val RUNNER = "androidx.test:runner:$VERSION"
 
       object Ext {
-        private const val VERSION = "1.1.2"
+        private const val VERSION = "1.1.3"
         const val JUNIT = "androidx.test.ext:junit-ktx:$VERSION"
       }
 
@@ -139,7 +140,7 @@ object Libs {
   }
 
   object Gowtham {
-    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.1.1"
+    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.2.0"
   }
 
   object JUnit {
@@ -148,8 +149,8 @@ object Libs {
   }
 
   object Koin {
-    private const val VERSION = "3.1.3"
-    private const val COMPOSE_VERSION = "3.1.3"
+    private const val VERSION = "3.1.4"
+    private const val COMPOSE_VERSION = "3.1.4"
     const val CORE = "io.insert-koin:koin-core:$VERSION"
     const val ANDROID = "io.insert-koin:koin-android:$VERSION"
     const val COMPOSE = "io.insert-koin:koin-androidx-compose:$COMPOSE_VERSION"
@@ -159,15 +160,15 @@ object Libs {
   }
 
   object Kotlin {
-    private const val VERSION = "1.5.31"
+    private const val VERSION = "1.6.10"
     const val KGP = "org.jetbrains.kotlin:kotlin-gradle-plugin:$VERSION"
-    const val REFLECT = "org.jetbrains.kotlin:kotlin-reflect:$VERSION"
+//    const val REFLECT = "org.jetbrains.kotlin:kotlin-reflect:$VERSION"
 
     // const val STDLIB = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$VERSION"
     // const val EXTENSIONS = "org.jetbrains.kotlin:kotlin-android-extensions:$VERSION"
 
     object Coroutines {
-      private const val VERSION = "1.5.2"
+      private const val VERSION = "1.6.0-RC3"
       const val CORE = "org.jetbrains.kotlinx:kotlinx-coroutines-core:$VERSION"
       const val ANDROID =
         "org.jetbrains.kotlinx:kotlinx-coroutines-android:$VERSION"
@@ -175,14 +176,14 @@ object Libs {
     }
 
     object Serialization {
-      private const val VERSION = "1.3.0"
+      private const val VERSION = "1.3.1"
       const val CORE = "org.jetbrains.kotlinx:kotlinx-serialization-core:$VERSION"
       const val JSON = "org.jetbrains.kotlinx:kotlinx-serialization-json:$VERSION"
     }
   }
 
   object LibVLC {
-    const val ALL = "org.videolan.android:libvlc-all:3.4.5"
+    const val ALL = "org.videolan.android:libvlc-all:3.4.7"
   }
 
   object Phoenix {
@@ -190,7 +191,7 @@ object Libs {
   }
 
   object PreferenceStore {
-    private const val VERSION = "0.10.5-0"
+    private const val VERSION = "0.10.7-0"
     const val STORE = "com.ealva:pref-store:$VERSION"
     const val COMPOSE = "com.ealva:compose-preference:$VERSION"
   }
@@ -202,7 +203,7 @@ object Libs {
   }
 
   object Robolectric {
-    const val ROBOLECTRIC = "org.robolectric:robolectric:4.6.1"
+    const val ROBOLECTRIC = "org.robolectric:robolectric:4.7.3"
   }
 
   object SimpleStack {
@@ -216,6 +217,6 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.2.11-0"
+    const val CORE = "com.ealva:welite-core:0.2.26-0"
   }
 }

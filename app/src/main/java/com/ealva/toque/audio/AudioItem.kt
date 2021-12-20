@@ -20,10 +20,10 @@ import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.Rating
 
 interface AudioItem : HasId {
   override val id: MediaId

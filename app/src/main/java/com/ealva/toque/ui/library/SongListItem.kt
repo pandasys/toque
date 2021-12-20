@@ -40,10 +40,10 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.R
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
-import com.ealva.toque.service.media.Rating
-import com.ealva.toque.service.media.toStarRating
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.theme.toqueColors
 import com.gowtham.ratingbar.RatingBar

@@ -29,10 +29,9 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
-import com.ealva.toque.log._e
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.controller.SessionControlEvent
-import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow

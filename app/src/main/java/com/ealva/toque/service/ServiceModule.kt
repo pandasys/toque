@@ -19,15 +19,12 @@ package com.ealva.toque.service
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.PlayableAudioItemFactory
 import com.ealva.toque.service.player.WakeLockFactory
-import com.ealva.toque.service.scrobble.ScrobblerFactory
 import com.ealva.toque.service.vlc.LibVlcPrefs
-import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
 object ServiceModule {
   val koinModule = module {
     single { WakeLockFactory(powerManager = get()) }
-    single { ScrobblerFactory(androidContext()) }
     single {
       PlayableAudioItemFactory(
         audioMediaDao = get(),

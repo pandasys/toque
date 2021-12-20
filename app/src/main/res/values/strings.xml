@@ -46,6 +46,11 @@
     <item quantity="other">Failed adding %1$d songs to Up Next</item>
   </plurals>
 
+  <plurals name="AddedCountToPlaylist">
+    <item quantity="one">Added %1$d song to %2$s</item>
+    <item quantity="other">Added %1$d songs to %2$s</item>
+  </plurals>
+
   <string name="app_name">Toque</string>
 
   <string name="None">None</string>
@@ -93,10 +98,10 @@
   <string name="FailedToInsertItem">Failed to insert %s</string>
   <string name="FailedToUpdateItem">Failed to update %s</string>
   <string name="FailedToDeleteItem">Failed to delete %s</string>
-  <string name="ShuffleNone">Shuffle none</string>
-  <string name="ShuffleMedia">Shuffle media</string>
-  <string name="ShuffleLists">Shuffle lists</string>
-  <string name="ShuffleMediaAndLists">Shuffle media and lists</string>
+  <string name="ShuffleOff">Shuffle Off</string>
+  <string name="ShuffleMedia">Shuffle Media Only</string>
+  <string name="ShuffleCategories">Shuffle Categories Only</string>
+  <string name="ShuffleMediaAndCategories">Shuffle Media and Categories</string>
   <string name="Duck">Duck</string>
   <string name="Play">Play</string>
   <string name="Pause">Pause</string>
@@ -143,7 +148,6 @@
   <string name="Audio">Audio</string>
   <string name="AudioHeadsetOptions">Audio/Headset/Bluetooth options</string>
   <string name="Social">Social</string>
-  <string name="ScrobbleEtc">Scrobble,…</string>
   <string name="Advanced">Advanced</string>
   <string name="AdvancedSettingsAnd">Advanced settings, reset, and restart</string>
   <string name="Lists">Lists</string>
@@ -187,7 +191,6 @@
   <string name="StartPlayerOnWiredConnection">Start player on wired headset/speaker connection</string>
   <string name="PlayOnBluetoothConnection">Play on Bluetooth Connection</string>
   <string name="StartPlayerOnBluetoothConnection">Start player on Bluetooth connection</string>
-  <string name="SelectScrobbler">Select Scrobbler</string>
   <string name="AlbumArt">Album art</string>
   <string name="ArtistImage">Artist image</string>
   <string name="AllAlbumArtistSongs">All Album Artist Songs</string>
@@ -228,8 +231,63 @@
   <string name="LastPlayed">Last Played</string>
   <string name="Skips">Skips</string>
   <string name="LastSkipped">Last Skipped</string>
-    <string name="Theme">Theme</string>
+  <string name="Last_skipped">Last skipped</string>
+  <string name="Theme">Theme</string>
   <string name="EmptyResult">Empty Result</string>
-    <string name="DateAdded">Date Added</string>
+  <string name="DateAdded">Date Added</string>
   <string name="EmbeddedArtwork">Embedded Artwork</string>
+  <string name="MediaID">Media ID</string>
+  <string name="AlbumID">Album ID</string>
+  <string name="ArtistID">Artist ID</string>
+  <string name="EqualizerOff">Equalizer Off</string>
+  <string name="EqualizerOn">Equalizer On</string>
+  <string name="contains">contains</string>
+  <string name="does_not_contain">does not contain</string>
+  <string name="is_">is</string>
+  <string name="ends_with">ends with</string>
+  <string name="begins_with">begins with</string>
+  <string name="is_not">is not</string>
+  <string name="days">days</string>
+  <string name="weeks">weeks</string>
+  <string name="months">months</string>
+  <string name="in_the_last">in the last</string>
+  <string name="not_in_the_last">not in the last</string>
+  <string name="is_after">is after</string>
+  <string name="is_before">is before</string>
+  <string name="is_in_the_range">is in the range</string>
+  <string name="is_greater_than">is greater than</string>
+  <string name="is_less_than">is less than</string>
+  <string name="Played_count">Played count</string>
+  <string name="Skipped_count">Skipped count</string>
+  <string name="Disc_count">Disc count</string>
+  <string name="all">all</string>
+  <string name="any">any</string>
+  <string name="Replay">Replay</string>
+  <string name="Reshuffle">Reshuffle</string>
+  <string name="Random">Random</string>
+  <string name="HighestRating">Highest Rating</string>
+  <string name="LowestRating">Lowest Rating</string>
+  <string name="MostOftenPlayed">Most Often Played</string>
+  <string name="LeastOftenPlayed">Least Often Played</string>
+  <string name="MostRecentlyAdded">Most Recently Added</string>
+  <string name="LeastRecentlyAdded">Least Recently Added</string>
+  <string name="MostRecentlyPlayed">Most Recently Played</string>
+  <string name="LeastRecentlyPlayed">Least Recently Played</string>
+  <string name="NewSmartPlaylist">New Smart Playlist</string>
+  <string name="SmartPlaylistEditor">Smart Playlist Editor</string>
+  <string name="Name">Name</string>
+  <string name="Match">Match</string>
+  <string name="of_the_following">of the following:</string>
+  <string name="Limit_to">Limit to</string>
+  <string name="PositiveNumberRequired">Positive number required</string>
+  <string name="Invalid">Invalid</string>
+  <string name="Reserved">Reserved</string>
+  <string name="Select_by">Select by</string>
+  <string name="At_list_end">At list end</string>
+  <string name="Album_artist">Album artist</string>
+  <string name="Date_added">Date added</string>
+  <string name="Last_played">Last played</string>
+  <string name="ErrorSavingPlaylist">Error saving playlist "%1$s"</string>
+  <string name="SavedPlaylist">Saved playlist "%1$s"</string>
+    <string name="to">to</string>
 </resources>

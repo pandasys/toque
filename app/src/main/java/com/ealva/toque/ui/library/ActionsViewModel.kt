@@ -17,7 +17,6 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.runtime.Composable
-import com.ealva.toque.persist.MediaId
 
 interface ActionsViewModel {
   fun selectAll()

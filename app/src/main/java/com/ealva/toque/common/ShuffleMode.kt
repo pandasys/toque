@@ -36,10 +36,10 @@ enum class ShuffleMode(
   private val lists: Boolean,
   @StringRes override val titleRes: Int
 ) : HasConstId, HasTitle, Parcelable {
-  None(1, false, false, R.string.ShuffleNone),
+  None(1, false, false, R.string.ShuffleOff),
   Media(2, true, false, R.string.ShuffleMedia),
-  Lists(3, false, true, R.string.ShuffleLists),
-  MediaAndLists(4, true, true, R.string.ShuffleMediaAndLists);
+  Lists(3, false, true, R.string.ShuffleCategories),
+  MediaAndLists(4, true, true, R.string.ShuffleMediaAndCategories);
 
   fun shuffleMedia(): ShuffleMedia = ShuffleMedia(media)
 

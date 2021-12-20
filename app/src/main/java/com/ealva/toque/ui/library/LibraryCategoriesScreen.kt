@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.nav.goToScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -84,7 +85,7 @@ private interface LibraryItemsViewModel {
 private class LibraryItemsViewModelImpl(private val backstack: Backstack) : LibraryItemsViewModel {
   val categories = LibraryCategories()
   override fun goToItem(key: ComposeKey) {
-    backstack.goTo(key)
+    backstack.goToScreen(key)
   }
 
   override fun getItems(): List<LibraryCategories.CategoryItem> = categories.getItems()

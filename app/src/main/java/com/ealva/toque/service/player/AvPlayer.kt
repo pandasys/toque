@@ -22,7 +22,6 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.queue.ForceTransition
-import com.ealva.toque.service.queue.ForceTransition.AllowFade
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -44,8 +43,10 @@ interface AvPlayer {
   var volume: Volume
   var isMuted: Boolean
   var playbackRate: PlaybackRate
+
   /** Player audio delay in Microseconds */
   var audioDelay: Micros
+
   /** Player subtitle delay in Microseconds */
   var spuDelay: Micros
   val isVideoPlayer: Boolean
@@ -90,6 +91,7 @@ sealed interface AvPlayerEvent {
    * starting playback position is not always Millis(0).
    */
   data class Prepared(val position: Millis, val duration: Millis) : AvPlayerEvent
+
   /**
    * The position within the media has changed. [position] is within 0..[duration]. If [isPlaying]
    * this PositionUpdate is due to media playing else it's due to user seeking.
@@ -117,7 +119,9 @@ sealed interface AvPlayerEvent {
    * playback will not resume. The underlying player should support resumption but must reacquire
    * necessary resources and prepare for playback.
    */
-  data class Stopped(val position: Millis) : AvPlayerEvent
+  object Stopped : AvPlayerEvent {
+    override fun toString(): String = "Stopped"
+  }
 
   /**
    * Playback has reached the end of the media.

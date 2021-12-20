@@ -44,6 +44,7 @@ import com.ealva.toque.app.Toque
 import com.ealva.toque.audioout.AudioOutputState
 import com.ealva.toque.audioout.handleAudioOutputStateBroadcasts
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
@@ -184,6 +185,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     isStarted = false
     mediaSession.isActive = false
     mediaSession.release()
+    LOG._e { it("onDestroy") }
   }
 
   override fun onGetRoot(
@@ -226,18 +228,18 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     inForeground = true
   }
 
-  private fun removeFromForegroundAndStopSelf() {
-    stopForeground(false)
-    inForeground = false
-    stopSelf()
-  }
-
   private inner class NotificationListener : MediaSessionState.NotificationListener {
     override fun onPosted(notificationId: Int, notification: Notification) {
       if (!inForeground) putInForeground(notificationId, notification)
     }
 
-    override fun onCanceled() = removeFromForegroundAndStopSelf()
+    override fun stopForground() = removeFromForegroundAndStopSelf()
+  }
+
+  private fun removeFromForegroundAndStopSelf() {
+    stopForeground(false)
+    inForeground = false
+    stopSelf()
   }
 
   enum class Action {

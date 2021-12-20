@@ -22,11 +22,11 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
@@ -157,7 +157,7 @@ sealed interface PlayableItemEvent {
   ) : PlayableItemEvent
 
   data class Paused(val audioItem: PlayableAudioItem, val position: Millis) : PlayableItemEvent
-  data class Stopped(val audioItem: PlayableAudioItem, val position: Millis) : PlayableItemEvent
+  data class Stopped(val audioItem: PlayableAudioItem) : PlayableItemEvent
   data class PlaybackComplete(val audioItem: PlayableAudioItem) : PlayableItemEvent
   data class Error(val audioItem: PlayableAudioItem) : PlayableItemEvent
 

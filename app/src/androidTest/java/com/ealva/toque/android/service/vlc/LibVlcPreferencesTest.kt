@@ -33,6 +33,8 @@ import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestCoroutineScope
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -57,24 +59,19 @@ class LibVlcPreferencesTest {
 
   private lateinit var appCtx: Context
   private lateinit var testFile: File
-  private lateinit var dataStoreScope: TestCoroutineScope
+  private lateinit var dataStoreScope: TestScope
   private lateinit var prefsSingleton: LibVlcPrefsSingleton
 
   @Before
   fun setup() {
     appCtx = ApplicationProvider.getApplicationContext()
     testFile = tempFolder.newFile("dummy.preferences_pb")
-    dataStoreScope = TestCoroutineScope(coroutineRule.testDispatcher + Job())
+    dataStoreScope = TestScope(coroutineRule.testDispatcher + Job())
     prefsSingleton = LibVlcPrefsSingleton(LibVlcPrefs.Companion::make, testFile, dataStoreScope)
   }
 
-  @After
-  fun cleanup() {
-    dataStoreScope.cleanupTestCoroutines()
-  }
-
   @Test
-  fun testEnableVerboseMode() = coroutineRule.runBlockingTest {
+  fun testEnableVerboseMode() = runTest {
     prefsSingleton {
       expect(enableVerboseMode()).toBe(false)
       enableVerboseMode.set(true)
@@ -85,7 +82,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testChroma() = coroutineRule.runBlockingTest {
+  fun testChroma() = runTest {
     prefsSingleton {
       expect(chroma()).toBe(Chroma.DEFAULT)
       Chroma.values().forEach { chroma ->
@@ -98,7 +95,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testNetworkCachingAmount() = coroutineRule.runBlockingTest {
+  fun testNetworkCachingAmount() = runTest {
     prefsSingleton {
       expect(networkCachingAmount()).toBe(networkCachingAmount.default)
       networkCachingAmount.set(Millis(5000))
@@ -108,7 +105,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testSubtitleEncoding() = coroutineRule.runBlockingTest {
+  fun testSubtitleEncoding() = runTest {
     prefsSingleton {
       expect(subtitleEncoding()).toBe(SubtitleEncoding.DEFAULT)
       SubtitleEncoding.values().forEach { encoding ->
@@ -121,7 +118,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testReplayGainMode() = coroutineRule.runBlockingTest {
+  fun testReplayGainMode() = runTest {
     prefsSingleton {
       expect(replayGainMode()).toBe(ReplayGainMode.DEFAULT)
       ReplayGainMode.values().forEach { mode ->
@@ -134,7 +131,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testReplayPreamp() = coroutineRule.runBlockingTest {
+  fun testReplayPreamp() = runTest {
     prefsSingleton {
       expect(replayGainPreamp()).toBe(replayGainPreamp.default)
       replayGainPreamp.set(Amp(-50))
@@ -149,7 +146,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testDefaultReplayGain() = coroutineRule.runBlockingTest {
+  fun testDefaultReplayGain() = runTest {
     prefsSingleton {
       expect(defaultReplayGain()).toBe(defaultReplayGain.default)
       defaultReplayGain.set(Amp(5))
@@ -159,7 +156,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testEnableFrameSkip() = coroutineRule.runBlockingTest {
+  fun testEnableFrameSkip() = runTest {
     prefsSingleton {
       expect(enableFrameSkip()).toBe(enableFrameSkip.default)
       enableFrameSkip.set(!enableFrameSkip.default)
@@ -169,7 +166,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testSkipLoopFilter() = coroutineRule.runBlockingTest {
+  fun testSkipLoopFilter() = runTest {
     prefsSingleton {
 
       clear()
@@ -177,7 +174,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testAllowTimeStretchAudio() = coroutineRule.runBlockingTest {
+  fun testAllowTimeStretchAudio() = runTest {
     prefsSingleton {
 
       clear()
@@ -185,7 +182,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testDigitalAudioOutputEnabled() = coroutineRule.runBlockingTest {
+  fun testDigitalAudioOutputEnabled() = runTest {
     prefsSingleton {
       expect(digitalAudioOutputEnabled()).toBe(digitalAudioOutputEnabled.default)
       digitalAudioOutputEnabled.set(!digitalAudioOutputEnabled.default)
@@ -196,7 +193,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testHardwareAcceleration() = coroutineRule.runBlockingTest {
+  fun testHardwareAcceleration() = runTest {
     prefsSingleton {
       expect(hardwareAcceleration()).toBe(HardwareAcceleration.DEFAULT)
       HardwareAcceleration.values().forEach { accel ->
@@ -209,7 +206,7 @@ class LibVlcPreferencesTest {
   }
 
   @Test
-  fun testResetAllToDefault() = coroutineRule.runBlockingTest {
+  fun testResetAllToDefault() = runTest {
     prefsSingleton {
       clear()
       expectAllAreDefault()

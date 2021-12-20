@@ -21,6 +21,7 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.InstanceId
@@ -30,7 +31,6 @@ import com.ealva.toque.service.audio.NullPlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata

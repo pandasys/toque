@@ -131,6 +131,10 @@ interface GenreDao {
   suspend fun getMin(): Result<GenreId, DaoMessage>
   suspend fun getMax(): Result<GenreId, DaoMessage>
   suspend fun getRandom(): Result<GenreId, DaoMessage>
+  suspend fun getGenreSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): Result<List<String>, DaoMessage>
 
   companion object {
     operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
@@ -274,6 +278,19 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .where { id inSubQuery GenreTable.select(id).all().orderByRandom().limit(1) }
         .longForQuery()
         .asGenreId
+    }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
+
+  override suspend fun getGenreSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): Result<List<String>, DaoMessage> = runSuspendCatching {
+    db.query {
+      GenreTable
+        .select { genre }
+        .where { genre like textSearch.applyWildcards(partial) escape ESC_CHAR }
+        .sequence { it[genre] }
+        .toList()
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
 

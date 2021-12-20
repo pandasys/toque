@@ -18,7 +18,6 @@ package com.ealva.toque.ui.settings
 
 import android.os.Parcelable
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -75,11 +74,12 @@ import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.DuckAction
 import com.ealva.toque.prefs.EndOfQueueAction
 import com.ealva.toque.prefs.PlayUpNextAction
-import com.ealva.toque.prefs.ScrobblerPackage
 import com.ealva.toque.prefs.ThemeChoice
 import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
+import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.settings.SettingScreenKeys.AdvancedSettings
 import com.ealva.toque.ui.settings.SettingScreenKeys.ArtworkSettings
 import com.ealva.toque.ui.settings.SettingScreenKeys.AudioSettings
@@ -90,7 +90,6 @@ import com.ealva.toque.ui.settings.SettingScreenKeys.LookAndFeel
 import com.ealva.toque.ui.settings.SettingScreenKeys.MediaScannerSettings
 import com.ealva.toque.ui.settings.SettingScreenKeys.NowPlayingLookAndFeel
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
-import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
@@ -99,7 +98,6 @@ import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.core.LocalBackstack
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
@@ -123,10 +121,12 @@ object SettingScreenKeys {
   val NowPlayingLookAndFeel = SettingScreenKey(R.string.NowPlaying, R.string.LAndFSettings)
   val LibrarySettings = SettingScreenKey(R.string.Library, R.string.Settings)
   val MediaScannerSettings = SettingScreenKey(R.string.MediaScanner, R.string.LibrarySettings)
+
   //val MediaFileTag = SettingScreenKey("Media File Tag", "Media Scanner - Library - Settings")
   val ArtworkSettings = SettingScreenKey(R.string.Artwork, R.string.Settings)
   val AudioSettings = SettingScreenKey(R.string.Audio, R.string.Settings)
   val FadeAudioSettings = SettingScreenKey(R.string.Fade, R.string.AudioSettings)
+
   //val SocialSettings = SettingScreenKey(R.string.Social, R.string.Settings)
   val AdvancedSettings = SettingScreenKey(R.string.Advanced, R.string.Settings)
 }
@@ -140,13 +140,14 @@ private const val LIB_VLC_PREFS_TAG = "LibVlcPrefs"
 @Parcelize
 data class AppSettingsScreen(
   private val key: SettingScreenKey
-  ) : BaseAppSettingsScreen(), KoinComponent {
+) : BaseAppSettingsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
       addService(APP_PREFS_TAG, get<AppPrefsSingleton>(AppPrefs.QUALIFIER))
       addService(LIB_VLC_PREFS_TAG, get<LibVlcPrefsSingleton>(LibVlcPrefs.QUALIFIER))
     }
   }
+
   @OptIn(ExperimentalPagerApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
@@ -154,7 +155,7 @@ data class AppSettingsScreen(
     val libVlcPrefsSingleton = rememberService<LibVlcPrefsSingleton>(LIB_VLC_PREFS_TAG)
 
     val backstack = LocalBackstack.current
-    val goBack: () -> Unit = { backstack.goBack() }
+    val goBack: () -> Unit = { backstack.back() }
     if (key == AdvancedSettings) {
       ToqueSettingsScreen(
         title = stringResource(id = key.title),
@@ -211,37 +212,31 @@ data class AppSettingsScreen(
       title = fetch(R.string.LookandFeel),
       summary = fetch(R.string.UserInterfaceOptions),
       iconDrawable = R.drawable.ic_eye,
-      onClick = { backstack.goTo(AppSettingsScreen(LookAndFeel)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(LookAndFeel)) }
     ),
     CallbackSettingItem(
       title = fetch(R.string.Library),
       summary = fetch(R.string.LibraryAndFolderOptions),
       iconDrawable = R.drawable.ic_library_music,
-      onClick = { backstack.goTo(AppSettingsScreen(LibrarySettings)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(LibrarySettings)) }
     ),
     CallbackSettingItem(
       title = fetch(R.string.Artwork),
       summary = fetch(R.string.AlbumArtworkOptions),
       iconDrawable = R.drawable.ic_photo_library,
-      onClick = { backstack.goTo(AppSettingsScreen(ArtworkSettings)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(ArtworkSettings)) }
     ),
     CallbackSettingItem(
       title = fetch(R.string.Audio),
       summary = fetch(R.string.AudioHeadsetOptions),
       iconDrawable = R.drawable.ic_headphones,
-      onClick = { backstack.goTo(AppSettingsScreen(AudioSettings)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(AudioSettings)) }
     ),
-    //CallbackSettingItem(
-    //  title = fetch(R.string.Social),
-    //  summary = fetch(R.string.ScrobbleEtc),
-    //  iconDrawable = R.drawable.ic_groups,
-    //  onClick = { backstack.goTo(AppSettingsScreen(SocialSettings)) }
-    //),
     CallbackSettingItem(
       title = fetch(R.string.Advanced),
       summary = fetch(R.string.AdvancedSettingsAnd),
       iconDrawable = R.drawable.ic_wrench_outline,
-      onClick = { backstack.goTo(AppSettingsScreen(AdvancedSettings)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(AdvancedSettings)) }
     ),
   )
 
@@ -310,7 +305,7 @@ data class AppSettingsScreen(
       title = fetch(R.string.Fade),
       summary = fetch(R.string.FadeAndCrossfade),
       iconDrawable = R.drawable.ic_hearing,
-      onClick = { backstack.goTo(AppSettingsScreen(FadeAudioSettings)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(FadeAudioSettings)) }
     ),
     SwitchSettingItem(
       preference = prefs.playOnWiredConnection,
@@ -359,13 +354,13 @@ data class AppSettingsScreen(
       title = fetch(R.string.Lists),
       summary = fetch(R.string.ListItemActionsOptions),
       iconDrawable = R.drawable.ic_list,
-      onClick = { backstack.goTo(AppSettingsScreen(ListsLookAndFeel)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(ListsLookAndFeel)) }
     ),
     CallbackSettingItem(
       title = fetch(R.string.NowPlaying),
       summary = fetch(R.string.NowPlayingScreenOptions),
       iconDrawable = R.drawable.ic_presentation_play,
-      onClick = { backstack.goTo(AppSettingsScreen(NowPlayingLookAndFeel)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(NowPlayingLookAndFeel)) }
     ),
     ListSettingItem(
       preference = prefs.themeChoice,
@@ -417,7 +412,7 @@ data class AppSettingsScreen(
       title = fetch(R.string.MediaScanner),
       summary = fetch(R.string.LibraryScannerSettings),
       iconDrawable = R.drawable.ic_refresh,
-      onClick = { backstack.goTo(AppSettingsScreen(MediaScannerSettings)) }
+      onClick = { backstack.goToScreen(AppSettingsScreen(MediaScannerSettings)) }
     ),
     ListSettingItem(
       preference = prefs.endOfQueueAction,
@@ -441,17 +436,6 @@ data class AppSettingsScreen(
       valueRange = 0F..1.0F,
       floatToType = { value -> value.toDouble() },
       typeToFloat = { it.toFloat() }
-    ),
-    ListSettingItem(
-      preference = prefs.scrobbler,
-      title = fetch(R.string.SelectScrobbler),
-      singleLineTitle = true,
-      enabled = true,
-      dialogItems = mapOf(
-        ScrobblerPackage.None.titleValuePair,
-        ScrobblerPackage.LastFm.titleValuePair,
-        ScrobblerPackage.SimpleLastFm.titleValuePair
-      )
     ),
   )
 
@@ -488,7 +472,7 @@ data class AppSettingsScreen(
     //  title = "Media File Tag",
     //  summary = "Scanner tag field options",
     //  iconDrawable = R.drawable.ic_refresh,
-    //  onClick = { backstack.goTo(AppSettingsScreen(MediaFileTag)) }
+    //  onClick = { backstack.goToScreen(AppSettingsScreen(MediaFileTag)) }
     //)
     SwitchSettingItem(
       prefs.readTagRating,
@@ -663,6 +647,7 @@ private fun VolumeRange.toFloatRange(): ClosedFloatingPointRange<Float> =
 @JvmName("AmpToFloatRange")
 private fun AmpRange.toFloatRange(): ClosedFloatingPointRange<Float> =
   start.value..endInclusive.value
+
 private fun Float.toDecibelString(): String =
   "${"%.1f".format(this)}dB".let { if (it == "-0.0dB") "0.0dB" else it }
 
@@ -682,9 +667,6 @@ val PlayUpNextAction.titleValuePair: Pair<String, PlayUpNextAction>
   get() = Pair(fetch(titleRes), this)
 
 val EndOfQueueAction.titleValuePair: Pair<String, EndOfQueueAction>
-  get() = Pair(fetch(titleRes), this)
-
-val ScrobblerPackage.titleValuePair: Pair<String, ScrobblerPackage>
   get() = Pair(fetch(titleRes), this)
 
 val ReplayGainMode.titleValuePair: Pair<String, ReplayGainMode>

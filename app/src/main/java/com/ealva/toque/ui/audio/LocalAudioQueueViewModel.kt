@@ -39,7 +39,7 @@ import com.ealva.toque.service.audio.TransitionType.Manual
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
-import com.ealva.toque.ui.audio.LocalAudioQueueModel.PromptResult
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
 import com.ealva.toque.ui.common.DialogPrompt
 import com.ealva.toque.ui.library.PlayUpNextPrompt
 import com.ealva.toque.ui.main.MainViewModel
@@ -57,13 +57,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.regex.Pattern
 
-private val LOG by lazyLogger(LocalAudioQueueModel::class)
+private val LOG by lazyLogger(LocalAudioQueueViewModel::class)
 
-interface LocalAudioQueueModel {
+interface LocalAudioQueueViewModel {
   val localAudioQueue: StateFlow<LocalAudioQueue>
   val playUpNextAction: StateFlow<PlayUpNextAction>
   val queueSize: Int
@@ -97,8 +96,8 @@ interface LocalAudioQueueModel {
       appPrefsSingleton: AppPrefsSingleton,
       playlistDao: PlaylistDao,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
-    ): LocalAudioQueueModel =
-      LocalAudioQueueModelImpl(
+    ): LocalAudioQueueViewModel =
+      LocalAudioQueueViewModelImpl(
         mainViewModel,
         appPrefsSingleton,
         playlistDao,
@@ -109,12 +108,12 @@ interface LocalAudioQueueModel {
 
 private data class PrefsHolder(val appPrefs: AppPrefs? = null)
 
-class LocalAudioQueueModelImpl(
+class LocalAudioQueueViewModelImpl(
   private val mainViewModel: MainViewModel,
   private val appPrefsSingleton: AppPrefsSingleton,
   private val playlistDao: PlaylistDao,
   private val dispatcher: CoroutineDispatcher
-) : LocalAudioQueueModel, ScopedServices.Registered {
+) : LocalAudioQueueViewModel, ScopedServices.Registered {
   private lateinit var scope: CoroutineScope
 
   private val prefsHolder = MutableStateFlow(PrefsHolder())
@@ -138,7 +137,8 @@ class LocalAudioQueueModelImpl(
     shuffle: ShuffleMedia
   ): PromptResult {
     val result = CompletableDeferred<PromptResult>()
-    val idList = if (shuffle.value) mediaList.shuffled() else mediaList
+    val idList: CategoryMediaList = if (shuffle.value) mediaList.shuffled() else mediaList
+
     fun onDismiss() {
       clearPrompt()
       result.complete(PromptResult.Dismissed)
@@ -200,7 +200,7 @@ class LocalAudioQueueModelImpl(
           } else {
             R.plurals.AddedToUpNextNewSizeLessDuplicates
           }
-          Notification(fetchPlural(plural, size, result.value.value))
+          Notification(fetchPlural(plural, size, size, result.value.value))
         }
         is Err -> Notification(fetchPlural(R.plurals.FailedAddingToUpNext, size))
       }
@@ -213,7 +213,7 @@ class LocalAudioQueueModelImpl(
       mainViewModel.notify(
         when (val result = localAudioQueue.value.addToUpNext(categoryMediaList)) {
           is Ok -> Notification(
-            fetchPlural(R.plurals.AddedToUpNextNewSize, quantity, result.value.value)
+            fetchPlural(R.plurals.AddedToUpNextNewSize, quantity, quantity, result.value.value)
           )
           is Err -> Notification(fetchPlural(R.plurals.FailedAddingToUpNext, quantity))
         }
@@ -226,7 +226,7 @@ class LocalAudioQueueModelImpl(
   }
 
   override fun clearPrompt() {
-    showPrompt(DialogPrompt.None)
+    mainViewModel.clearPrompt()
   }
 
   override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
@@ -301,10 +301,20 @@ class LocalAudioQueueModelImpl(
   private fun addAudioToPlaylist(mediaIdList: MediaIdList, playlistIdName: PlaylistIdName) {
     scope.launch {
       when (val result = playlistDao.addToUserPlaylist(playlistIdName.id, mediaIdList)) {
-        is Ok -> LOG._e { it("Added %d to %s", result.value, playlistIdName.name.value) }
+        is Ok -> { mainViewModel.notify(makeAddToPlaylistNotification(result, playlistIdName)) }
         is Err -> LOG.e { it("Error adding %s. %s", playlistIdName.name.value, result.error) }
       }
     }
+  }
+
+  private fun makeAddToPlaylistNotification(
+    result: Ok<Long>,
+    playlistIdName: PlaylistIdName
+  ): Notification {
+    val count = result.value.toInt()
+    return Notification(
+      fetchPlural(R.plurals.AddedCountToPlaylist, count, count, playlistIdName.name.value)
+    )
   }
 
   private fun createPlaylistWithAudio(mediaIdList: MediaIdList, playlistName: PlaylistName) {

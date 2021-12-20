@@ -63,7 +63,7 @@ android {
   }
 
   composeOptions {
-    kotlinCompilerExtensionVersion = Libs.AndroidX.Compose.VERSION
+    kotlinCompilerExtensionVersion = Libs.AndroidX.Compose.COMPILER_VERSION
   }
 
   compileOptions {
@@ -104,7 +104,6 @@ android {
 }
 
 dependencies {
-  implementation("androidx.test.ext:junit-ktx:1.1.2")
   coreLibraryDesugaring(Libs.DESUGAR)
   implementation(kotlin("stdlib-jdk8"))
 
@@ -115,12 +114,10 @@ dependencies {
   implementation(Libs.AndroidX.Lifecycle.COMMON_JAVA8)
   implementation(Libs.Datastore.PREFERENCES)
 
-  //implementation(Libs.Kotlin.REFLECT)
   implementation(Libs.Kotlin.Serialization.CORE)
   implementation(Libs.Kotlin.Serialization.JSON)
 
   implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
-  //implementation("androidx.lifecycle:lifecycle-viewmodel-savedstate:2.3.1")
 
   implementation(Libs.Android.MATERIAL)
   implementation(Libs.AndroidX.Compose.UI)
@@ -175,26 +172,15 @@ dependencies {
 
   testImplementation(Libs.JUnit.JUNIT)
   testImplementation(Libs.AndroidX.Test.CORE)
-//  {
-//    exclude("junit", "junit")
-//  }
+  testImplementation(Libs.AndroidX.Test.Ext.JUNIT)
   testImplementation(Libs.AndroidX.Test.RULES)
-//  {
-//    exclude("junit", "junit")
-//  }
   testImplementation(Libs.Expect.EXPECT)
   testImplementation(Libs.Robolectric.ROBOLECTRIC)
   testImplementation(Libs.Kotlin.Coroutines.TEST)
 //  testImplementation(ThirdParty.KOIN_TEST)
 
   androidTestImplementation(Libs.AndroidX.Test.Ext.JUNIT)
-//  {
-//    exclude("junit", "junit")
-//  }
   androidTestImplementation(Libs.AndroidX.Test.RUNNER)
-//  {
-//    exclude("junit", "junit")
-//  }
   androidTestImplementation(Libs.JUnit.JUNIT)
   androidTestImplementation(Libs.Expect.EXPECT)
   androidTestImplementation(Libs.Kotlin.Coroutines.TEST)

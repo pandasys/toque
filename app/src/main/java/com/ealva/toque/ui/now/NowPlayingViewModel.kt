@@ -37,7 +37,7 @@ import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.StreamVolume
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,7 +134,7 @@ interface NowPlayingViewModel {
 
   companion object {
     operator fun invoke(
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       appPrefsSingleton: AppPrefsSingleton
     ): NowPlayingViewModel =
       NowPlayingViewModelImpl(localAudioQueueModel, appPrefsSingleton)
@@ -149,7 +149,7 @@ private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 private class NowPlayingViewModelImpl(
-  private val localAudioQueueModel: LocalAudioQueueModel,
+  private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefsSingleton: AppPrefsSingleton
 ) : NowPlayingViewModel, ScopedServices.Activated {
   private lateinit var scope: CoroutineScope
@@ -225,45 +225,25 @@ private class NowPlayingViewModelImpl(
     }
   }
 
-  override fun nextShuffleMode() {
-    audioQueue.nextShuffleMode()
-  }
+  override fun nextShuffleMode() = audioQueue.nextShuffleMode()
 
-  override fun nextMedia() {
-    audioQueue.next()
-  }
+  override fun nextMedia() = audioQueue.next()
 
-  override fun previousMedia() {
-    audioQueue.previous()
-  }
+  override fun previousMedia() = audioQueue.previous()
 
-  override fun nextList() {
-    audioQueue.nextList()
-  }
+  override fun nextList() = audioQueue.nextList()
 
-  override fun previousList() {
-    audioQueue.previousList()
-  }
+  override fun previousList() = audioQueue.previousList()
 
-  override fun togglePlayPause() {
-    audioQueue.togglePlayPause()
-  }
+  override fun togglePlayPause() = audioQueue.togglePlayPause()
 
-  override fun nextRepeatMode() {
-    audioQueue.nextRepeatMode()
-  }
+  override fun nextRepeatMode() = audioQueue.nextRepeatMode()
 
-  override fun toggleEqMode() {
-    audioQueue.toggleEqMode()
-  }
+  override fun toggleEqMode() = audioQueue.toggleEqMode()
 
-  override fun seekTo(position: Millis) {
-    audioQueue.seekTo(position)
-  }
+  override fun seekTo(position: Millis) = audioQueue.seekTo(position)
 
-  override fun goToQueueIndexMaybePlay(index: Int) {
-    audioQueue.goToIndexMaybePlay(index)
-  }
+  override fun goToQueueIndexMaybePlay(index: Int) = audioQueue.goToIndexMaybePlay(index)
 
   override fun scheduleSleepTimer(duration: Millis) {
     TODO("Not yet implemented")

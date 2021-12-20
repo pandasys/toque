@@ -16,9 +16,7 @@
 
 package com.ealva.toque.db
 
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.HasConstId
 
 private val LOG by lazyLogger(SongListType::class)

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.media
+package com.ealva.toque.common
 
 import com.nhaarman.expect.expect
 import org.junit.Test

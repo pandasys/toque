@@ -16,9 +16,47 @@
 
 package com.ealva.toque.ui.nav
 
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.ealvalog.w
 import com.ealva.toque.navigation.ComposeKey
 import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.History
 import com.zhuinden.simplestack.StateChange
 
+private val LOG by lazyLogger("BackstackExt")
+
+inline val Backstack.topScreen: ComposeKey get() = top()
+
+private inline fun History<ComposeKey>.ifSameRun(
+  history: History<ComposeKey>,
+  command: () -> Unit
+) {
+  if (this == history) command() else LOG.w(RuntimeException()) { it("History changed") }
+}
+
+private fun Backstack.navigateIfAllowed(command: () -> Unit) {
+  val currentHistory: History<ComposeKey> = getHistory()
+  try {
+    topScreen.navigateIfAllowed {
+      currentHistory.ifSameRun(getHistory()) {
+        command()
+      }
+    }
+  } catch (e: java.lang.IllegalStateException) {
+    // if no topScreen, just execute
+    command()
+  }
+}
+
 fun Backstack.goToAboveRoot(screen: ComposeKey) =
-  setHistory(listOf(root(), screen), StateChange.REPLACE)
+  navigateIfAllowed { setHistory(listOf(root(), screen), StateChange.REPLACE) }
+
+fun Backstack.goToScreen(screen: ComposeKey) = navigateIfAllowed { goTo(screen) }
+
+fun Backstack.back() = navigateIfAllowed { goBack() }
+
+fun Backstack.setScreenHistory(newHistory: List<ComposeKey>, direction: Int) =
+  navigateIfAllowed() { setHistory(newHistory, direction) }
+
+fun Backstack.jumpToRootScreen() = navigateIfAllowed() { jumpToRoot() }

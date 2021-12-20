@@ -19,7 +19,6 @@ package com.ealva.toque.android.service.vlc
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.service.vlc.LibVlc
 import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
@@ -28,6 +27,8 @@ import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestCoroutineScope
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -52,33 +53,30 @@ class LibVlcFactoryTest {
 
   private lateinit var appCtx: Context
   private lateinit var testFile: File
-  private lateinit var dataStoreScope: TestCoroutineScope
+  private lateinit var dataStoreScope: TestScope
   private lateinit var singleton: LibVlcPrefsSingleton
 
   @Before
   fun setup() {
     appCtx = ApplicationProvider.getApplicationContext()
     testFile = tempFolder.newFile("dummy.preferences_pb")
-    dataStoreScope = TestCoroutineScope(coroutineRule.testDispatcher + Job())
+    dataStoreScope = TestScope(coroutineRule.testDispatcher + Job())
     singleton = LibVlcPrefsSingleton(LibVlcPrefs.Companion::make, testFile, dataStoreScope)
   }
 
-  @After
-  fun cleanup() {
-    dataStoreScope.cleanupTestCoroutines()
-  }
-
   @Test
-  fun testGetInstance() = coroutineRule.runBlockingTest {
-    val factory = LibVlcSingleton(
-      appCtx,
-      singleton,
-      dispatcher = coroutineRule.testDispatcher
-    )
-
-    // Test will break when upgrading LibVlc and that's expected (obviously)
-    factory.withInstance { libVlc ->
-      expect(libVlc.libVlcVersion()).toBe("3.0.16 Vetinari")
+  fun testGetInstance() = // Test will break when upgrading LibVlc and that's expected (obviously)
+    runTest {
+      // Test will break when upgrading LibVlc and that's expected (obviously)
+      val factory = LibVlcSingleton(
+        appCtx,
+        singleton,
+        dispatcher = coroutineRule.testDispatcher
+      )
+      // Test will break when upgrading LibVlc and that's expected (obviously)
+// Test will break when upgrading LibVlc and that's expected (obviously)
+      factory.withInstance { libVlc ->
+        expect(libVlc.libVlcVersion()).toBe("3.0.16 Vetinari")
+      }
     }
-  }
 }

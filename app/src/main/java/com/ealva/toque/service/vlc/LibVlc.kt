@@ -19,9 +19,11 @@ package com.ealva.toque.service.vlc
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.StartPaused
+import com.ealva.toque.log._e
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex

@@ -24,6 +24,7 @@ import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -49,7 +50,7 @@ class FadeInTransitionTest {
   }
 
   @Test
-  fun isPlaying() = run {
+  fun isPlaying() {
     player._isPlaying = false
     expect(transition.isPlaying).toBe(true) // shouldn't ask the player, always true
   }
@@ -71,7 +72,7 @@ class FadeInTransitionTest {
   }
 
   @Test
-  fun execute() = coroutineRule.runBlockingTest {
+  fun execute() = runTest {
     // given
     player._volume = Volume.NONE
     player._isPlaying = false
@@ -94,7 +95,7 @@ class FadeInTransitionTest {
   }
 
   @Test
-  fun cancel() = coroutineRule.runBlockingTest {
+  fun cancel() = runTest {
     transition.setCancelled()
     transition.execute()
     player.verifyZeroInteractions()

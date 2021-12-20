@@ -16,7 +16,6 @@
 
 package com.ealva.toque.ui.library
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,7 +47,8 @@ import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumIdList
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
@@ -167,7 +166,7 @@ private class ArtistAlbumsViewModel(
   private val artistType: ArtistType,
   albumDao: AlbumDao,
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   backstack: Backstack
 ) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel) {
   override suspend fun doGetAlbums(
@@ -177,7 +176,7 @@ private class ArtistAlbumsViewModel(
     albumDao.getAllAlbumsFor(artistId, artistType)
 
   override fun goToAlbumSongs(albumId: AlbumId) =
-    backstack.goTo(AlbumSongsForArtistScreen(albumId, artistId))
+    backstack.goToScreen(AlbumSongsForArtistScreen(albumId, artistId))
 
   override suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>
@@ -191,5 +190,5 @@ private class ArtistAlbumsViewModel(
     .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
     .map { idList -> CategoryMediaList(idList, CategoryToken(albumList.last().id)) }
 
-  fun goToArtistSongs() = backstack.goTo(ArtistSongsScreen(artistId, artistType))
+  fun goToArtistSongs() = backstack.goToScreen(ArtistSongsScreen(artistId, artistType))
 }

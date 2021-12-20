@@ -37,8 +37,10 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.QueueChangedException
 import com.ealva.toque.common.RepeatMode
+import com.ealva.toque.common.ShuffleLists
 import com.ealva.toque.common.ShuffleMedia
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.debug
 import com.ealva.toque.common.debugCheck
@@ -46,6 +48,7 @@ import com.ealva.toque.common.debugRequire
 import com.ealva.toque.common.ensureUiThread
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.moveItem
+import com.ealva.toque.common.toRating
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
@@ -63,8 +66,6 @@ import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPresetFactory
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.media.toRating
 import com.ealva.toque.service.notify.ServiceNotification
 import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.AvPlayer.Companion.OFFSET_CONSIDERED_END
@@ -84,10 +85,6 @@ import com.ealva.toque.service.queue.QueuePrefs
 import com.ealva.toque.service.queue.QueuePrefsSingleton
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.service.queue.StreamVolume
-import com.ealva.toque.service.scrobble.NullScrobbler
-import com.ealva.toque.service.scrobble.Scrobbler
-import com.ealva.toque.service.scrobble.ScrobblerFacade
-import com.ealva.toque.service.scrobble.ScrobblerFactory
 import com.ealva.toque.service.session.common.PlaybackActions
 import com.ealva.toque.service.session.common.PlaybackState
 import com.ealva.toque.service.session.server.AudioFocusManager
@@ -312,19 +309,20 @@ private class LocalAudioQueueImpl(
   private val eqPresetFactory: EqPresetFactory by inject()
   private val audioOutputState: AudioOutputState by inject()
   private var sharedPlayerState: SharedPlayerState = NullSharedPlayerState
-  private val scrobblerFactory: ScrobblerFactory by inject()
   private val audioFocusManager: AudioFocusManager by inject()
   private val telecomManager: TelecomManager by inject()
   private val libVlcSingleton: LibVlcSingleton by inject()
-  private var scrobbler: Scrobbler = NullScrobbler
   private var currentItemFlowJob: Job? = null
   private var playState: PlayState = PlayState.None
-  private var positionState = initialState
+  private var positionState: QueuePositionState = initialState
   private var lastShuffle = prefs.shuffleMode()
   private var nextPendingCategory: CategoryMediaList? = null
 
   override val queueState = MutableStateFlow(makeInitialState())
-  override val notification = MutableSharedFlow<ServiceNotification>()
+  override val notification = MutableSharedFlow<ServiceNotification>(
+    replay = 0,
+    extraBufferCapacity = 0
+  )
 
   private val focusRequest = AvPlayer.FocusRequest {
     audioFocusManager.requestFocus(AudioFocusManager.ContentType.Audio) { playState.isPlaying }
@@ -351,8 +349,10 @@ private class LocalAudioQueueImpl(
     scope.launch { prefs.repeatMode.set(mode) }
   }
 
-  val shuffle: ShuffleMode get() = prefs.shuffleMode()
-  override fun nextShuffleMode() = setShuffleMode(shuffle.getNext())
+  private inline val shuffleLists: ShuffleLists get() = prefs.shuffleMode().shuffleLists()
+  private inline val shuffleMedia: ShuffleMedia get() = prefs.shuffleMode().shuffleMedia()
+
+  override fun nextShuffleMode() = setShuffleMode(prefs.shuffleMode().getNext())
 
   override fun setShuffleMode(mode: ShuffleMode) {
     scope.launch { prefs.shuffleMode.set(mode) }
@@ -372,7 +372,7 @@ private class LocalAudioQueueImpl(
   }
 
   private val queue: List<PlayableAudioItem>
-    get() = if (shuffle.shuffleMedia().value) upNextShuffled else upNextQueue
+    get() = if (shuffleMedia.value) upNextShuffled else upNextQueue
 
   private val currentItem: PlayableAudioItem get() = queue.getItemFromIndex(currentItemIndex)
   private val currentItemIndex: Int get() = positionState.queueIndex
@@ -422,7 +422,6 @@ private class LocalAudioQueueImpl(
     reactToLibVlcPrefs()
     sessionState.contentType = AudioFocusManager.ContentType.Audio
     sessionState.setQueueTitle(fetch(R.string.LocalAudio))
-    scrobbler = ScrobblerFacade(appPrefs, scrobblerFactory)
     upNextQueue = itemFactory.makeUpNextQueue(false, focusRequest, sharedPlayerState)
     upNextShuffled = itemFactory.makeUpNextQueue(true, focusRequest, sharedPlayerState)
     val currentQueue = queue
@@ -477,9 +476,14 @@ private class LocalAudioQueueImpl(
 
   private fun reactToEqModeChanges() {
     sharedPlayerState.eqMode
-      .onEach { mode -> queueState.update { it.copy(eqMode = mode) } }
+      .onEach { mode -> handleNewEqMode(mode) }
       .catch { cause -> LOG.e(cause) { it("Error handling EqMode change") } }
       .launchIn(scope)
+  }
+
+  private fun handleNewEqMode(mode: EqMode) {
+    queueState.update { it.copy(eqMode = mode) }
+    notify(ServiceNotification(fetch(mode.titleRes)))
   }
 
   private fun reactToHeadsetChanges() {
@@ -559,24 +563,30 @@ private class LocalAudioQueueImpl(
   private fun reactToRepeatModeChanges() {
     prefs.repeatMode
       .asFlow()
-      .onEach { mode ->
-        queueState.update { it.copy(repeatMode = mode) }
-        sessionState.setRepeat(mode)
-      }
+      .onEach { mode -> handleNewRepeatMode(mode) }
       .launchIn(scope)
+  }
+
+  private fun handleNewRepeatMode(mode: RepeatMode) {
+    queueState.update { it.copy(repeatMode = mode) }
+    sessionState.setRepeat(mode)
+    notify(ServiceNotification(fetch(mode.titleRes)))
   }
 
   private fun reactToShuffleChanges() {
     prefs.shuffleMode
       .asFlow()
-      .onEach { newMode ->
-        if (lastShuffle.shuffleListsDiffers(newMode)) updateNextPendingCategory()
-        if (lastShuffle.shuffleMediaDiffers(newMode)) toggleShuffleMedia(lastShuffle, newMode)
-        lastShuffle = newMode
-        queueState.update { it.copy(shuffleMode = newMode) }
-        sessionState.setShuffle(newMode)
-      }
+      .onEach { newMode -> handleNewShuffleMode(newMode) }
       .launchIn(scope)
+  }
+
+  private suspend fun handleNewShuffleMode(newMode: ShuffleMode) {
+    if (lastShuffle.shuffleListsDiffers(newMode)) updateNextPendingCategory()
+    if (lastShuffle.shuffleMediaDiffers(newMode)) toggleShuffleMedia(lastShuffle, newMode)
+    lastShuffle = newMode
+    queueState.update { it.copy(shuffleMode = newMode) }
+    sessionState.setShuffle(newMode)
+    notify(ServiceNotification(fetch(newMode.titleRes)))
   }
 
   override fun deactivate() {
@@ -660,7 +670,7 @@ private class LocalAudioQueueImpl(
       val nextList = getNextPendingCategory()
       if (nextList.isNotEmpty) {
         playNext(
-          if (shuffle.shuffleMedia().value) nextList.shuffled() else nextList,
+          if (shuffleMedia.value) nextList.shuffled() else nextList,
           ClearQueue(true),
           PlayNow(playState.isPlaying),
           Manual
@@ -676,7 +686,7 @@ private class LocalAudioQueueImpl(
       )
       if (prevList.isNotEmpty) {
         playNext(
-          if (shuffle.shuffleMedia().value) prevList.shuffled() else prevList,
+          if (shuffleMedia.value) prevList.shuffled() else prevList,
           ClearQueue(true),
           PlayNow(playState.isPlaying),
           Manual
@@ -729,10 +739,10 @@ private class LocalAudioQueueImpl(
               prevCurrent = prevCurrent,
               prevCurrentIndex = prevCurrentIndex,
               idList = idList,
-              shuffleMode = shuffle,
               addAt = AddAt.AtEnd,
               clearAndRemakeQueues = false,
-              allowDuplicates = allowDuplicates
+              allowDuplicates = allowDuplicates,
+              shuffleMedia = shuffleMedia
             )
 
             persistIfCurrentUnchanged(
@@ -786,10 +796,10 @@ private class LocalAudioQueueImpl(
             prevCurrent = prevCurrent,
             prevCurrentIndex = prevCurrentIndex,
             idList = idList,
-            shuffleMode = shuffle,
             addAt = AddAt.AfterCurrent,
             clearAndRemakeQueues = upNextEmptyOrCleared,
-            allowDuplicates = allowDuplicates
+            allowDuplicates = allowDuplicates,
+            shuffleMedia = shuffleMedia
           )
 
           persistIfCurrentUnchanged(
@@ -828,13 +838,12 @@ private class LocalAudioQueueImpl(
     QueueExceptionMessage(cause)
   }
 
-  private fun notify(msg: () -> ServiceNotification) {
-    scope.launch { notification.emit(msg()) }
+  private fun notify(msg: ServiceNotification) {
+    scope.launch { notification.emit(msg) }
   }
 
   override suspend fun removeFromQueue(index: Int, item: AudioItem) {
     val updateTime = Millis.currentTime()
-    val shuffleMedia = shuffle.shuffleMedia()
     val prevCurrentIndex = currentItemIndex
     val prevCurrent = currentItem
 
@@ -897,7 +906,7 @@ private class LocalAudioQueueImpl(
     establishNewQueues(newQueue, newShuffled, newIndex)
 
     if (removed !== NullPlayableAudioItem) {
-      notify {
+      notify(
         ServiceNotification(
           fetch(R.string.TitleRemovedFromQueue, removed.title.value),
           ItemRemovedFromQueueUndo(
@@ -909,9 +918,9 @@ private class LocalAudioQueueImpl(
             shuffleMedia
           )
         )
-      }
+      )
     } else {
-      notify { ServiceNotification(fetch(R.string.RemoveFailed, item.title, index)) }
+      notify(ServiceNotification(fetch(R.string.RemoveFailed, item.title.value, index)))
     }
   }
 
@@ -920,14 +929,14 @@ private class LocalAudioQueueImpl(
     index: Int,
     unshuffledIndex: Int,
     updateTime: Millis,
-    shuffleMedia: ShuffleMedia
+    shuffle: ShuffleMedia
   ) = runSuspendCatching {
     val currentIndex = currentItemIndex
-    if (shuffleMedia == shuffle.shuffleMedia()) {
+    if (shuffle == shuffleMedia) {
       val newQueue: MutableList<PlayableAudioItem> = upNextQueue.toMutableList()
       val newShuffled: MutableList<PlayableAudioItem> = upNextShuffled.toMutableList()
 
-      if (shuffleMedia.value) {
+      if (shuffle.value) {
         newShuffled.add(index, item)
         newQueue.add(unshuffledIndex.coerceIn(newQueue.indices), item)
       } else {
@@ -948,7 +957,7 @@ private class LocalAudioQueueImpl(
     }
   }.onFailure { cause ->
     LOG.e(cause) { it("undoRemoveItemFromQueue error") }
-    notify { ServiceNotification(fetch(R.string.CouldNotUndoItem, item.title.value)) }
+    notify(ServiceNotification(fetch(R.string.CouldNotUndoItem, item.title.value)))
   }
 
   inner class ItemRemovedFromQueueUndo(
@@ -975,43 +984,34 @@ private class LocalAudioQueueImpl(
   override fun moveQueueItem(from: Int, to: Int) {
     if (from == to) return
     scope.launch {
-      val prevCurrentIndex = currentItemIndex
-      val prevCurrent = currentItem
+      val index = currentItemIndex
+      val item = currentItem
 
       val indexRange = upNextQueue.indices
       var newQueue = upNextQueue.toMutableList()
       var newShuffled = upNextShuffled.toMutableList()
-      var newIndex = prevCurrentIndex
+      var newIndex = index
 
       if (from in indexRange && to in indexRange) {
-        if (shuffle.shuffleMedia().value) {
+        if (shuffleMedia.value) {
           newShuffled.moveItem(from, to)
         } else {
           newQueue.moveItem(from, to)
         }
 
-        newIndex = if (from == prevCurrentIndex) {
-          to
-        } else if (from < prevCurrentIndex) {
-          if (to >= prevCurrentIndex) {
-            prevCurrentIndex - 1
-          } else {
-            prevCurrentIndex
-          }
-        } else if (to <= prevCurrentIndex) {
-          if (from > prevCurrentIndex) {
-            prevCurrentIndex + 1
-          } else {
-            prevCurrentIndex
-          }
-        } else prevCurrentIndex
+        newIndex = when {
+          from == index -> to
+          from < index -> if (to >= index) index - 1 else index
+          to <= index -> if (from > index) index + 1 else index
+          else -> index
+        }
 
         try {
           persistIfCurrentUnchanged(
             newQueue = newQueue,
             newShuffled = newShuffled,
-            prevCurrent = prevCurrent,
-            prevCurrentIndex = prevCurrentIndex
+            prevCurrent = item,
+            prevCurrentIndex = index
           )
         } catch (e: Exception) {
           LOG.e(e) { it("Could not persist new queue") }
@@ -1019,7 +1019,7 @@ private class LocalAudioQueueImpl(
           // sent to clients
           newQueue = upNextQueue.toMutableList()
           newShuffled = upNextShuffled.toMutableList()
-          newIndex = prevCurrentIndex
+          newIndex = index
         }
       }
       // We want to send an state update even if nothing changed to ensure the UI is consistent
@@ -1096,8 +1096,8 @@ private class LocalAudioQueueImpl(
             val nextList = getNextPendingCategory()
             if (nextList.isNotEmpty) {
               val shouldShuffle = currentListType != nextList.categoryType &&
-                currentListName != nextList.categoryId &&
-                endOfQueueAction.shouldShuffle
+              currentListName != nextList.categoryId &&
+              endOfQueueAction.shouldShuffle
               playNext(
                 if (shouldShuffle) nextList.shuffled() else nextList,
                 ClearQueue(true),
@@ -1114,7 +1114,7 @@ private class LocalAudioQueueImpl(
   }
 
   private suspend fun getNextCategory(token: CategoryToken): CategoryMediaList =
-    audioMediaDao.getNextCategory(token, shuffle.shuffleLists())
+    audioMediaDao.getNextCategory(token, shuffleLists)
 
   private suspend fun updateNextPendingCategory() {
     nextPendingCategory = null
@@ -1128,7 +1128,7 @@ private class LocalAudioQueueImpl(
   }
 
   private suspend fun getPreviousCategory(token: CategoryToken): CategoryMediaList =
-    audioMediaDao.getPreviousCategory(token, shuffle.shuffleLists())
+    audioMediaDao.getPreviousCategory(token, shuffleLists)
 
   private fun doGoToIndex(
     goToIndex: Int,
@@ -1178,7 +1178,7 @@ private class LocalAudioQueueImpl(
     item: PlayableAudioItem,
     replacement: PlayableAudioItem
   ) {
-    if (shuffle.shuffleMedia().value) {
+    if (shuffleMedia.value) {
       debugCheck(upNextShuffled[index].instanceId == item.instanceId) {
         "index does not match item"
       }
@@ -1208,7 +1208,6 @@ private class LocalAudioQueueImpl(
     if (currentItem.isValid) {
       currentItemFlowJob?.cancel()
       currentItemFlowJob = null
-      scrobbler.complete(currentItem)
     }
     if (playNow.value) currentItem.shutdown(transition.exitTransition) else currentItem.shutdown()
     currentItemFlowJob = nextItem.collectEvents(doOnStart = {
@@ -1263,6 +1262,9 @@ private class LocalAudioQueueImpl(
   }
 
   private suspend fun onPositionUpdate(event: PlayableItemEvent.PositionUpdate) {
+    updatePositionState(
+      positionState.copy(mediaId = event.audioItem.id, playbackPosition = event.position)
+    )
     if (event.audioItem.isPlaying) {
       updatePlaybackState(currentItem, currentItemIndex, queue, PlayState.Playing)
       if (event.shouldAutoAdvance()) doNextOrRepeat()
@@ -1275,11 +1277,6 @@ private class LocalAudioQueueImpl(
     playState = PlayState.Playing
     val item = event.audioItem
     updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = event.position))
-    if (event.firstStart) {
-      scrobbler.start(item)
-    } else {
-      scrobbler.resume(item)
-    }
     updatePlaybackState(PlayState.Playing)
   }
 
@@ -1288,7 +1285,6 @@ private class LocalAudioQueueImpl(
     val item = event.audioItem
     val position = event.position
     updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = position))
-    scrobbler.pause(item)
     updatePlaybackState(currentItem, currentItemIndex, queue, PlayState.Paused)
   }
 
@@ -1297,8 +1293,6 @@ private class LocalAudioQueueImpl(
     val current = currentItem
     if (current.instanceId == item.instanceId) {
       playState = PlayState.Stopped
-      // TODO unsure our reported position is valid anymore, let's stick with last position for now
-//    updateQueueState(queueState.copy(mediaId = item.id, playbackPosition = event.currentPosition))
       updatePlaybackState(PlayState.Stopped)
     }
   }
@@ -1336,7 +1330,7 @@ private class LocalAudioQueueImpl(
       it.copy(
         queue = queue,
         queueIndex = index,
-        position = item.position,
+        position = positionState.playbackPosition,
         duration = item.duration,
         playingState = playState
       )
@@ -1344,13 +1338,13 @@ private class LocalAudioQueueImpl(
     sessionState.setState(
       PlaybackState(
         playState,
-        item.position,
+        positionState.playbackPosition,
         PlaybackRate.NORMAL,
         item.instanceId,
         PlaybackActions(
           hasMedia = queue.isNotEmpty(),
-          isPlaying = item.isPlaying,
-          hasPrev = index > 0 || item.position > Millis.FIVE_SECONDS
+          isPlaying = playState == PlayState.Playing,
+          hasPrev = index > 0 || positionState.playbackPosition > Millis.FIVE_SECONDS
         )
       )
     )
@@ -1482,10 +1476,10 @@ private class LocalAudioQueueImpl(
     prevCurrent: PlayableAudioItem,
     prevCurrentIndex: Int,
     idList: LongCollection,
-    shuffleMode: ShuffleMode,
     addAt: AddAt,
     clearAndRemakeQueues: Boolean,
-    allowDuplicates: AllowDuplicates
+    allowDuplicates: AllowDuplicates,
+    shuffleMedia: ShuffleMedia
   ): Triple<QueueList, QueueList, Int> = withContext(Dispatchers.Default) {
     val newQueue: QueueList
     val newShuffled: QueueList
@@ -1497,11 +1491,11 @@ private class LocalAudioQueueImpl(
     if (clearAndRemakeQueues) {
       // if the queue is empty OR we are supposed to clear the queue, just build new list(s)
       newQueue = newQueueItems
-      newShuffled = maybeMakeShuffled(shuffleMode, newQueue)
+      newShuffled = maybeMakeShuffled(shuffleMedia, newQueue)
       newIndex = 0
     } else {
       val idSet = LongOpenHashSet(idList)
-      if (shuffleMode.shuffleMedia().value) {
+      if (shuffleMedia.value) {
         val queueInfo = currentShuffled.addNewItems(
           newQueueItems,
           prevCurrentIndex,
@@ -1509,7 +1503,7 @@ private class LocalAudioQueueImpl(
           idSet,
           allowDuplicates,
           addAt,
-          shuffleMode
+          shuffleMedia
         )
         newShuffled = queueInfo.queue
         newIndex = queueInfo.index
@@ -1523,7 +1517,7 @@ private class LocalAudioQueueImpl(
           idSet,
           allowDuplicates,
           addAt,
-          shuffle
+          shuffleMedia
         )
         newQueue = queueInfo.queue
         newIndex = queueInfo.index
@@ -1533,8 +1527,8 @@ private class LocalAudioQueueImpl(
     Triple(newQueue, newShuffled, newIndex)
   }
 
-  private fun maybeMakeShuffled(shuffleMode: ShuffleMode, newQueue: QueueList): QueueList =
-    if (shuffleMode.shuffleMedia().value) newQueue.shuffled() else emptyList()
+  private fun maybeMakeShuffled(shuffleMedia: ShuffleMedia, newQueue: QueueList): QueueList =
+    if (shuffleMedia.value) newQueue.shuffled() else emptyList()
 
   private suspend fun persistIfCurrentUnchanged(
     newQueue: QueueList,
@@ -1624,7 +1618,7 @@ private fun List<PlayableAudioItem>.itemIsAtIndex(item: PlayableAudioItem, index
 /**
  * Add [newQueueItems] into this list after [currentIndex] or at the end of the list depending on
  * [addAt], removing all items being added from queue history if ![allowDuplicates] using
- * [newItemsIdSet], and adjusting the index as necessary. If [shuffleMode].shuffleMedia then the new
+ * [newItemsIdSet], and adjusting the index as necessary. If [shuffleMedia] then the new
  * items will be shuffled into the existing items in the list after [currentIndex].
  *
  * @return a [QueueInfo] with the new list and index after adding the new items
@@ -1636,7 +1630,7 @@ fun QueueList.addNewItems(
   newItemsIdSet: LongSet,
   allowDuplicates: AllowDuplicates,
   addAt: AddAt,
-  shuffleMode: ShuffleMode,
+  shuffleMedia: ShuffleMedia,
   shuffler: ListShuffler = LIST_SHUFFLER
 ): QueueInfo = if (newQueueItems.isEmpty()) QueueInfo(this, currentIndex) else {
   val beforeCurrent = sublistFromStartTo(currentIndex)
@@ -1648,7 +1642,7 @@ fun QueueList.addNewItems(
     ArrayList<PlayableAudioItem>(queueStart.size + afterCurrent.size + 1).apply {
       addAll(queueStart)
       if (currentItem != NullPlayableAudioItem) add(currentItem)
-      addAt.addTo(this, afterCurrent, newQueueItems, shuffleMode, shuffler)
+      addAt.addTo(this, afterCurrent, newQueueItems, shuffleMedia, shuffler)
     },
     if (currentIndex < 0) 0 else currentIndex - (beforeCurrent.size - queueStart.size)
   )

@@ -22,7 +22,6 @@ import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
-import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
@@ -41,7 +40,6 @@ import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MARK_PLAYED_PERCENTAGE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE_LENGTH
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
-import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SCROBBLER_PACKAGE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SELECT_MEDIA_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_THEME_CHOICE
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
@@ -52,8 +50,6 @@ import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 import org.koin.core.qualifier.named
 
 typealias AppPrefsSingleton = PreferenceStoreSingleton<AppPrefs>
-
-typealias AllowDuplicatesPref = StorePref<Boolean, AllowDuplicates>
 
 interface AppPrefs : PreferenceStore<AppPrefs> {
   val firstRun: BoolPref
@@ -68,7 +64,6 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val autoAdvanceFadeLength: MillisStorePref
   val manualChangeFade: BoolPref
   val manualChangeFadeLength: MillisStorePref
-  val scrobbler: StorePref<Int, ScrobblerPackage>
   val duckAction: StorePref<Int, DuckAction>
   val duckVolume: VolumeStorePref
   val playUpNextAction: StorePref<Int, PlayUpNextAction>
@@ -107,7 +102,6 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
     val DEFAULT_AUTO_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
     const val DEFAULT_MANUAL_ADVANCE_FADE = true
     val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.TWO_SECONDS.coerceIn(MEDIA_FADE_RANGE)
-    val DEFAULT_SCROBBLER_PACKAGE = ScrobblerPackage.None
     val DEFAULT_PLAY_UP_NEXT_ACTION = PlayUpNextAction.Prompt
     val DEFAULT_END_OF_QUEUE_ACTION = EndOfQueueAction.PlayNextList
     val DEFAULT_SELECT_MEDIA_ACTION = SelectMediaAction.Play
@@ -147,7 +141,6 @@ private class AppPrefsImpl(
   override val manualChangeFadeLength by millisPref(DEFAULT_MANUAL_ADVANCE_FADE_LENGTH) { millis ->
     millis.coerceIn(MEDIA_FADE_RANGE)
   }
-  override val scrobbler by enumPref(DEFAULT_SCROBBLER_PACKAGE)
   override val duckAction by enumPref(DEFAULT_DUCK_ACTION)
   override val duckVolume by volumePref(DEFAULT_DUCK_VOLUME) {
     it.coerceIn(DUCK_VOLUME_RANGE)

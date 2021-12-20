@@ -23,6 +23,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.debug
 import com.ealva.toque.persist.AlbumId
@@ -33,7 +34,6 @@ import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.audio.SharedPlayerState
-import com.ealva.toque.service.media.Rating
 import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.AvPlayerEvent
 import com.ealva.toque.service.player.NoOpPlayerTransition
@@ -119,6 +119,8 @@ class VlcAudioItem(
 
   override val supportsFade: Boolean = true
 
+  override var position: Millis = Millis(0)
+
   override val duration: Millis
     get() = metadata.duration
 
@@ -165,21 +167,26 @@ class VlcAudioItem(
     }
   }
 
+  /**
+   * We could get blasted with resets if there was a "stop" and then we get prepare/play requests
+   * originating from MediaSession/user/... Check [isPreparing] to prevent killing a player we're
+   * trying to start.
+   */
   override fun reset(playNow: PlayNow) {
-    val shouldPlayNow = PlayNow(playNow.value || isPlaying)
-    val currentTime = position
-    avPlayer.shutdown()
-    avPlayer = NullAvPlayer
-    prepareSeekMaybePlay(
-      currentTime,
-      if (playNow.value) PlayImmediateTransition() else NoOpPlayerTransition,
-      shouldPlayNow,
-      previousTimePlayed,
-      countTimeFrom
-    )
+    if (!isPreparing) {
+      val shouldPlayNow = PlayNow(playNow.value || isPlaying)
+      val currentTime = position
+      avPlayer.shutdown()
+      avPlayer = NullAvPlayer
+      prepareSeekMaybePlay(
+        currentTime,
+        if (playNow.value) PlayImmediateTransition() else NoOpPlayerTransition,
+        shouldPlayNow,
+        previousTimePlayed,
+        countTimeFrom
+      )
+    }
   }
-
-  override var position: Millis = Millis(0)
 
   override var playbackRate: PlaybackRate
     get() = avPlayer.playbackRate
@@ -256,13 +263,12 @@ class VlcAudioItem(
   }
 
   private suspend fun handleAvPlayerEvent(event: AvPlayerEvent) {
-    // LOG._e { it("handleAvPlayerEvent %s", event) }
     when (event) {
       is AvPlayerEvent.Prepared -> onPrepared(event)
       is AvPlayerEvent.Start -> onStart(event)
       is AvPlayerEvent.PositionUpdate -> onPositionUpdate(event)
       is AvPlayerEvent.Paused -> onPaused(event)
-      is AvPlayerEvent.Stopped -> onStopped(event)
+      is AvPlayerEvent.Stopped -> onStopped()
       is AvPlayerEvent.PlaybackComplete -> onPlaybackComplete()
       is AvPlayerEvent.Error -> onError()
       is AvPlayerEvent.None -> {
@@ -272,15 +278,13 @@ class VlcAudioItem(
 
   private suspend fun onPrepared(event: AvPlayerEvent.Prepared) {
     // Can get a 0 before we start actual playback, but we set this during prepareSeekMaybePlay
-    if (position == Millis(0)) position = event.position
-    // establish where we will start counting percentage played if not already set
-    if (countTimeFrom == Millis(0)) countTimeFrom = event.position
+//    if (position != Millis(0)) position = event.position
     isPreparing = false
     if (event.duration > 0 && duration != event.duration) {
       metadata = metadata.copy(duration = event.duration)
       mediaFileStore.updateDurationAsync(id, duration)
     }
-    eventFlow.emit(PlayableItemEvent.Prepared(this, event.position, event.duration))
+    eventFlow.emit(PlayableItemEvent.Prepared(this, position, event.duration))
     if (startOnPrepared) play(AllowFade)
   }
 
@@ -334,10 +338,10 @@ class VlcAudioItem(
     eventFlow.emit(PlayableItemEvent.Paused(this, event.position))
   }
 
-  private suspend fun onStopped(event: AvPlayerEvent.Stopped) {
+  private suspend fun onStopped() {
     isPreparing = false
     isStopped = true
-    eventFlow.emit(PlayableItemEvent.Stopped(this, event.position))
+    eventFlow.emit(PlayableItemEvent.Stopped(this))
   }
 
   private suspend fun onPlaybackComplete() {

@@ -21,11 +21,17 @@ import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
 import com.ealva.ealvabrainz.brainz.data.TrackMbid
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.StarRating
 
 interface MediaFileTagInfo : AutoCloseable {
   val duration: Millis
   val title: String
   val titleSort: String
+
+  /**
+   * The media artist, which may be a delimited list of artists
+   */
+  val mediaArtist: String
 
   /**
    * An artist in a file Tag can be a comma delimited list of some sort. There can also be multiple

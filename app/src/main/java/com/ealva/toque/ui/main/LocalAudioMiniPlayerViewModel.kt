@@ -20,13 +20,10 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
-import com.ealva.toque.service.controller.NullMediaController
-import com.ealva.toque.service.controller.ToqueMediaController
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue

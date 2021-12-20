@@ -21,6 +21,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.test.shared.CoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -46,27 +47,27 @@ class QueuePositionStateDaoTest {
   }
 
   @Test
-  fun testGetBeforeInit() = coroutineRule.runBlockingTest {
+  fun testGetBeforeInit() = runTest {
     Common.testGetBeforePersist(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testPersistState() = coroutineRule.runBlockingTest {
+  fun testPersistState() = runTest {
     Common.testPersistState(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testFactory() = coroutineRule.runBlockingTest {
+  fun testFactory() = runTest {
     Common.testFactory(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testCloseDaoAndRemake() = coroutineRule.runBlockingTest {
+  fun testCloseDaoAndRemake() = runTest {
     Common.testCloseDaoAndRemake(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testClosedDaoThrows() = coroutineRule.runBlockingTest {
+  fun testClosedDaoThrows() = runTest {
     thrown.expect(IllegalStateException::class.java)
     Common.testClosedDaoThrows(appCtx, coroutineRule.testDispatcher)
   }

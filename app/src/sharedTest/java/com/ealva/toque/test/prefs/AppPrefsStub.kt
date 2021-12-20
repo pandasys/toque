@@ -20,16 +20,12 @@ import com.ealva.prefstore.store.BoolPref
 import com.ealva.prefstore.store.MutablePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.StoreHolder
-import com.ealva.prefstore.store.StorePref
-import com.ealva.toque.audioout.AudioOutputModule
-import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.DuckAction
 import com.ealva.toque.prefs.EndOfQueueAction
 import com.ealva.toque.prefs.PlayUpNextAction
-import com.ealva.toque.prefs.ScrobblerPackage
 import com.ealva.toque.prefs.SelectMediaAction
 import com.ealva.toque.prefs.ThemeChoice
 import kotlinx.coroutines.flow.Flow
@@ -62,7 +58,6 @@ class AppPrefsStub : AppPrefs {
   override val autoAdvanceFadeLength = MillisPrefStub()
   override val manualChangeFade = BoolPrefStub()
   override val manualChangeFadeLength = MillisPrefStub()
-  override val scrobbler = PrefStub<Int, ScrobblerPackage>()
   override val duckAction = PrefStub<Int, DuckAction>()
   override val duckVolume = PrefStub<Int, Volume>()
   override val playUpNextAction = PrefStub<Int, PlayUpNextAction>()

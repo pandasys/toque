@@ -21,10 +21,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.test.shared.CoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import org.junit.Before
+import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.test.BeforeTest
 import com.ealva.toque.test.db.CommonPresetAssocDaoTest as Common
 
 @ExperimentalCoroutinesApi
@@ -35,38 +36,38 @@ class EqPresetAssociationDaoTest {
 
   private lateinit var appCtx: Context
 
-  @Before
+  @BeforeTest
   fun setup() {
     appCtx = ApplicationProvider.getApplicationContext()
   }
 
   @Test
-  fun testSetDefaultPreset() = coroutineRule.runBlockingTest {
+  fun testSetDefaultPreset() = runTest {
     Common.testSetAsDefault(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testReplaceDefault() = coroutineRule.runBlockingTest {
+  fun testReplaceDefault() = runTest {
     Common.testReplaceDefault(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testMakeAssociations() = coroutineRule.runBlockingTest {
+  fun testMakeAssociations() = runTest {
     Common.testMakeAssociations(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testReplaceAssociations() = coroutineRule.runBlockingTest {
+  fun testReplaceAssociations() = runTest {
     Common.testReplaceAssociations(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testGetPreferredIdFallbackToDefault() = coroutineRule.runBlockingTest {
+  fun testGetPreferredIdFallbackToDefault() = runTest {
     Common.testGetPreferredIdDefault(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testGetPreferredId() = coroutineRule.runBlockingTest {
+  fun testGetPreferredId() = runTest {
     Common.testGetPreferredId(appCtx, coroutineRule.testDispatcher)
   }
 }

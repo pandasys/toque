@@ -21,6 +21,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.test.shared.CoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -41,42 +42,42 @@ class EqPresetDaoTest {
   }
 
   @Test
-  fun testEstablishEqPresetTableMinimumRowid() = coroutineRule.runBlockingTest {
+  fun testEstablishEqPresetTableMinimumRowid() = runTest {
     Common.testEstablishMinRowId(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testUpdateMissingPreset() = coroutineRule.runBlockingTest {
+  fun testUpdateMissingPreset() = runTest {
     Common.testUpdateMissingPreset(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testInsertPreset() = coroutineRule.runBlockingTest {
+  fun testInsertPreset() = runTest {
     Common.testInsertPreset(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testInsertDuplicatePreset() = coroutineRule.runBlockingTest {
+  fun testInsertDuplicatePreset() = runTest {
     Common.testInsertDuplicatePreset(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testUpdatePreset() = coroutineRule.runBlockingTest {
+  fun testUpdatePreset() = runTest {
     Common.testUpdatePreset(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testUpdatePreAmp() = coroutineRule.runBlockingTest {
+  fun testUpdatePreAmp() = runTest {
     Common.testUpdatePreAmp(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testUpdateBAnd() = coroutineRule.runBlockingTest {
+  fun testUpdateBAnd() = runTest {
     Common.testUpdateBand(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
-  fun testDeletePreset() = coroutineRule.runBlockingTest {
+  fun testDeletePreset() = runTest {
     Common.testDeletePreset(appCtx, coroutineRule.testDispatcher)
   }
 }

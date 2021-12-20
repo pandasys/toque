@@ -41,6 +41,7 @@ import androidx.compose.material.SwipeToDismiss
 import androidx.compose.material.Text
 import androidx.compose.material.rememberDismissState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,7 +67,7 @@ import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.scrollToFirst
 import com.ealva.toque.ui.common.scrollToPosition
@@ -86,6 +87,7 @@ import com.ealva.toque.ui.library.inSelectionModeThenTurnOff
 import com.ealva.toque.ui.library.selectAll
 import com.ealva.toque.ui.library.toggleSelection
 import com.ealva.toque.ui.library.turnOffSelectionMode
+import com.ealva.toque.ui.nav.goToScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -230,9 +232,8 @@ private fun QueueContents(
       items(items = queue, key = { it.instanceId }) { queueItem ->
         val dismissState = rememberDismissState()
         if (dismissState.isDismissed(DismissDirection.EndToStart)) {
-          val scope = rememberCoroutineScope()
-          scope.launch {
-            onDelete(queueItem)
+          onDelete(queueItem)
+          LaunchedEffect(key1 = queueItem.instanceId) {
             // Need to reset dismiss state so swipe doesn't occur again when undoing onDelete
             dismissState.snapTo(DismissValue.Default)
           }
@@ -243,7 +244,7 @@ private fun QueueContents(
         val isCurrent = queueItem.item.instanceId == currentId
         val isSelected = selectedItems.isSelected(queueItem.instanceId)
 
-        DraggableQueueItem(
+        DismissibleItem(
           dismissState = dismissState,
           modifier = Modifier.draggedItem(reorderState.offsetByKey(queueItem.instanceId))
         ) {
@@ -269,10 +270,10 @@ private fun QueueContents(
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun DraggableQueueItem(
+ fun DismissibleItem(
   dismissState: DismissState,
   modifier: Modifier,
-  queueItem: @Composable () -> Unit,
+  item: @Composable () -> Unit,
 ) {
   SwipeToDismiss(
     state = dismissState,
@@ -299,7 +300,7 @@ private fun DraggableQueueItem(
     },
     modifier = modifier
   ) {
-    queueItem()
+    item()
   }
 }
 
@@ -383,7 +384,7 @@ interface QueueViewModel {
 
   companion object {
     operator fun invoke(
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): QueueViewModel =
@@ -392,7 +393,7 @@ interface QueueViewModel {
 }
 
 private class QueueViewModelImpl(
-  private val localAudioQueueModel: LocalAudioQueueModel,
+  private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : QueueViewModel, ScopedServices.Activated, ScopedServices.HandlesBack {
@@ -477,7 +478,7 @@ private class QueueViewModelImpl(
     if (selected.selectedCount == 1) {
       val instanceId: InstanceId = selected.single()
 
-      backstack.goTo(
+      backstack.goToScreen(
         AudioMediaInfoScreen(
           queueState.value
             .queue

@@ -22,10 +22,10 @@ import androidx.core.net.toUri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.Rating
-import com.ealva.toque.service.media.StarRating
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

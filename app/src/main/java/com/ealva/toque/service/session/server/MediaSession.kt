@@ -43,6 +43,7 @@ import android.support.v4.media.session.MediaSessionCompat.FLAG_HANDLES_MEDIA_BU
 import android.support.v4.media.session.MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS
 import android.support.v4.media.session.MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
 import android.support.v4.media.session.PlaybackStateCompat
+import android.support.v4.media.session.PlaybackStateCompat.STATE_PAUSED
 import android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING
 import android.support.v4.media.session.PlaybackStateCompat.STATE_STOPPED
 import android.util.TypedValue
@@ -73,10 +74,10 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.asCompat
 import com.ealva.toque.common.fetch
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.common.windowOf15
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.service.controller.SessionControlEvent
-import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.session.common.Metadata
 import com.ealva.toque.service.session.common.PlaybackState
 import com.ealva.toque.service.session.common.PlaybackState.Companion.NullPlaybackState
@@ -150,7 +151,7 @@ interface MediaSessionState {
 
   interface NotificationListener {
     fun onPosted(notificationId: Int, notification: Notification)
-    fun onCanceled()
+    fun stopForground()
   }
 
   /** Update the current playback state clients can display */
@@ -296,8 +297,10 @@ private class MediaSessionImpl(
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
   private var allowNotifications = false
+
   /** Primary (only?) purpose of [lastMetadata] is for fast recent media query at startup */
   private var lastMetadata: Metadata = Metadata.NullMetadata
+
   /** [msgHandler] for async notification update and bitmap retrieval */
   private var msgHandler = makeHandler()
   private var isNotificationStarted = false
@@ -561,17 +564,36 @@ private class MediaSessionImpl(
     }
   }
 
+  /**
+   * Trouble canceling notification unless doing a [STATE_PAUSED] before [STATE_STOPPED]. This is
+   * likely related to MediaPlayerService being considered a "foreground service'. Either we have to
+   * pause before stopping foreground and canceling notification, or it's a timing issue.
+   */
   private fun startOrUpdateNotification(bitmap: Bitmap?) {
     scope.launch {
-      makeBuilder(bitmap)?.let { builder ->
-        val notification = builder.build()
-        notificationManager.notify(NOW_PLAYING_NOTIFICATION_ID, notification)
-        if (!isNotificationStarted) {
-          isNotificationStarted = true
-        }
-        notificationListener.onPosted(NOW_PLAYING_NOTIFICATION_ID, notification)
-      } ?: stopNotificationIfStarted()
+      val controller: MediaControllerCompat = session.controller
+      val playbackState: PlaybackStateCompat? = controller.playbackState
+      val description: MediaDescriptionCompat? = controller.metadata?.description
+      val sessionActivity = controller.sessionActivity
+      if (playbackState?.state == STATE_STOPPED) {
+        doStartOrUpdateNotification(bitmap, STATE_PAUSED, description, sessionActivity)
+      }
+      doStartOrUpdateNotification(bitmap, playbackState?.state, description, sessionActivity)
     }
+  }
+
+  private suspend fun doStartOrUpdateNotification(
+    bitmap: Bitmap?,
+    playbackState: Int?,
+    description: MediaDescriptionCompat?,
+    sessionActivity: PendingIntent
+  ) {
+    makeBuilder(bitmap, playbackState, description, sessionActivity)?.let { builder ->
+      val notification = builder.build()
+      notificationManager.notify(NOW_PLAYING_NOTIFICATION_ID, notification)
+      if (!isNotificationStarted) isNotificationStarted = true
+      notificationListener.onPosted(NOW_PLAYING_NOTIFICATION_ID, notification)
+    } ?: stopNotificationIfStarted()
   }
 
   private fun stopNotificationIfStarted() {
@@ -579,22 +601,27 @@ private class MediaSessionImpl(
       isNotificationStarted = false
       msgHandler.removeMessages(MSG_START_OR_UPDATE_NOTIFICATION)
       msgHandler.removeMessages(MSG_UPDATE_NOTIFICATION_BITMAP)
-      notificationListener.onCanceled()
-      notificationManager.cancel(NOW_PLAYING_NOTIFICATION_ID)
+      cancelNotification()
     }
   }
 
-  private suspend fun makeBuilder(bitmap: Bitmap?): NotificationBuilder? {
-    val controller: MediaControllerCompat = session.controller
-    val state: PlaybackStateCompat? = controller.playbackState
-    val description: MediaDescriptionCompat? = controller.metadata?.description
+  private fun cancelNotification() {
+    notificationListener.stopForground()
+    notificationManager.cancel(NOW_PLAYING_NOTIFICATION_ID)
+  }
 
-    if (state == null || state.state == STATE_STOPPED || description == null) {
+  private suspend fun makeBuilder(
+    bitmap: Bitmap?,
+    state: Int?,
+    description: MediaDescriptionCompat?,
+    sessionActivity: PendingIntent
+  ): NotificationBuilder? {
+    if (state == null || state == STATE_STOPPED || description == null) {
       return null
     }
 
-    return (makeNewBuilder(controller.sessionActivity)).apply {
-      val isPlaying = state.isPlaying
+    return (makeNewBuilder(sessionActivity)).apply {
+      val isPlaying = state == STATE_PLAYING
       setOngoing(isPlaying)
 
       var largeIcon = bitmap

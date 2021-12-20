@@ -17,15 +17,6 @@
 
 <resources>
 
-  <string name="SimpleLastFm">Simple Last.fm Scrobbler</string>
-  <string name="LastFm">Last.fm</string>
-
-  <string-array name="scrobbler_names">
-    <item>None</item>
-    <item>Simple Last.fm Scrobbler</item>
-    <item>Last.fm</item>
-  </string-array>
-
   <string-array name="audio_output_module_names">
     <item>OpenSL ES</item>
     <item>Audio Track</item>

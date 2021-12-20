@@ -23,13 +23,13 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.file.isLocalScheme
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.Rating
-import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.tag.SongTag
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.binding.binding

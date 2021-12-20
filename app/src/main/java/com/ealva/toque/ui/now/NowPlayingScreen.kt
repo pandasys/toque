@@ -60,21 +60,20 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.service.media.Rating
-import com.ealva.toque.service.media.toStarRating
 import com.ealva.toque.service.vlc.toFloat
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ARTIST
@@ -106,8 +105,6 @@ import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
-private val LOG by lazyLogger(NowPlayingScreen::class)
-
 object NowPlayingScreenIds {
   const val ID_SLIDER_SPACE = 1
   const val ID_BUTTON_ROW = 2
@@ -128,7 +125,7 @@ object NowPlayingScreenIds {
 data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(LocalAudioQueueModel(lookup(), get(AppPrefs.QUALIFIER), get()))
+      add(LocalAudioQueueViewModel(lookup(), get(AppPrefs.QUALIFIER), get()))
       add(NowPlayingViewModel(lookup(), get(AppPrefs.QUALIFIER)))
     }
   }
@@ -447,7 +444,7 @@ private fun PositionSlider(
   Slider(
     value = position.toFloat(),
     valueRange = range,
-    onValueChange = { seekTo(Millis(it)) },
+    onValueChange = { value -> seekTo(Millis(value)) },
     modifier = modifier
   )
 }

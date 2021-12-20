@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
@@ -34,7 +33,8 @@ import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.asAlbumIdList
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
@@ -93,7 +93,7 @@ private class AllAlbumsViewModel(
   albumDao: AlbumDao,
   private val audioMediaDao: AudioMediaDao,
   backstack: Backstack,
-  localAudioQueueModel: LocalAudioQueueModel
+  localAudioQueueModel: LocalAudioQueueViewModel
 ) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel) {
   private val categories = LibraryCategories()
 
@@ -105,7 +105,7 @@ private class AllAlbumsViewModel(
     filter: Filter
   ): Result<List<AlbumDescription>, DaoMessage> = albumDao.getAllAlbums(filter)
 
-  override fun goToAlbumSongs(albumId: AlbumId) = backstack.goTo(AlbumSongsScreen(albumId))
+  override fun goToAlbumSongs(albumId: AlbumId) = backstack.goToScreen(AlbumSongsScreen(albumId))
 
   override suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>

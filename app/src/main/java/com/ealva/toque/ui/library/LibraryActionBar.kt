@@ -135,7 +135,7 @@ fun LibraryActionBar(
           onCheckedChange = selectAllOrNone
         )
         Text(
-          modifier = Modifier.padding(start = 8.dp),
+          modifier = Modifier.padding(start = 2.dp),
           text = "All",
           textAlign = TextAlign.End,
           maxLines = 1,

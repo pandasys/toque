@@ -18,7 +18,6 @@
 
 package com.ealva.toque.prefs
 
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.prefstore.store.BasePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
@@ -28,7 +27,6 @@ import com.ealva.toque.common.Amp
 import com.ealva.toque.common.BooleanValue
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reify
 

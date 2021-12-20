@@ -25,13 +25,23 @@ import com.zhuinden.simplestackcomposeintegration.core.DefaultComposeKey
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import kotlinx.parcelize.Parcelize
 
-abstract class ComposeKey : DefaultComposeKey(), Parcelable, DefaultServiceProvider.HasServices {
+abstract class ComposeKey : DefaultComposeKey(), Parcelable, DefaultServiceProvider.HasServices,
+  AllowableNavigation {
   override val saveableStateProviderKey: Any
     get() = this
 
   override fun getScopeTag(): String = javaClass.name
 
   override fun bindServices(serviceBinder: ServiceBinder) {
+  }
+
+  /**
+   * If allowed to navigate away from the top screen, perform the [command]. By default all
+   * navigation commands are allowed. Editor screens may disallow navigation until the user has been
+   * prompted.
+   */
+  override fun navigateIfAllowed(command: () -> Unit) {
+    command()
   }
 }
 

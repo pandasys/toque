@@ -14,24 +14,32 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.prefs
+package com.ealva.toque.db.smart
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
-import com.ealva.toque.common.PackageName
-import com.ealva.toque.common.asPackageName
+import com.ealva.toque.common.fetch
 import com.ealva.toque.persist.HasConstId
-import com.ealva.toque.res.HasTitle
+import com.ealva.welite.db.expr.Expression
+import com.ealva.welite.db.expr.Op
+import com.ealva.welite.db.expr.and
+import com.ealva.welite.db.expr.or
 
-/**
- * Don't change any enum instance [id] as it is persisted in the app preferences.
- */
-enum class ScrobblerPackage(
+enum class AnyOrAll(
   override val id: Int,
-  val packageName: PackageName,
-  @StringRes override val titleRes: Int
-) : HasConstId, HasTitle {
-  None(0, PackageName("NONE"), R.string.None),
-  LastFm(1, "fm.last.android".asPackageName, R.string.LastFm),
-  SimpleLastFm(2, "com.adam.aslfms".asPackageName, R.string.SimpleLastFm);
+  @StringRes private val stringRes: Int,
+  val op: Expression<Boolean>.(op: Expression<Boolean>) -> Op<Boolean>,
+) : HasConstId {
+  All(1, R.string.all, { rhs -> and(rhs) }),
+  Any(2, R.string.any, { rhs -> or(rhs) });
+
+  fun apply(lhs: Op<Boolean>, rhs: Op<Boolean>): Op<Boolean> = lhs.op(rhs)
+
+  override fun toString(): String {
+    return fetch(stringRes)
+  }
+
+  companion object {
+    val allValues = values().asList()
+  }
 }

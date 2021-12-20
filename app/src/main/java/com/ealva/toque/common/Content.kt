@@ -29,5 +29,5 @@ fun fetchPlural(@PluralsRes pluralRes: Int, quantity: Int): String =
   Toque.appContext.resources.getQuantityString(pluralRes, quantity, quantity)
 
 fun fetchPlural(@PluralsRes pluralRes: Int, quantity: Int, vararg formatArgs: Any): String =
-  Toque.appContext.resources.getQuantityString(pluralRes, quantity, quantity, *formatArgs)
+  Toque.appContext.resources.getQuantityString(pluralRes, quantity, *formatArgs)
 

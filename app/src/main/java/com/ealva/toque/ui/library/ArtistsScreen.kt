@@ -69,7 +69,7 @@ import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asArtistIdList
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -77,6 +77,7 @@ import com.ealva.toque.ui.config.ProvideScreenConfig
 import com.ealva.toque.ui.config.makeScreenConfig
 import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
+import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -292,7 +293,7 @@ private interface ArtistsViewModel : ActionsViewModel {
     operator fun invoke(
       key: ComposeKey,
       audioDao: AudioMediaDao,
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       artistType: ArtistType,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
@@ -304,7 +305,7 @@ private interface ArtistsViewModel : ActionsViewModel {
 private class ArtistsViewModelImpl(
   private val key: ComposeKey,
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   private val artistType: ArtistType,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
@@ -370,7 +371,7 @@ private class ArtistsViewModelImpl(
     .filterIfHasSelection(selectedItems.value) { it.artistId }
 
   private fun goToArtistAlbums(artistId: ArtistId, songCount: Int) =
-    backstack.goTo(ArtistAlbumsScreen(artistId, artistType, songCount))
+    backstack.goToScreen(ArtistAlbumsScreen(artistId, artistType, songCount))
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)

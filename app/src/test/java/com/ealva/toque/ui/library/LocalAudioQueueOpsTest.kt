@@ -28,7 +28,8 @@ import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.test.shared.CoroutineRule
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
 import com.ealva.toque.ui.common.DialogPrompt
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.LocalAudioQueueOps.OpMessage
@@ -40,6 +41,7 @@ import com.nhaarman.expect.fail
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -49,7 +51,7 @@ class LocalAudioQueueOpsTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
-  private val queueStub = LocalAudioQueueStub()
+  private val queueStub = LocalAudioQueueViewModelStub()
   private lateinit var queueOps: LocalAudioQueueOps
 
   @Before
@@ -58,7 +60,7 @@ class LocalAudioQueueOpsTest {
   }
 
   @Test
-  fun testGetMediaListReturnsError() = coroutineRule.runBlockingTest {
+  fun testGetMediaListReturnsError() = runTest {
     Op.values().forEach { op ->
       var clearCalled = false
       when (val result = queueOps.doOp(op, { Err(DaoNotImplemented) }, { clearCalled = true })) {
@@ -70,7 +72,7 @@ class LocalAudioQueueOpsTest {
   }
 
   @Test
-  fun testGetMediaListReturnsEmptyList() = coroutineRule.runBlockingTest {
+  fun testGetMediaListReturnsEmptyList() = runTest {
     Op.values().forEach { op ->
       var clearCalled = false
       when (val result = queueOps.doOp(op, { Ok(EMPTY_MEDIA_LIST) }, { clearCalled = true })) {
@@ -82,15 +84,15 @@ class LocalAudioQueueOpsTest {
   }
 
   @Test
-  fun testDismissedReturned() = coroutineRule.runBlockingTest {
+  fun testDismissedReturned() = runTest {
     val ops = listOf(Op.Play, Op.Shuffle, Op.AddToPlaylist)
-    queueStub._playReturn = LocalAudioQueueModel.PromptResult.Dismissed
-    queueStub._shuffleReturn = LocalAudioQueueModel.PromptResult.Dismissed
-    queueStub._addToPlaylistReturn = LocalAudioQueueModel.PromptResult.Dismissed
+    queueStub._playReturn = PromptResult.Dismissed
+    queueStub._shuffleReturn = PromptResult.Dismissed
+    queueStub._addToPlaylistReturn = PromptResult.Dismissed
     ops.forEach { op ->
       var clearCalled = false
       when (val result = queueOps.doOp(op, { Ok(MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> expect(result.value).toBe(LocalAudioQueueModel.PromptResult.Dismissed)
+        is Ok -> expect(result.value).toBe(PromptResult.Dismissed)
         is Err -> fail("Expected Ok")
       }
       expect(clearCalled).toBe(false)
@@ -98,15 +100,15 @@ class LocalAudioQueueOpsTest {
   }
 
   @Test
-  fun testAlwaysReturnExecuted() = coroutineRule.runBlockingTest {
+  fun testAlwaysReturnExecuted() = runTest {
     val alwaysExecOps = listOf(Op.PlayNext, Op.AddToUpNext)
-    queueStub._playReturn = LocalAudioQueueModel.PromptResult.Dismissed
-    queueStub._shuffleReturn = LocalAudioQueueModel.PromptResult.Dismissed
-    queueStub._addToPlaylistReturn = LocalAudioQueueModel.PromptResult.Dismissed
+    queueStub._playReturn = PromptResult.Dismissed
+    queueStub._shuffleReturn = PromptResult.Dismissed
+    queueStub._addToPlaylistReturn = PromptResult.Dismissed
     alwaysExecOps.forEach { op ->
       var clearCalled = false
       when (val result = queueOps.doOp(op, { Ok(MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> expect(result.value).toBe(LocalAudioQueueModel.PromptResult.Executed)
+        is Ok -> expect(result.value).toBe(PromptResult.Executed)
         is Err -> fail("Expected Ok")
       }
       expect(clearCalled).toBe(true)
@@ -114,14 +116,14 @@ class LocalAudioQueueOpsTest {
   }
 
   @Test
-  fun testExecutedReturned() = coroutineRule.runBlockingTest {
-    queueStub._playReturn = LocalAudioQueueModel.PromptResult.Executed
-    queueStub._shuffleReturn = LocalAudioQueueModel.PromptResult.Executed
-    queueStub._addToPlaylistReturn = LocalAudioQueueModel.PromptResult.Executed
+  fun testExecutedReturned() = runTest {
+    queueStub._playReturn = PromptResult.Executed
+    queueStub._shuffleReturn = PromptResult.Executed
+    queueStub._addToPlaylistReturn = PromptResult.Executed
     Op.values().forEach { op ->
       var clearCalled = false
       when (val result = queueOps.doOp(op, { Ok(MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> expect(result.value).toBe(LocalAudioQueueModel.PromptResult.Executed)
+        is Ok -> expect(result.value).toBe(PromptResult.Executed)
         is Err -> fail("Expected Ok")
       }
       expect(clearCalled).toBe(true)
@@ -129,7 +131,7 @@ class LocalAudioQueueOpsTest {
   }
 }
 
-private class LocalAudioQueueStub : LocalAudioQueueModel {
+private class LocalAudioQueueViewModelStub : LocalAudioQueueViewModel {
   override val localAudioQueue: StateFlow<LocalAudioQueue> = MutableStateFlow(NullLocalAudioQueue)
   override val playUpNextAction: StateFlow<PlayUpNextAction> =
     MutableStateFlow(PlayUpNextAction.Prompt)
@@ -137,13 +139,13 @@ private class LocalAudioQueueStub : LocalAudioQueueModel {
 
   override fun emitNotification(notification: Notification) {}
 
-  var _playReturn: LocalAudioQueueModel.PromptResult = LocalAudioQueueModel.PromptResult.Executed
-  override suspend fun play(mediaList: CategoryMediaList): LocalAudioQueueModel.PromptResult {
+  var _playReturn: PromptResult = PromptResult.Executed
+  override suspend fun play(mediaList: CategoryMediaList): PromptResult {
     return _playReturn
   }
 
-  var _shuffleReturn: LocalAudioQueueModel.PromptResult = LocalAudioQueueModel.PromptResult.Executed
-  override suspend fun shuffle(mediaList: CategoryMediaList): LocalAudioQueueModel.PromptResult {
+  var _shuffleReturn: PromptResult = PromptResult.Executed
+  override suspend fun shuffle(mediaList: CategoryMediaList): PromptResult {
     return _shuffleReturn
   }
 
@@ -153,9 +155,9 @@ private class LocalAudioQueueStub : LocalAudioQueueModel {
   override fun addToUpNext(categoryMediaList: CategoryMediaList) {
   }
 
-  var _addToPlaylistReturn: LocalAudioQueueModel.PromptResult =
-    LocalAudioQueueModel.PromptResult.Executed
-  override suspend fun addToPlaylist(mediaIdList: MediaIdList): LocalAudioQueueModel.PromptResult {
+  var _addToPlaylistReturn: PromptResult =
+    PromptResult.Executed
+  override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
     return _addToPlaylistReturn
   }
 

@@ -56,8 +56,6 @@ import com.ealva.toque.ui.config.ProvideScreenConfig
 import com.ealva.toque.ui.config.makeScreenConfig
 import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.LocalWindowInsets
-import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

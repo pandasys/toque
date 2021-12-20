@@ -16,7 +16,7 @@
 
 package com.ealva.toque.service.audio
 
-import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.ShuffleMedia
 
 enum class AddAt {
   AfterCurrent {
@@ -24,14 +24,14 @@ enum class AddAt {
         addTo: MutableList<PlayableAudioItem>,
         queueItems: List<PlayableAudioItem>,
         newItems: List<PlayableAudioItem>,
-        shuffleMode: ShuffleMode,
+        shuffleMedia: ShuffleMedia,
         shuffler: ListShuffler
     ) {
       addTo.addAll(
         ArrayList<PlayableAudioItem>(newItems.size + queueItems.size).apply {
           addAll(newItems)
           addAll(queueItems)
-          if (shuffleMode.shuffleMedia().value) shuffler.shuffleInPlace(this)
+          if (shuffleMedia.value) shuffler.shuffleInPlace(this)
         }
       )
     }
@@ -41,14 +41,14 @@ enum class AddAt {
         addTo: MutableList<PlayableAudioItem>,
         queueItems: List<PlayableAudioItem>,
         newItems: List<PlayableAudioItem>,
-        shuffleMode: ShuffleMode,
+        shuffleMedia: ShuffleMedia,
         shuffler: ListShuffler
     ) {
       addTo.addAll(
         ArrayList<PlayableAudioItem>(newItems.size + queueItems.size).apply {
           addAll(queueItems)
           addAll(newItems)
-          if (shuffleMode.shuffleMedia().value) shuffler.shuffleInPlace(this)
+          if (shuffleMedia.value) shuffler.shuffleInPlace(this)
         }
       )
     }
@@ -58,7 +58,7 @@ enum class AddAt {
       addTo: MutableList<PlayableAudioItem>,
       queueItems: List<PlayableAudioItem>,
       newItems: List<PlayableAudioItem>,
-      shuffleMode: ShuffleMode,
+      shuffleMedia: ShuffleMedia,
       shuffler: ListShuffler
   )
 }

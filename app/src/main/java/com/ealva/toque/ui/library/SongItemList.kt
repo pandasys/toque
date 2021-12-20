@@ -34,9 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.media.Rating
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.config.ProvideScreenConfig

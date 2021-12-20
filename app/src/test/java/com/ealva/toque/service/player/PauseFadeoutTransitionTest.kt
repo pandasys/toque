@@ -24,10 +24,10 @@ import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PauseFadeoutTransitionTest {
@@ -49,7 +49,7 @@ class PauseFadeoutTransitionTest {
   }
 
   @Test
-  fun isPlaying() = run {
+  fun isPlaying() {
     player._isPlaying = true
     expect(transition.isPlaying).toBe(false) // shouldn't ask the player, always true
   }
@@ -71,7 +71,7 @@ class PauseFadeoutTransitionTest {
   }
 
   @Test
-  fun execute() = coroutineRule.runBlockingTest {
+  fun execute() = runTest {
     // given
     player._volume = Volume.MAX
     player._isPlaying = true
@@ -95,7 +95,7 @@ class PauseFadeoutTransitionTest {
   }
 
   @Test
-  fun cancel() = coroutineRule.runBlockingTest {
+  fun cancel() = runTest {
     transition.setCancelled()
     transition.execute()
     player.verifyZeroInteractions()

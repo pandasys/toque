@@ -71,13 +71,19 @@
 
     <activity
       android:name=".ui.main.MainActivity"
+      android:configChanges="orientation|screenSize|screenLayout"
       android:exported="true"
       android:label="@string/app_name"
-      android:configChanges="orientation|screenSize|screenLayout"
       android:theme="@style/Theme.Toque.NoActionBar">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
+
         <category android:name="android.intent.category.LAUNCHER" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+        <category android:name="android.intent.category.DEFAULT" />
       </intent-filter>
     </activity>
 
@@ -85,8 +91,7 @@
       android:name=".ui.main.RequestPermissionActivity"
       android:exported="false"
       android:label="Request Permission"
-      android:theme="@style/Theme.Toque.NoActionBar"
-      />
+      android:theme="@style/Theme.Toque.NoActionBar" />
 
     <service
       android:name=".scanner.MediaScannerService"

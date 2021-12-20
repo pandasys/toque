@@ -27,7 +27,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -87,7 +87,7 @@ private class AlbumSongsForArtistViewModel(
   private val albumId: AlbumId,
   private val artistId: ArtistId,
   audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),

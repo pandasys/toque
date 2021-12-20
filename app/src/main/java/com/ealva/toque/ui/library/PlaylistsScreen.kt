@@ -19,9 +19,14 @@ package com.ealva.toque.ui.library
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,16 +34,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
 import androidx.compose.material.ListItem
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
@@ -55,17 +70,19 @@ import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
 import com.ealva.toque.db.PlaylistDescription
+import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.asPlaylistIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
+import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -90,6 +107,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
@@ -128,7 +150,10 @@ data class PlaylistsScreen(
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      CategoryTitleBar(viewModel.categoryItem)
+      TitleBar(
+        categoryItem = viewModel.categoryItem,
+        newSmartPlaylist = { viewModel.newSmartPlaylist() }
+      )
       LibraryItemsActions(
         itemCount = playlists.value.size,
         selectedItems = selected.value,
@@ -138,8 +163,50 @@ data class PlaylistsScreen(
         list = playlists.value,
         selected = selected.value,
         itemClicked = { viewModel.itemClicked(it) },
-        itemLongClicked = { viewModel.itemLongClicked(it) }
+        itemLongClicked = { viewModel.itemLongClicked(it) },
+        editSmartPlaylist = { viewModel.editSmartPlaylist(it) }
       )
+    }
+  }
+
+  @Composable
+  private fun TitleBar(
+    categoryItem: LibraryCategories.CategoryItem,
+    newSmartPlaylist: () -> Unit
+  ) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      CategoryTitleBar(categoryItem)
+      Spacer(modifier = Modifier.weight(1.0F, fill = true))
+      var expanded by remember { mutableStateOf(false) }
+      Box(
+        modifier = Modifier
+          .size(42.dp)
+          .padding(end = 8.dp)
+          .clickable { expanded = true },
+
+        ) {
+        Icon(
+          painter = rememberImagePainter(data = R.drawable.ic_more_vert),
+          contentDescription = stringResource(id = R.string.EmbeddedArtwork),
+          modifier = Modifier.size(40.dp),
+          tint = LocalContentColor.current
+        )
+        DropdownMenu(
+          expanded = expanded,
+          onDismissRequest = { expanded = false },
+        ) {
+          DropdownMenuItem(
+            onClick = {
+              expanded = false
+              newSmartPlaylist()
+            }
+          ) {
+            Text(text = stringResource(id = R.string.NewSmartPlaylist))
+          }
+        }
+      }
     }
   }
 }
@@ -149,7 +216,8 @@ private fun AllPlaylists(
   list: List<PlaylistInfo>,
   selected: SelectedItems<PlaylistId>,
   itemClicked: (PlaylistInfo) -> Unit,
-  itemLongClicked: (PlaylistInfo) -> Unit
+  itemLongClicked: (PlaylistInfo) -> Unit,
+  editSmartPlaylist: (PlaylistInfo) -> Unit
 ) {
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
@@ -173,7 +241,8 @@ private fun AllPlaylists(
           playlistInfo = playlistInfo,
           isSelected = selected.isSelected(playlistInfo.id),
           itemClicked = itemClicked,
-          itemLongClicked = itemLongClicked
+          itemLongClicked = itemLongClicked,
+          editSmartPlaylist = editSmartPlaylist
         )
       }
     }
@@ -186,34 +255,57 @@ private fun PlaylistItem(
   playlistInfo: PlaylistInfo,
   isSelected: Boolean,
   itemClicked: (PlaylistInfo) -> Unit,
-  itemLongClicked: (PlaylistInfo) -> Unit
+  itemLongClicked: (PlaylistInfo) -> Unit,
+  editSmartPlaylist: (PlaylistInfo) -> Unit
 ) {
-  ListItem(
-    modifier = Modifier
-      .fillMaxWidth()
-      .modifyIf(isSelected) { background(MaterialTheme.toqueColors.selectedBackground) }
-      .combinedClickable(
-        onClick = { itemClicked(playlistInfo) },
-        onLongClick = { itemLongClicked(playlistInfo) }
-      ),
-    icon = {
-      Icon(
-        painter = rememberImagePainter(data = playlistInfo.type.icon),
-        contentDescription = "Playlist Icon",
-        modifier = Modifier.size(40.dp)
-      )
-    },
-    text = { Text(text = playlistInfo.name.value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-    secondaryText = {
-      Text(
-        text = LocalContext.current.resources.getQuantityString(
-          R.plurals.SongCount,
-          playlistInfo.songCount,
-          playlistInfo.songCount,
-        ), maxLines = 1, overflow = TextOverflow.Ellipsis
-      )
-    },
-  )
+  Row(
+    Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween,
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    ListItem(
+      modifier = Modifier
+        .weight(.80F)
+        .modifyIf(isSelected) { background(MaterialTheme.toqueColors.selectedBackground) }
+        .combinedClickable(
+          onClick = { itemClicked(playlistInfo) },
+          onLongClick = { itemLongClicked(playlistInfo) }
+        ),
+      icon = {
+        Icon(
+          painter = rememberImagePainter(data = playlistInfo.type.icon),
+          contentDescription = "Playlist Icon",
+          modifier = Modifier.size(40.dp)
+        )
+      },
+      text = {
+        Text(text = playlistInfo.name.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      },
+      secondaryText = {
+        Text(
+          text = LocalContext.current.resources.getQuantityString(
+            R.plurals.SongCount,
+            playlistInfo.songCount,
+            playlistInfo.songCount,
+          ), maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+      },
+    )
+    if (playlistInfo.type == PlayListType.Rules) {
+      IconButton(
+        modifier = Modifier
+          .weight(.15F)
+          .size(50.dp),
+        onClick = { editSmartPlaylist(playlistInfo) }
+      ) {
+        Icon(
+          painter = rememberImagePainter(data = R.drawable.ic_edit),
+          contentDescription = "Item menu",
+          modifier = Modifier.size(26.dp)
+        )
+      }
+    }
+  }
 }
 
 private interface PlaylistsViewModel : ActionsViewModel {
@@ -233,11 +325,14 @@ private interface PlaylistsViewModel : ActionsViewModel {
   fun itemClicked(playlistInfo: PlaylistInfo)
   fun itemLongClicked(playlistInfo: PlaylistInfo)
 
+  fun newSmartPlaylist()
+  fun editSmartPlaylist(playlistInfo: PlaylistInfo)
+
   companion object {
     operator fun invoke(
       key: ComposeKey,
       audioMediaDao: AudioMediaDao,
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       appPrefs: AppPrefsSingleton,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
@@ -256,11 +351,11 @@ private interface PlaylistsViewModel : ActionsViewModel {
 private class PlaylistsViewModelImpl(
   private val key: ComposeKey,
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefs: AppPrefsSingleton,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
-) : PlaylistsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
+) : PlaylistsViewModel, ScopedServices.Registered, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private val playlistDao: PlaylistDao = audioMediaDao.playlistDao
 
@@ -315,12 +410,18 @@ private class PlaylistsViewModelImpl(
     scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
   }
 
-  override fun onServiceActive() {
+  override fun onServiceRegistered() {
     scope = CoroutineScope(SupervisorJob() + dispatcher)
-    requestPlaylists()
+    playlistDao
+      .playlistDaoEvents
+      .onStart { requestPlaylists() }
+      .onEach { requestPlaylists() }
+      .catch { cause -> LOG.e(cause) { it("Error collecting PlaylistDao events") } }
+      .onCompletion { LOG._i { it("Completed collection PlaylistDao events") } }
+      .launchIn(scope)
   }
 
-  override fun onServiceInactive() {
+  override fun onServiceUnregistered() {
     scope.cancel()
     selectedItems.turnOffSelectionMode()
     playlistsFlow.value = emptyList()
@@ -353,8 +454,18 @@ private class PlaylistsViewModelImpl(
     playlistInfo.id
   )
 
+  override fun newSmartPlaylist() {
+    backstack.goToScreen(SmartPlaylistEditorScreen())
+  }
+
+  override fun editSmartPlaylist(playlistInfo: PlaylistInfo) {
+    if (playlistInfo.type == PlayListType.Rules) {
+      backstack.goToScreen(SmartPlaylistEditorScreen(playlistInfo.id))
+    }
+  }
+
   private fun goToPlaylistSongs(playlistInfo: PlaylistInfo) =
-    backstack.goTo(PlaylistSongsScreen(playlistInfo.id, playlistInfo.type))
+    backstack.goToScreen(PlaylistSongsScreen(playlistInfo.id, playlistInfo.type))
 
   override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 
@@ -373,4 +484,3 @@ private class PlaylistsViewModelImpl(
 private data class PlaylistsViewModelState(val selected: SelectedItems<PlaylistId>) : Parcelable
 
 private const val KEY_MODEL_STATE = "PlaylistsModelState"
-

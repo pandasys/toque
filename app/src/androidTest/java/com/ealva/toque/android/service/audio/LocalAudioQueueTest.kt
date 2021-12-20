@@ -226,7 +226,7 @@ class LocalAudioQueueTest {
       newQueueItems.idSet,
       allowDuplicates,
       addAt,
-      shuffleMode,
+      shuffleMode.shuffleMedia(),
       shufflerFake
     ).let { queueInfo ->
       expect(queueInfo.index).toBe(expectedIndex)

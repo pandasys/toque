@@ -32,6 +32,7 @@ import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
@@ -39,15 +40,14 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.asMediaIdList
-import com.ealva.toque.service.media.Rating
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
+import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -77,16 +77,39 @@ private val LOG by lazyLogger(BaseSongsViewModel::class)
 
 interface SongsViewModel : ActionsViewModel {
   @Immutable
-  @Parcelize
-  data class SongInfo(
-    val id: MediaId,
-    val title: Title,
-    val duration: Millis,
-    val rating: Rating,
-    val album: AlbumTitle,
-    val artist: ArtistName,
+  interface SongInfo : Parcelable {
+    val id: MediaId
+    val title: Title
+    val duration: Millis
+    val rating: Rating
+    val album: AlbumTitle
+    val artist: ArtistName
     val artwork: Uri
-  ) : Parcelable
+
+    companion object {
+      operator fun invoke(
+        id: MediaId,
+        title: Title,
+        duration: Millis,
+        rating: Rating,
+        album: AlbumTitle,
+        artist: ArtistName,
+        artwork: Uri
+      ): SongInfo = SongInfoData(id, title, duration, rating, album, artist, artwork)
+
+      @Immutable
+      @Parcelize
+      data class SongInfoData(
+        override val id: MediaId,
+        override val title: Title,
+        override val duration: Millis,
+        override val rating: Rating,
+        override val album: AlbumTitle,
+        override val artist: ArtistName,
+        override val artwork: Uri
+      ) : SongInfo
+    }
+  }
 
   val songsFlow: StateFlow<List<SongInfo>>
   val selectedItems: SelectedItemsFlow<MediaId>
@@ -102,7 +125,7 @@ interface SongsViewModel : ActionsViewModel {
 
 abstract class BaseSongsViewModel(
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : SongsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
@@ -160,18 +183,20 @@ abstract class BaseSongsViewModel(
   }
 
   private fun handleAudioList(list: List<AudioDescription>) {
-    songsFlow.value = list.mapTo(ArrayList(list.size)) {
-      SongInfo(
-        id = it.mediaId,
-        title = it.title,
-        duration = it.duration,
-        rating = it.rating,
-        album = it.album,
-        artist = it.artist,
-        artwork = if (it.albumLocalArt !== Uri.EMPTY) it.albumLocalArt else it.albumArt
-      )
+    songsFlow.value = list.mapIndexedTo(ArrayList(list.size)) { index, audioDescription ->
+      makeSongInfo(index, audioDescription)
     }
   }
+
+  protected open fun makeSongInfo(index: Int, it: AudioDescription) = SongInfo(
+    id = it.mediaId,
+    title = it.title,
+    duration = it.duration,
+    rating = it.rating,
+    album = it.album,
+    artist = it.artist,
+    artwork = if (it.albumLocalArt !== Uri.EMPTY) it.albumLocalArt else it.albumArt
+  )
 
   override fun mediaClicked(mediaId: MediaId) =
     selectedItems.ifInSelectionModeToggleElse(mediaId) {}
@@ -221,12 +246,9 @@ abstract class BaseSongsViewModel(
 
   override fun displayMediaInfo() {
     val selected = selectedItems.value
-    LOG._e { it("selectedCount:%d", selected.selectedCount) }
-
     if (selected.selectedCount == 1) {
       val mediaId = selected.single()
-      LOG._e { it("id=%s", mediaId) }
-      backstack.goTo(AudioMediaInfoScreen(mediaId))
+      backstack.goToScreen(AudioMediaInfoScreen(mediaId))
     }
   }
 

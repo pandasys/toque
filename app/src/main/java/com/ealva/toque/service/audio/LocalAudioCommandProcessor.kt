@@ -29,6 +29,7 @@ import com.ealva.toque.common.LoggingCoroutineExceptionHandler
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.db.AudioDaoEvent
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
@@ -40,7 +41,6 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.scanner.MediaScannerService
 import com.ealva.toque.service.audio.LocalAudioCommand.DeferredResult
 import com.ealva.toque.service.controller.SessionControlEvent
-import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.ForceTransition
 import com.ealva.toque.service.queue.ForceTransition.AllowFade

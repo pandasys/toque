@@ -30,7 +30,7 @@ import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -57,7 +57,7 @@ private val LOG by lazyLogger(BaseAlbumsViewModel::class)
 abstract class BaseAlbumsViewModel(
   private val albumDao: AlbumDao,
   protected val backstack: Backstack,
-  localAudioQueueModel: LocalAudioQueueModel
+  localAudioQueueModel: LocalAudioQueueViewModel
 ) : AlbumsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private var requestJob: Job? = null

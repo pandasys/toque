@@ -17,15 +17,20 @@
 package com.ealva.toque.service.media
 
 import android.os.Parcelable
+import androidx.annotation.StringRes
+import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
-enum class EqMode(override val id: Int) : HasConstId, Parcelable {
-  Off(0) {
+enum class EqMode(
+  override val id: Int,
+  @StringRes val titleRes: Int
+) : HasConstId, Parcelable {
+  Off(0, R.string.EqualizerOff) {
     override fun next() = On
   },
-  On(1) {
+  On(1, R.string.EqualizerOn) {
     override fun next() = Off
   };
 

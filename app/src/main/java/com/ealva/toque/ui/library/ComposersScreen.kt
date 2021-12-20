@@ -57,12 +57,13 @@ import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.asComposerIdList
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
+import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -228,7 +229,7 @@ private interface ComposersViewModel : ActionsViewModel {
     operator fun invoke(
       key: ComposeKey,
       audioMediaDao: AudioMediaDao,
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ComposersViewModel =
@@ -239,7 +240,7 @@ private interface ComposersViewModel : ActionsViewModel {
 private class ComposersViewModelImpl(
   private val key: ComposeKey,
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : ComposersViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
@@ -297,7 +298,7 @@ private class ComposersViewModelImpl(
   }
 
   private fun goToComposersSongs(composerId: ComposerId) =
-    backstack.goTo(ComposerSongsScreen(composerId))
+    backstack.goToScreen(ComposerSongsScreen(composerId))
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)

@@ -37,8 +37,10 @@ import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.count
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
@@ -122,6 +124,10 @@ interface ComposerDao {
   suspend fun getMin(): Result<ComposerId, DaoMessage>
   suspend fun getMax(): Result<ComposerId, DaoMessage>
   suspend fun getRandom(): Result<ComposerId, DaoMessage>
+  suspend fun getComposerSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): Result<List<String>, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -313,6 +319,20 @@ private class ComposerDaoImpl(
     .where { id inSubQuery ComposerTable.select(id).all().orderByRandom().limit(1) }
     .sequence { cursor -> ComposerIdName(ComposerId(cursor[id]), ComposerName(cursor[composer])) }
     .single()
+
+
+  override suspend fun getComposerSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): Result<List<String>, DaoMessage> = runSuspendCatching {
+    db.query {
+      ComposerTable
+        .select { composer }
+        .where { composer like textSearch.applyWildcards(partial) escape DaoCommon.ESC_CHAR }
+        .sequence { it[composer] }
+        .toList()
+    }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   /**
    * Could be a race condition if two threads are trying to insert the same composer at the same

@@ -26,6 +26,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
 import com.ealva.toque.file.isNetworkScheme
@@ -33,7 +34,6 @@ import com.ealva.toque.service.media.EmbeddedArtwork
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParser
 import com.ealva.toque.service.media.MediaMetadataParserFactory
-import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.tag.ArtistParser
 import com.ealva.toque.tag.ArtworkField
 import com.ealva.toque.tag.SongTag
@@ -86,6 +86,8 @@ private class FileTagInfo private constructor(
     get() = tag.title
   override val titleSort: String
     get() = tag.titleSort
+  override val mediaArtist: String
+    get() = tag.mediaArtists.joinToString(separator = "/")
   override val artists: List<String>
     get() = artistParser.parseAll(tag.mediaArtists)
   override val artistsSort: List<String>
@@ -208,6 +210,8 @@ private class VlcTagInfo private constructor(
     get() = meta(IMedia.Meta.Title).orUnknown()
   override val titleSort: String
     get() = title.toTitleSort()
+  override val mediaArtist: String
+    get() = _artists.joinToString(separator = "/")
   override val artists: List<String>
     get() = _artists
   override val artistsSort: List<String>

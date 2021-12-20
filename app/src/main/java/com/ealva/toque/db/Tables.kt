@@ -20,6 +20,8 @@ package com.ealva.toque.db
 
 import com.ealva.toque.db.MediaTable.mediaType
 import com.ealva.toque.db.QueueStateTable.id
+import com.ealva.toque.db.smart.SmartPlaylistRuleTable
+import com.ealva.toque.db.smart.SmartPlaylistTable
 import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
 
@@ -39,7 +41,9 @@ val setOfAllTables = setOf(
   QueueItemsTable,
   QueueStateTable,
   PlayListTable,
-  PlayListMediaTable
+  PlayListMediaTable,
+  SmartPlaylistTable,
+  SmartPlaylistRuleTable
 )
 
 object ArtistTable : Table() {
@@ -144,9 +148,11 @@ object MediaTable : Table() {
   val artistId = reference("Media_ArtistId", ArtistTable.id)
 
   /**
-   * For fast display of genres not parsed, ie. could have several genres joined in 1 string
+   * Redundant data also stored parsed in GenreTable. This is to make smart playlist queries more
+   * simple and for fast display of genres not parsed, ie. could have several genres joined in 1
+   * string
    */
-  val genre = text("MediaGenre") { default("") }
+  val genre = text("MediaGenre") { collateNoCase() }
 
   val year = integer("MediaYear") { default(0) }
   val rating = integer("MediaRating") { default(-1) }
@@ -187,8 +193,10 @@ object MediaTable : Table() {
      * Note: Adding all of the following indices resulted in a worst case cost of approx 3-4%
      * inserting over 2500 during initial scanning, which includes parsing all metadata (on a Galaxy
      * S10e, all media residing on internal storage). So, we'll keep the indices given many of them
-     * greatly speed up complex smart playlist queries, such as the Rock Station example
+     * greatly speed up complex smart playlist queries, especially when smart playlists refer to
+     * other smart playlists.
      */
+    index(genre)
     index(mediaType) // to find all audio or all video
     index(albumId) // for quick album info
     index(artistId) // to quickly find first track artist
@@ -217,6 +225,25 @@ object ComposerTable : Table() {
   }
 }
 
+object ComposerMediaTable : Table() {
+  val composerId = reference(
+    "ComposerMedia_ComposerId",
+    ComposerTable.id,
+    onDelete = ForeignKeyAction.CASCADE
+  )
+  val mediaId = reference(
+    "ComposerMedia_MediaId",
+    MediaTable.id,
+    onDelete = ForeignKeyAction.CASCADE
+  )
+  val createdTime = long("ComposerMediaCreated")
+  override val primaryKey = PrimaryKey(composerId, mediaId)
+
+  init {
+    index(mediaId)
+  }
+}
+
 object GenreTable : Table() {
   val id = long("GenreId") { primaryKey() }
   val genre = text("Genre") { collateNoCase() }
@@ -224,6 +251,21 @@ object GenreTable : Table() {
 
   init {
     uniqueIndex(genre) // a genre should only appear once
+  }
+}
+
+object GenreMediaTable : Table() {
+  val genreId = reference("GenreMedia_GenreId", GenreTable.id, ForeignKeyAction.CASCADE)
+  val mediaId = reference(
+    "GenreMedia_MediaId",
+    MediaTable.id,
+    onDelete = ForeignKeyAction.CASCADE
+  )
+  val createdTime = long("GenreMediaCreated")
+  override val primaryKey: PrimaryKey = PrimaryKey(genreId, mediaId)
+
+  init {
+    index(mediaId) // to query all genre for a piece of media
   }
 }
 
@@ -248,40 +290,6 @@ object ArtistMediaTable : Table() {
 
   init {
     index(mediaId) // quickly find all artists for a piece of media
-  }
-}
-
-object ComposerMediaTable : Table() {
-  val composerId = reference(
-    "ComposerMedia_ComposerId",
-    ComposerTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val mediaId = reference(
-    "ComposerMedia_MediaId",
-    MediaTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val createdTime = long("ComposerMediaCreated")
-  override val primaryKey = PrimaryKey(composerId, mediaId)
-
-  init {
-    index(mediaId)
-  }
-}
-
-object GenreMediaTable : Table() {
-  val genreId = reference("GenreMedia_GenreId", GenreTable.id, ForeignKeyAction.CASCADE)
-  val mediaId = reference(
-    "GenreMedia_MediaId",
-    MediaTable.id,
-    onDelete = ForeignKeyAction.CASCADE
-  )
-  val createdTime = long("GenreMediaCreated")
-  override val primaryKey: PrimaryKey = PrimaryKey(genreId, mediaId)
-
-  init {
-    index(mediaId) // to query all genre for a piece of media
   }
 }
 

@@ -41,6 +41,7 @@ object DbModule {
     single { EqPresetDao(db = get()) }
     single { EqPresetAssociationDao(db = get()) }
     single { PlaylistDao(db = get()) }
+    single { SchemaDao(db = get()) }
     single {
       AudioMediaDao(
         db = get(),
@@ -67,7 +68,7 @@ object DbModule {
     fileName = DB_FILENAME,
     tables = setOfAllTables,
     version = 1,
-    otherCreatables = listOf(AudioViewQueueData, FullAudioView),
+    otherCreatables = listOf(AudioViewQueueData),
     openParams = OpenParams(
       enableWriteAheadLogging = true,
       enableForeignKeyConstraints = true

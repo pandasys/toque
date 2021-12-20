@@ -40,7 +40,6 @@ import com.ealva.toque.common.debug
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.MediaStorage
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.prefs.AppPrefs

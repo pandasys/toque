@@ -42,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.config.LocalScreenConfig

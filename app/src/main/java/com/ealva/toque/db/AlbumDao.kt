@@ -32,11 +32,9 @@ import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumId
-import com.ealva.toque.persist.isInvalid
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -61,6 +59,7 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Column
+import com.ealva.welite.db.table.Join
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -166,6 +165,10 @@ interface AlbumDao {
   suspend fun getMin(): Result<AlbumId, DaoMessage>
   suspend fun getMax(): Result<AlbumId, DaoMessage>
   suspend fun getRandom(): Result<AlbumId, DaoMessage>
+  suspend fun getAlbumSuggestions(
+    partialTitle: String,
+    textSearch: TextSearch
+  ): Result<List<String>, DaoMessage>
 
   companion object {
     operator fun invoke(
@@ -413,14 +416,6 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
-  private fun Queryable.doGetPreviousAlbum(albumId: AlbumId): AlbumId = AlbumTable
-    .select(AlbumTable.id)
-    .where { albumTitle less SELECT_TITLE_FROM_BIND_ID }
-    .orderBy { albumTitle by Order.DESC }
-    .limit(1)
-    .longForQuery { it[BIND_ALBUM_ID] = albumId.value }
-    .asAlbumId
-
   override suspend fun getPrevious(title: AlbumTitle) = runSuspendCatching {
     db.query { if (title.isEmpty()) doGetMaxAlbum() else doGetPreviousAlbum(title) }
   }.mapError { cause -> DaoExceptionMessage(cause) }
@@ -453,7 +448,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
-  override suspend fun getRandom(): Result<AlbumId, DaoMessage>  = runSuspendCatching {
+  override suspend fun getRandom(): Result<AlbumId, DaoMessage> = runSuspendCatching {
     db.query {
       AlbumTable
         .select(AlbumTable.id)
@@ -470,6 +465,19 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       .longForQuery()
       .asAlbumId
   }
+
+  override suspend fun getAlbumSuggestions(
+    partialTitle: String,
+    textSearch: TextSearch
+  ): Result<List<String>, DaoMessage> = runSuspendCatching {
+    db.query {
+      AlbumTable
+        .select { albumTitle }
+        .where { albumTitle like textSearch.applyWildcards(partialTitle) escape ESC_CHAR }
+        .sequence { it[albumTitle] }
+        .toList()
+    }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,

@@ -16,6 +16,7 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,15 +24,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvabrainz.common.AlbumTitle
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
+import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
+import com.ealva.toque.common.Title
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.db.PlayListType
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PlaylistId
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -88,12 +95,52 @@ data class PlaylistSongsScreen(
 
 interface PlaylistSongsViewModel : SongsViewModel {
 
+  @Immutable
+  interface PlaylistSongInfo : SongsViewModel.SongInfo {
+    val position: Int
+
+    companion object {
+      operator fun invoke(
+        position: Int,
+        id: MediaId,
+        title: Title,
+        duration: Millis,
+        rating: Rating,
+        album: AlbumTitle,
+        artist: ArtistName,
+        artwork: Uri
+      ): PlaylistSongInfo = PlaylistSongInfoData(
+        position,
+        id,
+        title,
+        duration,
+        rating,
+        album,
+        artist,
+        artwork
+      )
+
+      @Immutable
+      @Parcelize
+      data class PlaylistSongInfoData(
+        override val position: Int,
+        override val id: MediaId,
+        override val title: Title,
+        override val duration: Millis,
+        override val rating: Rating,
+        override val album: AlbumTitle,
+        override val artist: ArtistName,
+        override val artwork: Uri
+      ) : PlaylistSongInfo
+    }
+  }
+
   companion object {
     operator fun invoke(
       playlistId: PlaylistId,
       playListType: PlayListType,
       audioMediaDao: AudioMediaDao,
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): PlaylistSongsViewModel = PlaylistSongsViewModelImpl(
@@ -111,13 +158,26 @@ private class PlaylistSongsViewModelImpl(
   private val playlistId: PlaylistId,
   private val playListType: PlayListType,
   audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher
 ) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),
   PlaylistSongsViewModel {
   override val categoryToken: CategoryToken
     get() = CategoryToken(playlistId)
+
+  override fun makeSongInfo(index: Int, it: AudioDescription): SongsViewModel.SongInfo {
+    return PlaylistSongsViewModel.PlaylistSongInfo(
+      position = index,
+      id = it.mediaId,
+      title = it.title,
+      duration = it.duration,
+      rating = it.rating,
+      album = it.album,
+      artist = it.artist,
+      artwork = if (it.albumLocalArt !== Uri.EMPTY) it.albumLocalArt else it.albumArt
+    )
+  }
 
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,

@@ -17,9 +17,10 @@
 package com.ealva.toque.ui.main
 
 import androidx.compose.material.SnackbarDuration
-import com.ealva.toque.service.notify.ServiceNotification
+import androidx.compose.runtime.Immutable
 import java.util.concurrent.atomic.AtomicInteger
 
+@Immutable
 interface Notification {
   /**
    * Action to be displayed as the action of a snackbar. The [label] is to be displayed to the
@@ -60,6 +61,7 @@ interface Notification {
   val version: Int
 
   companion object {
+    @Immutable
     private data class NotificationData(
       override val msg: String,
       override val duration: SnackbarDuration,

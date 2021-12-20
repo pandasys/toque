@@ -20,6 +20,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,20 +55,20 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.FullAudioInfo
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.EmbeddedArtwork
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParserFactory
-import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.media.asString
 import com.ealva.toque.tag.ArtistParserFactory
+import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -103,7 +104,6 @@ data class AudioMediaInfoScreen(
   private val mediaId: MediaId
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    LOG._e { it("bindServices") }
     serviceBinder.add(
       MediaInfoViewModel(
         mediaId = mediaId,
@@ -215,12 +215,11 @@ private class MediaInfoViewModelImpl(
 
   override val mediaInfo = MutableStateFlow(MediaInfoViewModel.MediaInfo())
   override fun goBack() {
-    backstack.goBack()
+    backstack.back()
   }
 
   override fun onServiceActive() {
     scope = CoroutineScope(SupervisorJob() + dispatcher)
-    LOG._e { it("onServiceActive") }
     scope.launch {
       when (val result = audioMediaDao.getFullInfo(mediaId)) {
         is Ok -> handleFullAudioInfo(result.value)
@@ -230,7 +229,6 @@ private class MediaInfoViewModelImpl(
   }
 
   private fun handleFullAudioInfo(fullInfo: FullAudioInfo) {
-    LOG._e { it("handleFullAudioInfo") }
     scope.launch {
       val uriToParse = if (fullInfo.file == Uri.EMPTY) fullInfo.location else fullInfo.file
       if (uriToParse !== Uri.EMPTY) {
@@ -239,7 +237,6 @@ private class MediaInfoViewModelImpl(
           artistParser = artistParserFactory.make(),
           ignoreArtwork = false
         ).use { tag: MediaFileTagInfo ->
-          LOG._e { it("have tag") }
           mediaInfo.update { info ->
             info.copy(
               tagRating = tag.rating,
@@ -281,7 +278,6 @@ private class MediaInfoViewModelImpl(
   }
 
   private fun handleEmbeddedArtwork(artwork: EmbeddedArtwork) {
-    LOG._e { it("artwork=%s", artwork.asString) }
     if (artwork.exists && artwork.isBinary) {
       scope.launch(Dispatchers.IO) {
         try {
@@ -295,7 +291,6 @@ private class MediaInfoViewModelImpl(
             options.outMimeType,
             artwork.pictureType
           )
-          LOG._e { it("description=%s", description) }
           mediaInfo.update { info ->
             info.copy(
               embeddedArtwork = bitmap,
@@ -325,12 +320,15 @@ private class MediaInfoViewModelImpl(
 @Composable
 private fun MediaInfo(mediaInfo: MediaInfoViewModel.MediaInfo) {
   val labelColor = MaterialTheme.colors.onSurface.copy(ContentAlpha.medium)
+  val config = LocalScreenConfig.current
+
 
   Column(
     modifier = Modifier
       .verticalScroll(rememberScrollState())
       .fillMaxWidth()
       .padding(horizontal = 12.dp)
+      .padding(bottom = config.getListBottomContentPadding(isExpanded = true))
   ) {
     LabeledTextValue(R.string.AlbumArtist, mediaInfo.albumArtist.value, labelColor)
     LabeledTextValue(R.string.Album, mediaInfo.album.value, labelColor)
@@ -367,13 +365,60 @@ private fun MediaInfo(mediaInfo: MediaInfoViewModel.MediaInfo) {
       labelRes = R.string.EmbeddedArtwork,
       labelColor = labelColor,
       labelBottomPadding = 4.dp,
-      value = {}
+      value = { MediaAndDescription(mediaInfo.embeddedArtwork, mediaInfo.artworkDescription) }
+    )
+    LabeledTextValue(
+      labelRes = R.string.Comment,
+      valueText = mediaInfo.comment,
+      labelColor = labelColor
+    )
+    IdRow(mediaInfo.mediaId, mediaInfo.albumId, mediaInfo.albumArtistId, labelColor)
+  }
+}
+
+@Composable
+fun IdRow(mediaId: MediaId, albumId: AlbumId, albumArtistId: ArtistId, labelColor: Color) {
+  Row(modifier = Modifier.fillMaxWidth()) {
+    val weight = .25f
+    LabeledTextValue(
+      modifier = Modifier.weight(weight),
+      labelRes = R.string.MediaID,
+      valueText = mediaId.value.toString(),
+      labelColor = labelColor
+    )
+    LabeledTextValue(
+      modifier = Modifier.weight(weight),
+      labelRes = R.string.AlbumID,
+      valueText = albumId.value.toString(),
+      labelColor = labelColor
+    )
+    LabeledTextValue(
+      modifier = Modifier.weight(weight),
+      labelRes = R.string.ArtistID,
+      valueText = albumArtistId.value.toString(),
+      labelColor = labelColor
     )
   }
 }
 
 @Composable
-fun RatingRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color) {
+private fun MediaAndDescription(embeddedArtwork: Bitmap?, artworkDescription: String) {
+  if (embeddedArtwork != null) {
+    Column {
+      Image(
+        modifier = Modifier.size(100.dp),
+        painter = rememberImagePainter(data = embeddedArtwork),
+        contentDescription = stringResource(id = R.string.EmbeddedArtwork)
+      )
+      Text(text = artworkDescription, style = MaterialTheme.typography.body1)
+    }
+  } else {
+    Text(text = stringResource(id = R.string.None), style = MaterialTheme.typography.body1)
+  }
+}
+
+@Composable
+private fun RatingRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color) {
   Row(
     modifier = Modifier.fillMaxWidth()
   ) {
@@ -423,7 +468,7 @@ fun RatingRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color) {
 }
 
 @Composable
-fun CountLastOccurredRow(
+private fun CountLastOccurredRow(
   count: Int,
   @StringRes countLabel: Int,
   last: Millis,
@@ -449,7 +494,7 @@ fun CountLastOccurredRow(
 }
 
 @Composable
-fun TrackDiscRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color) {
+private fun TrackDiscRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color) {
   Row(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceBetween
@@ -461,7 +506,7 @@ fun TrackDiscRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color) {
   }
 }
 
-fun numOfTotal(num: Int, totalTracks: Int): String {
+private fun numOfTotal(num: Int, totalTracks: Int): String {
   return if (totalTracks > 0) "$num of $totalTracks" else "$num"
 }
 
@@ -471,7 +516,7 @@ private fun LabeledTextValue(
   valueText: String,
   labelColor: Color,
   modifier: Modifier = Modifier,
-  ) {
+) {
   LabeledTextValue(
     labelText = stringResource(id = labelRes),
     valueText = valueText,

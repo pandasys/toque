@@ -14,19 +14,24 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.media
+package com.ealva.toque.db.smart
 
-import android.net.Uri
-import com.ealva.toque.common.Millis
-import com.ealva.toque.persist.AlbumId
-import com.ealva.toque.persist.MediaId
+import com.ealva.welite.db.table.Column
 
-interface MediaFactory {
-  suspend fun makeAudio(
-    location: Uri,
-    mediaId: MediaId,
-    albumId: AlbumId,
-    initialSeek: Millis,
-    startPaused: Boolean
-  ): Media
+interface SuggestionProvider {
+  suspend fun getSuggestions(): List<String>
+}
+
+interface SuggestionProviderFactory {
+  /**
+   * Return a [SuggestionProvider] based on identity equals of [column]. If not found, the
+   * [EmptySuggestionProvider] is returned
+   */
+  fun getProvider(column: Column<*>): SuggestionProvider
+}
+
+object EmptySuggestionProvider : SuggestionProvider {
+  override suspend fun getSuggestions(): List<String> {
+    return emptyList()
+  }
 }

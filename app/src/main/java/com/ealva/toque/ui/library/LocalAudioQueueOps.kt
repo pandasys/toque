@@ -18,8 +18,8 @@ package com.ealva.toque.ui.library
 
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
-import com.ealva.toque.ui.audio.LocalAudioQueueModel.PromptResult
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.mapError
@@ -31,23 +31,23 @@ import com.github.michaelbull.result.toErrorIf
  * from the UI perspective. Gather the media to be operated on, return a value indicating if the
  * operation was executed, and if it was executed clear any user selection.
  */
-class LocalAudioQueueOps(private val localAudioQueueModel: LocalAudioQueueModel) {
+class LocalAudioQueueOps(private val localAudioQueueModel: LocalAudioQueueViewModel) {
   enum class Op {
     Play {
       override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueModel,
+        localAudioQueueModel: LocalAudioQueueViewModel,
         mediaList: CategoryMediaList
       ): PromptResult = localAudioQueueModel.play(mediaList)
     },
     Shuffle {
       override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueModel,
+        localAudioQueueModel: LocalAudioQueueViewModel,
         mediaList: CategoryMediaList
       ): PromptResult = localAudioQueueModel.shuffle(mediaList)
     },
     PlayNext {
       override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueModel,
+        localAudioQueueModel: LocalAudioQueueViewModel,
         mediaList: CategoryMediaList
       ): PromptResult {
         localAudioQueueModel.playNext(mediaList)
@@ -56,7 +56,7 @@ class LocalAudioQueueOps(private val localAudioQueueModel: LocalAudioQueueModel)
     },
     AddToUpNext {
       override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueModel,
+        localAudioQueueModel: LocalAudioQueueViewModel,
         mediaList: CategoryMediaList
       ): PromptResult {
         localAudioQueueModel.addToUpNext(mediaList)
@@ -65,13 +65,13 @@ class LocalAudioQueueOps(private val localAudioQueueModel: LocalAudioQueueModel)
     },
     AddToPlaylist {
       override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueModel,
+        localAudioQueueModel: LocalAudioQueueViewModel,
         mediaList: CategoryMediaList
       ): PromptResult = localAudioQueueModel.addToPlaylist(mediaList.idList)
     };
 
     abstract suspend operator fun invoke(
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       mediaList: CategoryMediaList
     ): PromptResult
   }

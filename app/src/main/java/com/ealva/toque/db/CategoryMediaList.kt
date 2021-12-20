@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
 import java.util.Random
 
-
 /**
  * A list of media associated with a particular Category. If the list contains media from multiple
  * instances of a Category, eg. multiple Albums, multiple Playlists, etc, the [token] should

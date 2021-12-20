@@ -22,8 +22,8 @@ import android.support.v4.media.MediaDescriptionCompat
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.persist.InstanceId
-import com.ealva.toque.service.media.StarRating
 
 sealed interface SessionControlEvent {
 

@@ -60,12 +60,13 @@ import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.asGenreIdList
-import com.ealva.toque.ui.audio.LocalAudioQueueModel
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.library.GenresViewModel.GenreInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
+import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -237,7 +238,7 @@ private interface GenresViewModel : ActionsViewModel {
     operator fun invoke(
       key: ComposeKey,
       audioMediaDao: AudioMediaDao,
-      localAudioQueueModel: LocalAudioQueueModel,
+      localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): GenresViewModel = GenresViewModelImpl(
@@ -253,7 +254,7 @@ private interface GenresViewModel : ActionsViewModel {
 private class GenresViewModelImpl(
   private val key: ComposeKey,
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueModel,
+  localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : GenresViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
@@ -317,7 +318,7 @@ private class GenresViewModelImpl(
     scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
   }
 
-  private fun goToGenreSongs(genreId: GenreId) = backstack.goTo(GenreSongsScreen(genreId))
+  private fun goToGenreSongs(genreId: GenreId) = backstack.goToScreen(GenreSongsScreen(genreId))
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)

@@ -17,6 +17,8 @@
 package com.ealva.toque.service.session.common
 
 import android.support.v4.media.RatingCompat
+import com.ealva.toque.common.StarRating
+import com.ealva.toque.common.coerceToValid
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ComposerId
@@ -24,8 +26,6 @@ import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
-import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.media.coerceToValid
 import com.ealva.toque.service.session.common.IdPrefixes.ALBUM_PREFIX
 import com.ealva.toque.service.session.common.IdPrefixes.ARTIST_PREFIX
 import com.ealva.toque.service.session.common.IdPrefixes.COMPOSER_PREFIX

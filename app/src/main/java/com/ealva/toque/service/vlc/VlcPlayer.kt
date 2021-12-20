@@ -158,7 +158,7 @@ private class VlcPlayerImpl(
       .launchIn(scope)
   }
 
-  override val eventFlow = MutableSharedFlow<AvPlayerEvent>(extraBufferCapacity = 30)
+  override val eventFlow = MutableSharedFlow<AvPlayerEvent>(extraBufferCapacity = 10)
 
   private var seekable = false
   override val isSeekable: Boolean
@@ -325,8 +325,8 @@ private class VlcPlayerImpl(
     eventFlow.emit(event)
   }
 
-  private fun makeEventListener() = MediaPlayer.EventListener { event ->
-//    LOG._e { it("%s %s", title(), event.asString()) }
+  private fun makeEventListener() = MediaPlayer.EventListener { event: MediaPlayer.Event ->
+//    LOG._e { it("%s %s", title(), event.asString) }
     if (!isShutdown) {
       scope.launch {
         when (event.type) {
@@ -340,7 +340,7 @@ private class VlcPlayerImpl(
           MediaPlayer.Event.Stopped -> {
             wakeLock.release()
             seekable = false
-            emit(AvPlayerEvent.Stopped(time))
+            emit(AvPlayerEvent.Stopped)
           }
           MediaPlayer.Event.EndReached -> {
             // emit before shutdown or won't go due to scope cancellation
@@ -367,9 +367,7 @@ private class VlcPlayerImpl(
               duration = Millis(reportedLength)
             }
           }
-          MediaPlayer.Event.LengthChanged -> {
-
-          }
+          MediaPlayer.Event.LengthChanged -> {}
         }
       }
     } else {
@@ -407,17 +405,13 @@ private class VlcPlayerImpl(
     override var playerVolume: Volume
       get() = volume
       set(value) {
-        if (_allowVolumeChange) {
-          volume = value
-        }
+        if (_allowVolumeChange) volume = value
       }
     override val volumeRange: VolumeRange get() = AvPlayer.DEFAULT_VOLUME_RANGE
 
     private var _allowVolumeChange = true
     override var allowVolumeChange: Boolean
-      get() {
-        return _allowVolumeChange
-      }
+      get() = _allowVolumeChange
       set(value) {
         _allowVolumeChange = value
       }
@@ -481,3 +475,29 @@ private class VlcPlayerImpl(
     }
   }
 }
+
+@Suppress("unused")
+private val MediaPlayer.Event.asString: String
+  get() {
+    return when (type) {
+      MediaPlayer.Event.MediaChanged -> "Event.MediaChanged"
+      MediaPlayer.Event.Opening -> "Event.Opening"
+      MediaPlayer.Event.Buffering -> "Event.Buffering $buffering"
+      MediaPlayer.Event.Playing -> "Event.Playing"
+      MediaPlayer.Event.Paused -> "Event.Paused"
+      MediaPlayer.Event.Stopped -> "Event.Stopped"
+      MediaPlayer.Event.EndReached -> "Event.EndReached"
+      MediaPlayer.Event.EncounteredError -> "Event.EncounteredError"
+      MediaPlayer.Event.TimeChanged -> "Event.TimeChanged $timeChanged"
+      MediaPlayer.Event.PositionChanged -> "Event.PositionChanged $positionChanged"
+      MediaPlayer.Event.SeekableChanged -> "Event.SeekableChanged $seekable"
+      MediaPlayer.Event.PausableChanged -> "Event.PausableChanged $pausable"
+      MediaPlayer.Event.LengthChanged -> "Event.LengthChanged $lengthChanged"
+      MediaPlayer.Event.Vout -> "Event.Vout $voutCount"
+      MediaPlayer.Event.ESAdded -> "Event.ESAdded"
+      MediaPlayer.Event.ESDeleted -> "Event.ESDeleted"
+      MediaPlayer.Event.ESSelected -> "Event.ESSelected"
+      MediaPlayer.Event.RecordChanged -> "Event.RecordChanged"
+      else -> "Event.UNKNOWN"
+    }
+  }

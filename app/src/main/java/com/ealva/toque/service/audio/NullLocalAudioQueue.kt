@@ -20,9 +20,9 @@ import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.persist.InstanceId
-import com.ealva.toque.service.media.StarRating
 import com.ealva.toque.service.notify.ServiceNotification
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.ForceTransition

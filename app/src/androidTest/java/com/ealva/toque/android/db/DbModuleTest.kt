@@ -26,7 +26,6 @@ import com.ealva.toque.db.ArtistMediaDao
 import com.ealva.toque.db.ArtistMediaTable
 import com.ealva.toque.db.ArtistTable
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.QueueTable
 import com.ealva.toque.db.ComposerDao
 import com.ealva.toque.db.ComposerMediaDao
 import com.ealva.toque.db.ComposerMediaTable
@@ -47,6 +46,9 @@ import com.ealva.toque.db.QueueDao
 import com.ealva.toque.db.QueueItemsTable
 import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.db.QueueStateTable
+import com.ealva.toque.db.QueueTable
+import com.ealva.toque.db.smart.SmartPlaylistRuleTable
+import com.ealva.toque.db.smart.SmartPlaylistTable
 import com.ealva.welite.db.Database
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -86,6 +88,8 @@ class DbModuleTest : KoinTest {
         QueueStateTable,
         PlayListTable,
         PlayListMediaTable,
+        SmartPlaylistTable,
+        SmartPlaylistRuleTable
       )
     )
   }

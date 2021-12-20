@@ -24,14 +24,14 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.ealvalog.w
+import com.ealva.toque.common.Mp3Rating
+import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.debug
+import com.ealva.toque.common.toMp3Rating
+import com.ealva.toque.common.toRating
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.service.media.MediaFormat
 import com.ealva.toque.service.media.MediaType
-import com.ealva.toque.service.media.Mp3Rating
-import com.ealva.toque.service.media.StarRating
-import com.ealva.toque.service.media.toMp3Rating
-import com.ealva.toque.service.media.toRating
-import com.ealva.toque.service.media.toStarRating
 import com.google.common.base.Optional
 import com.google.common.base.Splitter
 import com.google.common.cache.CacheBuilder
@@ -91,6 +91,7 @@ private fun StringBuilder.appendFormattedSampleRate(header: AudioHeader) {
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun Optional<String>.orUnknown() = orNull().orUnknown()
+
 @Suppress("NOTHING_TO_INLINE")
 private inline fun String?.orUnknown(): String = if (isNullOrBlank()) SongTag.UNKNOWN else this
 

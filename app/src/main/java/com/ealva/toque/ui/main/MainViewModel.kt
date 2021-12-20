@@ -32,6 +32,7 @@ import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.ui.common.DialogPrompt
+import com.ealva.toque.ui.nav.setScreenHistory
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.History
@@ -74,6 +75,8 @@ interface MainViewModel : MainBridge {
   val promptFlow: StateFlow<DialogPrompt>
 
   fun prompt(prompt: DialogPrompt)
+
+  fun clearPrompt()
 
   fun gainedReadExternalPermission()
 
@@ -119,6 +122,10 @@ private class MainViewModelImpl(
     promptFlow.value = prompt
   }
 
+  override fun clearPrompt() {
+    prompt(DialogPrompt.None)
+  }
+
   override fun gainedReadExternalPermission() {
     playerServiceConnection.mediaController
       .onStart { playerServiceConnection.bind() }
@@ -161,11 +168,11 @@ private class MainViewModelImpl(
 
   private fun handleAudioQueue() {
     if (backstack.root<ComposeKey>() !is NowPlayingScreen)
-      backstack.setHistory(History.of(NowPlayingScreen()), StateChange.REPLACE)
+      backstack.setScreenHistory(History.of(NowPlayingScreen()), StateChange.REPLACE)
   }
 
   private fun handleNullQueue() {
-    backstack.setHistory(History.of(SplashScreen()), StateChange.REPLACE)
+    backstack.setScreenHistory(History.of(SplashScreen()), StateChange.REPLACE)
   }
 
   override fun onServiceRegistered() {

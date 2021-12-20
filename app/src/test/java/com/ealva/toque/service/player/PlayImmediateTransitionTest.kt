@@ -23,6 +23,7 @@ import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -69,7 +70,7 @@ class PlayImmediateTransitionTest {
   }
 
   @Test
-  fun execute() = coroutineRule.runBlockingTest {
+  fun execute() = runTest {
     transition.setPlayer(player)
     transition.execute()
     expect(player._playCalled).toBe(1)
@@ -81,7 +82,7 @@ class PlayImmediateTransitionTest {
   }
 
   @Test
-  fun cancel() = coroutineRule.runBlockingTest {
+  fun cancel() = runTest {
     transition.setCancelled()
     transition.execute()
     player.verifyZeroInteractions()

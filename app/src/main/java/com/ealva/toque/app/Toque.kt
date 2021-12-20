@@ -39,14 +39,12 @@ import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.audioout.AudioModule
-import com.ealva.toque.common.debug
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
 import com.ealva.toque.prefs.PrefsModule
 import com.ealva.toque.service.ServiceModule
 import com.ealva.toque.service.vlc.LibVlcModule
 import com.ealva.toque.tag.TagModule
-import com.ealva.welite.db.log.WeLiteLog
 import com.jakewharton.processphoenix.ProcessPhoenix
 import ealvatag.logging.EalvaTagLog
 import okhttp3.OkHttpClient
