@@ -38,12 +38,18 @@ inline val Long.asPlaylistId: PlaylistId get() = PlaylistId(this)
 
 @JvmInline
 value class PlaylistIdList(val value: LongList) : Iterable<PlaylistId> {
-  inline val size: Int
-    get() = value.size
+  inline val size: Int get() = value.size
+  inline val isEmpty: Boolean get() = size == 0
 
-  inline operator fun plusAssign(artistId: PlaylistId) {
-    value.add(artistId.value)
+  fun add(playlistId: PlaylistId) {
+    value.add(playlistId.value)
   }
+
+  inline operator fun plusAssign(playlistId: PlaylistId) {
+    value.add(playlistId.value)
+  }
+
+  fun contains(playlistId: PlaylistId): Boolean = value.contains(playlistId.value)
 
   inline operator fun get(index: Int): PlaylistId = PlaylistId(value.getLong(index))
 

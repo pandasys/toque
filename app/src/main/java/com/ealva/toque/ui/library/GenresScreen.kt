@@ -53,7 +53,7 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.GenreDao
 import com.ealva.toque.db.GenreDescription
 import com.ealva.toque.log._i
@@ -70,7 +70,6 @@ import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
@@ -283,7 +282,7 @@ private class GenresViewModelImpl(
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): Result<CategoryMediaList, DaoMessage> =
+  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
     makeCategoryMediaList(getSelectedGenres())
 
   suspend fun makeCategoryMediaList(genreList: List<GenreInfo>) = audioMediaDao

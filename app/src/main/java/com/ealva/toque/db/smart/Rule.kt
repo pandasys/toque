@@ -35,9 +35,6 @@ data class Rule(
     }
   }
 
-  val ruleType: Int
-    get() = ruleField.id shl 16 and matcher.id
-
   fun makeWhereClause(): Op<Boolean> = ruleField.makeWhereClause(matcher, data)
 
   fun makeJoinTemplate(): JoinTemplate? = ruleField.makeJoinClause(matcher, data)
@@ -49,6 +46,7 @@ data class Rule(
    * Is the Rule consistent and [data] is valid for the [matcher]
    */
   val isValid: Boolean get() = ruleField.contains(matcher) && matcher.willAccept(data)
+
   inline val isNotValid: Boolean get() = !isValid
 
   override fun toString(): String {

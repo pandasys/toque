@@ -108,8 +108,8 @@ class NumberMatcherTest {
       NumberMatcher.IsInTheRange,
 
       ).let { list ->
-      expect(NumberMatcher.allValues.size).toBe(list.size)
-      list.forEach { matcher -> expect(NumberMatcher.allValues).toContain(matcher) }
+      expect(NumberMatcher.ALL_VALUES.size).toBe(list.size)
+      list.forEach { matcher -> expect(NumberMatcher.ALL_VALUES).toContain(matcher) }
     }
   }
 }

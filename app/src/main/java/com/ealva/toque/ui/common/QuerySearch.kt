@@ -53,14 +53,14 @@ fun QuerySearch(
   onQueryChanged: (String) -> Unit,
   isFocused: (Boolean) -> Unit
 ) {
-  val focusRequester = remember { FocusRequester() }
-  val inputService = LocalTextInputService.current
+//  val focusRequester = remember { FocusRequester() }
+//  val inputService = LocalTextInputService.current
   var showClearButton by remember { mutableStateOf(false) }
-  val focusManager = LocalFocusManager.current
+//  val focusManager = LocalFocusManager.current
 
   OutlinedTextField(
     modifier = modifier
-      .focusRequester(focusRequester)
+//      .focusRequester(focusRequester)
       .fillMaxWidth()
       .onFocusChanged { focusState ->
         showClearButton = (focusState.isFocused)
@@ -81,14 +81,14 @@ fun QuerySearch(
     isError = isError,
     keyboardActions = KeyboardActions(onDone = {
       onDoneActionClick()
-      focusManager.moveFocus(FocusDirection.Next)
+//      focusManager.moveFocus(FocusDirection.Next)
     }),
     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done, keyboardType = KeyboardType.Text)
   )
-
-  LaunchedEffect(Unit) {
-    inputService?.showSoftwareKeyboard()
-    delay(100)
-    focusRequester.requestFocus()
-  }
+//
+//  LaunchedEffect(Unit) {
+////    inputService?.showSoftwareKeyboard()
+//    delay(100)
+//    focusRequester.requestFocus()
+//  }
 }

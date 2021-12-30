@@ -35,7 +35,7 @@ import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.ArtistDao
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.GenreDao
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
@@ -51,7 +51,6 @@ import com.ealva.toque.service.session.common.toPersistentId
 import com.ealva.toque.ui.library.ArtistType
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapAll
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -95,6 +94,7 @@ interface MediaSessionBrowser {
       scope,
       dispatcher
     )
+
     /** Throws IllegalArgumentException if [mediaId] is not of a recognized type */
     suspend fun <T> handleMedia(
       mediaId: String,
@@ -114,7 +114,7 @@ interface MediaSessionBrowser {
   }
 }
 
-private typealias ItemListResult = Result<List<MediaItem>, DaoMessage>
+private typealias ItemListResult = DaoResult<List<MediaItem>>
 
 private class MediaSessionBrowserImpl(
   private val audioMediaDao: AudioMediaDao,
@@ -160,7 +160,7 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun getChildren(parentId: String): List<MediaItem> {
     suspend fun valueFromList(
-      maker: suspend () -> Result<List<MediaItem>, DaoMessage>
+      maker: suspend () -> DaoResult<List<MediaItem>>
     ): List<MediaItem> = when (val result = maker()) {
       is Ok -> result.value
       is Err -> emptyList()
@@ -273,7 +273,7 @@ private class MediaSessionBrowserImpl(
     extras = getContentStyle(CONTENT_STYLE_GRID, CONTENT_STYLE_LIST)
   )
 
-  private suspend fun makeArtistList(): Result<List<MediaItem>, DaoMessage> =
+  private suspend fun makeArtistList(): DaoResult<List<MediaItem>> =
     artistDao
       .getAllArtistNames(MAX_LIST_SIZE)
       .mapAll {
@@ -302,7 +302,7 @@ private class MediaSessionBrowserImpl(
   private fun makeItemDesc(id: PersistentId, name: String, icon: Uri, subtitle: String? = null) =
     makeItemDesc(id.toCompatMediaId(), name, icon, subtitle, Bundle.EMPTY)
 
-  private suspend fun makeAlbumList(): Result<List<MediaItem>, DaoMessage> =
+  private suspend fun makeAlbumList(): DaoResult<List<MediaItem>> =
     albumDao
       .getAllAlbums(limit = MAX_LIST_SIZE)
       .mapAll {
@@ -321,7 +321,7 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun makeArtistAlbumList(
     artistId: ArtistId
-  ): Result<List<MediaItem>, DaoMessage> = albumDao
+  ): DaoResult<List<MediaItem>> = albumDao
     .getAllAlbumsFor(artistId, ArtistType.AlbumArtist, limit = MAX_LIST_SIZE)
     .mapAll {
       Ok(
@@ -345,7 +345,7 @@ private class MediaSessionBrowserImpl(
     }
   }
 
-  private suspend fun makeGenreList(): Result<List<MediaItem>, DaoMessage> =
+  private suspend fun makeGenreList(): DaoResult<List<MediaItem>> =
     genreDao
       .getAllGenreNames(MAX_LIST_SIZE)
       .mapAll {
@@ -360,7 +360,7 @@ private class MediaSessionBrowserImpl(
   private fun makeGenreListItemDesc(): MediaDescriptionCompat =
     makeItemDesc(ID_GENRES, fetch(R.string.Genres), GENRE_ICON)
 
-  private suspend fun makeTrackList(): Result<List<MediaItem>, DaoMessage> =
+  private suspend fun makeTrackList(): DaoResult<List<MediaItem>> =
     audioMediaDao
       .getAllAudio(limit = MAX_LIST_SIZE)
       .mapToMediaList()
@@ -370,17 +370,17 @@ private class MediaSessionBrowserImpl(
 
 //  private suspend fun makeArtistTracksList(
 //    artistId: ArtistId
-//  ): Result<List<MediaItem>, DaoMessage> = audioMediaDao
+//  ): DaoResult<List<MediaItem>> = audioMediaDao
 //    .getAllAudioFor(artistId, MAX_LIST_SIZE)
 //    .mapToMediaList()
 
   private suspend fun makeAlbumTracksList(
     albumId: AlbumId
-  ): Result<List<MediaItem>, DaoMessage> = audioMediaDao
+  ): DaoResult<List<MediaItem>> = audioMediaDao
     .getAlbumAudio(id = albumId, limit = MAX_LIST_SIZE)
     .mapToMediaList()
 
-  private fun Result<Iterable<AudioDescription>, DaoMessage>.mapToMediaList(): ItemListResult =
+  private fun DaoResult<Iterable<AudioDescription>>.mapToMediaList(): ItemListResult =
     mapAll { item ->
       Ok(
         MediaItem(
@@ -396,7 +396,7 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun makeGenreTracksList(
     genreId: GenreId
-  ): Result<List<MediaItem>, DaoMessage> = audioMediaDao
+  ): DaoResult<List<MediaItem>> = audioMediaDao
     .getGenreAudio(genreId = genreId, limit = MAX_LIST_SIZE)
     .mapToMediaList()
 
@@ -503,6 +503,7 @@ private class MediaSessionBrowserImpl(
       "android.resource://${BuildConfig.APPLICATION_ID}/drawable"
     private val ALBUM_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_album}".toUri()
     private val ARTIST_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_artist}".toUri()
+
     //private val STREAM_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_stream}".toUri()
     private val PLAYLIST_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_playlist}".toUri()
     private val GENRE_ICON = "$BASE_DRAWABLE_URI/${R.drawable.ic_auto_drama_masks}".toUri()
@@ -531,8 +532,10 @@ fun Bundle.isFocusedSearch(): Boolean {
 enum class MediaItemFlags(private val flags: Int) {
   Playable(MediaItem.FLAG_PLAYABLE),
   Browsable(MediaItem.FLAG_BROWSABLE),
+
   /** Not usable until clients actually support it */
-  @Suppress("unused") PlayAndBrowse(MediaItem.FLAG_PLAYABLE or MediaItem.FLAG_BROWSABLE);
+  @Suppress("unused")
+  PlayAndBrowse(MediaItem.FLAG_PLAYABLE or MediaItem.FLAG_BROWSABLE);
 
   val asCompat: Int
     get() = flags

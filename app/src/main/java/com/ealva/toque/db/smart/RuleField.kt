@@ -30,7 +30,7 @@ enum class RuleField(
   private val stringRes: Int,
 ) : HasConstId {
   Title(1, R.string.Title) {
-    override val matchers: List<TextMatcher> = TextMatcher.allValues
+    override val matchers: List<TextMatcher> = TextMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): TextMatcher = TextMatcher.fromId(matcherId)
     override fun getSuggestionsSource(factory: SuggestionProviderFactory): SuggestionProvider =
       factory.getProvider(MediaTable.title)
@@ -39,7 +39,7 @@ enum class RuleField(
       matchers.first { it === matcher }.makeWhereClause(MediaTable.title, data)
   },
   Album(2, R.string.Album) {
-    override val matchers: List<TextMatcher> = TextMatcher.allValues
+    override val matchers: List<TextMatcher> = TextMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): TextMatcher = TextMatcher.fromId(matcherId)
     override fun getSuggestionsSource(factory: SuggestionProviderFactory): SuggestionProvider =
       factory.getProvider(AlbumTable.albumTitle)
@@ -51,7 +51,7 @@ enum class RuleField(
       AlbumJoinTemplate
   },
   Artist(3, R.string.Artist) {
-    override val matchers: List<TextMatcher> = TextMatcher.allValues
+    override val matchers: List<TextMatcher> = TextMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): TextMatcher = TextMatcher.fromId(matcherId)
     override fun getSuggestionsSource(factory: SuggestionProviderFactory): SuggestionProvider =
       factory.getProvider(SmartPlaylist.songArtistName)
@@ -63,7 +63,7 @@ enum class RuleField(
       SongArtistJoinTemplate
   },
   AlbumArtist(4, R.string.Album_artist) {
-    override val matchers: List<TextMatcher> = TextMatcher.allValues
+    override val matchers: List<TextMatcher> = TextMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): TextMatcher = TextMatcher.fromId(matcherId)
     override fun getSuggestionsSource(factory: SuggestionProviderFactory): SuggestionProvider =
       factory.getProvider(SmartPlaylist.albumArtistName)
@@ -75,7 +75,7 @@ enum class RuleField(
       AlbumArtistJoinTemplate
   },
   Genre(5, R.string.Genre) {
-    override val matchers: List<GenreMatcher> = GenreMatcher.allValues
+    override val matchers: List<GenreMatcher> = GenreMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): GenreMatcher = GenreMatcher.fromId(matcherId)
     override fun getSuggestionsSource(factory: SuggestionProviderFactory): SuggestionProvider =
       factory.getProvider(MediaTable.genre)
@@ -87,7 +87,7 @@ enum class RuleField(
       GenreJoinTemplate
   },
   Composer(6, R.string.Composer) {
-    override val matchers: List<TextMatcher> = TextMatcher.allValues
+    override val matchers: List<TextMatcher> = TextMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): TextMatcher = TextMatcher.fromId(matcherId)
     override fun getSuggestionsSource(factory: SuggestionProviderFactory): SuggestionProvider =
       factory.getProvider(ComposerTable.composer)
@@ -100,57 +100,57 @@ enum class RuleField(
     }
   },
   Rating(7, R.string.Rating) {
-    override val matchers: List<RatingMatcher> = RatingMatcher.allValues
+    override val matchers: List<RatingMatcher> = RatingMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): RatingMatcher = RatingMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.rating, data)
   },
   Year(8, R.string.Year) {
-    override val matchers: List<NumberMatcher> = NumberMatcher.allValues
+    override val matchers: List<NumberMatcher> = NumberMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): NumberMatcher = NumberMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.year, data)
   },
   DateAdded(9, R.string.Date_added) {
-    override val matchers: List<DateMatcher> = DateMatcher.allValues
+    override val matchers: List<DateMatcher> = DateMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): DateMatcher = DateMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.createdTime, data)
   },
   PlayCount(10, R.string.Played_count) {
-    override val matchers: List<NumberMatcher> = NumberMatcher.allValues
+    override val matchers: List<NumberMatcher> = NumberMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): NumberMatcher = NumberMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.playedCount, data)
   },
   LastPlayed(11, R.string.Last_played) {
-    override val matchers: List<DateMatcher> = DateMatcher.allValues
+    override val matchers: List<DateMatcher> = DateMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): DateMatcher = DateMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.lastPlayedTime, data)
   },
   SkipCount(12, R.string.Skipped_count) {
-    override val matchers: List<NumberMatcher> = NumberMatcher.allValues
+    override val matchers: List<NumberMatcher> = NumberMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): NumberMatcher = NumberMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.skippedCount, data)
   },
   LastSkipped(13, R.string.Last_skipped) {
-    override val matchers: List<DateMatcher> = DateMatcher.allValues
+    override val matchers: List<DateMatcher> = DateMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): DateMatcher = DateMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.lastSkippedTime, data)
   },
   Duration(14, R.string.Duration) {
-    override val matchers: List<LongNumberMatcher> = LongNumberMatcher.allValues
-    override fun reifyMatcher(matcherId: Int): LongNumberMatcher =
-      LongNumberMatcher.fromId(matcherId)
+    override val matchers: List<DurationMatcher> = DurationMatcher.ALL_VALUES
+    override fun reifyMatcher(matcherId: Int): DurationMatcher =
+      DurationMatcher.fromId(matcherId)
 
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.duration, data)
   },
   Playlist(15, R.string.Playlist) {
-    override val matchers: List<PlaylistMatcher> = PlaylistMatcher.allValues
+    override val matchers: List<PlaylistMatcher> = PlaylistMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): PlaylistMatcher = PlaylistMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(PlayListTable.id, data)
@@ -159,13 +159,13 @@ enum class RuleField(
       matchers.first { it === matcher }.makeJoinTemplate(data)
   },
   Comment(16, R.string.Comment) {
-    override val matchers: List<TextMatcher> = TextMatcher.allValues
+    override val matchers: List<TextMatcher> = TextMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): TextMatcher = TextMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.comment, data)
   },
   DiscCount(17, R.string.Disc_count) {
-    override val matchers: List<NumberMatcher> = NumberMatcher.allValues
+    override val matchers: List<NumberMatcher> = NumberMatcher.ALL_VALUES
     override fun reifyMatcher(matcherId: Int): NumberMatcher = NumberMatcher.fromId(matcherId)
     override fun makeWhereClause(matcher: Matcher<*>, data: MatcherData): Op<Boolean> =
       matchers.first { it === matcher }.makeWhereClause(MediaTable.totalDiscs, data)
@@ -197,6 +197,6 @@ enum class RuleField(
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues = values().asList()
+    val ALL_VALUES = values().asList()
   }
 }

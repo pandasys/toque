@@ -843,7 +843,7 @@ private class LocalAudioQueueImpl(
   }
 
   override suspend fun removeFromQueue(index: Int, item: AudioItem) {
-    val updateTime = Millis.currentTime()
+    val updateTime = Millis.currentUtcEpochMillis()
     val prevCurrentIndex = currentItemIndex
     val prevCurrent = currentItem
 
@@ -1535,7 +1535,7 @@ private class LocalAudioQueueImpl(
     newShuffled: QueueList,
     prevCurrent: PlayableAudioItem,
     prevCurrentIndex: Int,
-    updateTime: Millis = Millis.currentTime(),
+    updateTime: Millis = Millis.currentUtcEpochMillis(),
     skipUnchangedCheck: Boolean = false
   ) {
     if (skipUnchangedCheck) {

@@ -27,14 +27,13 @@ import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -99,7 +98,7 @@ abstract class BaseAlbumsViewModel(
   protected abstract suspend fun doGetAlbums(
     albumDao: AlbumDao,
     filter: Filter
-  ): Result<List<AlbumDescription>, DaoMessage>
+  ): DaoResult<List<AlbumDescription>>
 
   private fun handleAlbumList(list: List<AlbumDescription>) {
     albumFlow.value = list.mapTo(ArrayList(list.size)) {
@@ -145,11 +144,11 @@ abstract class BaseAlbumsViewModel(
 
   protected abstract suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>
-  ): Result<CategoryMediaList, DaoMessage>
+  ): DaoResult<CategoryMediaList>
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): Result<CategoryMediaList, DaoMessage> =
+  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
     makeCategoryMediaList(getSelectedAlbums())
 
   override fun play() {

@@ -16,6 +16,7 @@
 
 package com.ealva.toque.db.smart
 
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.fetch
@@ -28,9 +29,6 @@ import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.neq
 import com.ealva.welite.db.table.Column
 import kotlinx.parcelize.Parcelize
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
 
 private val LOG by lazyLogger(RatingMatcher::class)
 
@@ -62,26 +60,15 @@ enum class RatingMatcher(
     override fun willAccept(data: MatcherData): Boolean =
       data.first >= -1 && data.first <= 100 && data.first < data.second && data.second <= 100
 
-    override fun sanitizeData(previous: MatcherData?, data: MatcherData): MatcherData {
-      LOG._e { it("data:%s", data) }
-      var first: Int = data.first.toInt().coerceAtLeast(Rating.RATING_0.value)
-      var second: Int = data.second.toInt().coerceIn(first, Rating.RATING_5.value)
-      if (first >= second) {
-          when {
-            first == Rating.RATING_5.value -> {
-              first = Rating.RATING_4_5.value
-              second = Rating.RATING_5.value
-            }
-            second == Rating.RATING_0.value -> {
-              first = Rating.RATING_0.value
-              second = Rating.RATING_0_5.value
-            }
-            else -> {
-              second = first + Rating.RATING_0_5.value
-            }
-          }
-      }
-      return data.copy(first = first.toLong(), second = second.toLong())
+    override fun sanitize(data: MatcherData): MatcherData {
+      val low = data.first
+        .toInt()
+        .coerceIn(Rating.RATING_0.value..Rating.RATING_4_5.value)
+      var high = data.second
+        .toInt()
+        .coerceIn(Rating.RATING_0_5.value..Rating.RATING_5.value)
+      if (low >= high) high = low + Rating.RATING_0_5.value
+      return data.copy(first = low.toLong(), second = high.toLong())
     }
   };
 
@@ -99,7 +86,7 @@ enum class RatingMatcher(
     return data.first >= -1 && data.first <= 100
   }
 
-  open fun sanitizeData(previous: MatcherData?, data: MatcherData): MatcherData = data.copy(
+  override fun sanitize(data: MatcherData): MatcherData = data.copy(
     first = data.first.toInt().toRating().coerceIn(Rating.VALID_RANGE).value.toLong()
   )
 
@@ -108,10 +95,10 @@ enum class RatingMatcher(
   }
 
   companion object {
-    val allValues: List<RatingMatcher> = values().toList()
+    val ALL_VALUES: List<RatingMatcher> = values().toList()
 
     fun fromId(matcherId: Int): RatingMatcher {
-      return allValues.find { it.id == matcherId }
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
   }

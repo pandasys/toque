@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.library
+package com.ealva.toque.ui.library.smart
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

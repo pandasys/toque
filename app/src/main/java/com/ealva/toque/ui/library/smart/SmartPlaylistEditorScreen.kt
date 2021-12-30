@@ -14,76 +14,57 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.library
+package com.ealva.toque.ui.library.smart
 
-import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Checkbox
 import androidx.compose.material.DismissDirection
 import androidx.compose.material.DismissValue
-import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ExposedDropdownMenuBox
-import androidx.compose.material.ExposedDropdownMenuDefaults
 import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.LocalTextStyle
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
-import androidx.compose.material.TextFieldColors
-import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.TopAppBar
 import androidx.compose.material.rememberDismissState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.text.isDigitsOnly
 import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.common.Rating
-import com.ealva.toque.common.StarRating
-import com.ealva.toque.common.toRating
-import com.ealva.toque.common.toStarRating
+import com.ealva.toque.common.asPlaylistName
+import com.ealva.toque.common.fetch
+import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.smart.AnyOrAll
 import com.ealva.toque.db.smart.EndOfSmartPlaylistAction
 import com.ealva.toque.db.smart.Matcher
 import com.ealva.toque.db.smart.MatcherData
-import com.ealva.toque.db.smart.RatingMatcher
 import com.ealva.toque.db.smart.RuleField
 import com.ealva.toque.db.smart.SmartOrderBy
 import com.ealva.toque.log._e
@@ -91,14 +72,17 @@ import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.ui.common.AutoCompleteTextView
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.config.ScreenConfig
-import com.ealva.toque.ui.library.SmartPlaylistEditorViewModel.SmartPlaylistData
+import com.ealva.toque.ui.library.BaseLibraryItemsScreen
+import com.ealva.toque.ui.library.smart.EditorRule.DateEditorRule
+import com.ealva.toque.ui.library.smart.EditorRule.DurationRule
+import com.ealva.toque.ui.library.smart.EditorRule.NumberEditorRule
+import com.ealva.toque.ui.library.smart.EditorRule.PlaylistEditorRule
+import com.ealva.toque.ui.library.smart.EditorRule.TextEditorRule
+import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.SmartPlaylistData
 import com.ealva.toque.ui.queue.DismissibleItem
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
-import com.gowtham.ratingbar.RatingBar
-import com.gowtham.ratingbar.RatingBarStyle
-import com.gowtham.ratingbar.StepSize
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
@@ -173,7 +157,7 @@ data class SmartPlaylistEditorScreen(
         ruleFieldChanged = { rule, ruleField -> viewModel.ruleFieldChanged(rule, ruleField) },
         matcherChanged = { rule, matcher -> viewModel.matcherChanged(rule, matcher) },
         ruleDataChanged = { rule, data ->
-          LOG._e { it("ruleDataChanged rule:%s", rule) }
+          LOG._e { it("ruleDataChanged %s", data) }
           viewModel.ruleDataChanged(rule, data)
         },
         deleteRule = { rule -> viewModel.deleteRule(rule) }
@@ -215,6 +199,8 @@ private fun Editor(
   ruleDataChanged: (EditorRule, MatcherData) -> Unit,
   deleteRule: (EditorRule) -> Unit
 ) {
+  val ruleList = playlist.ruleList
+  if (ruleList.isNotEmpty()) LOG._e { it("text=%s", ruleList[0].rule.data.text) }
   Column {
     ProvideTextStyle(value = MaterialTheme.typography.body2) {
       Column(
@@ -239,15 +225,17 @@ private fun Editor(
           limitChanged,
           limitCheckboxChanged
         )
-        LabeledDropdown(
+        LabeledComboBox(
+          modifier = Modifier.padding(top = 8.dp),
           value = playlist.selectBy,
-          allValues = SmartOrderBy.values(),
+          possibleValues = SmartOrderBy.ALL_VALUES,
           valueChanged = selectByChanged,
           labelRes = R.string.Select_by
         )
-        LabeledDropdown(
+        LabeledComboBox(
+          modifier = Modifier.padding(top = 8.dp),
           value = playlist.endOfListAction,
-          allValues = EndOfSmartPlaylistAction.values(),
+          possibleValues = EndOfSmartPlaylistAction.ALL_VALUES,
           valueChanged = endOfListActionChanged,
           labelRes = R.string.At_list_end
         )
@@ -324,9 +312,9 @@ fun LimitRow(
       maxLines = 1,
       singleLine = true,
       label = if (limitOn && !limitIsValid) {
-        { Text(text = stringResource(id = R.string.PositiveNumberRequired)) }
+        { Text(text = fetch(R.string.MustBeGreaterThanX, 0)) }
       } else null,
-      onValueChange = { limitChanged(it) },
+      onValueChange = { value -> if (value.isDigitsOnly()) limitChanged(value) },
       isError = !limitIsValid,
       enabled = limitOn,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -342,9 +330,10 @@ fun AnyOrAllField(value: AnyOrAll, anyOrAllChanged: (AnyOrAll) -> Unit) {
     horizontalArrangement = Arrangement.Start,
     verticalAlignment = Alignment.CenterVertically
   ) {
-    LabeledDropdown(
+    LabeledComboBox(
+      modifier = Modifier.padding(top = 8.dp),
       value = value,
-      allValues = AnyOrAll.values(),
+      possibleValues = AnyOrAll.ALL_VALUES,
       valueChanged = anyOrAllChanged,
       labelRes = R.string.Match,
       dropDownWidth = 110.dp
@@ -396,56 +385,6 @@ private fun TitleBar(
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
-fun <T : Enum<T>> LabeledDropdown(
-  value: T,
-  allValues: Array<T>,
-  valueChanged: (T) -> Unit,
-  @StringRes labelRes: Int,
-  dropDownWidth: Dp = Dp.Unspecified
-) {
-  val options = allValues.toList()
-  var expanded by remember { mutableStateOf(false) }
-
-  Row(
-    modifier = Modifier.padding(top = 8.dp),
-    horizontalArrangement = Arrangement.Start,
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    Text(
-      modifier = Modifier.padding(end = 4.dp),
-      text = stringResource(id = labelRes)
-    )
-    ExposedDropdownMenuBox(
-      modifier = Modifier.width(dropDownWidth),
-      expanded = expanded,
-      onExpandedChange = { expanded = !expanded }
-    ) {
-      CustomTextField(
-        value = value.toString(),
-        readOnly = true,
-        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-      )
-      ExposedDropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false }
-      ) {
-        options.forEach { option ->
-          DropdownMenuItem(
-            onClick = {
-              expanded = false
-              valueChanged(option)
-            }
-          ) {
-            Text(text = option.toString())
-          }
-        }
-      }
-    }
-  }
-}
-
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
 fun FieldMatcherEditorRow(
   editorRule: EditorRule,
   deletable: Boolean,
@@ -491,17 +430,17 @@ private fun FieldMatcherEditor(
 ) {
   Column {
     Row(modifier = Modifier.padding(vertical = 4.dp)) {
-      RuleEditorDropdown(
+      ComboBox(
         modifier = Modifier.weight(.45F),
         value = editorRule.rule.ruleField,
-        allValues = RuleField.values().asList(),
-        valueChanged = { ruleFieldChanged(editorRule, it) }
+        possibleValues = RuleField.ALL_VALUES,
+        valueChanged = { field -> ruleFieldChanged(editorRule, field) }
       )
-      RuleEditorDropdown(
+      ComboBox(
         modifier = Modifier.weight(.55F),
         value = editorRule.rule.matcher,
-        allValues = editorRule.rule.ruleField.matchers,
-        valueChanged = { matcherChanged(editorRule, it) }
+        possibleValues = editorRule.rule.ruleField.matchers,
+        valueChanged = { matcher -> matcherChanged(editorRule, matcher) }
       )
     }
     RuleEditor(editorRule, ruleDataChanged)
@@ -510,203 +449,61 @@ private fun FieldMatcherEditor(
 
 @Composable
 fun RuleEditor(
-  rule: EditorRule,
+  editorRule: EditorRule,
   ruleDataChanged: (EditorRule, MatcherData) -> Unit
 ) {
-  when {
-    rule is EditorRule.TextEditorRule -> EditTextRule(rule, ruleDataChanged)
-    rule.rule.ruleField == RuleField.Rating -> EditRating(rule, ruleDataChanged)
+  when (editorRule) {
+    is TextEditorRule -> EditTextRule(editorRule, ruleDataChanged)
+    is EditorRule.RatingEditorRule -> RatingEditor(editorRule, ruleDataChanged)
+    is PlaylistEditorRule -> PlaylistEditor(editorRule, ruleDataChanged)
+    is NumberEditorRule -> NumberEditor(editorRule, ruleDataChanged)
+    is DateEditorRule -> DateEditor(editorRule, ruleDataChanged)
+    is DurationRule -> DurationEditor(editorRule, ruleDataChanged)
   }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
-fun EditRating(editorRule: EditorRule, ruleDataChanged: (EditorRule, MatcherData) -> Unit) {
-  when (editorRule.rule.matcher as RatingMatcher) {
-    RatingMatcher.IsInTheRange -> RatingRangeEditor(editorRule, ruleDataChanged)
-    else -> SingleRatingEditor(editorRule, ruleDataChanged)
-  }
-}
+fun PlaylistEditor(
+  editorRule: PlaylistEditorRule,
+  ruleDataChanged: (EditorRule, MatcherData) -> Unit
+) {
+  val options: List<PlaylistMatcherData> = editorRule.playlistMatcherData
+  val value = if (options.isNotEmpty()) {
+    options[if (editorRule.index in options.indices) editorRule.index else 0]
+  } else PlaylistMatcherData(
+    PlaylistId.INVALID,
+    stringResource(R.string.ERRORNoPlaylists).asPlaylistName,
+    PlayListType.System
+  )
 
-@Composable
-fun SingleRatingEditor(editorRule: EditorRule, ruleDataChanged: (EditorRule, MatcherData) -> Unit) {
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(vertical = 8.dp),
-    horizontalArrangement = Arrangement.Center,
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    RatingBar(
-      modifier = Modifier.wrapContentSize(),
-      value = Rating(editorRule.rule.data.first.toInt()).toStarRating().value,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = false,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
-      stepSize = StepSize.HALF,
-      ratingBarStyle = RatingBarStyle.HighLighted,
-      onValueChange = {
-        ruleDataChanged(
-          editorRule,
-          editorRule.rule.data.copy(first = StarRating(it).toRating().value.toLong())
-        )
-      },
-      onRatingChanged = {},
-    )
-  }
-}
-
-@Composable
-fun RatingRangeEditor(editorRule: EditorRule, ruleDataChanged: (EditorRule, MatcherData) -> Unit) {
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(vertical = 8.dp),
-    horizontalArrangement = Arrangement.Center,
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    RatingBar(
-      modifier = Modifier.wrapContentSize(),
-      value = Rating(editorRule.rule.data.first.toInt()).toStarRating().value,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = false,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
-      stepSize = StepSize.HALF,
-      ratingBarStyle = RatingBarStyle.HighLighted,
-      onValueChange = {
-        ruleDataChanged(
-          editorRule,
-          editorRule.rule.data.copy(first = StarRating(it).toRating().value.toLong())
-        )
-      },
-      onRatingChanged = {},
-    )
-    Text(
-      modifier = Modifier.padding(horizontal = 8.dp),
-      text = stringResource(id = R.string.to),
-      style = MaterialTheme.typography.caption
-    )
-    RatingBar(
-      modifier = Modifier.wrapContentSize(),
-      value = Rating(editorRule.rule.data.second.toInt()).toStarRating().value,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = false,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
-      stepSize = StepSize.HALF,
-      ratingBarStyle = RatingBarStyle.HighLighted,
-      onValueChange = {
-        ruleDataChanged(
-          editorRule,
-          editorRule.rule.data.copy(second = StarRating(it).toRating().value.toLong())
-        )
-      },
-      onRatingChanged = {},
-    )
-  }
+  ComboBox(
+    modifier = Modifier.fillMaxWidth(),
+    value = value,
+    possibleValues = options,
+    valueChanged = { playlistData -> ruleDataChanged(editorRule, playlistData.asMatcherData) }
+  )
 }
 
 @Composable
 fun EditTextRule(
-  editorRule: EditorRule.TextEditorRule,
+  editorRule: TextEditorRule,
   ruleDataChanged: (EditorRule, MatcherData) -> Unit,
 ) {
   val rule = editorRule.rule
-  val nameValidity = editorRule.nameValidity
+  val validity = editorRule.nameValidity
 
   AutoCompleteTextView(
     modifier = Modifier.fillMaxWidth(),
     query = rule.data.text,
     suggestions = editorRule.suggestions,
-    isError = nameValidity.isNotValid,
+    isError = validity.isNotValid,
     onTextChanged = { text -> ruleDataChanged(editorRule, rule.data.copy(text = text)) },
-    label = {
-      Text(if (nameValidity.isNotValid) nameValidity.toString() else rule.ruleField.toString())
+    onSelected = { text ->
+      ruleDataChanged(editorRule.copy(editing = false), rule.data.copy(text = text))
     },
-    onDoneActionClick = {
-      LOG._e { it("onDone") }
-      ruleDataChanged(editorRule.copy(editing = false), rule.data)
-    },
-    isFocused = { isFocused ->
-      LOG._e { it("isFocus:%s", isFocused) }
-      ruleDataChanged(editorRule.copy(editing = isFocused), rule.data)
-    }
-  )
-}
-
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
-fun <T> RuleEditorDropdown(
-  modifier: Modifier = Modifier,
-  value: T,
-  allValues: List<T>,
-  valueChanged: (T) -> Unit,
-) {
-  val options = allValues.toList()
-  var expanded by remember { mutableStateOf(false) }
-
-  ExposedDropdownMenuBox(
-    modifier = modifier,
-    expanded = expanded,
-    onExpandedChange = { expanded = !expanded }
-  ) {
-    CustomTextField(
-      value = value.toString(),
-      readOnly = true,
-      trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-    )
-    ExposedDropdownMenu(
-      expanded = expanded,
-      onDismissRequest = { expanded = false }
-    ) {
-      options.forEach { option ->
-        DropdownMenuItem(
-          onClick = {
-            expanded = false
-            valueChanged(option)
-          }
-        ) {
-          Text(text = option.toString())
-        }
-      }
-    }
-  }
-}
-
-@Composable
-private fun CustomTextField(
-  modifier: Modifier = Modifier,
-  value: String,
-  readOnly: Boolean,
-  enabled: Boolean = true,
-  textStyle: TextStyle = LocalTextStyle.current,
-  trailingIcon: @Composable (() -> Unit)? = null
-) {
-  val colors: TextFieldColors = TextFieldDefaults.textFieldColors()
-  val backgroundColor = colors.backgroundColor(enabled).value
-
-  BasicTextField(
-    modifier = modifier
-      .background(backgroundColor, MaterialTheme.shapes.small)
-      .padding(start = 6.dp),
-    value = value,
-    readOnly = readOnly,
-    onValueChange = {},
-    maxLines = 1,
-    singleLine = true,
-    textStyle = textStyle.copy(color = LocalContentColor.current),
-    decorationBox = { innerTextField ->
-      Row(
-        modifier,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Box(Modifier.weight(1f)) { innerTextField() }
-        if (trailingIcon != null) trailingIcon()
-      }
-    }
+    onDoneActionClick = { ruleDataChanged(editorRule.copy(editing = false), rule.data) },
+    isFocused = { isFocused -> ruleDataChanged(editorRule.copy(editing = isFocused), rule.data) },
+    label = { Text(if (validity.isNotValid) validity.toString() else rule.ruleField.toString()) }
   )
 }

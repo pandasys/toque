@@ -21,7 +21,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.asMillis
-import com.ealva.toque.common.toDateTime
+import com.ealva.toque.common.asDateTimeWithMillis
 import com.ealva.toque.db.QueueItemsTable.itemId
 import com.ealva.toque.db.QueueTable.queueId
 import com.ealva.toque.db.QueueTable.updatedTime
@@ -54,7 +54,7 @@ interface QueueDao {
     queue: QueueId,
     queueItems: List<HasId>,
     shuffledItems: List<HasId> = emptyList(),
-    updateTime: Millis = Millis.currentTime()
+    updateTime: Millis = Millis.currentUtcEpochMillis()
   ): BoolResult
 
   suspend fun replaceIfQueueUnchanged(
@@ -67,7 +67,7 @@ interface QueueDao {
   suspend fun addQueueItems(
     queue: QueueId,
     mediaIds: MediaIdList,
-    updateTime: Millis = Millis.currentTime()
+    updateTime: Millis = Millis.currentUtcEpochMillis()
   ): BoolResult
 
   suspend fun lastUpdatedTime(queue: QueueId): MillisResult
@@ -110,7 +110,7 @@ private class QueueDaoImpl(
     db.transaction {
       val queueUpdated = doGetLastUpdatedTime(queue)
       if (queueUpdated == lastUpdated) {
-        setQueueLastUpdateTime(queue, Millis.currentTime())
+        setQueueLastUpdateTime(queue, Millis.currentUtcEpochMillis())
         deleteAll(queue)
         insertList(queue, queueItems, isShuffled = false)
         insertList(queue, shuffledItems, isShuffled = true)
@@ -119,11 +119,11 @@ private class QueueDaoImpl(
         LOG.e {
           it(
             "Queue changed since %s, last updated %s",
-            lastUpdated.toDateTime(),
-            queueUpdated.toDateTime()
+            lastUpdated.asDateTimeWithMillis,
+            queueUpdated.asDateTimeWithMillis
           )
         }
-        throw IllegalStateException("Queue has changed since ${lastUpdated.toDateTime()}")
+        throw IllegalStateException("Queue has changed since ${lastUpdated.asDateTimeWithMillis}")
       }
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
@@ -199,7 +199,7 @@ object QueueTable : Table() {
   val queueId = integer("QueueId") { primaryKey() }
 
   /**
-   * The last time [Millis.currentTime] the items of [queueId] in [QueueItemsTable] were
+   * The last time [Millis.currentUtcEpochMillis] the items of [queueId] in [QueueItemsTable] were
    * updated. This is initially used as a sanity check for "undo' functionality. If an undo request
    * is made, this time should be stored in the [Memento] so undo is aborted if a change has
    * occurred after this time.

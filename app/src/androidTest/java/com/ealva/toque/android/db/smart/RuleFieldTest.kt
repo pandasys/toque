@@ -27,7 +27,7 @@ import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.smart.DateMatcher
 import com.ealva.toque.db.smart.EmptySuggestionProvider
 import com.ealva.toque.db.smart.GenreMatcher
-import com.ealva.toque.db.smart.LongNumberMatcher
+import com.ealva.toque.db.smart.DurationMatcher
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.db.smart.NumberMatcher
 import com.ealva.toque.db.smart.PlaylistMatcher
@@ -46,6 +46,8 @@ import org.junit.runner.RunWith
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.util.concurrent.TimeUnit.MILLISECONDS
+import java.util.concurrent.TimeUnit.SECONDS
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -329,10 +331,14 @@ class RuleFieldTest {
       expect(field.reifyMatcher(matcher.id)).toBe(matcher)
     }
     expectSuggestionProviderNotCalled(field)
-    val matcher = LongNumberMatcher.Is
-    val data = MatcherData("", 777888, 0)
+    val matcher = DurationMatcher.Is
+    val first: Long = 777888
+    val asMillis = SECONDS.toMillis(MILLISECONDS.toSeconds(first))
+    val low = asMillis - 500
+    val high = asMillis + 499
+    val data = MatcherData("", first, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaDuration" = 777888""")
+      .toBe(""""Media"."MediaDuration" BETWEEN $low AND $high""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 

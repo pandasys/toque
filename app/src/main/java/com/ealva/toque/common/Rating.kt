@@ -92,8 +92,9 @@ fun Int.toRating(): Rating = when (this) {
 
 fun String.toRating(): Rating = toIntOrNull()?.toRating() ?: Rating.RATING_NONE
 
+@Parcelize
 @JvmInline
-value class StarRating(val value: Float) : Comparable<StarRating> {
+value class StarRating(val value: Float) : Comparable<StarRating>, Parcelable {
   override fun compareTo(other: StarRating): Int = value.compareTo(other.value)
 
   val isValid: Boolean

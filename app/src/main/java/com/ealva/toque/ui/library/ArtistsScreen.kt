@@ -64,7 +64,7 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
@@ -81,7 +81,6 @@ import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.LocalWindowInsets
@@ -333,7 +332,7 @@ private class ArtistsViewModelImpl(
   override fun clearSelection() = selectedItems.clearSelection()
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
-  private suspend fun getMediaList(): Result<CategoryMediaList, DaoMessage> =
+  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
     makeCategoryMediaList(getSelectedArtists())
 
   override fun play() {
@@ -358,7 +357,7 @@ private class ArtistsViewModelImpl(
 
   suspend fun makeCategoryMediaList(
     artistList: List<ArtistInfo>
-  ): Result<CategoryMediaList, DaoMessage> = audioMediaDao
+  ): DaoResult<CategoryMediaList> = audioMediaDao
     .getMediaForArtists(
       artistList
         .mapTo(LongArrayList(512)) { it.artistId.value }

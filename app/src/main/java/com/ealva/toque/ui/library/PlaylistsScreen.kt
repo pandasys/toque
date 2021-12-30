@@ -19,10 +19,8 @@ package com.ealva.toque.ui.library
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,25 +29,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.ListItem
-import androidx.compose.material.LocalContentColor
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -62,11 +53,13 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.PlaylistName
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
+import com.ealva.toque.db.Memento
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
 import com.ealva.toque.db.PlaylistDescription
@@ -78,15 +71,19 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.PopupMenu
+import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.config.LocalScreenConfig
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
+import com.ealva.toque.ui.library.smart.SmartPlaylistEditorScreen
+import com.ealva.toque.ui.main.MainViewModel
+import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
@@ -129,11 +126,12 @@ data class PlaylistsScreen(
     val key = this
     serviceBinder.add(
       PlaylistsViewModel(
-        key,
-        get(),
-        serviceBinder.lookup(),
-        get(AppPrefs.QUALIFIER),
-        serviceBinder.backstack
+        key = key,
+        audioMediaDao = get(),
+        mainViewModel = serviceBinder.lookup(),
+        localAudioQueueModel = serviceBinder.lookup(),
+        appPrefs = get(AppPrefs.QUALIFIER),
+        backstack = serviceBinder.backstack
       )
     )
   }
@@ -164,7 +162,8 @@ data class PlaylistsScreen(
         selected = selected.value,
         itemClicked = { viewModel.itemClicked(it) },
         itemLongClicked = { viewModel.itemLongClicked(it) },
-        editSmartPlaylist = { viewModel.editSmartPlaylist(it) }
+        editSmartPlaylist = { viewModel.editSmartPlaylist(it) },
+        deletePlaylist = { viewModel.deletePlaylist(it) }
       )
     }
   }
@@ -179,34 +178,12 @@ data class PlaylistsScreen(
     ) {
       CategoryTitleBar(categoryItem)
       Spacer(modifier = Modifier.weight(1.0F, fill = true))
-      var expanded by remember { mutableStateOf(false) }
-      Box(
-        modifier = Modifier
-          .size(42.dp)
-          .padding(end = 8.dp)
-          .clickable { expanded = true },
-
-        ) {
-        Icon(
-          painter = rememberImagePainter(data = R.drawable.ic_more_vert),
-          contentDescription = stringResource(id = R.string.EmbeddedArtwork),
-          modifier = Modifier.size(40.dp),
-          tint = LocalContentColor.current
+      PopupMenu(
+        items = listOf(
+          PopupMenuItem(stringResource(id = R.string.NewSmartPlaylist), newSmartPlaylist)
         )
-        DropdownMenu(
-          expanded = expanded,
-          onDismissRequest = { expanded = false },
-        ) {
-          DropdownMenuItem(
-            onClick = {
-              expanded = false
-              newSmartPlaylist()
-            }
-          ) {
-            Text(text = stringResource(id = R.string.NewSmartPlaylist))
-          }
-        }
-      }
+      )
+      Spacer(modifier = Modifier.width(8.dp))
     }
   }
 }
@@ -217,7 +194,8 @@ private fun AllPlaylists(
   selected: SelectedItems<PlaylistId>,
   itemClicked: (PlaylistInfo) -> Unit,
   itemLongClicked: (PlaylistInfo) -> Unit,
-  editSmartPlaylist: (PlaylistInfo) -> Unit
+  editSmartPlaylist: (PlaylistInfo) -> Unit,
+  deletePlaylist: (PlaylistInfo) -> Unit
 ) {
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
@@ -242,7 +220,8 @@ private fun AllPlaylists(
           isSelected = selected.isSelected(playlistInfo.id),
           itemClicked = itemClicked,
           itemLongClicked = itemLongClicked,
-          editSmartPlaylist = editSmartPlaylist
+          editSmartPlaylist = editSmartPlaylist,
+          deletePlaylist = deletePlaylist
         )
       }
     }
@@ -256,7 +235,8 @@ private fun PlaylistItem(
   isSelected: Boolean,
   itemClicked: (PlaylistInfo) -> Unit,
   itemLongClicked: (PlaylistInfo) -> Unit,
-  editSmartPlaylist: (PlaylistInfo) -> Unit
+  editSmartPlaylist: (PlaylistInfo) -> Unit,
+  deletePlaylist: (PlaylistInfo) -> Unit
 ) {
   Row(
     Modifier.fillMaxWidth(),
@@ -291,20 +271,37 @@ private fun PlaylistItem(
         )
       },
     )
-    if (playlistInfo.type == PlayListType.Rules) {
-      IconButton(
-        modifier = Modifier
-          .weight(.15F)
-          .size(50.dp),
-        onClick = { editSmartPlaylist(playlistInfo) }
-      ) {
-        Icon(
-          painter = rememberImagePainter(data = R.drawable.ic_edit),
-          contentDescription = "Item menu",
-          modifier = Modifier.size(26.dp)
+    PopupMenu(items = playlistInfo.makePopupMenuItems(editSmartPlaylist, deletePlaylist))
+    Spacer(modifier = Modifier.width(8.dp))
+  }
+}
+
+private fun PlaylistInfo.makePopupMenuItems(
+  editSmartPlaylist: (PlaylistInfo) -> Unit,
+  deletePlaylist: (PlaylistInfo) -> Unit
+): List<PopupMenuItem> {
+  return when (type) {
+    PlayListType.Rules -> {
+      listOf(
+        PopupMenuItem(
+          title = fetch(R.string.Edit),
+          onClick = { editSmartPlaylist(this) }
+        ),
+        PopupMenuItem(
+          title = fetch(R.string.Delete),
+          onClick = { deletePlaylist(this) }
         )
-      }
+      )
     }
+    PlayListType.UserCreated -> {
+      listOf(
+        PopupMenuItem(
+          title = fetch(R.string.Delete),
+          onClick = { deletePlaylist(this) }
+        )
+      )
+    }
+    else -> emptyList()
   }
 }
 
@@ -327,11 +324,13 @@ private interface PlaylistsViewModel : ActionsViewModel {
 
   fun newSmartPlaylist()
   fun editSmartPlaylist(playlistInfo: PlaylistInfo)
+  fun deletePlaylist(playlistInfo: PlaylistInfo)
 
   companion object {
     operator fun invoke(
       key: ComposeKey,
       audioMediaDao: AudioMediaDao,
+      mainViewModel: MainViewModel,
       localAudioQueueModel: LocalAudioQueueViewModel,
       appPrefs: AppPrefsSingleton,
       backstack: Backstack,
@@ -340,6 +339,7 @@ private interface PlaylistsViewModel : ActionsViewModel {
       PlaylistsViewModelImpl(
         key,
         audioMediaDao,
+        mainViewModel,
         localAudioQueueModel,
         appPrefs,
         backstack,
@@ -351,6 +351,7 @@ private interface PlaylistsViewModel : ActionsViewModel {
 private class PlaylistsViewModelImpl(
   private val key: ComposeKey,
   private val audioMediaDao: AudioMediaDao,
+  private val mainViewModel: MainViewModel,
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefs: AppPrefsSingleton,
   private val backstack: Backstack,
@@ -374,7 +375,7 @@ private class PlaylistsViewModelImpl(
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): Result<CategoryMediaList, DaoMessage> =
+  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
     makeCategoryMediaList(getSelectedPlaylists())
 
   private suspend fun makeCategoryMediaList(playlists: List<PlaylistInfo>) = audioMediaDao
@@ -464,6 +465,27 @@ private class PlaylistsViewModelImpl(
     }
   }
 
+  override fun deletePlaylist(playlistInfo: PlaylistInfo) {
+    scope.launch {
+      when (
+        val result = playlistDao.deletePlaylist(playlistId = playlistInfo.id)
+      ) {
+        is Ok -> mainViewModel.notify(
+          Notification(
+            fetch(R.string.DeletedName, playlistInfo.name.value),
+            MementoAction(scope, result.value)
+          )
+        )
+        is Err -> {
+          LOG.e { it("Couldn't delete %s. %s", playlistInfo.name, result.error) }
+          mainViewModel.notify(
+            Notification(fetch(R.string.CouldNotDeleteName, playlistInfo.name.value))
+          )
+        }
+      }
+    }
+  }
+
   private fun goToPlaylistSongs(playlistInfo: PlaylistInfo) =
     backstack.goToScreen(PlaylistSongsScreen(playlistInfo.id, playlistInfo.type))
 
@@ -484,3 +506,16 @@ private class PlaylistsViewModelImpl(
 private data class PlaylistsViewModelState(val selected: SelectedItems<PlaylistId>) : Parcelable
 
 private const val KEY_MODEL_STATE = "PlaylistsModelState"
+
+class MementoAction(val scope: CoroutineScope, private val memento: Memento) : Notification.Action {
+  override val label: String
+    get() = fetch(R.string.Undo)
+
+  override fun action() {
+    scope.launch { memento.undo() }
+  }
+
+  override fun expired() {
+    scope.launch { memento.release() }
+  }
+}

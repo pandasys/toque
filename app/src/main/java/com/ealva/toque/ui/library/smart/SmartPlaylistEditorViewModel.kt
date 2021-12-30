@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.library
+package com.ealva.toque.ui.library.smart
 
 import android.os.Parcelable
 import androidx.annotation.StringRes
@@ -46,14 +46,24 @@ import com.ealva.toque.navigation.AllowableNavigation
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.isValid
 import com.ealva.toque.ui.common.DialogPrompt
-import com.ealva.toque.ui.library.EditorRule.Companion.albumArtistEditorRule
-import com.ealva.toque.ui.library.EditorRule.Companion.albumEditorRule
-import com.ealva.toque.ui.library.EditorRule.Companion.artistEditorRule
-import com.ealva.toque.ui.library.EditorRule.Companion.composerEditorRule
-import com.ealva.toque.ui.library.EditorRule.Companion.genreEditorRule
-import com.ealva.toque.ui.library.EditorRule.Companion.titleEditorRule
-import com.ealva.toque.ui.library.SmartPlaylistEditorViewModel.NameValidity
-import com.ealva.toque.ui.library.SmartPlaylistEditorViewModel.SmartPlaylistData
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.albumArtistRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.albumRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.artistRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.commentRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.composerRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.dateAddedRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.discCountRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.genreRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.lastPlayedRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.lastSkippedRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.playCountRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.playlistRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.ratingRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.skipCountRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.titleRule
+import com.ealva.toque.ui.library.smart.EditorRule.Companion.yearRule
+import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.NameValidity
+import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.SmartPlaylistData
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back
@@ -143,9 +153,9 @@ interface SmartPlaylistEditorViewModel : AllowableNavigation {
   fun limitChanged(limit: String)
   fun selectByChanged(selectBy: SmartOrderBy)
   fun endOfListActionChanged(action: EndOfSmartPlaylistAction)
-  fun ruleFieldChanged(rule: EditorRule, ruleField: RuleField)
-  fun matcherChanged(rule: EditorRule, matcher: Matcher<*>)
-  fun ruleDataChanged(rule: EditorRule, newData: MatcherData)
+  fun ruleFieldChanged(updateRule: EditorRule, ruleField: RuleField)
+  fun matcherChanged(updateRule: EditorRule, matcher: Matcher<*>)
+  fun ruleDataChanged(updateRule: EditorRule, newData: MatcherData)
 
   fun save()
   fun deleteRule(editorRule: EditorRule)
@@ -192,17 +202,9 @@ private class SmartPlaylistEditorViewModelImpl(
   private val ruleUpdateFlow = MutableSharedFlow<ModelRuleUpdate>(extraBufferCapacity = 10)
 
   sealed interface ModelRuleUpdate {
-    data class RuleFieldChanged(
-      val editorRule: EditorRule,
-      val ruleField: RuleField
-    ) :  ModelRuleUpdate
-
-    data class MatcherChanged(val editorRule: EditorRule, val matcher: Matcher<*>) : ModelRuleUpdate
-
-    data class RuleDataChanged(
-      val editorRule: EditorRule,
-      val newData: MatcherData
-    ) : ModelRuleUpdate
+    data class RuleFieldChanged(val updateRule: EditorRule, val field: RuleField) : ModelRuleUpdate
+    data class MatcherChanged(val updateRule: EditorRule, val matcher: Matcher<*>) : ModelRuleUpdate
+    data class RuleDataChanged(val updateRule: EditorRule, val data: MatcherData) : ModelRuleUpdate
   }
 
   private fun makeEmptySmartPlaylistData(): SmartPlaylistData {
@@ -231,8 +233,8 @@ private class SmartPlaylistEditorViewModelImpl(
       allPlaylistNames.clear()
       allViewNames.clear()
       scope.launch {
-        when (val result = playlistDao.getAllPlaylistNames()) {
-          is Ok -> allPlaylistNames.addAll(result.value)
+        when (val result = playlistDao.getAllOfType()) {
+          is Ok -> allPlaylistNames.addAll(result.value.asSequence().map { it.name })
           is Err -> LOG.e { it("Error getting playlist names. %s", result.error) }
         }
         when (val result = schemaDao.getTableAndViewNames()) {
@@ -349,8 +351,8 @@ private class SmartPlaylistEditorViewModelImpl(
     scope.launch { ruleUpdateFlow.emit(update) }
   }
 
-  override fun ruleFieldChanged(rule: EditorRule, ruleField: RuleField) {
-    emitRuleUpdate(ModelRuleUpdate.RuleFieldChanged(rule, ruleField))
+  override fun ruleFieldChanged(updateRule: EditorRule, ruleField: RuleField) {
+    emitRuleUpdate(ModelRuleUpdate.RuleFieldChanged(updateRule, ruleField))
   }
 
   private suspend fun doRuleFieldChange(update: ModelRuleUpdate.RuleFieldChanged) {
@@ -359,8 +361,8 @@ private class SmartPlaylistEditorViewModelImpl(
         ruleList = it.ruleList.map { current ->
           changeRuleField(
             current,
-            update.editorRule,
-            update.ruleField
+            update.updateRule,
+            update.field
           )
         }
       )
@@ -373,57 +375,57 @@ private class SmartPlaylistEditorViewModelImpl(
    */
   private suspend fun changeRuleField(
     current: EditorRule,
-    editorRule: EditorRule,
+    updateRule: EditorRule,
     ruleField: RuleField
-  ): EditorRule = if (current.rule.id == editorRule.rule.id) {
+  ): EditorRule = if (current.rule.id == updateRule.rule.id) {
     val matcher = ruleField.matchers.first()
     makeEditorRule(
-      update = current,
+      update = null,
       ruleId = current.rule.id,
       field = ruleField,
       matcher = matcher,
-      data = matcher.acceptableData(current.rule.data),
+      data = matcher.acceptableData(updateRule.rule.data),
     )
   } else {
     current
   }
 
-  override fun matcherChanged(rule: EditorRule, matcher: Matcher<*>) {
-    emitRuleUpdate(ModelRuleUpdate.MatcherChanged(rule, matcher))
+  override fun matcherChanged(updateRule: EditorRule, matcher: Matcher<*>) {
+    emitRuleUpdate(ModelRuleUpdate.MatcherChanged(updateRule, matcher))
   }
 
   private suspend fun doMatcherChanged(update: ModelRuleUpdate.MatcherChanged) {
     playlistFlow.update {
       it.copy(ruleList = it.ruleList.map { current ->
-        changeMatcher(current, update.editorRule, update.matcher)
+        changeMatcher(current, update.updateRule, update.matcher)
       })
     }
   }
 
   private suspend fun changeMatcher(
     current: EditorRule,
-    editorRule: EditorRule,
+    updateRule: EditorRule,
     matcher: Matcher<*>
-  ): EditorRule = if (current.rule.id == editorRule.rule.id) {
+  ): EditorRule = if (current.rule.id == updateRule.rule.id) {
     makeEditorRule(
-      update = current,
+      update = null,
       ruleId = current.rule.id,
       field = current.rule.ruleField,
       matcher = matcher,
-      data = matcher.acceptableData(current.rule.data),
+      data = matcher.acceptableData(updateRule.rule.data),
     )
   } else {
     current
   }
 
-  override fun ruleDataChanged(rule: EditorRule, newData: MatcherData) {
-    LOG._e { it("ruleDataChanged editing:%s", rule) }
-    emitRuleUpdate(ModelRuleUpdate.RuleDataChanged(rule, newData))
+  override fun ruleDataChanged(updateRule: EditorRule, newData: MatcherData) {
+    emitRuleUpdate(ModelRuleUpdate.RuleDataChanged(updateRule, newData))
   }
 
   private suspend fun doRuleDataChanged(update: ModelRuleUpdate.RuleDataChanged) {
-    val updateRule = update.editorRule
-    val newData = update.newData
+    val updateRule = update.updateRule
+    val newData = update.data
+    LOG._e { it("newData %s", newData) }
     playlistFlow.update { smartPlaylistData ->
       smartPlaylistData.copy(
         ruleList = smartPlaylistData.ruleList.map { current ->
@@ -552,9 +554,8 @@ private class SmartPlaylistEditorViewModelImpl(
     )
   }
 
-  private suspend fun Rule.toEditorRule(): EditorRule {
-    return makeEditorRule(null, id, ruleField, matcher, data)
-  }
+  private suspend fun Rule.toEditorRule(): EditorRule =
+    makeEditorRule(null, id, ruleField, matcher, data)
 
   private suspend fun setOriginal(playlist: SmartPlaylist) {
     original = playlist
@@ -613,8 +614,8 @@ private class SmartPlaylistEditorViewModelImpl(
 
   private fun nameIsReserved(name: String): Boolean = name.trim().let { value ->
     name.startsWith("sqlite_", ignoreCase = true) ||
-    allViewNames.any { it.value.equals(value, ignoreCase = true) } ||
-    allPlaylistNames.any { it.value.equals(value, ignoreCase = true) }
+        allViewNames.any { it.value.equals(value, ignoreCase = true) } ||
+        allPlaylistNames.any { it.value.equals(value, ignoreCase = true) }
   }
 
   private fun makeDefaultRule(): EditorRule {
@@ -628,8 +629,13 @@ private class SmartPlaylistEditorViewModelImpl(
     )
   }
 
-  private var nextRuleId = 0L
-  private fun getNextId(): Long = ++nextRuleId
+  private fun getNextId(): Long = (playlistFlow
+    .value
+    .ruleList
+    .maxByOrNull { edit -> edit.rule.id }
+    ?.rule
+    ?.id
+    ?: 0) + 1
 
   private suspend fun makeEditorRule(
     update: EditorRule?,
@@ -637,33 +643,25 @@ private class SmartPlaylistEditorViewModelImpl(
     field: RuleField,
     matcher: Matcher<*>,
     data: MatcherData
-  ): EditorRule {
-    LOG._e { it("makeEditorRule existing:%s", update ?: "null") }
-    return when (field) {
-      RuleField.Title -> titleEditorRule(update, ruleId, matcher, data, audioMediaDao)
-      RuleField.Album -> albumEditorRule(update, ruleId, matcher, data, audioMediaDao.albumDao)
-      RuleField.Artist -> artistEditorRule(update, ruleId, matcher, data, audioMediaDao)
-      RuleField.AlbumArtist -> albumArtistEditorRule(update, ruleId, matcher, data, audioMediaDao)
-      RuleField.Genre -> genreEditorRule(update, ruleId, matcher, data, audioMediaDao.genreDao)
-      RuleField.Composer -> composerEditorRule(
-        update,
-        ruleId,
-        matcher,
-        data,
-        audioMediaDao.composerDao
-      )
-      RuleField.Rating -> EditorRule.ratingEditorRule(update, ruleId, matcher, data)
-      RuleField.Year -> TODO()
-      RuleField.DateAdded -> TODO()
-      RuleField.PlayCount -> TODO()
-      RuleField.LastPlayed -> TODO()
-      RuleField.SkipCount -> TODO()
-      RuleField.LastSkipped -> TODO()
-      RuleField.Duration -> TODO()
-      RuleField.Playlist -> TODO()
-      RuleField.Comment -> EditorRule.commentEditorRule(ruleId, matcher, data)
-      RuleField.DiscCount -> TODO()
-    }
+  ): EditorRule = when (field) {
+    RuleField.Title -> titleRule(update, ruleId, matcher, data, audioMediaDao)
+    RuleField.Album -> albumRule(update, ruleId, matcher, data, audioMediaDao.albumDao)
+    RuleField.Artist -> artistRule(update, ruleId, matcher, data, audioMediaDao)
+    RuleField.AlbumArtist -> albumArtistRule(update, ruleId, matcher, data, audioMediaDao)
+    RuleField.Genre -> genreRule(update, ruleId, matcher, data, audioMediaDao.genreDao)
+    RuleField.Composer -> composerRule(update, ruleId, matcher, data, audioMediaDao.composerDao)
+    RuleField.Rating -> ratingRule(ruleId, matcher, data)
+    RuleField.Year -> yearRule(update, ruleId, matcher, data)
+    RuleField.DateAdded -> dateAddedRule(update, ruleId, matcher, data)
+    RuleField.PlayCount -> playCountRule(update, ruleId, matcher, data)
+    RuleField.LastPlayed -> lastPlayedRule(update, ruleId, matcher, data)
+    RuleField.SkipCount -> skipCountRule(update, ruleId, matcher, data)
+    RuleField.LastSkipped -> lastSkippedRule(update, ruleId, matcher, data)
+    RuleField.Duration -> EditorRule.durationRule(ruleId, matcher, data)
+    RuleField.Playlist ->
+      playlistRule(playlistId, update, ruleId, matcher, data, audioMediaDao.playlistDao)
+    RuleField.Comment -> commentRule(ruleId, matcher, data)
+    RuleField.DiscCount -> discCountRule(update, ruleId, matcher, data)
   }
 
   override fun toBundle(): StateBundle = StateBundle().apply {

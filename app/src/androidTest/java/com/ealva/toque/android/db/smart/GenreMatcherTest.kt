@@ -115,8 +115,8 @@ class GenreMatcherTest {
       GenreMatcher.BeginsWith,
       GenreMatcher.EndsWith
     ).let { list ->
-      expect(GenreMatcher.allValues.size).toBe(list.size)
-      list.forEach { matcher -> expect(GenreMatcher.allValues).toContain(matcher) }
+      expect(GenreMatcher.ALL_VALUES.size).toBe(list.size)
+      list.forEach { matcher -> expect(GenreMatcher.ALL_VALUES).toContain(matcher) }
     }
   }
 }

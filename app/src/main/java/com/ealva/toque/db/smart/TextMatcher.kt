@@ -81,10 +81,10 @@ enum class TextMatcher(
   }
 
   companion object {
-    val allValues: List<TextMatcher> = values().toList()
+    val ALL_VALUES: List<TextMatcher> = values().toList()
 
     fun fromId(matcherId: Int): TextMatcher {
-      return allValues.find { it.id == matcherId }
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
   }

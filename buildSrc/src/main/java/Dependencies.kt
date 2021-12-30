@@ -168,7 +168,7 @@ object Libs {
     // const val EXTENSIONS = "org.jetbrains.kotlin:kotlin-android-extensions:$VERSION"
 
     object Coroutines {
-      private const val VERSION = "1.6.0-RC3"
+      private const val VERSION = "1.6.0"
       const val CORE = "org.jetbrains.kotlinx:kotlinx-coroutines-core:$VERSION"
       const val ANDROID =
         "org.jetbrains.kotlinx:kotlinx-coroutines-android:$VERSION"

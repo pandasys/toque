@@ -40,6 +40,6 @@ enum class AnyOrAll(
   }
 
   companion object {
-    val allValues = values().asList()
+    val ALL_VALUES = values().asList()
   }
 }

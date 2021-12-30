@@ -29,8 +29,9 @@ import com.ealva.toque.service.session.common.Metadata
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.service.vlc.VlcAudioItem
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
 import it.unimi.dsi.fastutil.longs.LongCollection
 
 private val LOG by lazyLogger(PlayableAudioItemFactory::class)
@@ -87,12 +88,13 @@ private class PlayableAudioItemFactoryImpl(
     shuffled: Boolean,
     request: AvPlayer.FocusRequest,
     sharedPlayerState: SharedPlayerState
-  ): MutableList<PlayableAudioItem> {
-    val appPrefs = appPrefsSingleton.instance()
-    val libVlcPrefs = libVlcPrefsSingleton.instance()
-    return when (val result = audioMediaDao.getAudioQueueItems(shuffled)) {
-      is Ok -> ArrayList<PlayableAudioItem>(result.value.size).apply {
-        result.value.forEach { itemData ->
+  ): MutableList<PlayableAudioItem> = audioMediaDao
+    .getAudioQueueItems(shuffled)
+    .map { list ->
+      ArrayList<PlayableAudioItem>(list.size).apply {
+        val appPrefs = appPrefsSingleton.instance()
+        val libVlcPrefs = libVlcPrefsSingleton.instance()
+        list.forEach { itemData ->
           add(
             VlcAudioItem(
               Metadata(
@@ -123,12 +125,9 @@ private class PlayableAudioItemFactoryImpl(
           )
         }
       }
-      is Err -> {
-        LOG.e { it("Failed to get UpNextQueue data. %s", result.error) }
-        mutableListOf()
-      }
     }
-  }
+    .onFailure { cause -> LOG.e(cause) { it("Failed to get UpNextQueue data.") } }
+    .getOrElse { mutableListOf() }
 
   override suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T> =
     audioMediaDao.makeShuffledQueue(upNextQueue)
@@ -137,12 +136,13 @@ private class PlayableAudioItemFactoryImpl(
     idList: LongCollection,
     request: AvPlayer.FocusRequest,
     sharedPlayerState: SharedPlayerState
-  ): QueueList {
-    val appPrefs = appPrefsSingleton.instance()
-    val libVlcPrefs = libVlcPrefsSingleton.instance()
-    return when (val result = audioMediaDao.getAudioItemsForQueue(idList)) {
-      is Ok -> ArrayList<PlayableAudioItem>(result.value.size).apply {
-        result.value.forEach { itemData ->
+  ): QueueList = audioMediaDao
+    .getAudioItemsForQueue(idList)
+    .map { itemList ->
+      ArrayList<PlayableAudioItem>(itemList.size).apply {
+        val appPrefs = appPrefsSingleton.instance()
+        val libVlcPrefs = libVlcPrefsSingleton.instance()
+        itemList.forEach { itemData ->
           add(
             VlcAudioItem(
               Metadata(
@@ -173,10 +173,7 @@ private class PlayableAudioItemFactoryImpl(
           )
         }
       }
-      is Err -> {
-        LOG.e { it("Make new queue items failed. %s", result.error) }
-        mutableListOf()
-      }
     }
-  }
+    .onFailure { cause -> LOG.e(cause) { it("Make new queue items failed") } }
+    .getOrElse { emptyList() }
 }

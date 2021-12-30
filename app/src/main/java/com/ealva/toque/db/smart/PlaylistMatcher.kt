@@ -21,7 +21,10 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.db.MediaTable
 import com.ealva.toque.db.PlayListMediaTable
 import com.ealva.toque.db.PlayListType
-import com.ealva.toque.persist.reifyRequire
+import com.ealva.toque.ui.library.smart.asPlaylistMatcherData
+import com.ealva.toque.ui.library.smart.playlistId
+import com.ealva.toque.ui.library.smart.playlistName
+import com.ealva.toque.ui.library.smart.playlistType
 import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.isNotNull
@@ -73,20 +76,20 @@ enum class PlaylistMatcher(override val id: Int, private val stringRes: Int) : M
     }
   };
 
-  override fun willAccept(data: MatcherData): Boolean {
-    return data.second > 0
-  }
+  override fun willAccept(data: MatcherData): Boolean =
+    data.playlistType != null && data.playlistId > 0 && data.playlistName.value.isNotBlank()
 
   /**
    * Make a where clause where PlayListType is [data].first, view name is [data].text, and playlist
    * ID is [data].second
    */
   override fun makeWhereClause(column: Column<Long>, data: MatcherData): Op<Boolean> {
+    val playlistData = data.asPlaylistMatcherData
     return doMakeWhereClause(
       column,
-      data.text,
-      PlayListType::class.reifyRequire(data.first.toInt()),
-      data.second
+      playlistData.name.value,
+      playlistData.type,
+      playlistData.id.value
     )
   }
 
@@ -98,10 +101,11 @@ enum class PlaylistMatcher(override val id: Int, private val stringRes: Int) : M
   ): Op<Boolean>
 
   fun makeJoinTemplate(data: MatcherData): JoinTemplate? {
+    val playlistData = data.asPlaylistMatcherData
     return doMakeJoinTemplate(
-      data.text,
-      PlayListType::class.java.reifyRequire(data.first.toInt()),
-      data.second
+      playlistData.name.value,
+      playlistData.type,
+      playlistData.id.value
     )
   }
 
@@ -114,10 +118,10 @@ enum class PlaylistMatcher(override val id: Int, private val stringRes: Int) : M
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues: List<PlaylistMatcher> = values().toList()
+    val ALL_VALUES: List<PlaylistMatcher> = values().toList()
 
     fun fromId(matcherId: Int): PlaylistMatcher {
-      return allValues.find { it.id == matcherId }
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
 

@@ -71,10 +71,10 @@ enum class NumberMatcher(
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues: List<NumberMatcher> = values().toList()
+    val ALL_VALUES: List<NumberMatcher> = values().toList()
 
     fun fromId(matcherId: Int): NumberMatcher {
-      return allValues.find { it.id == matcherId }
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
   }

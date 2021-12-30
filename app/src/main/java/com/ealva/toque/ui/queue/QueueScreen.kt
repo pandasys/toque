@@ -60,6 +60,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.asMediaIdList
@@ -520,7 +521,7 @@ private class QueueViewModelImpl(
     queueStateJob = queue.queueState
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("Error with LocalAudioQueueState flow") } }
-      .onCompletion { LOG._e { it("LocalAudioQueue state flow completed") } }
+      .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }
 

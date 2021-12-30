@@ -17,12 +17,11 @@
 package com.ealva.toque.service.media
 
 import com.ealva.toque.audioout.AudioOutputRoute
-import com.ealva.toque.persist.AlbumId
-import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.EqPresetIdName
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
-import com.github.michaelbull.result.Result
 
 interface EqPresetFactory {
 
@@ -37,15 +36,15 @@ interface EqPresetFactory {
 
   suspend fun getAllPresets(): List<EqPresetIdName>
 
-  suspend fun getPreset(id: EqPresetId): Result<EqPreset, DaoMessage>
+  suspend fun getPreset(id: EqPresetId): DaoResult<EqPreset>
 
-  suspend fun makeFrom(eqPreset: EqPreset, name: String): Result<EqPreset, DaoMessage>
+  suspend fun makeFrom(eqPreset: EqPreset, name: String): DaoResult<EqPreset>
 
   suspend fun getPreferred(
     mediaId: MediaId,
     albumId: AlbumId,
     outputRoute: AudioOutputRoute
-  ): Result<EqPreset, DaoMessage>
+  ): DaoResult<EqPreset>
 
   /**
    * Setting this preset turns off equalization.

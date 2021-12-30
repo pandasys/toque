@@ -176,8 +176,8 @@ class DateMatcherTest {
       DateMatcher.NotInTheLast,
       DateMatcher.IsInTheRange
     ).let { list ->
-      expect(DateMatcher.allValues.size).toBe(list.size)
-      list.forEach { matcher -> expect(DateMatcher.allValues).toContain(matcher) }
+      expect(DateMatcher.ALL_VALUES.size).toBe(list.size)
+      list.forEach { matcher -> expect(DateMatcher.ALL_VALUES).toContain(matcher) }
     }
   }
 }

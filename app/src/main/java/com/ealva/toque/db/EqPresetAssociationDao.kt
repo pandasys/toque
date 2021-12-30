@@ -47,7 +47,7 @@ import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 
-typealias AssociationListResult = Result<List<PresetAssociation>, DaoMessage>
+typealias AssociationListResult = DaoResult<List<PresetAssociation>>
 
 interface EqPresetAssociationDao {
   /**

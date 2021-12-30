@@ -55,7 +55,7 @@ enum class TheLast(
   abstract fun calc(units: Long): Long
 
   companion object {
-    val allValues = values().asList()
+    val ALL_VALUES = values().asList()
 
     /**
      * @throws IllegalArgumentException if [id] is not found and [defaultValue] is null
@@ -70,7 +70,7 @@ enum class TheLast(
     }
 
     fun isValidId(id: Long): Boolean {
-      return allValues.any { it.id.toLong() == id }
+      return ALL_VALUES.any { it.id.toLong() == id }
     }
   }
 }

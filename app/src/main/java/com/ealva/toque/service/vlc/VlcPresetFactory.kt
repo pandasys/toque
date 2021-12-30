@@ -22,7 +22,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.DaoExceptionMessage
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetIdName
@@ -35,7 +35,6 @@ import com.ealva.toque.service.media.EqPresetFactory.Companion.DEFAULT_SYSTEM_PR
 import com.ealva.toque.service.vlc.VlcEqPreset.Companion.setNativeEqValues
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 import org.videolan.libvlc.MediaPlayer
@@ -69,38 +68,37 @@ class VlcPresetFactory(
    * which may bed edited and saved ni the DB. User preset IDs start at a high number, currently
    * 1000, so they should never clash with system IDs.
    */
-  override suspend fun getPreset(id: EqPresetId): Result<EqPreset, DaoMessage> =
-    runSuspendCatching {
-      if (id.value in 0..systemPresetCount) {
-        presetCache.getOrPut(id) {
-          VlcEqPreset(
-            MediaPlayer.Equalizer.createFromPreset(id.value.toInt()),
-            MediaPlayer.Equalizer.getPresetName(id.value.toInt()),
-            true,
-            id,
-            NullEqPresetDao
-          )
-        }
-      } else {
-        presetCache.getOrPut(id) {
-          when (val result = eqPresetDao.getPresetData(id)) {
-            is Ok -> {
-              val data = result.value
-              VlcEqPreset(
-                MediaPlayer.Equalizer.create().setNativeEqValues(data.preAmpAndBands),
-                data.name,
-                false,
-                data.id,
-                eqPresetDao
-              )
-            }
-            is Err -> throw NoSuchElementException("PresetId:$id")
+  override suspend fun getPreset(id: EqPresetId): DaoResult<EqPreset> = runSuspendCatching {
+    if (id.value in 0..systemPresetCount) {
+      presetCache.getOrPut(id) {
+        VlcEqPreset(
+          MediaPlayer.Equalizer.createFromPreset(id.value.toInt()),
+          MediaPlayer.Equalizer.getPresetName(id.value.toInt()),
+          true,
+          id,
+          NullEqPresetDao
+        )
+      }
+    } else {
+      presetCache.getOrPut(id) {
+        when (val result = eqPresetDao.getPresetData(id)) {
+          is Ok -> {
+            val data = result.value
+            VlcEqPreset(
+              MediaPlayer.Equalizer.create().setNativeEqValues(data.preAmpAndBands),
+              data.name,
+              false,
+              data.id,
+              eqPresetDao
+            )
           }
+          is Err -> throw NoSuchElementException("PresetId:$id")
         }
       }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+    }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
-  override suspend fun makeFrom(eqPreset: EqPreset, name: String): Result<EqPreset, DaoMessage> {
+  override suspend fun makeFrom(eqPreset: EqPreset, name: String): DaoResult<EqPreset> {
     val preAmpAndBands = eqPreset.getAllValues()
     return when (val result = eqPresetDao.insertPreset(name, preAmpAndBands)) {
       is Ok -> {
@@ -122,13 +120,13 @@ class VlcPresetFactory(
     mediaId: MediaId,
     albumId: AlbumId,
     outputRoute: AudioOutputRoute
-  ): Result<EqPreset, DaoMessage> = doGetPreferred(mediaId, albumId, outputRoute)
+  ): DaoResult<EqPreset> = doGetPreferred(mediaId, albumId, outputRoute)
 
   private suspend fun doGetPreferred(
     mediaId: MediaId,
     albumId: AlbumId,
     route: AudioOutputRoute
-  ): Result<EqPreset, DaoMessage> = when (
+  ): DaoResult<EqPreset> = when (
     val result = eqPresetAssocDao.getPreferredId(mediaId, albumId, route, defaultId)
   ) {
     is Ok -> getPreset(result.value)

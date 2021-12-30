@@ -26,9 +26,9 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.common.fetchPlural
 import com.ealva.toque.common.isValidAndUnique
 import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
-import com.ealva.toque.db.PlaylistIdName
-import com.ealva.toque.log._e
+import com.ealva.toque.db.PlaylistIdNameType
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -232,8 +232,8 @@ class LocalAudioQueueViewModelImpl(
   override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
     val deferred = CompletableDeferred<PromptResult>()
     // get list of user playlists. If Empty return CreatePlaylist
-    val playlists: List<PlaylistIdName> =
-      when (val result = playlistDao.getUserPlaylistNames()) {
+    val playlists: List<PlaylistIdNameType> =
+      when (val result = playlistDao.getAllOfType(PlayListType.UserCreated)) {
         is Ok -> result.value
         is Err -> {
           LOG.e { it("Error retrieving user playlists. %s", result.error) }
@@ -246,9 +246,9 @@ class LocalAudioQueueViewModelImpl(
       deferred.complete(PromptResult.Dismissed)
     }
 
-    fun addToPlaylist(mediaIdList: MediaIdList, playlistIdName: PlaylistIdName) {
+    fun addToPlaylist(mediaIdList: MediaIdList, playlistIdNameType: PlaylistIdNameType) {
       clearPrompt()
-      addAudioToPlaylist(mediaIdList, playlistIdName)
+      addAudioToPlaylist(mediaIdList, playlistIdNameType)
       deferred.complete(PromptResult.Executed)
     }
 
@@ -259,18 +259,29 @@ class LocalAudioQueueViewModelImpl(
     }
 
     fun showCreatePrompt() {
-      showPrompt(
-        DialogPrompt(
-          prompt = {
-            CreatePlaylistPrompt(
-              suggestedName = getSuggestedNewPlaylistName(playlists),
-              checkValidName = { isValidName(playlists, it) },
-              dismiss = ::onDismiss,
-              createPlaylist = { playlistName -> createPlaylist(mediaIdList, playlistName) }
-            )
+      scope.launch {
+        val allPlaylists: List<PlaylistIdNameType> =
+          when (val result = playlistDao.getAllOfType()) {
+            is Ok -> result.value
+            is Err -> {
+              LOG.e { it("Error retrieving all playlists. %s", result.error) }
+              emptyList()
+            }
           }
+
+        showPrompt(
+          DialogPrompt(
+            prompt = {
+              CreatePlaylistPrompt(
+                suggestedName = getSuggestedNewPlaylistName(allPlaylists),
+                checkValidName = { isValidName(allPlaylists, it) },
+                dismiss = ::onDismiss,
+                createPlaylist = { playlistName -> createPlaylist(mediaIdList, playlistName) }
+              )
+            }
+          )
         )
-      )
+      }
     }
 
     if (playlists.isEmpty()) {
@@ -292,36 +303,39 @@ class LocalAudioQueueViewModelImpl(
     return deferred.await()
   }
 
-  private fun getSuggestedNewPlaylistName(playlists: List<PlaylistIdName>): String =
+  private fun getSuggestedNewPlaylistName(playlists: List<PlaylistIdNameType>): String =
     getSuggestedName(playlists.asSequence().map { it.name.value })
 
-  private fun isValidName(playlists: List<PlaylistIdName>, name: PlaylistName): Boolean =
+  private fun isValidName(playlists: List<PlaylistIdNameType>, name: PlaylistName): Boolean =
     name.isValidAndUnique(playlists.asSequence().map { it.name })
 
-  private fun addAudioToPlaylist(mediaIdList: MediaIdList, playlistIdName: PlaylistIdName) {
+  private fun addAudioToPlaylist(mediaIdList: MediaIdList, playlistIdNameType: PlaylistIdNameType) {
     scope.launch {
-      when (val result = playlistDao.addToUserPlaylist(playlistIdName.id, mediaIdList)) {
-        is Ok -> { mainViewModel.notify(makeAddToPlaylistNotification(result, playlistIdName)) }
-        is Err -> LOG.e { it("Error adding %s. %s", playlistIdName.name.value, result.error) }
+      when (val result = playlistDao.addToUserPlaylist(playlistIdNameType.id, mediaIdList)) {
+        is Ok -> { mainViewModel.notify(makeAddToPlaylistNotification(result, playlistIdNameType)) }
+        is Err -> LOG.e { it("Error adding %s. %s", playlistIdNameType.name.value, result.error) }
       }
     }
   }
 
   private fun makeAddToPlaylistNotification(
     result: Ok<Long>,
-    playlistIdName: PlaylistIdName
+    playlistIdNameType: PlaylistIdNameType
   ): Notification {
     val count = result.value.toInt()
     return Notification(
-      fetchPlural(R.plurals.AddedCountToPlaylist, count, count, playlistIdName.name.value)
+      fetchPlural(R.plurals.AddedCountToPlaylist, count, count, playlistIdNameType.name.value)
     )
   }
 
   private fun createPlaylistWithAudio(mediaIdList: MediaIdList, playlistName: PlaylistName) {
     scope.launch {
       when (val result = playlistDao.createUserPlaylist(playlistName, mediaIdList)) {
-        is Ok -> LOG._e { it("created %s", result.value) }
-        is Err -> LOG.e { it("Error creating %s. %s", playlistName, result.error) }
+        is Ok -> emitNotification(Notification(fetch(R.string.CreatedPlaylist, playlistName.value)))
+        is Err -> {
+          LOG.e { it("Error creating %s. %s", playlistName, result.error) }
+          emitNotification(Notification(fetch(R.string.ErrorCreatingPlaylist, playlistName.value)))
+        }
       }
     }
   }

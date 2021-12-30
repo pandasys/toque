@@ -39,13 +39,13 @@ import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
-import com.ealva.toque.db.PlaylistIdName
+import com.ealva.toque.db.PlaylistIdNameType
 
 @Composable
 fun SelectPlaylistPrompt(
-  playlists: List<PlaylistIdName>,
+  playlists: List<PlaylistIdNameType>,
   onDismiss: () -> Unit,
-  listSelected: (PlaylistIdName) -> Unit,
+  listSelected: (PlaylistIdNameType) -> Unit,
   createPlaylist: () -> Unit
 ) {
   AlertDialog(

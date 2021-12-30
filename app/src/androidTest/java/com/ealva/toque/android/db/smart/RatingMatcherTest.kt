@@ -111,8 +111,8 @@ class RatingMatcherTest {
       RatingMatcher.IsInTheRange,
 
       ).let { list ->
-      expect(RatingMatcher.allValues.size).toBe(list.size)
-      list.forEach { matcher -> expect(RatingMatcher.allValues).toContain(matcher) }
+      expect(RatingMatcher.ALL_VALUES.size).toBe(list.size)
+      list.forEach { matcher -> expect(RatingMatcher.ALL_VALUES).toContain(matcher) }
     }
   }
 }

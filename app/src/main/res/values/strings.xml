@@ -289,5 +289,17 @@
   <string name="Last_played">Last played</string>
   <string name="ErrorSavingPlaylist">Error saving playlist "%1$s"</string>
   <string name="SavedPlaylist">Saved playlist "%1$s"</string>
-    <string name="to">to</string>
+  <string name="to">to</string>
+  <string name="MustBeGreaterOrEqualZero"><![CDATA[Must be >= 0]]></string>
+  <string name="MustBeGreaterThanX">Must be > %1$d</string>
+  <string name="h_hours">h</string>
+  <string name="m_minutes">m</string>
+  <string name="s_seconds">s</string>
+  <string name="CreatedPlaylist">Created Playlist %s</string>
+  <string name="ErrorCreatingPlaylist">Error creating Playlist %s</string>
+  <string name="Edit">Edit</string>
+  <string name="Delete">Delete</string>
+    <string name="CouldNotDeleteName">Cound not delete %s</string>
+  <string name="DeletedName">Deleted %s</string>
+    <string name="ERRORNoPlaylists">ERROR - No Playlists</string>
 </resources>

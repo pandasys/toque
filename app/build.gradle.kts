@@ -107,6 +107,8 @@ dependencies {
   coreLibraryDesugaring(Libs.DESUGAR)
   implementation(kotlin("stdlib-jdk8"))
 
+  implementation("com.chargemap.compose:numberpicker:0.0.10")
+
   implementation(Libs.AndroidX.APPCOMPAT)
   implementation(Libs.AndroidX.Ktx.CORE)
   implementation(Libs.AndroidX.Lifecycle.RUNTIME_KTX)

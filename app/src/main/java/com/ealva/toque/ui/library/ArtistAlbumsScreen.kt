@@ -43,13 +43,12 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.nav.goToScreen
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
@@ -172,8 +171,7 @@ private class ArtistAlbumsViewModel(
   override suspend fun doGetAlbums(
     albumDao: AlbumDao,
     filter: Filter
-  ): Result<List<AlbumDescription>, DaoMessage> =
-    albumDao.getAllAlbumsFor(artistId, artistType)
+  ): DaoResult<List<AlbumDescription>> = albumDao.getAllAlbumsFor(artistId, artistType)
 
   override fun goToAlbumSongs(albumId: AlbumId) =
     backstack.goToScreen(AlbumSongsForArtistScreen(albumId, artistId))

@@ -19,8 +19,15 @@
 package com.ealva.toque.common
 
 import android.os.Parcelable
+import ealvatag.utils.TimeUnits
 import kotlinx.parcelize.Parcelize
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 typealias MillisRange = ClosedRange<Millis>
 
@@ -58,7 +65,7 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
     operator fun invoke(value: Int): Millis = Millis(value.toLong())
     operator fun invoke(value: Float): Millis = Millis(value.toLong())
 
-    inline fun currentTime(): Millis = Millis(System.currentTimeMillis())
+    inline fun currentUtcEpochMillis(): Millis = Millis(System.currentTimeMillis())
 
     val ONE_SECOND = Millis(1000)
     val TWO_SECONDS = Millis(2000)
@@ -71,3 +78,57 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
 }
 
 fun Long.asMillis(): Millis = Millis(this)
+
+private val BUILDER = StringBuilder(16)
+val Millis.asDurationString: String
+  get() = BUILDER.run {
+    debug { require(isUiThread) }   // don't share BUILDER across threads
+    val negative = value < 0
+    var totalSeconds =
+      TimeUnits.convert(kotlin.math.abs(value), TimeUnit.MILLISECONDS, TimeUnit.SECONDS, true)
+
+    val seconds = totalSeconds % 60
+    totalSeconds /= 60
+    val minutes = totalSeconds % 60
+    totalSeconds /= 60
+    val hours = totalSeconds
+
+    setLength(0)
+    if (negative) {
+      append("-")
+    }
+    if (totalSeconds > 0) {
+      append(hours)
+      append(":")
+      if (minutes < 10) {
+        append("0")
+      }
+      append(minutes)
+    } else {
+      append(minutes)
+    }
+
+    append(":")
+    if (seconds < 10) {
+      append("0")
+    }
+    append(seconds)
+  }.toString()
+
+private val dateTimeMillisFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.A")
+val Millis.asDateTimeWithMillis: String
+  get() = dateTimeMillisFormatter.format(
+    LocalDateTime.ofInstant(
+      Instant.ofEpochMilli(value),
+      ZoneId.systemDefault()
+    )
+  )
+
+private val mediumDateFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+val Millis.asMediumDate: String
+  get() = mediumDateFormatter.format(
+    LocalDateTime.ofInstant(
+      Instant.ofEpochMilli(value),
+      ZoneId.systemDefault()
+    )
+  )

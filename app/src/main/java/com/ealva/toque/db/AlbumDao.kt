@@ -59,7 +59,6 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Column
-import com.ealva.welite.db.table.Join
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -144,31 +143,31 @@ interface AlbumDao {
   suspend fun getAllAlbums(
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): Result<List<AlbumDescription>, DaoMessage>
+  ): DaoResult<List<AlbumDescription>>
 
   suspend fun getAllAlbumsFor(
     artistId: ArtistId,
     artistType: ArtistType,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): Result<List<AlbumDescription>, DaoMessage>
+  ): DaoResult<List<AlbumDescription>>
 
-  suspend fun getNext(title: AlbumTitle): Result<AlbumIdName, DaoMessage>
-  suspend fun getPrevious(title: AlbumTitle): Result<AlbumIdName, DaoMessage>
-  suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage>
+  suspend fun getNext(title: AlbumTitle): DaoResult<AlbumIdName>
+  suspend fun getPrevious(title: AlbumTitle): DaoResult<AlbumIdName>
+  suspend fun getRandomAlbum(): DaoResult<AlbumIdName>
 
   suspend fun getAlbumId(title: AlbumTitle): AlbumId
-  suspend fun getNextAlbumByTitle(albumId: AlbumId): Result<AlbumIdName, DaoMessage>
+  suspend fun getNextAlbumByTitle(albumId: AlbumId): DaoResult<AlbumIdName>
 
-  suspend fun getNext(albumId: AlbumId): Result<AlbumId, DaoMessage>
-  suspend fun getPrevious(albumId: AlbumId): Result<AlbumId, DaoMessage>
-  suspend fun getMin(): Result<AlbumId, DaoMessage>
-  suspend fun getMax(): Result<AlbumId, DaoMessage>
-  suspend fun getRandom(): Result<AlbumId, DaoMessage>
+  suspend fun getNext(albumId: AlbumId): DaoResult<AlbumId>
+  suspend fun getPrevious(albumId: AlbumId): DaoResult<AlbumId>
+  suspend fun getMin(): DaoResult<AlbumId>
+  suspend fun getMax(): DaoResult<AlbumId>
+  suspend fun getRandom(): DaoResult<AlbumId>
   suspend fun getAlbumSuggestions(
     partialTitle: String,
     textSearch: TextSearch
-  ): Result<List<String>, DaoMessage>
+  ): DaoResult<List<String>>
 
   companion object {
     operator fun invoke(
@@ -228,7 +227,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   override suspend fun getAllAlbums(
     filter: Filter,
     limit: Limit
-  ): Result<List<AlbumDescription>, DaoMessage> = runSuspendCatching {
+  ): DaoResult<List<AlbumDescription>> = runSuspendCatching {
     db.query {
       MediaTable
         .join(ArtistTable, JoinType.INNER, MediaTable.albumArtistId, ArtistTable.id)
@@ -263,14 +262,14 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
 
   private fun Filter.whereCondition() =
     if (isEmpty) null else (AlbumTable.albumTitle like value escape ESC_CHAR) or
-      (ArtistTable.artistName like value escape ESC_CHAR)
+        (ArtistTable.artistName like value escape ESC_CHAR)
 
   override suspend fun getAllAlbumsFor(
     artistId: ArtistId,
     artistType: ArtistType,
     filter: Filter,
     limit: Limit
-  ): Result<List<AlbumDescription>, DaoMessage> = runSuspendCatching {
+  ): DaoResult<List<AlbumDescription>> = runSuspendCatching {
     db.query {
       when (artistType) {
         ArtistType.AlbumArtist -> doGetAlbumArtistAlbums(artistId, limit)
@@ -393,7 +392,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private val albumMin by lazy { AlbumTable.albumTitle.min().alias("album_min_alias") }
-  override suspend fun getMin(): Result<AlbumId, DaoMessage> = runSuspendCatching {
+  override suspend fun getMin(): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
         .selects { listOf(id, albumMin) }
@@ -405,7 +404,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private val albumMax by lazy { AlbumTable.albumTitle.max().alias("album_max_alias") }
-  override suspend fun getMax(): Result<AlbumId, DaoMessage> = runSuspendCatching {
+  override suspend fun getMax(): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
         .selects { listOf(id, albumMax) }
@@ -438,7 +437,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumMax])) }
     .single()
 
-  override suspend fun getRandomAlbum(): Result<AlbumIdName, DaoMessage> = runSuspendCatching {
+  override suspend fun getRandomAlbum(): DaoResult<AlbumIdName> = runSuspendCatching {
     db.query {
       AlbumTable
         .selects { listOf<Column<out Any>>(id, albumTitle) }
@@ -448,7 +447,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
-  override suspend fun getRandom(): Result<AlbumId, DaoMessage> = runSuspendCatching {
+  override suspend fun getRandom(): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
         .select(AlbumTable.id)
@@ -469,7 +468,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   override suspend fun getAlbumSuggestions(
     partialTitle: String,
     textSearch: TextSearch
-  ): Result<List<String>, DaoMessage> = runSuspendCatching {
+  ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       AlbumTable
         .select { albumTitle }

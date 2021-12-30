@@ -23,12 +23,11 @@ import com.ealva.welite.db.table.MasterType
 import com.ealva.welite.db.table.SQLiteSchema
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.where
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 
 interface SchemaDao {
-  suspend fun getTableAndViewNames(): Result<List<SchemaName>, DaoMessage>
+  suspend fun getTableAndViewNames(): DaoResult<List<SchemaName>>
 
   companion object {
     operator fun invoke(db: Database): SchemaDao = SchemaDaoImpl(db)
@@ -36,7 +35,7 @@ interface SchemaDao {
 }
 
 private class SchemaDaoImpl(private val db: Database) : SchemaDao {
-  override suspend fun getTableAndViewNames(): Result<List<SchemaName>, DaoMessage> =
+  override suspend fun getTableAndViewNames(): DaoResult<List<SchemaName>> =
     runSuspendCatching {
       db.query {
         SQLiteSchema

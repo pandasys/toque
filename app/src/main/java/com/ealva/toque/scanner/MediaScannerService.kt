@@ -206,7 +206,7 @@ class MediaScannerService : LifecycleService() {
     LOG._i { it("Start scan stopwatch") }
     val stopWatch = Stopwatch.createStarted()
     if (rescan.cleanDb) deleteAllMediaFromDb()
-    val createUpdateTime = Millis.currentTime()
+    val createUpdateTime = Millis.currentUtcEpochMillis()
     val minimumDuration = if (BuildConfig.DEBUG) {
       Millis(30000)
     } else {

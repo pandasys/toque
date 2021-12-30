@@ -21,8 +21,10 @@ import androidx.compose.runtime.Immutable
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
+import com.ealva.toque.common.checkThen
 import com.ealva.toque.db.ArtistTable
 import com.ealva.toque.db.MediaTable
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.service.media.MediaType
 import com.ealva.welite.db.expr.and
@@ -38,6 +40,10 @@ import com.ealva.welite.db.table.toQuery
 import com.ealva.welite.db.table.where
 import com.ealva.welite.db.view.View
 import kotlinx.parcelize.Parcelize
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+
+private val LOG by lazyLogger(SmartPlaylist::class)
 
 @Immutable
 @Parcelize
@@ -48,13 +54,51 @@ data class SmartPlaylist(
   val limit: Limit,
   val selectBy: SmartOrderBy,
   val endOfListAction: EndOfSmartPlaylistAction,
-  val ruleList: List<Rule> = ArrayList()
+  val ruleList: List<Rule> = emptyList()
 ) : Parcelable {
-  fun asView(): View = makeView(name, anyOrAll, ruleList, limit, selectBy)
-  fun asQuery(): Query<ColumnSet> = buildQuery(anyOrAll, ruleList, limit, selectBy)
+  fun asView(): View = checkThen(isValid) {
+    View(buildQuery(anyOrAll, ruleList, limit, selectBy), name.value)
+  }
+
+  fun asQuery(): Query<ColumnSet> = checkThen(isValid) {
+    buildQuery(anyOrAll, ruleList, limit, selectBy)
+  }
 
   val isValid: Boolean
-    get() = nameIsValid(name) && ruleList.isNotEmpty() && ruleList.all { rule -> rule.isValid }
+    get() = nameIsValid(name).also { valid -> LOG._e { it("valid %s", valid) } } &&
+        ruleList.isNotEmpty().also { empty -> LOG._e { it("empty %s", !empty) } } &&
+        ruleList.all { rule ->
+          if (rule.isNotValid) LOG._e { it("rule not valid %s", rule) }
+          rule.isValid
+        }
+
+  private fun nameIsValid(name: PlaylistName): Boolean {
+    return name.value.isNotEmpty() && !name.value.startsWith("sqlite_", true)
+  }
+
+  /**
+   * There must be at least 1 rule for a SmartPlaylist
+   */
+  private fun buildQuery(
+    anyOrAll: AnyOrAll,
+    rules: List<Rule>,
+    limit: Limit,
+    selectBy: SmartOrderBy,
+  ): Query<ColumnSet> = rules
+    .mapNotNullTo(LinkedHashSet(rules.size)) { rule -> rule.makeJoinTemplate() }
+    .apply { selectBy.makeJoinTemplate()?.let { template -> add(template) } }
+    .fold(MediaTable as ColumnSet) { acc, joinTemplate -> joinTemplate.joinTo(acc) }
+    .select { MediaTable.id }
+    .where {
+      (MediaTable.mediaType eq MediaType.Audio.id) and rules
+        .asSequence()
+        .map { rule -> rule.makeWhereClause() }
+        .reduce { acc, op -> anyOrAll.apply(acc, op) }
+    }
+    .groupBy { MediaTable.id }
+    .orderBy { selectBy.getOrderBy() }
+    .limit(limit.value)
+    .toQuery()
 
   companion object {
     val EMPTY = SmartPlaylist(
@@ -78,44 +122,5 @@ data class SmartPlaylist(
     val songArtistId: Column<Long> = SongArtistTable[ArtistTable.id]
     val songArtistName: Column<String> = SongArtistTable[ArtistTable.artistName]
     val songArtistSort: Column<String> = SongArtistTable[ArtistTable.artistSort]
-
-    fun nameIsValid(name: PlaylistName): Boolean {
-      return name.value.isNotEmpty() && !name.value.startsWith("sqlite_", true)
-    }
-
-    private fun makeView(
-      playlistName: PlaylistName,
-      anyOrAll: AnyOrAll,
-      rules: List<Rule>,
-      limit: Limit,
-      selectBy: SmartOrderBy,
-    ): View {
-      require(rules.isNotEmpty()) { "A SmartPlaylist must have at least 1 rule" }
-      return View(buildQuery(anyOrAll, rules, limit, selectBy), playlistName.value)
-    }
-
-    /**
-     * There must be at least 1 rule for a SmartPlaylist
-     */
-    private fun buildQuery(
-      anyOrAll: AnyOrAll,
-      rules: List<Rule>,
-      limit: Limit,
-      selectBy: SmartOrderBy,
-    ): Query<ColumnSet> = rules
-      .mapNotNullTo(LinkedHashSet(rules.size)) { rule -> rule.makeJoinTemplate() }
-      .apply { selectBy.makeJoinTemplate()?.let { template -> add(template) } }
-      .fold(MediaTable as ColumnSet) { acc, joinTemplate -> joinTemplate.joinTo(acc) }
-      .select { MediaTable.id }
-      .where {
-        (MediaTable.mediaType eq MediaType.Audio.id) and rules
-          .asSequence()
-          .map { rule -> rule.makeWhereClause() }
-          .reduce { acc, op -> anyOrAll.apply(acc, op) }
-      }
-      .groupBy { MediaTable.id }
-      .orderBy { selectBy.getOrderBy() }
-      .limit(limit.value)
-      .toQuery()
   }
 }

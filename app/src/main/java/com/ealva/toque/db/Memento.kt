@@ -16,18 +16,54 @@
 
 package com.ealva.toque.db
 
-interface Memento<T> {
-  @Suppress("unused")
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+
+private val LOG by lazyLogger(Memento::class)
+
+interface Memento {
+  /** True if [undo] or [release] has been called */
   val isReleased: Boolean
 
-  /**
-   * Perform the undo. May only be invoked once. Throws IllegalStateException if already released
-   */
-  @Throws(IllegalStateException::class)
-  suspend fun undo(): T
+  /** Perform the undo operation and release any resources */
+  suspend fun undo()
 
   /**
-   * Release resources. Call is idempotent.
+   * Release resources, undo has not be called.
    */
   suspend fun release()
+
+  companion object {
+    val NullMemento = object : Memento {
+      override val isReleased: Boolean get() = true
+      override suspend fun undo() = Unit
+      override suspend fun release() = Unit
+      override fun toString(): String = "NullMemento"
+    }
+  }
+}
+
+
+abstract class BaseMemento : Memento {
+  override var isReleased: Boolean = false
+  private inline val isNotReleased: Boolean get() = !isReleased
+
+  override suspend fun undo() {
+    if (isNotReleased) {
+      isReleased = true
+      doUndo()
+    } else LOG.e { it("Attempt to execute (undo) already released Memento %s", this) }
+  }
+
+  protected abstract suspend fun doUndo()
+
+  override suspend fun release() {
+    if (isNotReleased) {
+      isReleased
+      doRelease()
+    } else LOG.e { it("Attempt to release already released Memento %s", this) }
+  }
+
+  protected open suspend fun doRelease() {}
 }

@@ -119,22 +119,19 @@ interface GenreDao {
   suspend fun getAllGenres(
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): Result<List<GenreDescription>, DaoMessage>
+  ): DaoResult<List<GenreDescription>>
 
-  suspend fun getAllGenreNames(limit: Limit = NoLimit): Result<List<GenreIdName>, DaoMessage>
-  suspend fun getNextGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
-  suspend fun getPreviousGenre(genreName: GenreName): Result<GenreIdName, DaoMessage>
-  suspend fun getRandomGenre(): Result<GenreIdName, DaoMessage>
+  suspend fun getAllGenreNames(limit: Limit = NoLimit): DaoResult<List<GenreIdName>>
+  suspend fun getNextGenre(genreName: GenreName): DaoResult<GenreIdName>
+  suspend fun getPreviousGenre(genreName: GenreName): DaoResult<GenreIdName>
+  suspend fun getRandomGenre(): DaoResult<GenreIdName>
 
-  suspend fun getNext(genreId: GenreId): Result<GenreId, DaoMessage>
-  suspend fun getPrevious(genreId: GenreId): Result<GenreId, DaoMessage>
-  suspend fun getMin(): Result<GenreId, DaoMessage>
-  suspend fun getMax(): Result<GenreId, DaoMessage>
-  suspend fun getRandom(): Result<GenreId, DaoMessage>
-  suspend fun getGenreSuggestions(
-    partial: String,
-    textSearch: TextSearch
-  ): Result<List<String>, DaoMessage>
+  suspend fun getNext(genreId: GenreId): DaoResult<GenreId>
+  suspend fun getPrevious(genreId: GenreId): DaoResult<GenreId>
+  suspend fun getMin(): DaoResult<GenreId>
+  suspend fun getMax(): DaoResult<GenreId>
+  suspend fun getRandom(): DaoResult<GenreId>
+  suspend fun getGenreSuggestions(partial: String, textSearch: TextSearch): DaoResult<List<String>>
 
   companion object {
     operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
@@ -187,46 +184,46 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   override suspend fun getAllGenres(
     filter: Filter,
     limit: Limit
-  ): Result<List<GenreDescription>, DaoMessage> =
-    runSuspendCatching {
-      db.query {
-        GenreTable
-          .join(GenreMediaTable, JoinType.INNER, GenreTable.id, GenreMediaTable.genreId)
-          .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn) }
-          .where { filter.whereCondition() }
-          .groupBy { GenreTable.genre }
-          .orderByAsc { GenreTable.genre }
-          .limit(limit.value)
-          .sequence { cursor ->
-            GenreDescription(
-              GenreId(cursor[GenreTable.id]),
-              GenreName(cursor[GenreTable.genre]),
-              cursor[songCountColumn]
-            )
-          }
-          .toList()
-      }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+  ): DaoResult<List<GenreDescription>> = runSuspendCatching {
+    db.query {
+      GenreTable
+        .join(GenreMediaTable, JoinType.INNER, GenreTable.id, GenreMediaTable.genreId)
+        .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn) }
+        .where { filter.whereCondition() }
+        .groupBy { GenreTable.genre }
+        .orderByAsc { GenreTable.genre }
+        .limit(limit.value)
+        .sequence { cursor ->
+          GenreDescription(
+            GenreId(cursor[GenreTable.id]),
+            GenreName(cursor[GenreTable.genre]),
+            cursor[songCountColumn]
+          )
+        }
+        .toList()
+    }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   private fun Filter.whereCondition() =
     if (isEmpty) null else GenreTable.genre like value escape ESC_CHAR
 
-  override suspend fun getAllGenreNames(limit: Limit): Result<List<GenreIdName>, DaoMessage> =
-    runSuspendCatching {
-      db.query {
-        GenreTable
-          .selects { listOf(id, genre) }
-          .all()
-          .orderByAsc { genre }
-          .limit(limit.value)
-          .sequence { cursor -> GenreIdName(cursor[id].asGenreId, GenreName(cursor[genre])) }
-          .toList()
-      }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+  override suspend fun getAllGenreNames(
+    limit: Limit
+  ): DaoResult<List<GenreIdName>> = runSuspendCatching {
+    db.query {
+      GenreTable
+        .selects { listOf(id, genre) }
+        .all()
+        .orderByAsc { genre }
+        .limit(limit.value)
+        .sequence { cursor -> GenreIdName(cursor[id].asGenreId, GenreName(cursor[genre])) }
+        .toList()
+    }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   override suspend fun getNextGenre(
     genreName: GenreName
-  ): Result<GenreIdName, DaoMessage> = runSuspendCatching {
+  ): DaoResult<GenreIdName> = runSuspendCatching {
     db.query {
       GenreTable
         .selects { listOf(id, genre) }
@@ -238,10 +235,11 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
-  override suspend fun getPreviousGenre(genreName: GenreName): Result<GenreIdName, DaoMessage> =
-    runSuspendCatching {
-      db.query { if (genreName.isEmpty()) doGetMaxGenre() else doGetPreviousGenre(genreName) }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+  override suspend fun getPreviousGenre(
+    genreName: GenreName
+  ): DaoResult<GenreIdName> = runSuspendCatching {
+    db.query { if (genreName.isEmpty()) doGetMaxGenre() else doGetPreviousGenre(genreName) }
+  }.mapError { cause -> DaoExceptionMessage(cause) }
 
   /**
    * Throws NoSuchElementException if there is no genre name < greater than [previousGenre]
@@ -261,7 +259,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .sequence { cursor -> GenreIdName(GenreId(cursor[id]), GenreName(cursor[genreMax])) }
     .single()
 
-  override suspend fun getRandomGenre(): Result<GenreIdName, DaoMessage> = runSuspendCatching {
+  override suspend fun getRandomGenre(): DaoResult<GenreIdName> = runSuspendCatching {
     db.query {
       GenreTable
         .selects { listOf(id, genre) }
@@ -271,7 +269,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }.mapError { cause -> DaoExceptionMessage(cause) }
 
-  override suspend fun getRandom(): Result<GenreId, DaoMessage> = runSuspendCatching {
+  override suspend fun getRandom(): DaoResult<GenreId> = runSuspendCatching {
     db.query {
       GenreTable
         .select(GenreTable.id)
@@ -284,7 +282,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   override suspend fun getGenreSuggestions(
     partial: String,
     textSearch: TextSearch
-  ): Result<List<String>, DaoMessage> = runSuspendCatching {
+  ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       GenreTable
         .select { genre }

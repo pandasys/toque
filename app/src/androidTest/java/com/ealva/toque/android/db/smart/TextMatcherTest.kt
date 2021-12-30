@@ -113,8 +113,8 @@ class TextMatcherTest {
       TextMatcher.BeginsWith,
       TextMatcher.EndsWith
     ).let { list ->
-      expect(TextMatcher.allValues.size).toBe(list.size)
-      list.forEach { matcher -> expect(TextMatcher.allValues).toContain(matcher) }
+      expect(TextMatcher.ALL_VALUES.size).toBe(list.size)
+      list.forEach { matcher -> expect(TextMatcher.ALL_VALUES).toContain(matcher) }
     }
   }
 }

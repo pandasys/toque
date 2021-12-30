@@ -21,8 +21,8 @@ import com.ealva.toque.common.Millis
 
 inline fun <T> logExecTime(loggingFunction: (Long) -> Unit,
                            function: () -> T): T {
-  val startTime = Millis.currentTime().value
+  val startTime = Millis.currentUtcEpochMillis().value
   val result: T = function.invoke()
-  loggingFunction.invoke(Millis.currentTime().value - startTime)
+  loggingFunction.invoke(Millis.currentUtcEpochMillis().value - startTime)
   return result
 }

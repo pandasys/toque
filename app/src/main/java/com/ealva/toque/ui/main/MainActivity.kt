@@ -33,9 +33,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -78,8 +75,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
-
-private val LOG by lazyLogger(MainActivity::class)
 
 private val topOfStackFlow = MutableStateFlow<ComposeKey>(SplashScreen())
 
@@ -139,11 +134,6 @@ class MainActivity : ComponentActivity(), MainBridge {
         }
       }
     }
-  }
-
-  override fun onDestroy() {
-    LOG._e { it("onDestroy") }
-    super.onDestroy()
   }
 
   override fun onRestoreInstanceState(savedInstanceState: Bundle) {

@@ -18,43 +18,63 @@ package com.ealva.toque.db.smart
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.fetch
 import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.expr.between
-import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
-import com.ealva.welite.db.expr.neq
+import com.ealva.welite.db.expr.notBetween
 import com.ealva.welite.db.table.Column
 import kotlinx.parcelize.Parcelize
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit.MILLISECONDS
 
+@Suppress("unused")
 @Parcelize
-enum class LongNumberMatcher(
+enum class DurationMatcher(
   override val id: Int,
   @StringRes private val stringRes: Int
 ) : Matcher<Long> {
   Is(1, R.string.is_) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column eq first
+    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
+      val seconds = TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first))
+      return column.between(seconds - 500, seconds + 499)
+    }
   },
   IsNot(2, R.string.is_not) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column neq first
+    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
+      val seconds = TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first))
+      return column.notBetween(seconds - 500, seconds + 499)
+    }
   },
   IsGreaterThan(3, R.string.is_greater_than) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column greater first
+      column greater TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first)) + 499
+
   },
   IsLessThan(4, R.string.is_less_than) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column less first
+      column less TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first)) - 500
   },
   IsInTheRange(5, R.string.is_in_the_range) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column.between(first, second)
+      column.between(
+        TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first)) - 500,
+        TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(second)) + 499
+      )
 
     override fun willAccept(data: MatcherData): Boolean =
-      data.first >= 0 && data.second > 0 && data.second >= data.first
+      data.first >= 0 && data.second > 0 && data.second > data.first
+
+    override fun sanitize(data: MatcherData): MatcherData {
+      val first = Millis(data.first).coerceAtLeast(Millis.ONE_SECOND)
+      val second = Millis(data.second)
+      return data.copy(
+        first = first.value,
+        second = second.coerceAtLeast(first + Millis.ONE_SECOND).value
+      )
+    }
   };
 
   override fun makeWhereClause(column: Column<Long>, data: MatcherData): Op<Boolean> =
@@ -71,10 +91,10 @@ enum class LongNumberMatcher(
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues: List<LongNumberMatcher> = values().toList()
+    val ALL_VALUES: List<DurationMatcher> = values().toList()
 
-    fun fromId(matcherId: Int): LongNumberMatcher {
-      return allValues.find { it.id == matcherId }
+    fun fromId(matcherId: Int): DurationMatcher {
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
   }

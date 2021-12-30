@@ -21,7 +21,6 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.app.Toque
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.MediaPlayerServiceConnection
@@ -142,7 +141,7 @@ private class MainViewModelImpl(
           .onStart { LOG._i { it("start currentQueue flow") } }
           .onEach { queue -> handleQueueChange(queue) }
           .catch { cause -> LOG.e(cause) { it("currentQueue flow error") } }
-          .onCompletion { LOG._e { it("currentQueue flow completed") } }
+          .onCompletion { LOG._i { it("currentQueue flow completed") } }
           .launchIn(scope)
       } else {
         currentQueueJob?.cancel()

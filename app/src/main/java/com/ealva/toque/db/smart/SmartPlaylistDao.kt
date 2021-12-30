@@ -20,62 +20,78 @@ package com.ealva.toque.db.smart
 
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.asPlaylistName
+import com.ealva.toque.db.BaseMemento
 import com.ealva.toque.db.DaoExceptionMessage
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
+import com.ealva.toque.db.Memento
 import com.ealva.toque.db.PlayListTable
 import com.ealva.toque.persist.PlaylistId
+import com.ealva.toque.persist.PlaylistIdList
 import com.ealva.toque.persist.isValid
 import com.ealva.toque.persist.reifyRequire
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindInt
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
+import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
+import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectWhere
+import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapError
 
 interface SmartPlaylistDao {
-  suspend fun getPlaylist(playlistId: PlaylistId): Result<SmartPlaylist, DaoMessage>
+  suspend fun getSmartPlaylist(playlistId: PlaylistId): DaoResult<SmartPlaylist>
 
-  fun TransactionInProgress.createPlaylist(smartPlaylist: SmartPlaylist): SmartPlaylist
-  fun TransactionInProgress.updatePlaylist(smartPlaylist: SmartPlaylist): SmartPlaylist
+  fun Queryable.getPlaylist(playlistId: PlaylistId): Result<SmartPlaylist, Throwable>
+
+  fun TransactionInProgress.createSmartPlaylist(smartPlaylist: SmartPlaylist): SmartPlaylist
+  fun TransactionInProgress.updateSmartPlaylist(smartPlaylist: SmartPlaylist): SmartPlaylist
+
+  fun TransactionInProgress.deleteReferentRules(id: PlaylistId): Result<Memento, Throwable>
+  suspend fun playlistsReferringTo(playlistId: PlaylistId): Result<PlaylistIdList, Throwable>
 
   companion object {
     operator fun invoke(db: Database): SmartPlaylistDao = SmartPlaylistDaoImpl(db)
   }
 }
 
-private class SmartPlaylistDaoImpl(
-  private val db: Database
-) : SmartPlaylistDao {
-  override suspend fun getPlaylist(
+private class SmartPlaylistDaoImpl(private val db: Database) : SmartPlaylistDao {
+  override suspend fun getSmartPlaylist(
     playlistId: PlaylistId
-  ): Result<SmartPlaylist, DaoMessage> = runSuspendCatching {
-    db.query {
-      SmartPlaylistTable
-        .selectWhere { id eq playlistId.value }
-        .sequence {
-          SmartPlaylist(
-            id = playlistId,
-            name = it[smartName].asPlaylistName,
-            anyOrAll = AnyOrAll::class.reifyRequire(it[smartAnyOrAll]),
-            limit = Limit(it[smartLimit]),
-            selectBy = SmartOrderBy::class.reifyRequire(it[smartOrderBy]),
-            endOfListAction = EndOfSmartPlaylistAction::class
-              .reifyRequire(it[smartEndOfListAction]),
-            ruleList = emptyList()
-          )
-        }.map { it.copy(ruleList = getPlaylistRules(playlistId)) }
-        .single()
-    }
+  ): DaoResult<SmartPlaylist> = runSuspendCatching {
+    db.query { playlist(playlistId) }
   }.mapError { cause -> DaoExceptionMessage(cause) }
+
+  private fun Queryable.playlist(playlistId: PlaylistId): SmartPlaylist = SmartPlaylistTable
+    .selectWhere { smartId eq playlistId.value }
+    .sequence { cursor ->
+      SmartPlaylist(
+        id = playlistId,
+        name = cursor[smartName].asPlaylistName,
+        anyOrAll = AnyOrAll::class.reifyRequire(cursor[smartAnyOrAll]),
+        limit = Limit(cursor[smartLimit]),
+        selectBy = SmartOrderBy::class.reifyRequire(cursor[smartOrderBy]),
+        endOfListAction = EndOfSmartPlaylistAction::class
+          .reifyRequire(cursor[smartEndOfListAction]),
+        ruleList = emptyList()
+      )
+    }.map { playlist -> playlist.copy(ruleList = getPlaylistRules(playlistId)) }
+    .single()
+
+  override fun Queryable.getPlaylist(
+    playlistId: PlaylistId
+  ): Result<SmartPlaylist, Throwable> = runSuspendCatching {
+    playlist(playlistId)
+  }
 
   private fun Queryable.getPlaylistRules(playlistId: PlaylistId): List<Rule> =
     SmartPlaylistRuleTable
@@ -94,7 +110,7 @@ private class SmartPlaylistDaoImpl(
       }
       .toList()
 
-  override fun TransactionInProgress.createPlaylist(
+  override fun TransactionInProgress.createSmartPlaylist(
     smartPlaylist: SmartPlaylist
   ): SmartPlaylist = smartPlaylist.apply {
     check(smartPlaylist.id.isValid) { "Could not create playlist $smartPlaylist" }
@@ -126,26 +142,129 @@ private class SmartPlaylistDaoImpl(
     }
   }
 
-  override fun TransactionInProgress.updatePlaylist(
+  override fun TransactionInProgress.updateSmartPlaylist(
     smartPlaylist: SmartPlaylist
   ) = smartPlaylist.apply {
+    val oldPlaylist = playlist(smartPlaylist.id).apply {
+      if (isValid) asView().drop()
+    }
     val updated = SmartPlaylistTable.updateColumns {
       it[smartName] = name.value
       it[smartAnyOrAll] = anyOrAll.id
       it[smartLimit] = limit.value
       it[smartOrderBy] = selectBy.id
       it[smartEndOfListAction] = endOfListAction.id
-    }.where { smartId eq smartPlaylist.id.value }
-      .update()
+    }.where {
+      smartId eq smartPlaylist.id.value
+    }.update()
+
     check(updated > 0) { "Could not update smart playlist $smartPlaylist" }
     replacePlaylistRules(smartPlaylist.id, smartPlaylist.ruleList)
-    createOrUpdateView(this)
+    createOrUpdateView(smartPlaylist)
+    updateReferentRules(oldPlaylist, smartPlaylist)
+  }
+
+  data class SmartPlaylistRuleEntry(
+    val id: Long,
+    val smartPlaylistId: Long,
+    val field: Int,
+    val matcher: Int,
+    val matcherText: String,
+    val matcherFirst: Long,
+    val matcherSecond: Long
+  )
+
+  override fun TransactionInProgress.deleteReferentRules(
+    id: PlaylistId
+  ): Result<Memento, Throwable> = runSuspendCatching {
+    SmartPlaylistRulesMemento(
+      this@SmartPlaylistDaoImpl,
+      getEntryListFor(id)
+    ).also {
+      SmartPlaylistRuleTable
+        .delete { (field eq RuleField.Playlist.id) and (matcherSecond eq id.value) }
+    }
+  }
+
+  override suspend fun playlistsReferringTo(
+    playlistId: PlaylistId
+  ): Result<PlaylistIdList, Throwable> = runSuspendCatching {
+    db.query {
+      PlaylistIdList().apply {
+        SmartPlaylistRuleTable
+          .select { smartPlaylistId }
+          .where { (field eq RuleField.Playlist.id) and (matcherSecond eq playlistId.value) }
+          .distinct()
+          .sequence { add(PlaylistId(it[smartPlaylistId])) }
+      }
+    }
+  }
+
+  private fun Queryable.getEntryListFor(
+    playlistId: PlaylistId
+  ): List<SmartPlaylistRuleEntry> = SmartPlaylistRuleTable
+    .selectWhere { (field eq RuleField.Playlist.id) and (matcherSecond eq playlistId.value) }
+    .sequence { cursor ->
+      SmartPlaylistRuleEntry(
+        id = cursor[id],
+        smartPlaylistId = cursor[smartPlaylistId],
+        field = cursor[field],
+        matcher = cursor[matcher],
+        matcherText = cursor[matcherText],
+        matcherFirst = cursor[matcherFirst],
+        matcherSecond = cursor[matcherSecond]
+      )
+    }
+    .toList()
+
+  class SmartPlaylistRulesMemento(
+    private val smartPlaylistDao: SmartPlaylistDaoImpl,
+    private val entryList: List<SmartPlaylistRuleEntry>
+  ) : BaseMemento() {
+    override suspend fun doUndo() {
+      smartPlaylistDao.restoreEntries(entryList)
+    }
+  }
+
+  private suspend fun restoreEntries(entryList: List<SmartPlaylistRuleEntry>) {
+    if (entryList.isNotEmpty()) {
+      db.transaction {
+        entryList.forEach { entry ->
+          SmartPlaylistRuleTable
+            .insert {
+              it[id] = entry.id
+              it[smartPlaylistId] = entry.smartPlaylistId
+              it[field] = entry.field
+              it[matcher] = entry.matcher
+              it[matcherText] = entry.matcherText
+              it[matcherFirst] = entry.matcherFirst
+              it[matcherSecond] = entry.matcherSecond
+            }
+        }
+      }
+    }
   }
 
   private fun TransactionInProgress.createOrUpdateView(smartPlaylist: SmartPlaylist) {
     smartPlaylist.asView().let { view ->
       view.drop()
       view.create()
+    }
+  }
+
+  /**
+   * This function finds all rule data which refers to [oldPlaylist] and updates them to refer to
+   * [smartPlaylist]
+   */
+  private fun TransactionInProgress.updateReferentRules(
+    oldPlaylist: SmartPlaylist,
+    smartPlaylist: SmartPlaylist
+  ) {
+    if (oldPlaylist.id == smartPlaylist.id && oldPlaylist.name != smartPlaylist.name) {
+      SmartPlaylistRuleTable
+        .updateColumns { it[matcherText] = smartPlaylist.name.value }
+        .where { (field eq RuleField.Playlist.id) and (matcherSecond eq smartPlaylist.id.value) }
+        .update()
     }
   }
 }
@@ -161,7 +280,7 @@ object SmartPlaylistTable : Table() {
   val smartName = text("SmartName") { collateNoCase() }
 
   /** The ID of this SmartPlaylist in the PlaylistTable */
-  val smartId = reference("SmartPlaylistId", PlayListTable.id)
+  val smartId = reference("SmartPlaylistId", PlayListTable.id, onDelete = ForeignKeyAction.CASCADE)
 
   /** An [AnyOrAll] ID */
   val smartAnyOrAll = integer("SmartAnyOrAll") { default(AnyOrAll.All.id) }
@@ -198,7 +317,11 @@ object SmartPlaylistTable : Table() {
  */
 object SmartPlaylistRuleTable : Table() {
   val id = long("SmartRule_id") { primaryKey() }
-  val smartPlaylistId = reference("SmartRulePlaylistId", SmartPlaylistTable.smartId)
+  val smartPlaylistId = reference(
+    name = "SmartRulePlaylistId",
+    refColumn = SmartPlaylistTable.smartId,
+    onDelete = ForeignKeyAction.CASCADE
+  )
 
   /** ID of the RuleField */
   val field = integer("SmartRuleField") { default(RuleField.Title.id) }
@@ -229,6 +352,8 @@ object SmartPlaylistRuleTable : Table() {
 
   init {
     index(smartPlaylistId)
+    index(field) // deleting rules referring to playlists
+    index(matcherSecond) // deleting rules referring to playlists
   }
 }
 

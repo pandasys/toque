@@ -79,10 +79,10 @@ enum class GenreMatcher(
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues: List<GenreMatcher> = values().toList()
+    val ALL_VALUES: List<GenreMatcher> = values().toList()
 
     fun fromId(matcherId: Int): GenreMatcher {
-      return allValues.find { it.id == matcherId }
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
   }

@@ -28,6 +28,6 @@ enum class EndOfSmartPlaylistAction(override val id: Int, private val stringRes:
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues = values().asList()
+    val ALL_VALUES = values().asList()
   }
 }

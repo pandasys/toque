@@ -91,6 +91,6 @@ enum class SmartOrderBy(override val id: Int, private val stringRes: Int) : HasC
   }
 
   companion object {
-    val allValues: List<SmartOrderBy> = values().toList()
+    val ALL_VALUES: List<SmartOrderBy> = values().toList()
   }
 }

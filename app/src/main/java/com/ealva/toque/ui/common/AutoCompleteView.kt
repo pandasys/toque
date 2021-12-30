@@ -31,6 +31,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
+
+private val LOG by lazyLogger("AutoCompleteView")
 
 @Composable
 fun <T> AutoCompleteView(
@@ -75,17 +80,18 @@ fun AutoCompleteTextView(
   query: String,
   suggestions: List<String>,
   isError: Boolean,
-  onTextChanged: (String) -> Unit = {},
-  label: @Composable (() -> Unit)? = null,
-  onDoneActionClick: () -> Unit = {},
-  isFocused: (Boolean) -> Unit = {}
+  onTextChanged: (String) -> Unit,
+  onSelected: (String) -> Unit,
+  onDoneActionClick: () -> Unit,
+  isFocused: (Boolean) -> Unit,
+  label: @Composable() (() -> Unit)? = null,
 ) {
   AutoCompleteView(
     modifier = modifier,
     predictions = suggestions,
     onItemClick = { selectedText ->
-      onTextChanged(selectedText)
-      onDoneActionClick()
+      LOG._e { it("onSelected %s", selectedText) }
+      onSelected(selectedText)
     },
     itemContent = { Text(it) }
   ) {

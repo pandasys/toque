@@ -588,4 +588,4 @@ private val DATE_FORMATTER = DateFormat.getDateTimeInstance(
   Locale.getDefault()
 )
 
-fun Millis.asDateTime(): String = DATE_FORMATTER.format(value)
+private fun Millis.asDateTime(): String = DATE_FORMATTER.format(value)

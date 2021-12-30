@@ -18,6 +18,7 @@ package com.ealva.toque.db.smart
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.fetch
 import com.ealva.welite.db.expr.ComparisonOp
 import com.ealva.welite.db.expr.Expression
@@ -46,20 +47,32 @@ enum class DateMatcher(
       val date = Instant.ofEpochMilli(first).atZone(ZoneOffset.UTC)
       return column.between(date.startOfDayMillis(), date.endOfDayMillis())
     }
+
+    override fun sanitize(data: MatcherData): MatcherData =
+      data.copy(first = Millis.currentUtcEpochMillis().value)
   },
   IsNot(2, R.string.is_not) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
       val date = Instant.ofEpochMilli(first).atZone(ZoneOffset.UTC)
       return column.notBetween(date.startOfDayMillis(), date.endOfDayMillis())
     }
+
+    override fun sanitize(data: MatcherData): MatcherData =
+      data.copy(first = Millis.currentUtcEpochMillis().value)
   },
   IsAfter(3, R.string.is_after) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
       column greater Instant.ofEpochMilli(first).atZone(ZoneOffset.UTC).endOfDayMillis()
+
+    override fun sanitize(data: MatcherData): MatcherData =
+      data.copy(first = Millis.currentUtcEpochMillis().value)
   },
   IsBefore(4, R.string.is_before) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
       column less Instant.ofEpochMilli(first).atZone(ZoneOffset.UTC).startOfDayMillis()
+
+    override fun sanitize(data: MatcherData): MatcherData =
+      data.copy(first = Millis.currentUtcEpochMillis().value)
   },
   InTheLast(5, R.string.in_the_last) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
@@ -70,9 +83,14 @@ enum class DateMatcher(
       ) { t: Expression<Long> -> greaterEq(t) }
     }
 
-    override fun willAccept(data: MatcherData): Boolean {
-      return data.first < 356 && TheLast.isValidId(data.second)
-    }
+    override fun willAccept(data: MatcherData): Boolean =
+      data.first in 1..356 && TheLast.isValidId(data.second)
+
+    override fun sanitize(data: MatcherData): MatcherData = data.copy(
+      first = if (data.first in 1..356) data.first else 0,
+      second = if (TheLast.isValidId(data.second)) data.second else
+        TheLast.ALL_VALUES[0].id.toLong()
+    )
   },
   NotInTheLast(6, R.string.not_in_the_last) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
@@ -83,9 +101,14 @@ enum class DateMatcher(
       ) { t: Expression<Long> -> less(t) }
     }
 
-    override fun willAccept(data: MatcherData): Boolean {
-      return data.first < 356 && TheLast.isValidId(data.second)
-    }
+    override fun willAccept(data: MatcherData): Boolean =
+      data.first in 1..356 && TheLast.isValidId(data.second)
+
+    override fun sanitize(data: MatcherData): MatcherData = data.copy(
+      first = if (data.first in 1..356) data.first else 0,
+      second = if (TheLast.isValidId(data.second)) data.second else
+        TheLast.ALL_VALUES[0].id.toLong()
+    )
   },
   IsInTheRange(7, R.string.is_in_the_range) {
     override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
@@ -96,6 +119,13 @@ enum class DateMatcher(
 
     override fun willAccept(data: MatcherData): Boolean {
       return data.first >= 0 && data.second >= 0 && data.first <= data.second
+    }
+
+    override fun sanitize(data: MatcherData): MatcherData {
+      return data.copy(
+        first = if (data.first == 0L) Millis.currentUtcEpochMillis().value else data.first,
+        second = if (data.second == 0L) Millis.currentUtcEpochMillis().value else data.second
+      )
     }
   };
 
@@ -109,26 +139,26 @@ enum class DateMatcher(
   ): Op<Boolean>
 
   override fun willAccept(data: MatcherData): Boolean {
-    return data.first >= 0 && data.second >= 0
+    return data.first > 0 && data.second > 0
   }
 
   override fun toString(): String = fetch(stringRes)
 
   companion object {
-    val allValues: List<DateMatcher> = values().toList()
+    val ALL_VALUES: List<DateMatcher> = values().toList()
 
     fun fromId(matcherId: Int): DateMatcher {
-      return allValues.find { it.id == matcherId }
+      return ALL_VALUES.find { it.id == matcherId }
         ?: throw IllegalArgumentException("No matcher with id=$matcherId")
     }
 
-    fun calendarToUtcStartOfDay(year: Int, month: Int, day: Int): Long = ZonedDateTime
-      .of(year, month, day, 0, 0, 0, 0, ZoneOffset.UTC)
-      .startOfDayMillis()
-
-    fun calendarToUtcEndOfDay(year: Int, month: Int, day: Int): Long = ZonedDateTime
-      .of(year, month, day, 0, 0, 0, 0, ZoneOffset.UTC)
-      .endOfDayMillis()
+//    fun calendarToUtcStartOfDay(year: Int, month: Int, day: Int): Long = ZonedDateTime
+//      .of(year, month, day, 0, 0, 0, 0, ZoneOffset.UTC)
+//      .startOfDayMillis()
+//
+//    fun calendarToUtcEndOfDay(year: Int, month: Int, day: Int): Long = ZonedDateTime
+//      .of(year, month, day, 0, 0, 0, 0, ZoneOffset.UTC)
+//      .endOfDayMillis()
 
     /**
      * Build SQL to compare a date column to a value negatively offset from now, eg. 1 day ago or

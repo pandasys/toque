@@ -39,7 +39,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
-import com.ealva.toque.db.DaoMessage
+import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
@@ -50,7 +50,6 @@ import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -153,7 +152,7 @@ abstract class BaseSongsViewModel(
   protected abstract suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): Result<List<AudioDescription>, DaoMessage>
+  ): DaoResult<List<AudioDescription>>
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)
@@ -211,8 +210,7 @@ abstract class BaseSongsViewModel(
   private fun makeCategoryMediaList(): CategoryMediaList =
     CategoryMediaList(makeMediaIdList(), categoryToken)
 
-  private fun makeMediaListResult(): Result<CategoryMediaList, DaoMessage> =
-    Ok(makeCategoryMediaList())
+  private fun makeMediaListResult(): DaoResult<CategoryMediaList> = Ok(makeCategoryMediaList())
 
   private fun makeMediaIdList(): MediaIdList = songsFlow.value
     .asSequence()

@@ -33,11 +33,18 @@ interface Matcher<T> : HasConstId, Parcelable {
    */
   fun willAccept(data: MatcherData): Boolean
 
-  fun acceptableData(data: MatcherData): MatcherData {
-    return if (willAccept(data)) data else makeDefaultData()
-  }
+  /**
+   * If [data] is unacceptable for the matcher, try to modify it to be acceptable or return default
+   * values. By default if [data] is not acceptable, ie. ![willAccept], [MatcherData.EMPTY] is
+   * returned.
+   */
+  fun acceptableData(data: MatcherData): MatcherData =
+    if (willAccept(data)) data else sanitize(data)
 
-  fun makeDefaultData(): MatcherData = MatcherData.EMPTY
+  fun sanitize(data: MatcherData): MatcherData = defaultData
+
+  val defaultData: MatcherData
+    get() = MatcherData.EMPTY
 
   companion object {
     const val SQL_LIKE_WILDCARD = "%"
