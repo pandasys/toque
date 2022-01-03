@@ -23,9 +23,9 @@ import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.persist.reify
 import com.ealva.toque.persist.asAlbumId
 import com.ealva.toque.persist.asMediaId
+import com.ealva.toque.persist.reify
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Transaction
@@ -40,12 +40,7 @@ import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 
 typealias AssociationListResult = DaoResult<List<PresetAssociation>>
 
@@ -58,13 +53,11 @@ interface EqPresetAssociationDao {
   /**
    * Delete any current default association and then set this [preset] as the default preset. The
    * default preset will be used when there is no song, album, or connection associated preset.
-   * Returns [Ok] if successful, else [Err].
    */
   suspend fun setAsDefault(preset: EqPreset): BoolResult
 
   /**
-   * Associate [preset] with the list of associations. If [Ok] and value is true, associations
-   * were made, else if false the association list was empty. [Err] returned on exception
+   * Associate [preset] with the list of associations.
    */
   suspend fun makeAssociations(preset: EqPreset, associations: List<PresetAssociation>): BoolResult
 
@@ -91,7 +84,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     txn.run {
       EqPresetAssociationTable.delete {
         (associationType eq PresetAssociationType.Media.id) or
-          (associationType eq PresetAssociationType.Album.id)
+        (associationType eq PresetAssociationType.Album.id)
       }
     }
   }
@@ -110,7 +103,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     preset: EqPreset,
     associations: List<PresetAssociation>
   ): BoolResult = runSuspendCatching { db.transaction { doMakeAssociations(preset, associations) } }
-    .mapError { cause -> DaoExceptionMessage(cause) }
+
 
   private fun Transaction.doMakeAssociations(
     preset: EqPreset,
@@ -123,17 +116,16 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
     }
   }
 
-  override suspend fun getAssociationsFor(preset: EqPreset): AssociationListResult =
-    runSuspendCatching {
-      db.query {
-        QUERY_ASSOCIATIONS
-          .sequence(bind = { bindings ->
-            bindings[BIND_PRESET_ID] = preset.id.value
-            bindings[BIND_IS_SYSTEM] = preset.isSystemPreset
-          }) { cursor -> PresetAssociation.reify(cursor[associationType], cursor[associationId]) }
-          .toList()
-      }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+  override suspend fun getAssociationsFor(preset: EqPreset) = runSuspendCatching {
+    db.query {
+      QUERY_ASSOCIATIONS
+        .sequence(bind = { bindings ->
+          bindings[BIND_PRESET_ID] = preset.id.value
+          bindings[BIND_IS_SYSTEM] = preset.isSystemPreset
+        }) { cursor -> PresetAssociation.reify(cursor[associationType], cursor[associationId]) }
+        .toList()
+    }
+  }
 
   override suspend fun getPreferredId(
     mediaId: MediaId,
@@ -150,7 +142,7 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
         }) { cursor -> EqPresetId(cursor[presetId]) }
         .singleOrNull() ?: defaultValue
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Transaction.deletePresetAssociations(id: EqPresetId) =
     DELETE_PRESET.delete { it[BIND_PRESET_ID] = id.value }
@@ -178,9 +170,11 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
   }
 
   override suspend fun setAsDefault(preset: EqPreset): BoolResult =
-    runSuspendCatching { db.transaction { doSetAsDefault(preset) } }
-      .mapError { cause -> DaoExceptionMessage(cause) }
-      .andThen { if (it > 0) Ok(true) else Err(DaoFailedToInsert("$preset")) }
+    runSuspendCatching {
+      (db.transaction { doSetAsDefault(preset) } > 0).also { rc ->
+        if (!rc) throw DaoInsertFailedException("Error setting $preset as default.")
+      }
+    }
 
   private fun Transaction.doSetAsDefault(preset: EqPreset): Long {
     deleteAssociation(PresetAssociation.DEFAULT)
@@ -213,9 +207,9 @@ private val QUERY_DEFAULT = EqPresetAssociationTable
   .select { presetId }
   .where {
     ((associationType eq PresetAssociationType.Media.id) and (associationId eq BIND_MEDIA_ID)) or
-      ((associationType eq PresetAssociationType.Album.id) and (associationId eq BIND_ALBUM_ID)) or
-      ((associationType eq PresetAssociationType.Output.id) and (associationId eq BIND_ROUTE_ID)) or
-      (associationType eq PresetAssociationType.Default.id)
+    ((associationType eq PresetAssociationType.Album.id) and (associationId eq BIND_ALBUM_ID)) or
+    ((associationType eq PresetAssociationType.Output.id) and (associationId eq BIND_ROUTE_ID)) or
+    (associationType eq PresetAssociationType.Default.id)
   }.orderByAsc { associationType }
 
 /**

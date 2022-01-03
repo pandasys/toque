@@ -67,8 +67,8 @@ import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.SmartPlayli
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -233,22 +233,21 @@ private class SmartPlaylistEditorViewModelImpl(
       allPlaylistNames.clear()
       allViewNames.clear()
       scope.launch {
-        when (val result = playlistDao.getAllOfType()) {
-          is Ok -> allPlaylistNames.addAll(result.value.asSequence().map { it.name })
-          is Err -> LOG.e { it("Error getting playlist names. %s", result.error) }
-        }
-        when (val result = schemaDao.getTableAndViewNames()) {
-          is Ok -> allViewNames.addAll(result.value)
-          is Err -> LOG.e { it("Error getting schema names. %s", result.error) }
-        }
+        playlistDao.getAllOfType()
+          .onFailure { cause -> LOG.e(cause) { it("Error getting playlist names.") } }
+          .onSuccess { allPlaylists -> allPlaylistNames.addAll(allPlaylists.map { it.name }) }
+
+        schemaDao.getTableAndViewNames()
+          .onFailure { cause -> LOG.e(cause) { it("Error getting schema names.") } }
+          .onSuccess { schemaNameList -> allViewNames.addAll(schemaNameList) }
+
         if (playlistId.isValid) {
-          when (val result = playlistDao.getSmartPlaylist(playlistId)) {
-            is Ok -> setOriginal(result.value)
-            is Err -> {
-              LOG.e { it("Error getting Smart Playlist. %s", result.error) }
+          playlistDao.getSmartPlaylist(playlistId)
+            .onSuccess { smartPlaylist -> setOriginal(smartPlaylist) }
+            .onFailure { cause ->
+              LOG.e(cause) { it("Error getting Smart Playlist %s", playlistId) }
               setOriginal(makeDefaultSmartPlaylist())
             }
-          }
         } else {
           setOriginal(makeDefaultSmartPlaylist())
         }
@@ -425,7 +424,6 @@ private class SmartPlaylistEditorViewModelImpl(
   private suspend fun doRuleDataChanged(update: ModelRuleUpdate.RuleDataChanged) {
     val updateRule = update.updateRule
     val newData = update.data
-    LOG._e { it("newData %s", newData) }
     playlistFlow.update { smartPlaylistData ->
       smartPlaylistData.copy(
         ruleList = smartPlaylistData.ruleList.map { current ->
@@ -505,18 +503,17 @@ private class SmartPlaylistEditorViewModelImpl(
   }
 
   private suspend fun doSave(playlistData: SmartPlaylistData) {
-    when (val result = playlistDao.createOrUpdateSmartPlaylist(playlistData.asSmartPlaylist)) {
-      is Ok -> {
-        setOriginal(result.value)
-        mainViewModel.notify(Notification(fetch(R.string.SavedPlaylist, playlistData.editingName)))
-      }
-      is Err -> {
-        LOG.e { it("Couldn't create playlist. %s", result.error) }
+    playlistDao.createOrUpdateSmartPlaylist(playlistData.asSmartPlaylist)
+      .onFailure { cause ->
+        LOG.e(cause) { it("Couldn't save %s", playlistData.editingName) }
         mainViewModel.notify(
           Notification(fetch(R.string.ErrorSavingPlaylist, playlistData.editingName))
         )
       }
-    }
+      .onSuccess {
+        setOriginal(it)
+        mainViewModel.notify(Notification(fetch(R.string.SavedPlaylist, playlistData.editingName)))
+      }
   }
 
   private fun collectRuleUpdateFlow(scope: CoroutineScope) {
@@ -614,8 +611,8 @@ private class SmartPlaylistEditorViewModelImpl(
 
   private fun nameIsReserved(name: String): Boolean = name.trim().let { value ->
     name.startsWith("sqlite_", ignoreCase = true) ||
-        allViewNames.any { it.value.equals(value, ignoreCase = true) } ||
-        allPlaylistNames.any { it.value.equals(value, ignoreCase = true) }
+    allViewNames.any { it.value.equals(value, ignoreCase = true) } ||
+    allPlaylistNames.any { it.value.equals(value, ignoreCase = true) }
   }
 
   private fun makeDefaultRule(): EditorRule {

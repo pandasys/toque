@@ -26,7 +26,7 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoResult
+import com.github.michaelbull.result.Result
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.google.accompanist.insets.navigationBarsPadding
@@ -95,5 +95,6 @@ private class AlbumSongsViewModel(
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): DaoResult<List<AudioDescription>> = audioMediaDao.getAlbumAudio(id = albumId, filter = filter)
+  ): Result<List<AudioDescription>, Throwable> =
+    audioMediaDao.getAlbumAudio(id = albumId, filter = filter)
 }

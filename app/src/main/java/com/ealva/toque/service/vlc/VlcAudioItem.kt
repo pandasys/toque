@@ -46,8 +46,8 @@ import com.ealva.toque.service.queue.ForceTransition.AllowFade
 import com.ealva.toque.service.queue.ForceTransition.NoFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -381,19 +381,17 @@ class VlcAudioItem(
     val fileLocation = metadata.location
     val fileExt = displayName.substringAfterLast('.', "")
     scope.launch {
-      when (
-        val result = mediaFileStore.setRating(
-          id = mediaId,
-          fileLocation = fileLocation,
-          fileExt = fileExt,
-          newRating = newRating,
-          writeToFile = allowFileUpdate && appPrefs.saveRatingToFile(),
-          beforeFileWrite = { if (wasPlaying) pause(NoFade) }
-        ) { if (wasPlaying) play(NoFade) }
+      mediaFileStore.setRating(
+        id = mediaId,
+        fileLocation = fileLocation,
+        fileExt = fileExt,
+        newRating = newRating,
+        writeToFile = allowFileUpdate && appPrefs.saveRatingToFile(),
+        beforeFileWrite = { if (wasPlaying) pause(NoFade) }
       ) {
-        is Ok -> metadata = metadata.copy(rating = result.value)
-        is Err -> LOG.e { it("Error setting rating. %s", result.error) }
-      }
+        if (wasPlaying) play(NoFade)
+      }.onFailure { cause -> LOG.e(cause) { it("Error setting rating") } }
+        .onSuccess { rating -> metadata = metadata.copy(rating = rating) }
     }
   }
 

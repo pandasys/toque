@@ -123,7 +123,7 @@ class LocalAudioCommandProcessor(
 
   override suspend fun addToUpNext(
     categoryMediaList: CategoryMediaList
-  ): Result<QueueSize, QueueMessage> = deferredResult { addToUpNext(categoryMediaList) }
+  ): Result<QueueSize, Throwable> = deferredResult { addToUpNext(categoryMediaList) }
 
   private suspend fun prepareFromId(id: String, extras: Bundle) =
     command { MediaSessionBrowser.handleMedia(id, extras, PrepareMediaFromId(this, audioMediaDao)) }
@@ -141,7 +141,7 @@ class LocalAudioCommandProcessor(
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ): Result<QueueSize, QueueMessage> =
+  ): Result<QueueSize, Throwable> =
     deferredResult { playNext(categoryMediaList, clearUpNext, playNow, transitionType) }
 
   override suspend fun prepareNext(categoryMediaList: CategoryMediaList) =

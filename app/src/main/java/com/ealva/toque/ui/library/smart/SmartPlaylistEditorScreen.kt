@@ -55,8 +55,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.text.isDigitsOnly
 import coil.compose.rememberImagePainter
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.common.fetch
@@ -67,7 +65,6 @@ import com.ealva.toque.db.smart.Matcher
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.db.smart.RuleField
 import com.ealva.toque.db.smart.SmartOrderBy
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.ui.common.AutoCompleteTextView
 import com.ealva.toque.ui.config.LocalScreenConfig
@@ -91,8 +88,6 @@ import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-
-private val LOG by lazyLogger(SmartPlaylistEditorScreen::class)
 
 @Immutable
 @Parcelize
@@ -156,10 +151,7 @@ data class SmartPlaylistEditorScreen(
         endOfListActionChanged = { action -> viewModel.endOfListActionChanged(action) },
         ruleFieldChanged = { rule, ruleField -> viewModel.ruleFieldChanged(rule, ruleField) },
         matcherChanged = { rule, matcher -> viewModel.matcherChanged(rule, matcher) },
-        ruleDataChanged = { rule, data ->
-          LOG._e { it("ruleDataChanged %s", data) }
-          viewModel.ruleDataChanged(rule, data)
-        },
+        ruleDataChanged = { rule, data -> viewModel.ruleDataChanged(rule, data) },
         deleteRule = { rule -> viewModel.deleteRule(rule) }
       )
     }
@@ -199,8 +191,6 @@ private fun Editor(
   ruleDataChanged: (EditorRule, MatcherData) -> Unit,
   deleteRule: (EditorRule) -> Unit
 ) {
-  val ruleList = playlist.ruleList
-  if (ruleList.isNotEmpty()) LOG._e { it("text=%s", ruleList[0].rule.data.text) }
   Column {
     ProvideTextStyle(value = MaterialTheme.typography.body2) {
       Column(

@@ -57,7 +57,6 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoEmptyResult
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.Memento
 import com.ealva.toque.db.PlayListType
@@ -82,9 +81,11 @@ import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -375,17 +376,19 @@ private class PlaylistsViewModelImpl(
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
+  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedPlaylists())
 
-  private suspend fun makeCategoryMediaList(playlists: List<PlaylistInfo>) = audioMediaDao
+  private suspend fun makeCategoryMediaList(
+    playlists: List<PlaylistInfo>
+  ): DaoResult<CategoryMediaList> = audioMediaDao
     .getMediaForPlaylists(
       playlistIds = playlists
         .mapTo(LongArrayList(512)) { it.id.value }
         .asPlaylistIdList,
       removeDuplicates = !appPrefs.instance().allowDuplicates()
     )
-    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
     .map { idList -> CategoryMediaList(idList, CategoryToken(playlists.last().id)) }
 
   private fun getSelectedPlaylists() = playlistsFlow.value
@@ -430,21 +433,10 @@ private class PlaylistsViewModelImpl(
 
   private fun requestPlaylists() {
     scope.launch {
-      when (val result = playlistDao.getAllPlaylists()) {
-        is Ok -> handlePlaylistList(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
-    }
-  }
-
-  private fun handlePlaylistList(list: List<PlaylistDescription>) {
-    playlistsFlow.value = list.mapTo(ArrayList(list.size)) {
-      PlaylistInfo(
-        id = it.id,
-        name = it.name,
-        type = it.type,
-        songCount = it.songCount.toInt()
-      )
+      playlistsFlow.value = playlistDao.getAllPlaylists()
+        .onFailure { cause -> LOG.e(cause) { it("Error getting all playlists") } }
+        .getOrElse { emptyList() }
+        .map { playlistDescription -> playlistDescription.toPlaylistInfo() }
     }
   }
 
@@ -467,22 +459,21 @@ private class PlaylistsViewModelImpl(
 
   override fun deletePlaylist(playlistInfo: PlaylistInfo) {
     scope.launch {
-      when (
-        val result = playlistDao.deletePlaylist(playlistId = playlistInfo.id)
-      ) {
-        is Ok -> mainViewModel.notify(
-          Notification(
-            fetch(R.string.DeletedName, playlistInfo.name.value),
-            MementoAction(scope, result.value)
-          )
-        )
-        is Err -> {
-          LOG.e { it("Couldn't delete %s. %s", playlistInfo.name, result.error) }
+      playlistDao.deletePlaylist(playlistId = playlistInfo.id)
+        .onFailure { cause ->
+          LOG.e(cause) { it("Couldn't delete %s", playlistInfo.name) }
           mainViewModel.notify(
             Notification(fetch(R.string.CouldNotDeleteName, playlistInfo.name.value))
           )
         }
-      }
+        .onSuccess { memento ->
+          mainViewModel.notify(
+            Notification(
+              fetch(R.string.DeletedName, playlistInfo.name.value),
+              MementoAction(scope, memento)
+            )
+          )
+        }
     }
   }
 
@@ -501,6 +492,13 @@ private class PlaylistsViewModelImpl(
     }
   }
 }
+
+private fun PlaylistDescription.toPlaylistInfo() = PlaylistInfo(
+  id = id,
+  name = name,
+  type = type,
+  songCount = songCount.toInt()
+)
 
 @Parcelize
 private data class PlaylistsViewModelState(val selected: SelectedItems<PlaylistId>) : Parcelable

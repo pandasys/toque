@@ -63,7 +63,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,8 +76,6 @@ import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(ComposerDao::class)
 private val getOrInsertLock: Lock = ReentrantLock()
-
-data class ComposerIdName(val composerId: ComposerId, val composerName: ComposerName)
 
 data class ComposerDescription(
   val composerId: ComposerId,
@@ -114,16 +111,15 @@ interface ComposerDao {
 
   fun deleteAll(txn: TransactionInProgress)
   fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
+
   suspend fun getAllComposers(limit: Limit = NoLimit): DaoResult<List<ComposerDescription>>
-  suspend fun getNextComposer(name: ComposerName): DaoResult<ComposerIdName>
-  suspend fun getPreviousComposer(name: ComposerName): DaoResult<ComposerIdName>
-  suspend fun getRandomComposer(): DaoResult<ComposerIdName>
 
   suspend fun getNext(composerId: ComposerId): DaoResult<ComposerId>
   suspend fun getPrevious(composerId: ComposerId): DaoResult<ComposerId>
   suspend fun getMin(): DaoResult<ComposerId>
   suspend fun getMax(): DaoResult<ComposerId>
   suspend fun getRandom(): DaoResult<ComposerId>
+
   suspend fun getComposerSuggestions(
     partial: String,
     textSearch: TextSearch
@@ -208,50 +204,37 @@ private class ComposerDaoImpl(
         }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getNextComposer(
-    name: ComposerName
-  ): DaoResult<ComposerIdName> = runSuspendCatching {
+  override suspend fun getNext(composerId: ComposerId): DaoResult<ComposerId> = runSuspendCatching {
     db.query {
       ComposerTable
-        .selects { listOf(id, composer) }
-        .where { composer greater name.value }
-        .orderByAsc { composer }
-        .limit(1)
-        .sequence { cursor ->
-          ComposerIdName(ComposerId(cursor[id]), ComposerName(cursor[composer]))
-        }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getNext(composerId: ComposerId) = runSuspendCatching {
-    db.query {
-      ComposerTable
-        .select(ComposerTable.id)
-        .where { composer greater SELECT_COMPOSER_FROM_BIND_ID }
-        .orderByAsc { composer }
+        .select { id }
+        .where { composerSort greater SELECT_COMPOSER_SORT_FROM_BIND_ID }
+        .orderByAsc { composerSort }
         .limit(1)
         .longForQuery { it[BIND_COMPOSER_ID] = composerId.value }
         .asComposerId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getPrevious(composerId: ComposerId) = runSuspendCatching {
+  override suspend fun getPrevious(
+    composerId: ComposerId
+  ): DaoResult<ComposerId> = runSuspendCatching {
     db.query {
       ComposerTable
-        .select(ComposerTable.id)
-        .where { composer less SELECT_COMPOSER_FROM_BIND_ID }
-        .orderBy { composer by Order.DESC }
+        .select { id }
+        .where { composerSort less SELECT_COMPOSER_SORT_FROM_BIND_ID }
+        .orderBy { composerSort by Order.DESC }
         .limit(1)
         .longForQuery { it[BIND_COMPOSER_ID] = composerId.value }
         .asComposerId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  private val composerMin by lazy { ComposerTable.composer.min().alias("composer_min_alias") }
-  override suspend fun getMin() = runSuspendCatching {
+  private val composerMin by lazy { ComposerTable.composerSort.min().alias("composer_min_alias") }
+
+  override suspend fun getMin(): DaoResult<ComposerId> = runSuspendCatching {
     db.query {
       ComposerTable
         .selects { listOf(id, composerMin) }
@@ -260,10 +243,10 @@ private class ComposerDaoImpl(
         .sequence { cursor -> ComposerId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  private val composerMax by lazy { ComposerTable.composer.max().alias("composer_max_alias") }
-  override suspend fun getMax() = runSuspendCatching {
+  private val composerMax by lazy { ComposerTable.composerSort.max().alias("composer_max_alias") }
+  override suspend fun getMax(): DaoResult<ComposerId> = runSuspendCatching {
     db.query {
       ComposerTable
         .selects { listOf(id, composerMax) }
@@ -272,7 +255,7 @@ private class ComposerDaoImpl(
         .sequence { cursor -> ComposerId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getRandom(): DaoResult<ComposerId> = runSuspendCatching {
     db.query {
@@ -282,44 +265,7 @@ private class ComposerDaoImpl(
         .longForQuery()
         .asComposerId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getPreviousComposer(
-    name: ComposerName
-  ): DaoResult<ComposerIdName> = runSuspendCatching {
-    db.query { if (name.isEmpty()) doGetMaxComposer() else doGetPreviousComposer(name) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  /**
-   * Throws NoSuchElementException if there is no genre name < greater than [name]
-   */
-  private fun Queryable.doGetPreviousComposer(name: ComposerName): ComposerIdName = ComposerTable
-    .selects { listOf(id, composer) }
-    .where { composer less name.value }
-    .orderBy { composer by Order.DESC }
-    .limit(1)
-    .sequence { cursor -> ComposerIdName(ComposerId(cursor[id]), ComposerName(cursor[composer])) }
-    .single()
-
-  private fun Queryable.doGetMaxComposer(): ComposerIdName = ComposerTable
-    .selects { listOf(id, composerMax) }
-    .all()
-    .limit(1)
-    .sequence { cursor ->
-      ComposerIdName(ComposerId(cursor[id]), ComposerName(cursor[composerMax]))
-    }
-    .single()
-
-  override suspend fun getRandomComposer(): DaoResult<ComposerIdName> = runSuspendCatching {
-    db.query { doGetRandomComposer() }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  private fun Queryable.doGetRandomComposer(): ComposerIdName = ComposerTable
-    .selects { listOf(id, composer) }
-    .where { id inSubQuery ComposerTable.select(id).all().orderByRandom().limit(1) }
-    .sequence { cursor -> ComposerIdName(ComposerId(cursor[id]), ComposerName(cursor[composer])) }
-    .single()
-
+  }
 
   override suspend fun getComposerSuggestions(
     partial: String,
@@ -332,7 +278,7 @@ private class ComposerDaoImpl(
         .sequence { it[composer] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   /**
    * Could be a race condition if two threads are trying to insert the same composer at the same
@@ -372,8 +318,8 @@ private class ComposerDaoImpl(
 fun ComposerName.isEmpty(): Boolean = value.isEmpty()
 
 private val BIND_COMPOSER_ID: BindExpression<Long> = bindLong()
-private val SELECT_COMPOSER_FROM_BIND_ID: Expression<String> = ComposerTable
-  .select(ComposerTable.composer)
+private val SELECT_COMPOSER_SORT_FROM_BIND_ID: Expression<String> = ComposerTable
+  .select { composerSort }
   .where { id eq BIND_COMPOSER_ID }
   .limit(1)
   .asExpression()

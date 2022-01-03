@@ -73,7 +73,6 @@ import com.ealva.welite.db.table.where
 import com.ealva.welite.db.view.View
 import com.ealva.welite.db.view.ViewColumn
 import com.ealva.welite.db.view.existingView
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.mapBoth
@@ -134,6 +133,7 @@ interface PlaylistDao {
   ): DaoResult<PlaylistIdNameType>
 
   suspend fun createOrUpdateSmartPlaylist(smartPlaylist: SmartPlaylist): DaoResult<SmartPlaylist>
+
   suspend fun deletePlaylist(playlistId: PlaylistId): DaoResult<Memento>
 
   suspend fun getMediaForPlaylists(
@@ -193,7 +193,7 @@ private class PlaylistDaoImpl(
         }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun createUserPlaylist(
     name: PlaylistName,
@@ -212,9 +212,7 @@ private class PlaylistDaoImpl(
       } else throw IllegalStateException("Could not create $name")
       PlaylistIdNameType(playlistId, name, PlayListType.UserCreated)
     }
-  }
-    .mapError { cause -> DaoExceptionMessage(cause) }
-    .onSuccess { playlistIdName -> emit(PlaylistCreated(playlistId = playlistIdName.id)) }
+  }.onSuccess { playlistIdName -> emit(PlaylistCreated(playlistId = playlistIdName.id)) }
 
   override suspend fun createOrUpdateSmartPlaylist(
     smartPlaylist: SmartPlaylist
@@ -227,8 +225,6 @@ private class PlaylistDaoImpl(
         with(smartPlaylistDao) { updateSmartPlaylist(smartPlaylist) }
       }
     }
-  }.mapError { cause ->
-    DaoExceptionMessage(cause)
   }.onSuccess { result ->
     emit(if (smartPlaylist.id < 0) PlaylistCreated(result.id) else PlaylistUpdated(result.id))
   }
@@ -238,7 +234,7 @@ private class PlaylistDaoImpl(
     limit: Limit
   ): DaoResult<MediaIdList> = runSuspendCatching {
     db.query { mediaIdForPlaylists(playlistIds, limit) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   fun Queryable.mediaIdForPlaylists(
     playlistIds: PlaylistIdList,
@@ -309,8 +305,7 @@ private class PlaylistDaoImpl(
       doAddMediaToPlaylist(mediaIdList, id, getNextSortValue(id))
       updatePlaylist(id, Millis.currentUtcEpochMillis())
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-    .onSuccess { emit(PlaylistUpdated(id)) }
+  }.onSuccess { emit(PlaylistUpdated(id)) }
 
 
   override suspend fun getAllPlaylists(): DaoResult<List<PlaylistDescription>> =
@@ -362,7 +357,7 @@ private class PlaylistDaoImpl(
             .forEach { add(it) }
         }
       }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+    }
 
   private fun Queryable.getSmartPlaylistSongCount(
     smart: SmartPlaylistDescription
@@ -403,32 +398,34 @@ private class PlaylistDaoImpl(
     .single()
     .asPlaylistName
 
-  override suspend fun getNext(playlistId: PlaylistId) = runSuspendCatching {
+  override suspend fun getNext(playlistId: PlaylistId): DaoResult<PlaylistId> = runSuspendCatching {
     db.query {
       PlayListTable
-        .select(PlayListTable.id)
+        .select { id }
         .where { playListName greater SELECT_PLAYLIST_FROM_BIND_ID }
         .orderByAsc { playListName }
         .limit(1)
         .longForQuery { bindings -> bindings[BIND_PLAYLIST_ID] = playlistId.value }
         .asPlaylistId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getPrevious(playlistId: PlaylistId) = runSuspendCatching {
+  override suspend fun getPrevious(
+    playlistId: PlaylistId
+  ): DaoResult<PlaylistId> = runSuspendCatching {
     db.query {
       PlayListTable
-        .select(PlayListTable.id)
+        .select { id }
         .where { playListName less SELECT_PLAYLIST_FROM_BIND_ID }
         .orderBy { playListName by Order.DESC }
         .limit(1)
         .longForQuery { bindings -> bindings[BIND_PLAYLIST_ID] = playlistId.value }
         .asPlaylistId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private val playlistMin by lazy { PlayListTable.playListName.min().alias("playlist_min_alias") }
-  override suspend fun getMin(): Result<PlaylistId, DaoExceptionMessage> = runSuspendCatching {
+  override suspend fun getMin(): DaoResult<PlaylistId> = runSuspendCatching {
     db.query {
       PlayListTable
         .selects { listOf(id, playlistMin) }
@@ -437,10 +434,10 @@ private class PlaylistDaoImpl(
         .sequence { cursor -> PlaylistId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private val playlistMax by lazy { PlayListTable.playListName.max().alias("playlist_max_alias") }
-  override suspend fun getMax() = runSuspendCatching {
+  override suspend fun getMax(): DaoResult<PlaylistId> = runSuspendCatching {
     db.query {
       PlayListTable
         .selects { listOf(id, playlistMax) }
@@ -449,17 +446,17 @@ private class PlaylistDaoImpl(
         .sequence { cursor -> PlaylistId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getRandom(): DaoResult<PlaylistId> = runSuspendCatching {
     db.query {
       PlayListTable
-        .select(PlayListTable.id)
+        .select { id }
         .where { id inSubQuery PlayListTable.select(id).all().orderByRandom().limit(1) }
         .longForQuery()
         .asPlaylistId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun smartPlaylistsReferringTo(playlistId: PlaylistId): PlaylistIdList {
     return smartPlaylistDao.playlistsReferringTo(playlistId)
@@ -489,8 +486,6 @@ private class PlaylistDaoImpl(
         .map { playlistData -> delete(playlistData, ::playlistDeleteUndo) }
         .single()
     }
-  }.mapError { cause ->
-    DaoExceptionMessage(cause)
   }.onSuccess { emit(PlaylistDaoEvent.PlaylistDeleted(playlistId)) }
 
   private fun TransactionInProgress.delete(
@@ -599,15 +594,12 @@ private class PlaylistDaoImpl(
       }
     }
   }.toErrorIf({ it < 1 }) { DaoException("Could not restore ${playlistData.name}") }
-    .mapError { cause -> DaoExceptionMessage(cause) }
 
   suspend fun createSmartPlaylist(
     playlist: SmartPlaylist
   ): DaoResult<SmartPlaylist> = runSuspendCatching {
-    db.transaction {
-      with(smartPlaylistDao) { createSmartPlaylist(playlist) }
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+    db.transaction { with(smartPlaylistDao) { createSmartPlaylist(playlist) } }
+  }
 }
 
 private class DeleteSmartPlaylistMemento(
@@ -620,9 +612,9 @@ private class DeleteSmartPlaylistMemento(
   override suspend fun doUndo() {
     playlistDao.restoreDeletedPlaylist(playlistData)
       .andThen { playlistDao.createSmartPlaylist(playlist) }
+      .onFailure { msg -> LOG.e { it("Could not undo delete playlist. %s", msg) } }
       .onSuccess { referentRules.undo() }
       .onSuccess { onUndo(playlistData) }
-      .onFailure { msg -> LOG.e { it("Could not undo delete playlist. %s", msg) } }
   }
 
 }
@@ -637,9 +629,9 @@ private class DeleteUserPlaylistMemento(
   override suspend fun doUndo() {
     playlistDao.restoreDeletedPlaylist(playlistData)
       .andThen { playlistDao.addToUserPlaylist(playlistData.id, mediaIdList) }
+      .onFailure { cause -> LOG.e(cause) { it("Could not undo delete %s", playlistData) } }
       .onSuccess { referentRules.undo() }
       .onSuccess { onUndo(playlistData) }
-      .onFailure { msg -> LOG.e { it("Could not undo delete playlist. %s", msg) } }
   }
 }
 

@@ -51,8 +51,6 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.ComposerDescription
-import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ComposerId
@@ -65,9 +63,10 @@ import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -261,16 +260,16 @@ private class ComposersViewModelImpl(
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
+  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedComposers())
 
-  suspend fun makeCategoryMediaList(composerList: List<ComposerInfo>) = audioMediaDao
+  private suspend fun makeCategoryMediaList(composerList: List<ComposerInfo>) = audioMediaDao
     .getMediaForComposers(
       composerList
         .mapTo(LongArrayList(512)) { it.id.value }
         .asComposerIdList
     )
-    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
     .map { idList -> CategoryMediaList(idList, CategoryToken(composerList.last().id)) }
 
   private fun getSelectedComposers() = composerFlow.value
@@ -311,20 +310,11 @@ private class ComposersViewModelImpl(
 
   private fun requestComposers() {
     scope.launch {
-      when (val result = composerDao.getAllComposers()) {
-        is Ok -> handleList(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
-    }
-  }
-
-  private fun handleList(list: List<ComposerDescription>) {
-    composerFlow.value = list.mapTo(ArrayList(list.size)) {
-      ComposerInfo(
-        id = it.composerId,
-        name = it.composerName,
-        songCount = it.songCount.toInt()
-      )
+      composerFlow.value = composerDao
+        .getAllComposers()
+        .onFailure { cause -> LOG.e(cause) { it("Error getting Composers") } }
+        .getOrElse { emptyList() }
+        .map { composerDescription -> composerDescription.toComposerInfo() }
     }
   }
 
@@ -350,6 +340,12 @@ private class ComposersViewModelImpl(
     }
   }
 }
+
+private fun ComposerDescription.toComposerInfo() = ComposerInfo(
+  id = composerId,
+  name = composerName,
+  songCount = songCount.toInt()
+)
 
 @Parcelize
 private data class ComposersViewModelState(val selected: SelectedItems<ComposerId>) : Parcelable

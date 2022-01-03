@@ -28,13 +28,13 @@ import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoEmptyResult
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.nav.goToScreen
+import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
@@ -108,12 +108,12 @@ private class AllAlbumsViewModel(
 
   override suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>
-  ) = audioMediaDao
+  ): Result<CategoryMediaList, Throwable> = audioMediaDao
     .getMediaForAlbums(
       albumList
         .mapTo(LongArrayList(512)) { it.id.value }
         .asAlbumIdList
     )
-    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
     .map { idList -> CategoryMediaList(idList, CategoryToken(albumList.last().id)) }
 }

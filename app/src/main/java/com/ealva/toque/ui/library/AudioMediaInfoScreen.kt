@@ -58,6 +58,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.FullAudioInfo
 import com.ealva.toque.persist.AlbumId
@@ -68,10 +69,12 @@ import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import com.ealva.toque.tag.ArtistParserFactory
 import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.main.MainViewModel
+import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.settings.AppBarTitle
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.gowtham.ratingbar.RatingBar
@@ -81,6 +84,7 @@ import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,6 +111,7 @@ data class AudioMediaInfoScreen(
     serviceBinder.add(
       MediaInfoViewModel(
         mediaId = mediaId,
+        mainViewModel = serviceBinder.lookup(),
         audioMediaDao = get(),
         mediaDataParserFactory = get(),
         artistParserFactory = get(),
@@ -186,6 +191,7 @@ interface MediaInfoViewModel {
   companion object {
     operator fun invoke(
       mediaId: MediaId,
+      mainViewModel: MainViewModel,
       audioMediaDao: AudioMediaDao,
       mediaDataParserFactory: MediaMetadataParserFactory,
       artistParserFactory: ArtistParserFactory,
@@ -193,6 +199,7 @@ interface MediaInfoViewModel {
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): MediaInfoViewModel = MediaInfoViewModelImpl(
       mediaId,
+      mainViewModel,
       audioMediaDao,
       mediaDataParserFactory,
       artistParserFactory,
@@ -204,6 +211,7 @@ interface MediaInfoViewModel {
 
 private class MediaInfoViewModelImpl(
   private val mediaId: MediaId,
+  private val mainViewModel: MainViewModel,
   private val audioMediaDao: AudioMediaDao,
   mediaDataParserFactory: MediaMetadataParserFactory,
   private val artistParserFactory: ArtistParserFactory,
@@ -221,10 +229,12 @@ private class MediaInfoViewModelImpl(
   override fun onServiceActive() {
     scope = CoroutineScope(SupervisorJob() + dispatcher)
     scope.launch {
-      when (val result = audioMediaDao.getFullInfo(mediaId)) {
-        is Ok -> handleFullAudioInfo(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
+      audioMediaDao.getFullInfo(mediaId)
+        .onFailure { cause ->
+          LOG.e(cause) { it("Error getting media info for $mediaId") }
+          mainViewModel.notify(Notification(fetch(R.string.ErrorReadingMediaInfo)))
+        }
+        .onSuccess { fullAudioInfo -> handleFullAudioInfo(fullAudioInfo) }
     }
   }
 

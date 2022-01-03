@@ -52,8 +52,6 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
-import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.GenreDao
 import com.ealva.toque.db.GenreDescription
 import com.ealva.toque.log._i
@@ -68,9 +66,10 @@ import com.ealva.toque.ui.library.GenresViewModel.GenreInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -282,16 +281,16 @@ private class GenresViewModelImpl(
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
+  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedGenres())
 
-  suspend fun makeCategoryMediaList(genreList: List<GenreInfo>) = audioMediaDao
+  private suspend fun makeCategoryMediaList(genreList: List<GenreInfo>) = audioMediaDao
     .getMediaForGenres(
       genreList
         .mapTo(LongArrayList(512)) { it.id.value }
         .asGenreIdList
     )
-    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
     .map { idList -> CategoryMediaList(idList, CategoryToken(genreList.last().id)) }
 
   private fun getSelectedGenres() = genreFlow.value
@@ -336,20 +335,11 @@ private class GenresViewModelImpl(
 
   private fun requestGenres() {
     scope.launch {
-      when (val result = genreDao.getAllGenres(filterFlow.value)) {
-        is Ok -> handleGenreList(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
-    }
-  }
-
-  private fun handleGenreList(list: List<GenreDescription>) {
-    genreFlow.value = list.mapTo(ArrayList(list.size)) {
-      GenreInfo(
-        id = it.genreId,
-        name = it.genreName,
-        songCount = it.songCount.toInt()
-      )
+      genreFlow.value = genreDao
+        .getAllGenres(filterFlow.value)
+        .onFailure { cause -> LOG.e(cause) { it("Error getting Genres") } }
+        .getOrElse { emptyList() }
+        .map { genreDescription -> genreDescription.toGenreInfo() }
     }
   }
 
@@ -375,6 +365,12 @@ private class GenresViewModelImpl(
     }
   }
 }
+
+private fun GenreDescription.toGenreInfo() = GenreInfo(
+  id = genreId,
+  name = genreName,
+  songCount = songCount.toInt()
+)
 
 @Parcelize
 private data class GenresViewModelState(val selected: SelectedItems<GenreId>) : Parcelable

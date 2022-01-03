@@ -20,7 +20,6 @@ package com.ealva.toque.ui.library
 
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoNotImplemented
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
@@ -63,9 +62,11 @@ class LocalAudioQueueOpsTest {
   fun testGetMediaListReturnsError() = runTest {
     Op.values().forEach { op ->
       var clearCalled = false
-      when (val result = queueOps.doOp(op, { Err(DaoNotImplemented) }, { clearCalled = true })) {
+      when (
+        val result = queueOps.doOp(op, { Err(NotImplementedError()) }, { clearCalled = true })
+      ) {
         is Ok -> fail("Expected Err")
-        is Err -> expect(result).toBeInstanceOf<DaoResult<DaoNotImplemented>>()
+        is Err -> expect(result).toBeInstanceOf<DaoResult<NotImplementedError>>()
       }
       expect(clearCalled).toBe(false)
     }
@@ -157,6 +158,7 @@ private class LocalAudioQueueViewModelStub : LocalAudioQueueViewModel {
 
   var _addToPlaylistReturn: PromptResult =
     PromptResult.Executed
+
   override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
     return _addToPlaylistReturn
   }

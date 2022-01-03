@@ -23,6 +23,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.checkThen
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.isValid
 import com.ealva.welite.db.Database
@@ -34,7 +35,6 @@ import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -132,6 +132,7 @@ private class QueuePositionStateDaoImpl(
   dispatcher: CoroutineDispatcher
 ) : QueuePositionStateDao {
   private var closed = false
+
   // State is persisted at a usual rate of 3 times per second on average. A burst would be 4.
   // We create our own thread to reduce latency and get our flow, which persists, off of the UI
   // thread as quickly as possible. There should be only 1 queue (queueId) active at a time. The
@@ -177,9 +178,8 @@ private class QueuePositionStateDaoImpl(
     }
   }
 
-  override suspend fun getState(): DaoResult<QueuePositionState> {
-    check(!closed)
-    return runSuspendCatching {
+  override suspend fun getState(): DaoResult<QueuePositionState> = checkThen(!closed) {
+    runSuspendCatching {
       db.transaction {
         QueueStateTable
           .selects { listOf(mediaId, queueIndex, playbackPosition, timePlayed, countingFrom) }
@@ -196,7 +196,7 @@ private class QueuePositionStateDaoImpl(
           .singleOrNull()
           ?: QueuePositionState.INACTIVE_QUEUE_STATE
       }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+    }
   }
 
   override fun persistState(state: QueuePositionState): QueuePositionState {

@@ -78,6 +78,7 @@ import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
 import com.ealva.toque.persist.asMediaId
 import com.ealva.toque.persist.asMediaIdList
+import com.ealva.toque.persist.reifyRequire
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.media.MediaFileTagInfo
@@ -92,7 +93,6 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.Op
-import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
@@ -114,7 +114,6 @@ import com.ealva.welite.db.table.OrderBy
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.QueryBuilder
 import com.ealva.welite.db.table.alias
-import com.ealva.welite.db.table.by
 import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.ordersBy
 import com.ealva.welite.db.table.select
@@ -124,13 +123,13 @@ import com.ealva.welite.db.table.where
 import com.ealva.welite.db.view.View
 import com.ealva.welite.db.view.existingView
 import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.getOrElse
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongCollection
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -252,19 +251,19 @@ interface AudioMediaDao {
   suspend fun getAllAudio(
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getArtistAudio(
     id: ArtistId,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getAlbumArtistAudio(
     id: ArtistId,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   /**
    * Get the songs on the Album with [id]. If [restrictTo] is not null, get only the songs of
@@ -276,26 +275,26 @@ interface AudioMediaDao {
     restrictTo: ArtistId? = null,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getGenreAudio(
     genreId: GenreId,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getComposerAudio(
     composerId: ComposerId,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getPlaylistAudio(
     playlistId: PlaylistId,
     playListType: PlayListType,
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getAudioQueueItems(shuffled: Boolean): AudioItemListResult
   suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
@@ -666,45 +665,12 @@ private class AudioMediaDaoImpl(
 
   override suspend fun getCountAllAudio(): LongResult = runSuspendCatching {
     db.query { MediaTable.selectCount { mediaType eq MediaType.Audio.id }.count() }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-//  override suspend fun getAllAudio(
-//    filter: Filter,
-//    limit: Limit
-//  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
-//    val view = SmartPlaylist(
-//      PlaylistId.INVALID,
-//      "First Smart Playlist".asPlaylistName,
-//      AnyOrAll.All,
-//      NoLimit,
-//      SmartOrderBy.Title,
-//      EndOfSmartPlaylistAction.Reshuffle,
-//      listOf(Rule(1, RuleField.Album, TextMatcher.Contains, MatcherData("Blue", 0, 0))),
-//    ).asView()
-//
-//    val viewId = view.column(MediaTable.id, MediaTable.id.name)
-//
-//    db.transaction {
-//      view.drop()
-//      view.create()
-//    }
-//
-//    db.query {
-//      view
-//        .join(MediaTable, INNER, viewId, MediaTable.id)
-//        .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
-//        .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
-//        .selects { AUDIO_DESCRIPTION_SELECTS }
-//        .where { viewId.isNotNull() }
-//        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
-//        .toList()
-//    }
-//  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getAllAudio(
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
@@ -716,13 +682,13 @@ private class AudioMediaDaoImpl(
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getArtistAudio(
     id: ArtistId,
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(ArtistMediaTable, INNER, MediaTable.id, ArtistMediaTable.mediaId)
@@ -735,13 +701,13 @@ private class AudioMediaDaoImpl(
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getAlbumArtistAudio(
     id: ArtistId,
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(ArtistTable, INNER, MediaTable.albumArtistId, ArtistTable.id)
@@ -753,14 +719,14 @@ private class AudioMediaDaoImpl(
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getAlbumAudio(
     id: AlbumId,
     restrictTo: ArtistId?,
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
@@ -772,13 +738,13 @@ private class AudioMediaDaoImpl(
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getGenreAudio(
     genreId: GenreId,
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(GenreMediaTable, INNER, MediaTable.id, GenreMediaTable.mediaId)
@@ -799,13 +765,13 @@ private class AudioMediaDaoImpl(
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getComposerAudio(
     composerId: ComposerId,
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(ComposerMediaTable, INNER, MediaTable.id, ComposerMediaTable.mediaId)
@@ -818,19 +784,19 @@ private class AudioMediaDaoImpl(
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getPlaylistAudio(
     playlistId: PlaylistId,
     playListType: PlayListType,
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AudioDescription>> = runSuspendCatching {
+  ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
     when (playListType) {
       UserCreated, System, File -> getPlaylistListedMedia(playlistId, filter, limit)
       Rules -> getSmartPlaylistMedia(playlistId, filter, limit)
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private suspend fun getPlaylistListedMedia(
     playlistId: PlaylistId,
@@ -1078,9 +1044,12 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  override suspend fun setRating(id: MediaId, newRating: Rating) = runSuspendCatching {
+  override suspend fun setRating(
+    id: MediaId,
+    newRating: Rating
+  ): DaoResult<Rating> = runSuspendCatching {
     db.transaction { doSetRating(id, newRating) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Transaction.doSetRating(id: MediaId, newRating: Rating): Rating = MediaTable
     .updateColumns {
@@ -1098,7 +1067,7 @@ private class AudioMediaDaoImpl(
       newRating
     }
 
-  override suspend fun getMediaTitle(mediaId: MediaId) = runSuspendCatching {
+  override suspend fun getMediaTitle(mediaId: MediaId): DaoResult<Title> = runSuspendCatching {
     db.query {
       MediaTable
         .select(MediaTable.title)
@@ -1106,7 +1075,7 @@ private class AudioMediaDaoImpl(
         .sequence { cursor -> Title(cursor[title]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getMediaForAlbums(
     albumsIds: AlbumIdList,
@@ -1125,7 +1094,7 @@ private class AudioMediaDaoImpl(
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
         .asMediaIdList
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getMediaForArtists(
     artistIds: ArtistIdList,
@@ -1150,12 +1119,12 @@ private class AudioMediaDaoImpl(
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
         .asMediaIdList
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getMediaForComposers(
     composerIds: ComposerIdList,
     limit: Limit
-  ) = runSuspendCatching {
+  ): DaoResult<MediaIdList> = runSuspendCatching {
     db.query {
       ComposerMediaTable
         .join(MediaTable, INNER, ComposerMediaTable.mediaId, MediaTable.id)
@@ -1173,12 +1142,12 @@ private class AudioMediaDaoImpl(
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
         .asMediaIdList
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getMediaForGenres(
     genreIds: GenreIdList,
     limit: Limit
-  ) = runSuspendCatching {
+  ): DaoResult<MediaIdList> = runSuspendCatching {
     db.query {
       GenreMediaTable
         .join(MediaTable, INNER, GenreMediaTable.mediaId, MediaTable.id)
@@ -1197,7 +1166,7 @@ private class AudioMediaDaoImpl(
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
         .asMediaIdList
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getMediaForPlaylists(
     playlistIds: PlaylistIdList,
@@ -1205,31 +1174,67 @@ private class AudioMediaDaoImpl(
     limit: Limit
   ): DaoResult<MediaIdList> = runSuspendCatching {
     db.query {
-      PlayListMediaTable
-        .join(PlayListTable, INNER, PlayListMediaTable.playListId, PlayListTable.id)
-        .select(PlayListMediaTable.mediaId)
-        .where { PlayListMediaTable.playListId inList playlistIds.value }
-        .distinct()
-        .ordersBy {
-          listOf(
-            PlayListTable.playListName by Order.ASC,
-            PlayListMediaTable.sort by Order.ASC
-          )
+      val longCollection = if (removeDuplicates) LongLinkedOpenHashSet(2048) else
+        LongArrayList(2048)
+      PlayListTable
+        .selects { listOf(id, playListType) }
+        .where { id inList playlistIds.value }
+        .orderByAsc { playListName }
+        .sequence { cursor ->
+          Pair(PlaylistId(cursor[id]), PlayListType::class.reifyRequire(cursor[playListType]))
         }
-        .limit(limit.value)
-        .sequence { cursor -> cursor[PlayListMediaTable.mediaId] }
-        .mapTo(LongArrayList(512)) { it.asMediaId.value }
+        .forEach { (playlistId, playlistType) ->
+          getPlaylistMedia(playlistId, playlistType, longCollection)
+        }
+      (if (longCollection is LongArrayList) longCollection else LongArrayList(longCollection))
         .asMediaIdList
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
+
+  private fun Queryable.getPlaylistMedia(
+    playlistId: PlaylistId,
+    playlistType: PlayListType,
+    longCollection: LongCollection
+  ) {
+    when (playlistType) {
+      UserCreated -> getUserCreatedPlaylistMedia(playlistId, longCollection)
+      Rules -> getSmartPlaylistMediaIds(playlistId, longCollection)
+      else -> {}
+    }
+  }
+
+  private fun Queryable.getSmartPlaylistMediaIds(
+    playlistId: PlaylistId,
+    longCollection: LongCollection
+  ) {
+    val view = existingView(with(playlistDao) { getPlaylistName(playlistId, Rules) }.value)
+    val viewId = view.column(MediaTable.id, MediaTable.id.name)
+
+    view
+      .join(MediaTable, INNER, viewId, MediaTable.id)
+      .select { MediaTable.id }
+      .where { viewId.isNotNull() }
+      .forEach { cursor -> longCollection.add(cursor[MediaTable.id]) }
+  }
+
+  private fun Queryable.getUserCreatedPlaylistMedia(
+    playlistId: PlaylistId,
+    longCollection: LongCollection
+  ) {
+    PlayListMediaTable
+      .join(PlayListTable, INNER, PlayListMediaTable.playListId, PlayListTable.id)
+      .select(PlayListMediaTable.mediaId)
+      .where { PlayListMediaTable.playListId eq playlistId.value }
+      .sequence { cursor -> longCollection.add(cursor[PlayListMediaTable.mediaId]) }
+  }
 
   override suspend fun getNextCategory(
     token: CategoryToken,
     shuffleLists: ShuffleLists
   ): CategoryMediaList {
     var nextList = CategoryMediaList.EMPTY_ALL_LIST
-    val countResult = getCountAllAudio()
-    if (countResult is Ok && countResult.value > 0) {
+    val countResult = getCountAllAudio().getOrElse { 0 }
+    if (countResult > 0) {
       var nextToken = if (shuffleLists.value) token.getRandom(this) else token.nextToken(this)
       if (nextToken !== CategoryToken.All) {
         var possibleNext = CategoryMediaList(nextToken.getAllMedia(this), nextToken)
@@ -1250,8 +1255,8 @@ private class AudioMediaDaoImpl(
     shuffleLists: ShuffleLists
   ): CategoryMediaList {
     var prevList = CategoryMediaList.EMPTY_ALL_LIST
-    val countResult = getCountAllAudio()
-    if (countResult is Ok && countResult.value > 0) {
+    val countResult = getCountAllAudio().getOrElse { 0 }
+    if (countResult > 0) {
       var prevToken = if (shuffleLists.value) token.getRandom(this) else token.previousToken(this)
       if (prevToken !== CategoryToken.All) {
         var possiblePrev = CategoryMediaList(prevToken.getAllMedia(this), prevToken)
@@ -1332,7 +1337,7 @@ private class AudioMediaDaoImpl(
         }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
 
   override suspend fun getTitleSuggestions(
@@ -1346,7 +1351,7 @@ private class AudioMediaDaoImpl(
         .sequence { it[title] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getAlbumSuggestions(
     partialTitle: String,
@@ -1359,7 +1364,7 @@ private class AudioMediaDaoImpl(
         .sequence { it[albumTitle] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getArtistSuggestions(
     partial: String,
@@ -1374,7 +1379,7 @@ private class AudioMediaDaoImpl(
         .sequence { it[songArtistTableName] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getAlbumArtistSuggestions(
     partial: String,
@@ -1389,7 +1394,7 @@ private class AudioMediaDaoImpl(
         .sequence { it[albumArtistTableName] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   /**
    * While there could be a race condition if 2 threads tried to insert the same media, it's
@@ -1744,8 +1749,8 @@ private val BIND_FILTER_ONE = bindString()
 private val BIND_FILTER_TWO = bindString()
 private val BIND_FILTER_THREE = bindString()
 private val AUDIO_LIKE_CONDITION = (MediaTable.title like BIND_FILTER_ONE escape ESC_CHAR) or
-    (AlbumTable.albumTitle like BIND_FILTER_TWO escape ESC_CHAR) or
-    (ArtistTable.artistName like BIND_FILTER_THREE escape ESC_CHAR)
+(AlbumTable.albumTitle like BIND_FILTER_TWO escape ESC_CHAR) or
+(ArtistTable.artistName like BIND_FILTER_THREE escape ESC_CHAR)
 
 private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> =
   if (filter.isEmpty) this else this and AUDIO_LIKE_CONDITION

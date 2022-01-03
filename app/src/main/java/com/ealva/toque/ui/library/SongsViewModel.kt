@@ -34,22 +34,24 @@ import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
+import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.goToScreen
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.coroutines.runSuspendCatching
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -124,7 +126,7 @@ interface SongsViewModel : ActionsViewModel {
 
 abstract class BaseSongsViewModel(
   private val audioMediaDao: AudioMediaDao,
-  localAudioQueueModel: LocalAudioQueueViewModel,
+  private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : SongsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
@@ -152,7 +154,7 @@ abstract class BaseSongsViewModel(
   protected abstract suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): DaoResult<List<AudioDescription>>
+  ): Result<List<AudioDescription>, Throwable>
 
   override fun onServiceActive() {
     scope = CoroutineScope(Job() + dispatcher)
@@ -174,10 +176,12 @@ abstract class BaseSongsViewModel(
     if (requestJob?.isActive == true) requestJob?.cancel()
 
     requestJob = scope.launch {
-      when (val result = getAudioList(audioMediaDao, filterFlow.value)) {
-        is Ok -> handleAudioList(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
+      getAudioList(audioMediaDao, filterFlow.value)
+        .onFailure { cause ->
+          LOG.e(cause) { it("Error getting audio list") }
+          localAudioQueueModel.emitNotification(Notification(fetch(R.string.ErrorReadingMediaList)))
+        }
+        .onSuccess { list -> handleAudioList(list) }
     }
   }
 
@@ -202,21 +206,18 @@ abstract class BaseSongsViewModel(
 
   override fun mediaLongClicked(mediaId: MediaId) = selectedItems.toggleSelection(mediaId)
 
-  /**
-   * LocalAudioQueueOps requires a CategoryMediaList, because LocalAudioQueue play, shuffle, and
-   * addToPlaylist, require it. So, just wrap the MediaIdList in a CategoryMediaList with an
-   * appropriate CategoryToken
-   */
-  private fun makeCategoryMediaList(): CategoryMediaList =
-    CategoryMediaList(makeMediaIdList(), categoryToken)
-
-  private fun makeMediaListResult(): DaoResult<CategoryMediaList> = Ok(makeCategoryMediaList())
-
-  private fun makeMediaIdList(): MediaIdList = songsFlow.value
-    .asSequence()
-    .filterIfHasSelection(selectedItems.value) { it.id }
-    .mapTo(LongArrayList(512)) { it.id.value }
-    .asMediaIdList
+  private fun makeMediaListResult(): Result<CategoryMediaList, Throwable> =
+    runSuspendCatching {
+      CategoryMediaList(
+        songsFlow
+          .value
+          .asSequence()
+          .filterIfHasSelection(selectedItems.value) { it.id }
+          .mapTo(LongArrayList(512)) { it.id.value }
+          .asMediaIdList,
+        categoryToken
+      )
+    }
 
   private fun offSelectMode() {
     selectedItems.turnOffSelectionMode()

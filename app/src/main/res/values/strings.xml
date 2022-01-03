@@ -302,4 +302,6 @@
     <string name="CouldNotDeleteName">Cound not delete %s</string>
   <string name="DeletedName">Deleted %s</string>
     <string name="ERRORNoPlaylists">ERROR - No Playlists</string>
+    <string name="ErrorReadingMediaInfo">Error reading media info</string>
+  <string name="ErrorReadingMediaList">Error reading media list</string>
 </resources>

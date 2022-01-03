@@ -32,8 +32,9 @@ import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -88,10 +89,9 @@ abstract class BaseAlbumsViewModel(
   private fun requestAlbums() {
     if (requestJob?.isActive == true) requestJob?.cancel()
     requestJob = scope.launch {
-      when (val result = doGetAlbums(albumDao, escapedFilterFlow.value)) {
-        is Ok -> handleAlbumList(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
+      doGetAlbums(albumDao, escapedFilterFlow.value)
+        .onSuccess { list -> handleAlbumList(list) }
+        .onFailure { cause -> LOG.e(cause) { it("Error getting Albums") } }
     }
   }
 
@@ -144,11 +144,11 @@ abstract class BaseAlbumsViewModel(
 
   protected abstract suspend fun makeCategoryMediaList(
     albumList: List<AlbumsViewModel.AlbumInfo>
-  ): DaoResult<CategoryMediaList>
+  ): Result<CategoryMediaList, Throwable>
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
 
-  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
+  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedAlbums())
 
   override fun play() {

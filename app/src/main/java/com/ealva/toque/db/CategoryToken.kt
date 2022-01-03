@@ -32,8 +32,9 @@ import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
 import kotlinx.parcelize.Parcelize
 
 private val LOG by lazyLogger(CategoryToken::class)
@@ -104,47 +105,58 @@ sealed interface CategoryToken : Parcelable {
     override val persistentId: AlbumId,
     override val songListType: SongListType = SongListType.Album
   ) : BaseCategoryToken {
-    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken =
-      when (val result = audioMediaDao.albumDao.getRandom()) {
-        is Ok -> Album(result.value)
-        is Err -> Artist(ArtistId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.albumDao,
+      failureMsg = "Error getting random Album",
+      orElse = { Artist(ArtistId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Album(it) },
+      getId = { getRandom() }
+    )
 
-    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken =
-      when (val result = audioMediaDao.albumDao.getNext(persistentId)) {
-        is Ok -> Album(result.value)
-        is Err -> Artist(ArtistId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.albumDao,
+      failureMsg = "Error getting next Album",
+      orElse = { Artist(ArtistId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Album(it) },
+      getId = { getNext(persistentId) }
+    )
 
-    override suspend fun previousToken(audioMediaDao: AudioMediaDao): CategoryToken =
-      when (val result = audioMediaDao.albumDao.getPrevious(persistentId)) {
-        is Ok -> Album(result.value)
-        is Err -> Playlist(PlaylistId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    override suspend fun previousToken(
+      audioMediaDao: AudioMediaDao
+    ): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.albumDao,
+      failureMsg = "Error getting previous Album",
+      orElse = { Playlist(PlaylistId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Album(it) },
+      getId = { getPrevious(persistentId) }
+    )
 
     override suspend fun getMinToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Album) All else
-      when (val result = audioMediaDao.albumDao.getMin()) {
-        is Ok -> Album(result.value)
-        is Err -> Artist(ArtistId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Album) All else getCategoryToken(
+      dao = audioMediaDao.albumDao,
+      failureMsg = "Error getting min Album",
+      orElse = { Artist(ArtistId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Album(it) },
+      getId = { getMin() }
+    )
 
     override suspend fun getMaxToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Album) All else
-      when (val result = audioMediaDao.albumDao.getMax()) {
-        is Ok -> Album(result.value)
-        is Err -> Playlist(PlaylistId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Album) All else getCategoryToken(
+      dao = audioMediaDao.albumDao,
+      failureMsg = "Error getting max Album",
+      orElse = { Playlist(PlaylistId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Album(it) },
+      getId = { getMax() }
+    )
 
-    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList =
-      when (val result = audioMediaDao.getMediaForAlbums(AlbumIdList(persistentId))) {
-        is Ok -> result.value
-        is Err -> MediaIdList.EMPTY_LIST.also { LOG.e { it("%s", result.error) } }
-      }
+    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList = audioMediaDao
+      .getMediaForAlbums(AlbumIdList(persistentId))
+      .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s.", persistentId) } }
+      .getOrElse { MediaIdList.EMPTY_LIST }
   }
 
   @Parcelize
@@ -152,47 +164,58 @@ sealed interface CategoryToken : Parcelable {
     override val persistentId: ArtistId,
     override val songListType: SongListType = SongListType.Artist
   ) : BaseCategoryToken {
-    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken =
-      when (val result = audioMediaDao.artistDao.getRandom()) {
-        is Ok -> Artist(result.value)
-        is Err -> Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.artistDao,
+      failureMsg = "Error getting random Artist",
+      orElse = { Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Artist(it) },
+      getId = { getRandom() }
+    )
 
-    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken =
-      when (val result = audioMediaDao.artistDao.getNext(persistentId)) {
-        is Ok -> Artist(result.value)
-        is Err -> Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.artistDao,
+      failureMsg = "Error getting next Artist",
+      orElse = { Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Artist(it) },
+      getId = { getNext(persistentId) }
+    )
 
-    override suspend fun previousToken(audioMediaDao: AudioMediaDao): CategoryToken =
-      when (val result = audioMediaDao.artistDao.getPrevious(persistentId)) {
-        is Ok -> Artist(result.value)
-        is Err -> Album(AlbumId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    override suspend fun previousToken(
+      audioMediaDao: AudioMediaDao
+    ): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.artistDao,
+      failureMsg = "Error getting previous Artist",
+      orElse = { Album(AlbumId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Artist(it) },
+      getId = { getPrevious(persistentId) }
+    )
 
     override suspend fun getMinToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Artist) All else
-      when (val result = audioMediaDao.artistDao.getMin()) {
-        is Ok -> Artist(result.value)
-        is Err -> Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Artist) All else getCategoryToken(
+      dao = audioMediaDao.artistDao,
+      failureMsg = "Error getting min Artist",
+      orElse = { Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Artist(it) },
+      getId = { getMin() }
+    )
 
     override suspend fun getMaxToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Artist) All else
-      when (val result = audioMediaDao.artistDao.getMax()) {
-        is Ok -> Artist(result.value)
-        is Err -> Album(AlbumId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Artist) All else getCategoryToken(
+      dao = audioMediaDao.artistDao,
+      failureMsg = "Error getting max Artist",
+      orElse = { Album(AlbumId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Artist(it) },
+      getId = { getMax() }
+    )
 
-    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList =
-      when (val result = audioMediaDao.getMediaForArtists(ArtistIdList(persistentId))) {
-        is Ok -> result.value
-        is Err -> MediaIdList.EMPTY_LIST.also { LOG.e { it("%s", result.error) } }
-      }
+    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList = audioMediaDao
+      .getMediaForArtists(ArtistIdList(persistentId))
+      .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s.", persistentId) } }
+      .getOrElse { MediaIdList.EMPTY_LIST }
   }
 
   @Parcelize
@@ -200,51 +223,58 @@ sealed interface CategoryToken : Parcelable {
     override val persistentId: ComposerId,
     override val songListType: SongListType = SongListType.Composer
   ) : BaseCategoryToken {
-    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.composerDao.getRandom()) {
-        is Ok -> Composer(result.value)
-        is Err -> Genre(GenreId.INVALID).getMinToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.composerDao,
+      failureMsg = "Error getting random Composer",
+      orElse = { Genre(GenreId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Composer(it) },
+      getId = { getRandom() }
+    )
 
-    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.composerDao.getNext(persistentId)) {
-        is Ok -> Composer(result.value)
-        is Err -> Genre(GenreId.INVALID).getMinToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.composerDao,
+      failureMsg = "Error getting next Composer",
+      orElse = { Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Composer(it) },
+      getId = { getNext(persistentId) }
+    )
 
-    override suspend fun previousToken(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.composerDao.getPrevious(persistentId)) {
-        is Ok -> Composer(result.value)
-        is Err -> Artist(ArtistId.INVALID).getMaxToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun previousToken(
+      audioMediaDao: AudioMediaDao
+    ): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.composerDao,
+      failureMsg = "Error getting previous Composer",
+      orElse = { Artist(ArtistId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Composer(it) },
+      getId = { getPrevious(persistentId) }
+    )
 
     override suspend fun getMinToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Composer) All else
-      when (val result = audioMediaDao.composerDao.getMin()) {
-        is Ok -> Composer(result.value)
-        is Err -> Genre(GenreId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Composer) All else getCategoryToken(
+      dao = audioMediaDao.composerDao,
+      failureMsg = "Error getting min Composer",
+      orElse = { Genre(GenreId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Composer(it) },
+      getId = { getMin() }
+    )
 
     override suspend fun getMaxToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Composer) All else
-      when (val result = audioMediaDao.composerDao.getMax()) {
-        is Ok -> Composer(result.value)
-        is Err -> Artist(ArtistId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Composer) All else getCategoryToken(
+      dao = audioMediaDao.composerDao,
+      failureMsg = "Error getting max Composer",
+      orElse = { Artist(ArtistId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Composer(it) },
+      getId = { getMax() }
+    )
 
-    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList {
-      return when (val result = audioMediaDao.getMediaForComposers(ComposerIdList(persistentId))) {
-        is Ok -> result.value
-        is Err -> MediaIdList.EMPTY_LIST.also { LOG.e { it("%s", result.error) } }
-      }
-    }
+    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList =
+      audioMediaDao.getMediaForComposers(ComposerIdList(persistentId))
+        .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s", persistentId) } }
+        .getOrElse { MediaIdList.EMPTY_LIST }
   }
 
   @Parcelize
@@ -252,51 +282,58 @@ sealed interface CategoryToken : Parcelable {
     override val persistentId: GenreId,
     override val songListType: SongListType = SongListType.Genre
   ) : BaseCategoryToken {
-    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.genreDao.getRandom()) {
-        is Ok -> Genre(result.value)
-        is Err -> Playlist(PlaylistId.INVALID).getMinToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.genreDao,
+      failureMsg = "Error getting random Genre",
+      orElse = { Playlist(PlaylistId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Genre(it) },
+      getId = { getRandom() }
+    )
 
-    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.genreDao.getNext(persistentId)) {
-        is Ok -> Genre(result.value)
-        is Err -> Playlist(PlaylistId.INVALID).getMinToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.genreDao,
+      failureMsg = "Error getting next Genre",
+      orElse = { Composer(ComposerId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Genre(it) },
+      getId = { getNext(persistentId) }
+    )
 
-    override suspend fun previousToken(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.genreDao.getPrevious(persistentId)) {
-        is Ok -> Genre(result.value)
-        is Err -> Composer(ComposerId.INVALID).getMaxToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun previousToken(
+      audioMediaDao: AudioMediaDao
+    ): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.genreDao,
+      failureMsg = "Error getting previous Genre",
+      orElse = { Composer(ComposerId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Genre(it) },
+      getId = { getPrevious(persistentId) }
+    )
 
     override suspend fun getMinToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Genre) All else
-      when (val result = audioMediaDao.genreDao.getMin()) {
-        is Ok -> Genre(result.value)
-        is Err -> Playlist(PlaylistId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Genre) All else getCategoryToken(
+      dao = audioMediaDao.genreDao,
+      failureMsg = "Error getting min Genre",
+      orElse = { Playlist(PlaylistId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Genre(it) },
+      getId = { getMin() }
+    )
 
     override suspend fun getMaxToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Genre) All else
-      when (val result = audioMediaDao.genreDao.getMax()) {
-        is Ok -> Genre(result.value)
-        is Err -> Composer(ComposerId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Genre) All else getCategoryToken(
+      dao = audioMediaDao.genreDao,
+      failureMsg = "Error getting max Genre",
+      orElse = { Composer(ComposerId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Genre(it) },
+      getId = { getMax() }
+    )
 
-    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList {
-      return when (val result = audioMediaDao.getMediaForGenres(GenreIdList(persistentId))) {
-        is Ok -> result.value
-        is Err -> MediaIdList.EMPTY_LIST.also { LOG.e { it("%s", result.error) } }
-      }
-    }
+    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList =
+      audioMediaDao.getMediaForGenres(GenreIdList(persistentId))
+        .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s", persistentId) } }
+        .getOrElse { MediaIdList.EMPTY_LIST }
   }
 
   @Parcelize
@@ -304,56 +341,61 @@ sealed interface CategoryToken : Parcelable {
     override val persistentId: PlaylistId,
     override val songListType: SongListType = SongListType.PlayList
   ) : BaseCategoryToken {
-    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.playlistDao.getRandom()) {
-        is Ok -> Playlist(result.value)
-        is Err -> Album(AlbumId.INVALID).getMinToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.playlistDao,
+      failureMsg = "Error getting random Playlist",
+      orElse = { Album(AlbumId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Playlist(it) },
+      getId = { getRandom() }
+    )
 
-    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.playlistDao.getNext(persistentId)) {
-        is Ok -> Playlist(result.value)
-        is Err -> Album(AlbumId.INVALID).getMinToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.playlistDao,
+      failureMsg = "Error getting next Playlist",
+      orElse = { Album(AlbumId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Playlist(it) },
+      getId = { getNext(persistentId) }
+    )
 
-    override suspend fun previousToken(audioMediaDao: AudioMediaDao): CategoryToken {
-      return when (val result = audioMediaDao.playlistDao.getPrevious(persistentId)) {
-        is Ok -> Playlist(result.value)
-        is Err -> Genre(GenreId.INVALID).getMaxToken(audioMediaDao, this)
-      }
-    }
+    override suspend fun previousToken(
+      audioMediaDao: AudioMediaDao
+    ): CategoryToken = getCategoryToken(
+      dao = audioMediaDao.playlistDao,
+      failureMsg = "Error getting previous Playlist",
+      orElse = { Genre(GenreId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Playlist(it) },
+      getId = { getPrevious(persistentId) }
+    )
 
     override suspend fun getMinToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Playlist) All else
-      when (val result = audioMediaDao.playlistDao.getMin()) {
-        is Ok -> Playlist(result.value)
-        is Err -> Album(AlbumId.INVALID).getMinToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Artist) All else getCategoryToken(
+      dao = audioMediaDao.playlistDao,
+      failureMsg = "Error getting min Playlist",
+      orElse = { Album(AlbumId.INVALID).getMinToken(audioMediaDao, this) },
+      tokenMaker = { Playlist(it) },
+      getId = { getMin() }
+    )
 
     override suspend fun getMaxToken(
       audioMediaDao: AudioMediaDao,
       terminateOn: CategoryToken
-    ): CategoryToken = if (terminateOn is Playlist) All else
-      when (val result = audioMediaDao.playlistDao.getMax()) {
-        is Ok -> Playlist(result.value)
-        is Err -> Genre(GenreId.INVALID).getMaxToken(audioMediaDao, this)
-      }
+    ): CategoryToken = if (terminateOn is Artist) All else getCategoryToken(
+      dao = audioMediaDao.playlistDao,
+      failureMsg = "Error getting max Playlist",
+      orElse = { Genre(GenreId.INVALID).getMaxToken(audioMediaDao, this) },
+      tokenMaker = { Playlist(it) },
+      getId = { getMax() }
+    )
 
-    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList {
-      return when (
-        val result = audioMediaDao.getMediaForPlaylists(
-          playlistIds = PlaylistIdList(persistentId),
-          removeDuplicates = false // duplicates allowed unknown until added to queue
-        )
-      ) {
-        is Ok -> result.value
-        is Err -> MediaIdList.EMPTY_LIST.also { LOG.e { it("%s", result.error) } }
-      }
-    }
+    override suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList = audioMediaDao
+      .getMediaForPlaylists(
+        playlistIds = PlaylistIdList(persistentId),
+        removeDuplicates = false // duplicates allowed unknown until added to queue
+      )
+      .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s", persistentId) } }
+      .getOrElse { MediaIdList.EMPTY_LIST }
   }
 
   /**
@@ -416,7 +458,18 @@ sealed interface CategoryToken : Parcelable {
     }
 
     suspend fun makeRandom(audioMediaDao: AudioMediaDao): CategoryToken =
-      make(SongListType.getRandomType(), PersistentId.ID_INVALID)
-        .random(audioMediaDao)
+      make(SongListType.getRandomType(), PersistentId.ID_INVALID).random(audioMediaDao)
   }
 }
+
+private inline fun <D, T> getCategoryToken(
+  dao: D,
+  failureMsg: String,
+  orElse: () -> CategoryToken,
+  tokenMaker: (T) -> CategoryToken,
+  getId: D.() -> DaoResult<T>
+): CategoryToken = dao
+  .getId()
+  .onFailure { cause -> LOG.e(cause) { it(failureMsg) } }
+  .map { tokenMaker(it) }
+  .getOrElse { orElse() }

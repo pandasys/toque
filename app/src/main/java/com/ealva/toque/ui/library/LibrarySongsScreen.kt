@@ -27,9 +27,9 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -105,5 +105,5 @@ private class LibrarySongsViewModel(
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): DaoResult<List<AudioDescription>> = audioMediaDao.getAllAudio(filter)
+  ): Result<List<AudioDescription>, Throwable> = audioMediaDao.getAllAudio(filter)
 }

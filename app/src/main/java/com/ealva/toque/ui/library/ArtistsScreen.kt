@@ -63,8 +63,6 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
-import com.ealva.toque.db.DaoEmptyResult
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
@@ -79,9 +77,10 @@ import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
@@ -332,7 +331,7 @@ private class ArtistsViewModelImpl(
   override fun clearSelection() = selectedItems.clearSelection()
 
   private fun offSelectMode() = selectedItems.turnOffSelectionMode()
-  private suspend fun getMediaList(): DaoResult<CategoryMediaList> =
+  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedArtists())
 
   override fun play() {
@@ -355,15 +354,15 @@ private class ArtistsViewModelImpl(
     scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
   }
 
-  suspend fun makeCategoryMediaList(
+  private suspend fun makeCategoryMediaList(
     artistList: List<ArtistInfo>
-  ): DaoResult<CategoryMediaList> = audioMediaDao
+  ): Result<CategoryMediaList, Throwable> = audioMediaDao
     .getMediaForArtists(
       artistList
         .mapTo(LongArrayList(512)) { it.artistId.value }
         .asArtistIdList
     )
-    .toErrorIf({ idList -> idList.isEmpty() }) { DaoEmptyResult }
+    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
     .map { idList -> CategoryMediaList(idList, CategoryToken(artistList.last().artistId)) }
 
   private fun getSelectedArtists() = artistFlow.value
@@ -389,27 +388,12 @@ private class ArtistsViewModelImpl(
 
   private fun requestArtists() {
     scope.launch {
-      when (
-        val result = when (artistType) {
-          ArtistType.AlbumArtist -> artistDao.getAlbumArtists(filterFlow.value)
-          ArtistType.SongArtist -> artistDao.getSongArtists(filterFlow.value)
-        }
-      ) {
-        is Ok -> handleArtistList(result.value)
-        is Err -> LOG.e { it("%s", result.error) }
-      }
-    }
-  }
-
-  private fun handleArtistList(list: List<ArtistDescription>) {
-    artistFlow.value = list.mapTo(ArrayList(list.size)) {
-      ArtistInfo(
-        artistId = it.artistId,
-        name = it.name,
-        artwork = it.artwork,
-        albumCount = it.albumCount.toInt(),
-        songCount = it.songCount.toInt()
-      )
+      artistFlow.value = when (artistType) {
+        ArtistType.AlbumArtist -> artistDao.getAlbumArtists(filterFlow.value)
+        ArtistType.SongArtist -> artistDao.getSongArtists(filterFlow.value)
+      }.onFailure { cause -> LOG.e(cause) { it("Error getting %s artist", artistType) } }
+        .getOrElse { emptyList() }
+        .map { artistDescription -> artistDescription.toArtistInfo() }
     }
   }
 
@@ -442,6 +426,14 @@ private class ArtistsViewModelImpl(
     }
   }
 }
+
+private fun ArtistDescription.toArtistInfo() = ArtistInfo(
+  artistId = artistId,
+  name = name,
+  artwork = artwork,
+  albumCount = albumCount.toInt(),
+  songCount = songCount.toInt()
+)
 
 @Parcelize
 private data class ArtistsViewModelState(
@@ -484,4 +476,3 @@ fun AllArtistsListPreview() {
     )
   }
 }
-

@@ -66,7 +66,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -122,16 +121,17 @@ interface GenreDao {
   ): DaoResult<List<GenreDescription>>
 
   suspend fun getAllGenreNames(limit: Limit = NoLimit): DaoResult<List<GenreIdName>>
-  suspend fun getNextGenre(genreName: GenreName): DaoResult<GenreIdName>
-  suspend fun getPreviousGenre(genreName: GenreName): DaoResult<GenreIdName>
-  suspend fun getRandomGenre(): DaoResult<GenreIdName>
 
   suspend fun getNext(genreId: GenreId): DaoResult<GenreId>
   suspend fun getPrevious(genreId: GenreId): DaoResult<GenreId>
   suspend fun getMin(): DaoResult<GenreId>
   suspend fun getMax(): DaoResult<GenreId>
   suspend fun getRandom(): DaoResult<GenreId>
-  suspend fun getGenreSuggestions(partial: String, textSearch: TextSearch): DaoResult<List<String>>
+
+  suspend fun getGenreSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): DaoResult<List<String>>
 
   companion object {
     operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
@@ -202,7 +202,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Filter.whereCondition() =
     if (isEmpty) null else GenreTable.genre like value escape ESC_CHAR
@@ -219,55 +219,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { cursor -> GenreIdName(cursor[id].asGenreId, GenreName(cursor[genre])) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getNextGenre(
-    genreName: GenreName
-  ): DaoResult<GenreIdName> = runSuspendCatching {
-    db.query {
-      GenreTable
-        .selects { listOf(id, genre) }
-        .where { genre greater genreName.value }
-        .orderByAsc { genre }
-        .limit(1)
-        .sequence { cursor -> GenreIdName(GenreId(cursor[id]), GenreName(cursor[genre])) }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getPreviousGenre(
-    genreName: GenreName
-  ): DaoResult<GenreIdName> = runSuspendCatching {
-    db.query { if (genreName.isEmpty()) doGetMaxGenre() else doGetPreviousGenre(genreName) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  /**
-   * Throws NoSuchElementException if there is no genre name < greater than [previousGenre]
-   */
-  private fun Queryable.doGetPreviousGenre(previousGenre: GenreName): GenreIdName = GenreTable
-    .selects { listOf(id, genre) }
-    .where { genre less previousGenre.value }
-    .orderBy { genre by Order.DESC }
-    .limit(1)
-    .sequence { cursor -> GenreIdName(GenreId(cursor[id]), GenreName(cursor[genre])) }
-    .single()
-
-  private fun Queryable.doGetMaxGenre(): GenreIdName = GenreTable
-    .selects { listOf(id, genreMax) }
-    .all()
-    .limit(1)
-    .sequence { cursor -> GenreIdName(GenreId(cursor[id]), GenreName(cursor[genreMax])) }
-    .single()
-
-  override suspend fun getRandomGenre(): DaoResult<GenreIdName> = runSuspendCatching {
-    db.query {
-      GenreTable
-        .selects { listOf(id, genre) }
-        .where { id inSubQuery GenreTable.select(id).all().orderByRandom().limit(1) }
-        .sequence { cursor -> GenreIdName(GenreId(cursor[id]), GenreName(cursor[genre])) }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getRandom(): DaoResult<GenreId> = runSuspendCatching {
     db.query {
@@ -277,7 +229,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .longForQuery()
         .asGenreId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getGenreSuggestions(
     partial: String,
@@ -290,9 +242,9 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { it[genre] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getNext(genreId: GenreId) = runSuspendCatching {
+  override suspend fun getNext(genreId: GenreId): DaoResult<GenreId> = runSuspendCatching {
     db.query {
       GenreTable
         .select(GenreTable.id)
@@ -302,9 +254,9 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .longForQuery { it[BIND_GENRE_ID] = genreId.value }
         .asGenreId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getPrevious(genreId: GenreId) = runSuspendCatching {
+  override suspend fun getPrevious(genreId: GenreId): DaoResult<GenreId> = runSuspendCatching {
     db.query {
       GenreTable
         .select(GenreTable.id)
@@ -314,10 +266,10 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .longForQuery { it[BIND_GENRE_ID] = genreId.value }
         .asGenreId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private val genreMin by lazy { GenreTable.genre.min().alias("genre_min_alias") }
-  override suspend fun getMin() = runSuspendCatching {
+  override suspend fun getMin(): DaoResult<GenreId> = runSuspendCatching {
     db.query {
       GenreTable
         .selects { listOf(id, genreMin) }
@@ -326,10 +278,10 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { cursor -> GenreId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private val genreMax by lazy { GenreTable.genre.max().alias("genre_max_alias") }
-  override suspend fun getMax() = runSuspendCatching {
+  override suspend fun getMax(): DaoResult<GenreId> = runSuspendCatching {
     db.query {
       GenreTable
         .selects { listOf(id, genreMax) }
@@ -338,7 +290,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { cursor -> GenreId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   /**
    * Could be a race condition if two threads are trying to insert the same genre at the same time,

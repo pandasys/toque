@@ -19,5 +19,5 @@ package com.ealva.toque.common
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapBoth
 
-fun <T> Result<T, Exception>.getOrThrow(): T =
+fun <T> Result<T, Throwable>.getOrThrow(): T =
   mapBoth({ it }, { throw it })

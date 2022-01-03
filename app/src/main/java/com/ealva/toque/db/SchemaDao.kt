@@ -24,7 +24,6 @@ import com.ealva.welite.db.table.SQLiteSchema
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 
 interface SchemaDao {
   suspend fun getTableAndViewNames(): DaoResult<List<SchemaName>>
@@ -44,5 +43,5 @@ private class SchemaDaoImpl(private val db: Database) : SchemaDao {
           .sequence { it[name].asSchemaName }
           .toList()
       }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+    }
 }

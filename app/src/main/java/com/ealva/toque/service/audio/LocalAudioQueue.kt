@@ -95,11 +95,9 @@ import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
 import com.ealva.toque.ui.main.RequestPermissionActivity
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.onFailure
 import it.unimi.dsi.fastutil.longs.LongCollection
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet
@@ -211,7 +209,7 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   fun setRating(rating: StarRating, allowFileUpdate: Boolean = false)
 
   /** Add all media in [categoryMediaList] to the Up Next queue and return the new queue size*/
-  suspend fun addToUpNext(categoryMediaList: CategoryMediaList): Result<QueueSize, QueueMessage>
+  suspend fun addToUpNext(categoryMediaList: CategoryMediaList): Result<QueueSize, Throwable>
 
   /**
    * Add all the media in [categoryMediaList] ot the Up Next queue and maybe play. If [clearUpNext]
@@ -225,7 +223,7 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ): Result<QueueSize, QueueMessage>
+  ): Result<QueueSize, Throwable>
 
   /** Go to the queue item represented by the unique [instanceId] */
   fun goToQueueItem(instanceId: InstanceId)
@@ -265,14 +263,11 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
       libVlcPrefsSingleton: LibVlcPrefsSingleton
     ): LocalAudioQueue {
       val appPrefs = appPrefsSingleton.instance()
-      val libVlcPrefs = libVlcPrefsSingleton.instance()
       val dao = queuePositionStateDaoFactory.makeStateDao(AudioMediaDao.QUEUE_ID)
-      val positionState = when (val result = dao.getState()) {
-        is Ok -> result.value
-        is Err -> QueuePositionState.INACTIVE_QUEUE_STATE.also {
-          LOG.e { it("Can't read queue state %s", result.error) }
-        }
-      }
+      val positionState = dao.getState()
+        .onFailure { cause -> LOG.e(cause) { it("Can't read queue state") } }
+        .getOrElse { QueuePositionState.INACTIVE_QUEUE_STATE }
+
       return LocalAudioCommandProcessor(
         LocalAudioQueueImpl(
           queuePrefsSingleton.instance(),
@@ -282,7 +277,7 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
           playableAudioItemFactory,
           MusicStreamVolume(audioManager),
           appPrefs,
-          libVlcPrefs
+          libVlcPrefsSingleton.instance()
         ),
         appPrefs,
         sessionControl
@@ -610,10 +605,9 @@ private class LocalAudioQueueImpl(
   private suspend fun getNextListFirstMediaTitle(): Title = try {
     val nextList = getNextPendingCategory()
     if (nextList.idList.isNotEmpty()) {
-      when (val result = audioMediaDao.getMediaTitle(nextList.idList[0])) {
-        is Ok -> result.value
-        is Err -> Title.EMPTY
-      }
+      audioMediaDao.getMediaTitle(nextList.idList[0])
+        .onFailure { cause -> LOG.e(cause) { it("Error getting media title") } }
+        .getOrElse { Title.EMPTY }
     } else Title.EMPTY
   } catch (e: Exception) {
     LOG.e(e) { it("Error getting next list, first title") }
@@ -717,7 +711,7 @@ private class LocalAudioQueueImpl(
 
   override suspend fun addToUpNext(
     categoryMediaList: CategoryMediaList
-  ): Result<QueueSize, QueueMessage> {
+  ): Result<QueueSize, Throwable> {
     return if (upNextQueue.isEmpty()) {
       playNext(categoryMediaList, ClearQueue(true), PlayNow(false), Manual)
     } else {
@@ -755,8 +749,6 @@ private class LocalAudioQueueImpl(
             QueueSize(newQueue.size)
           } else throw IllegalArgumentException("List was empty")
         }
-      }.mapError { cause ->
-        QueueExceptionMessage(cause)
       }
     }
   }
@@ -770,7 +762,7 @@ private class LocalAudioQueueImpl(
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ): Result<QueueSize, QueueMessage> = runSuspendCatching {
+  ): Result<QueueSize, Throwable> = runSuspendCatching {
     // We will only swap the up next queue on the UI thread, which means we need to save current
     // information and only swap if the new queue "current" matches the old. If doesn't match the
     // current item changed while we were creating the new queue, need to loop and try again.
@@ -833,9 +825,6 @@ private class LocalAudioQueueImpl(
         else -> throw IllegalArgumentException("List was empty")
       }
     }
-  }.mapError { cause ->
-    LOG.e(cause) { it("playNext error") }
-    QueueExceptionMessage(cause)
   }
 
   private fun notify(msg: ServiceNotification) {

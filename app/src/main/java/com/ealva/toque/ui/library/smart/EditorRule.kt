@@ -44,8 +44,8 @@ import com.ealva.toque.ui.library.smart.EditorRule.DurationRule
 import com.ealva.toque.ui.library.smart.EditorRule.NumberEditorRule
 import com.ealva.toque.ui.library.smart.EditorRule.PlaylistEditorRule
 import com.ealva.toque.ui.library.smart.EditorRule.TextEditorRule
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.onFailure
 import kotlinx.parcelize.Parcelize
 
 private val LOG by lazyLogger(EditorRule::class)
@@ -298,7 +298,7 @@ private suspend fun makeTextEditorRuleWithSuggestions(
   showSuggestions: Boolean,
   getSuggestions: suspend ((String, TextSearch) -> List<String>)
 ): EditorRule {
-  val newName = data.text
+  val newName = data.text.trim()
   val suggestions: List<String> = if (newName.isNotBlank() && showSuggestions) {
     getSuggestions(newName, matcher.textSearch)
   } else emptyList()
@@ -318,19 +318,17 @@ private suspend fun makeTitleEditorRule(
   data: MatcherData,
   audioMediaDao: AudioMediaDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
-  ruleId,
-  RuleField.Title,
-  matcher,
-  data,
-  update.showSuggestions
+  ruleId = ruleId,
+  ruleField = RuleField.Title,
+  matcher = matcher,
+  data = data,
+  showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  when (val result = audioMediaDao.getTitleSuggestions(partial, textSearch)) {
-    is Ok -> result.value
-    is Err -> {
-      LOG.e { it("Error getting suggestions. %s", result.error) }
+  audioMediaDao.getTitleSuggestions(partial, textSearch)
+    .getOrElse { cause ->
+      LOG.e(cause) { it("Error getting Title suggestions.") }
       emptyList()
     }
-  }
 }
 
 private suspend fun makeAlbumEditorRule(
@@ -340,19 +338,17 @@ private suspend fun makeAlbumEditorRule(
   data: MatcherData,
   audioMediaDao: AlbumDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
-  ruleId,
-  RuleField.Album,
-  matcher,
-  data,
-  update.showSuggestions
+  ruleId = ruleId,
+  ruleField = RuleField.Album,
+  matcher = matcher,
+  data = data,
+  showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  when (val result = audioMediaDao.getAlbumSuggestions(partial, textSearch)) {
-    is Ok -> result.value
-    is Err -> {
-      LOG.e { it("Error getting suggestions. %s", result.error) }
+  audioMediaDao.getAlbumSuggestions(partial, textSearch)
+    .getOrElse { cause ->
+      LOG.e(cause) { it("Error getting Album suggestions.") }
       emptyList()
     }
-  }
 }
 
 private suspend fun makeArtistEditorRule(
@@ -362,19 +358,17 @@ private suspend fun makeArtistEditorRule(
   data: MatcherData,
   audioMediaDao: AudioMediaDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
-  ruleId,
-  RuleField.Artist,
-  matcher,
-  data,
-  update.showSuggestions
+  ruleId = ruleId,
+  ruleField = RuleField.Artist,
+  matcher = matcher,
+  data = data,
+  showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  when (val result = audioMediaDao.getArtistSuggestions(partial, textSearch)) {
-    is Ok -> result.value
-    is Err -> {
-      LOG.e { it("Error getting suggestions. %s", result.error) }
+  audioMediaDao.getArtistSuggestions(partial, textSearch)
+    .getOrElse { cause ->
+      LOG.e(cause) { it("Error getting Artist suggestions.") }
       emptyList()
     }
-  }
 }
 
 private suspend fun makeAlbumArtistEditorRule(
@@ -383,22 +377,16 @@ private suspend fun makeAlbumArtistEditorRule(
   matcher: Matcher<*>,
   data: MatcherData,
   audioMediaDao: AudioMediaDao
-): EditorRule {
-  return makeTextEditorRuleWithSuggestions(
-    ruleId,
-    RuleField.AlbumArtist,
-    matcher,
-    data,
-    update.showSuggestions
-  ) { partial, textSearch ->
-    when (val result = audioMediaDao.getAlbumArtistSuggestions(partial, textSearch)) {
-      is Ok -> result.value
-      is Err -> {
-        LOG.e { it("Error getting suggestions. %s", result.error) }
-        emptyList()
-      }
-    }
-  }
+): EditorRule = makeTextEditorRuleWithSuggestions(
+  ruleId = ruleId,
+  ruleField = RuleField.AlbumArtist,
+  matcher = matcher,
+  data = data,
+  showSuggestions = update.showSuggestions
+) { partial, textSearch ->
+  audioMediaDao.getAlbumArtistSuggestions(partial, textSearch)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting AlbumArtist suggestions.") } }
+    .getOrElse { emptyList() }
 }
 
 private suspend fun makeGenreEditorRule(
@@ -408,19 +396,15 @@ private suspend fun makeGenreEditorRule(
   data: MatcherData,
   genreDao: GenreDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
-  ruleId,
-  RuleField.Genre,
-  matcher,
-  data,
-  update.showSuggestions
+  ruleId = ruleId,
+  ruleField = RuleField.Genre,
+  matcher = matcher,
+  data = data,
+  showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  when (val result = genreDao.getGenreSuggestions(partial, textSearch)) {
-    is Ok -> result.value
-    is Err -> {
-      LOG.e { it("Error getting suggestions. %s", result.error) }
-      emptyList()
-    }
-  }
+  genreDao.getGenreSuggestions(partial, textSearch)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting Genre suggestions") } }
+    .getOrElse { emptyList() }
 }
 
 private suspend fun makeComposerEditorRule(
@@ -430,19 +414,15 @@ private suspend fun makeComposerEditorRule(
   data: MatcherData,
   composerDao: ComposerDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
-  ruleId,
-  RuleField.Composer,
-  matcher,
-  data,
-  update.showSuggestions
+  ruleId = ruleId,
+  ruleField = RuleField.Composer,
+  matcher = matcher,
+  data = data,
+  showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  when (val result = composerDao.getComposerSuggestions(partial, textSearch)) {
-    is Ok -> result.value
-    is Err -> {
-      LOG.e { it("Error getting suggestions. %s", result.error) }
-      emptyList()
-    }
-  }
+  composerDao.getComposerSuggestions(partial, textSearch)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting Composer suggestions") } }
+    .getOrElse { emptyList() }
 }
 
 private fun makeCommentEditorRule(
@@ -471,15 +451,11 @@ private suspend fun makePlaylistEditorRule(
    * Get the list of all playlists, less this smart playlist and less playlists
    * referring to this smart playlist
    */
-  val dataList = update?.playlistMatcherData ?: when (val result = playlistDao.getAllOfType()) {
-    is Ok -> result.value.map { idNameType ->
-      PlaylistMatcherData(idNameType.id, idNameType.name, idNameType.type)
-    }
-    is Err -> {
-      LOG.e { it("Error getting all playlists") }
-      emptyList()
-    }
-  }.asSequence()
+  val dataList = update?.playlistMatcherData ?: playlistDao.getAllOfType()
+    .onFailure { cause -> LOG.e(cause) { it("Error getting all playlists") } }
+    .getOrElse { emptyList() }
+    .asSequence()
+    .map { idName -> PlaylistMatcherData(idName.id, idName.name, idName.type) }
     .filterNot { playlistMatcherData -> playlistMatcherData.id == thisPlaylistId }
     .filterNot { playlistMatcherData -> refersToThis.contains(playlistMatcherData.id) }
     .toList()

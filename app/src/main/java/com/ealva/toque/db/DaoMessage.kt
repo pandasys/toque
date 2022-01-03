@@ -32,7 +32,7 @@ private fun Throwable.stackTraceToString(): String {
   }.toString()
 }
 
-typealias DaoResult<T> = Result<T, DaoMessage>
+typealias DaoResult<T> = Result<T, Throwable>
 typealias BoolResult = DaoResult<Boolean>
 typealias LongResult = DaoResult<Long>
 typealias MillisResult = DaoResult<Millis>
@@ -40,7 +40,10 @@ typealias MillisResult = DaoResult<Millis>
 /**
  * A Dao persistent operation failed. See [message] for specifics
  */
-class DaoException(msg: String) : RuntimeException(msg)
+open class DaoException(msg: String) : RuntimeException(msg)
+
+class DaoInsertFailedException(msg: String) : DaoException(msg)
+class DaoNotFoundException(msg: String) : DaoException(msg)
 
 sealed class DaoMessage
 
@@ -57,11 +60,3 @@ abstract class DaoStringMessage(
 
 class DaoNotFound(itemNotFound: Any) : DaoStringMessage(R.string.NotFoundItem, itemNotFound)
 class DaoFailedToInsert(item: Any) : DaoStringMessage(R.string.FailedToInsertItem, item)
-class DaoFailedToUpdate(item: Any) : DaoStringMessage(R.string.FailedToUpdateItem, item)
-class DaoFailedToDelete(item: Any) : DaoStringMessage(R.string.FailedToDeleteItem, item)
-
-object DaoEmptyResult : DaoStringMessage(R.string.EmptyResult)
-
-object DaoNotImplemented : DaoMessage() {
-  override fun toString(): String = "Not Implemented"
-}

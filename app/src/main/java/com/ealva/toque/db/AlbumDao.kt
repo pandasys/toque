@@ -58,7 +58,6 @@ import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
-import com.ealva.welite.db.table.Column
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -78,7 +77,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -104,11 +102,6 @@ data class AlbumDescription(
   val albumArt: Uri,
   val artistName: ArtistName,
   val songCount: Long
-)
-
-data class AlbumIdName(
-  val albumId: AlbumId,
-  val albumTitle: AlbumTitle
 )
 
 /**
@@ -151,13 +144,6 @@ interface AlbumDao {
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
   ): DaoResult<List<AlbumDescription>>
-
-  suspend fun getNext(title: AlbumTitle): DaoResult<AlbumIdName>
-  suspend fun getPrevious(title: AlbumTitle): DaoResult<AlbumIdName>
-  suspend fun getRandomAlbum(): DaoResult<AlbumIdName>
-
-  suspend fun getAlbumId(title: AlbumTitle): AlbumId
-  suspend fun getNextAlbumByTitle(albumId: AlbumId): DaoResult<AlbumIdName>
 
   suspend fun getNext(albumId: AlbumId): DaoResult<AlbumId>
   suspend fun getPrevious(albumId: AlbumId): DaoResult<AlbumId>
@@ -227,7 +213,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   override suspend fun getAllAlbums(
     filter: Filter,
     limit: Limit
-  ): DaoResult<List<AlbumDescription>> = runSuspendCatching {
+  ): Result<List<AlbumDescription>, Throwable> = runSuspendCatching {
     db.query {
       MediaTable
         .join(ArtistTable, JoinType.INNER, MediaTable.albumArtistId, ArtistTable.id)
@@ -258,11 +244,11 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Filter.whereCondition() =
     if (isEmpty) null else (AlbumTable.albumTitle like value escape ESC_CHAR) or
-        (ArtistTable.artistName like value escape ESC_CHAR)
+    (ArtistTable.artistName like value escape ESC_CHAR)
 
   override suspend fun getAllAlbumsFor(
     artistId: ArtistId,
@@ -276,7 +262,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         ArtistType.SongArtist -> doGetArtistAlbums(artistId, limit)
       }
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Queryable.doGetAlbumArtistAlbums(artistId: ArtistId, limit: Limit) = ArtistAlbumTable
     .join(AlbumTable, JoinType.INNER, ArtistAlbumTable.albumId, AlbumTable.id)
@@ -341,57 +327,31 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
     .toList()
 
-  override suspend fun getNext(title: AlbumTitle) = runSuspendCatching {
+  override suspend fun getNext(albumId: AlbumId): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
-        .selects { listOf<Column<out Any>>(id, albumTitle) }
-        .where { albumTitle greater title.value }
-        .orderByAsc { albumTitle }
-        .limit(1)
-        .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle])) }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getNextAlbumByTitle(albumId: AlbumId) = runSuspendCatching {
-    db.query {
-      AlbumTable
-        .selects { listOf(id, albumTitle) }
-        .where { albumTitle greater SELECT_TITLE_FROM_BIND_ID }
-        .orderByAsc { albumTitle }
-        .limit(1)
-        .sequence({ bindings -> bindings[BIND_ALBUM_ID] = albumId.value }) { cursor ->
-          AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle]))
-        }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getNext(albumId: AlbumId) = runSuspendCatching {
-    db.query {
-      AlbumTable
-        .select(AlbumTable.id)
-        .where { albumTitle greater SELECT_TITLE_FROM_BIND_ID }
-        .orderByAsc { albumTitle }
+        .select { id }
+        .where { albumSort greater SELECT_ALBUM_SORT_FROM_BIND_ID }
+        .orderByAsc { albumSort }
         .limit(1)
         .longForQuery { it[BIND_ALBUM_ID] = albumId.value }
         .asAlbumId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getPrevious(albumId: AlbumId) = runSuspendCatching {
+  override suspend fun getPrevious(albumId: AlbumId): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
-        .select(AlbumTable.id)
-        .where { albumTitle less SELECT_TITLE_FROM_BIND_ID }
-        .orderBy { albumTitle by Order.DESC }
+        .select { id }
+        .where { albumSort less SELECT_ALBUM_SORT_FROM_BIND_ID }
+        .orderBy { albumSort by Order.DESC }
         .limit(1)
         .longForQuery { it[BIND_ALBUM_ID] = albumId.value }
         .asAlbumId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  private val albumMin by lazy { AlbumTable.albumTitle.min().alias("album_min_alias") }
+  private val albumMin by lazy { AlbumTable.albumSort.min().alias("album_sort_min_alias") }
   override suspend fun getMin(): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
@@ -401,9 +361,9 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { cursor -> AlbumId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  private val albumMax by lazy { AlbumTable.albumTitle.max().alias("album_max_alias") }
+  private val albumMax by lazy { AlbumTable.albumSort.max().alias("album_sort_max_alias") }
   override suspend fun getMax(): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
@@ -413,56 +373,16 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { cursor -> AlbumId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getPrevious(title: AlbumTitle) = runSuspendCatching {
-    db.query { if (title.isEmpty()) doGetMaxAlbum() else doGetPreviousAlbum(title) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  /**
-   * Throws NoSuchElementException if there is no album title > greater than [previousTitle]
-   */
-  private fun Queryable.doGetPreviousAlbum(previousTitle: AlbumTitle): AlbumIdName = AlbumTable
-    .selects { listOf(id, albumTitle) }
-    .where { albumTitle less previousTitle.value }
-    .orderBy { albumTitle by Order.DESC }
-    .limit(1)
-    .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle])) }
-    .single()
-
-  private fun Queryable.doGetMaxAlbum(): AlbumIdName = AlbumTable
-    .selects { listOf(id, albumMax) }
-    .all()
-    .limit(1)
-    .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumMax])) }
-    .single()
-
-  override suspend fun getRandomAlbum(): DaoResult<AlbumIdName> = runSuspendCatching {
-    db.query {
-      AlbumTable
-        .selects { listOf<Column<out Any>>(id, albumTitle) }
-        .where { id inSubQuery AlbumTable.select(id).all().orderByRandom().limit(1) }
-        .sequence { cursor -> AlbumIdName(AlbumId(cursor[id]), AlbumTitle(cursor[albumTitle])) }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getRandom(): DaoResult<AlbumId> = runSuspendCatching {
     db.query {
       AlbumTable
-        .select(AlbumTable.id)
+        .select { id }
         .where { id inSubQuery AlbumTable.select(id).all().orderByRandom().limit(1) }
         .longForQuery()
         .asAlbumId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getAlbumId(title: AlbumTitle): AlbumId = db.query {
-    AlbumTable
-      .select(AlbumTable.id)
-      .where { albumTitle eq title.value }
-      .longForQuery()
-      .asAlbumId
   }
 
   override suspend fun getAlbumSuggestions(
@@ -476,7 +396,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { it[albumTitle] }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,
@@ -615,7 +535,7 @@ fun AlbumTitle.isEmpty(): Boolean = value.isEmpty()
 private val songCountColumn = MediaTable.id.countDistinct()
 
 private val BIND_ALBUM_ID: BindExpression<Long> = bindLong()
-private val SELECT_TITLE_FROM_BIND_ID: Expression<String> = AlbumTable
-  .select(AlbumTable.albumTitle)
+private val SELECT_ALBUM_SORT_FROM_BIND_ID: Expression<String> = AlbumTable
+  .select { albumSort }
   .where { id eq BIND_ALBUM_ID }
   .asExpression()

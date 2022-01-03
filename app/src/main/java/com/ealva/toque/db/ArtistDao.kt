@@ -53,7 +53,6 @@ import com.ealva.welite.db.statements.DeleteStatement
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
-import com.ealva.welite.db.table.Column
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -72,7 +71,6 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -136,17 +134,12 @@ interface ArtistDao {
   ): DaoResult<List<ArtistDescription>>
 
   suspend fun getAllArtistNames(limit: Limit = NoLimit): DaoResult<List<ArtistIdName>>
-  suspend fun getNextArtist(name: ArtistName): DaoResult<ArtistIdName>
-  suspend fun getPreviousArtist(name: ArtistName): DaoResult<ArtistIdName>
 
   suspend fun getNext(id: ArtistId): DaoResult<ArtistId>
   suspend fun getPrevious(id: ArtistId): DaoResult<ArtistId>
   suspend fun getMin(): DaoResult<ArtistId>
   suspend fun getMax(): DaoResult<ArtistId>
   suspend fun getRandom(): DaoResult<ArtistId>
-
-  suspend fun getRandomArtist(): DaoResult<ArtistIdName>
-  suspend fun getArtistName(id: ArtistId): DaoResult<ArtistName>
 
   companion object {
     operator fun invoke(
@@ -271,7 +264,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     limit: Limit
   ): DaoResult<List<ArtistDescription>> = runSuspendCatching {
     db.query { doGetAlbumArtists(filter, limit) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Queryable.doGetAlbumArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
     return ArtistTable
@@ -308,7 +301,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     limit: Limit
   ): DaoResult<List<ArtistDescription>> = runSuspendCatching {
     db.query { doGetSongArtists(filter, limit) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Queryable.doGetSongArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
     return ArtistTable
@@ -355,112 +348,53 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
         .toList()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getNextArtist(
-    name: ArtistName
-  ): DaoResult<ArtistIdName> = runSuspendCatching {
-      db.query {
-        ArtistTable
-          .selects { listOf(id, artistName) }
-          .where { artistName greater name.value }
-          .orderByAsc { artistSort }
-          .limit(1)
-          .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
-          .single()
-      }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getPreviousArtist(name: ArtistName) = runSuspendCatching {
-    db.query { if (name.isEmpty()) doGetMaxArtist() else doGetPreviousArtist(name) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getNext(id: ArtistId) = runSuspendCatching {
+  override suspend fun getNext(id: ArtistId): DaoResult<ArtistId> = runSuspendCatching {
     db.query {
       ArtistTable
         .select(ArtistTable.id)
-        .where { artistName greater SELECT_NAME_FROM_BIND_ID }
-        .orderByAsc { artistName }
+        .where { artistSort greater SELECT_ARTIST_SORT_FROM_BIND_ID }
+        .orderByAsc { artistSort }
         .limit(1)
         .longForQuery { it[BIND_ARTIST_ID] = id.value }
         .asArtistId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getPrevious(id: ArtistId) = runSuspendCatching {
+  override suspend fun getPrevious(id: ArtistId): DaoResult<ArtistId> = runSuspendCatching {
     db.query {
       ArtistTable
         .select(ArtistTable.id)
-        .where { artistName greater SELECT_NAME_FROM_BIND_ID }
-        .orderBy { artistName by Order.DESC }
+        .where { artistSort less SELECT_ARTIST_SORT_FROM_BIND_ID }
+        .orderBy { artistSort by Order.DESC }
         .limit(1)
         .longForQuery { it[BIND_ARTIST_ID] = id.value }
         .asArtistId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getMin() = runSuspendCatching {
+  override suspend fun getMin(): DaoResult<ArtistId> = runSuspendCatching {
     db.query {
       ArtistTable
-        .selects { listOf(id, artistMin) }
+        .selects { listOf(id, artistSortMin) }
         .all()
         .limit(1)
         .sequence { cursor -> ArtistId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
-  override suspend fun getMax() = runSuspendCatching {
+  override suspend fun getMax(): DaoResult<ArtistId> = runSuspendCatching {
     db.query {
       ArtistTable
-        .selects { listOf(id, artistMax) }
+        .selects { listOf(id, artistSortMax) }
         .all()
         .limit(1)
         .sequence { cursor -> ArtistId(cursor[id]) }
         .single()
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  /**
-   * Throws NoSuchElementException if there is no artist name > greater than [previousArtist]
-   */
-  private fun Queryable.doGetPreviousArtist(previousArtist: ArtistName): ArtistIdName = ArtistTable
-    .selects { listOf(id, artistName) }
-    .where { artistName less previousArtist.value }
-    .orderBy { artistName by Order.DESC }
-    .limit(1)
-    .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
-    .single()
-
-  private fun Queryable.doGetMaxArtist(): ArtistIdName = ArtistTable
-    .selects { listOf(id, artistMax) }
-    .all()
-    .limit(1)
-    .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistMax])) }
-    .single()
-
-  override suspend fun getArtistName(
-    id: ArtistId
-  ): DaoResult<ArtistName> = runSuspendCatching {
-    db.query {
-      ArtistTable
-        .select { artistName }
-        .where { this.id eq id.value }
-        .sequence { cursor -> ArtistName(cursor[artistName]) }
-        .single()
-    }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-
-  override suspend fun getRandomArtist(): DaoResult<ArtistIdName> =
-    runSuspendCatching {
-      db.query {
-        ArtistTable
-          .selects { listOf<Column<out Any>>(id, artistName) }
-          .where { id inSubQuery ArtistTable.select(id).all().orderByRandom().limit(1) }
-          .sequence { cursor -> ArtistIdName(ArtistId(cursor[id]), ArtistName(cursor[artistName])) }
-          .single()
-      }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun getRandom(): DaoResult<ArtistId> = runSuspendCatching {
     db.query {
@@ -470,15 +404,15 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         .longForQuery()
         .asArtistId
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
 }
 
 private val songCountColumn = MediaTable.id.countDistinct()
 private val songArtistAlbumCountColumn = AlbumTable.id.countDistinct()
 private val albumArtistAlbumCountColumn = ArtistAlbumTable.albumId.countDistinct()
-private val artistMax by lazy { ArtistTable.artistName.max().alias("artist_max_alias") }
-private val artistMin by lazy { ArtistTable.artistName.min().alias("artist_min_alias") }
+private val artistSortMax by lazy { ArtistTable.artistSort.max().alias("artist_sort_max_alias") }
+private val artistSortMin by lazy { ArtistTable.artistSort.min().alias("artist_sort_min_alias") }
 
 private val INSERT_STATEMENT = ArtistTable.insertValues {
   it[artistName].bindArg()
@@ -505,18 +439,18 @@ private data class ArtistUpdateInfo(
 
 private val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
   literal(0L) eq (
-      ArtistMediaTable.select { mediaId }.where { artistId eq id } union
-          MediaTable.select { id }.where {
-            (artistId eq ArtistTable.id) or (albumArtistId eq ArtistTable.id)
-          }
-      ).selectCount().asExpression()
+  ArtistMediaTable.select { mediaId }.where { artistId eq id } union
+  MediaTable.select { id }.where {
+    (artistId eq ArtistTable.id) or (albumArtistId eq ArtistTable.id)
+  }
+  ).selectCount().asExpression()
 }
 
 fun ArtistName.isEmpty(): Boolean = value.isEmpty()
 
 private val BIND_ARTIST_ID: BindExpression<Long> = bindLong()
-private val SELECT_NAME_FROM_BIND_ID: Expression<String> = ArtistTable
-  .select(ArtistTable.artistName)
+private val SELECT_ARTIST_SORT_FROM_BIND_ID: Expression<String> = ArtistTable
+  .select { artistSort }
   .where { id eq BIND_ARTIST_ID }
   .limit(1)
   .asExpression()

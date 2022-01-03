@@ -89,10 +89,7 @@ fun AutoCompleteTextView(
   AutoCompleteView(
     modifier = modifier,
     predictions = suggestions,
-    onItemClick = { selectedText ->
-      LOG._e { it("onSelected %s", selectedText) }
-      onSelected(selectedText)
-    },
+    onItemClick = { selectedText -> onSelected(selectedText) },
     itemContent = { Text(it) }
   ) {
     QuerySearch(

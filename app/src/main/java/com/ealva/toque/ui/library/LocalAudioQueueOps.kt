@@ -17,8 +17,6 @@
 package com.ealva.toque.ui.library
 
 import com.ealva.toque.db.CategoryMediaList
-import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
 import com.github.michaelbull.result.Result
@@ -78,16 +76,16 @@ class LocalAudioQueueOps(private val localAudioQueueModel: LocalAudioQueueViewMo
   }
 
   sealed interface OpMessage {
-    data class DaoMessageResult(val daoMessage: DaoMessage) : OpMessage
+    data class DaoExceptionResult(val cause: Throwable) : OpMessage
     object EmptyList : OpMessage
   }
 
   suspend fun doOp(
     op: Op,
-    getMediaList: suspend () -> DaoResult<CategoryMediaList>,
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
     clearSelection: () -> Unit
   ): Result<PromptResult, OpMessage> = getMediaList()
-    .mapError { daoMessage -> OpMessage.DaoMessageResult(daoMessage) }
+    .mapError { daoMessage -> OpMessage.DaoExceptionResult(daoMessage) }
     .toErrorIf({ it.isEmpty }) { OpMessage.EmptyList }
     .map { list: CategoryMediaList -> op(localAudioQueueModel, list) }
     .onSuccess { if (it.wasExecuted) clearSelection() }

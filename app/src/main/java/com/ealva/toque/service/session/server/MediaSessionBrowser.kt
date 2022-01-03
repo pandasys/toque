@@ -32,11 +32,13 @@ import com.ealva.toque.R
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
+import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.ArtistDao
+import com.ealva.toque.db.ArtistIdName
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.GenreDao
+import com.ealva.toque.db.GenreIdName
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
@@ -51,7 +53,9 @@ import com.ealva.toque.service.session.common.toPersistentId
 import com.ealva.toque.ui.library.ArtistType
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.mapAll
+import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.onFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,8 +118,6 @@ interface MediaSessionBrowser {
   }
 }
 
-private typealias ItemListResult = DaoResult<List<MediaItem>>
-
 private class MediaSessionBrowserImpl(
   private val audioMediaDao: AudioMediaDao,
   private val recentMediaProvider: RecentMediaProvider,
@@ -158,79 +160,69 @@ private class MediaSessionBrowserImpl(
     scope.launch(dispatcher) { result.sendResult(getChildren(parentId)) }
   }
 
-  private suspend fun getChildren(parentId: String): List<MediaItem> {
-    suspend fun valueFromList(
-      maker: suspend () -> DaoResult<List<MediaItem>>
-    ): List<MediaItem> = when (val result = maker()) {
-      is Ok -> result.value
-      is Err -> emptyList()
-    }
+  private suspend fun getChildren(parentId: String): List<MediaItem> = try {
+    when (parentId) {
+      MediaSessionBrowser.ID_ROOT -> makeRootList()
+      MediaSessionBrowser.ID_RECENT_ROOT -> makeRecentTrack()
+      ID_LIBRARY -> makeLibraryList()
+      ID_ARTISTS -> makeArtistList()
+      ID_ALBUMS -> makeAlbumList()
+      ID_GENRES -> makeGenreList()
+      ID_TRACKS -> makeTrackList()
+      else -> {
+        MediaSessionBrowser.handleMedia(
+          parentId,
+          Bundle.EMPTY,
+          object : OnMediaType<List<MediaItem>> {
+            // Media have no children
+            override suspend fun onMedia(
+              mediaId: MediaId,
+              extras: Bundle,
+              limit: Limit
+            ): List<MediaItem> = emptyList()
 
-    return try {
-      when (parentId) {
-        MediaSessionBrowser.ID_ROOT -> makeRootList()
-        MediaSessionBrowser.ID_RECENT_ROOT -> makeRecentTrack()
-        ID_LIBRARY -> makeLibraryList()
-        ID_ARTISTS -> valueFromList { makeArtistList() }
-        ID_ALBUMS -> valueFromList { makeAlbumList() }
-        ID_GENRES -> valueFromList { makeGenreList() }
-        ID_TRACKS -> valueFromList { makeTrackList() }
-        else -> {
-          MediaSessionBrowser.handleMedia(
-            parentId,
-            Bundle.EMPTY,
-            object : OnMediaType<List<MediaItem>> {
-              // Media have no children
-              override suspend fun onMedia(
-                mediaId: MediaId,
-                extras: Bundle,
-                limit: Limit
-              ): List<MediaItem> = emptyList()
+            override suspend fun onArtist(
+              artistId: ArtistId,
+              extras: Bundle,
+              limit: Limit
+            ): List<MediaItem> = makeArtistAlbumList(artistId)
 
-              override suspend fun onArtist(
-                artistId: ArtistId,
-                extras: Bundle,
-                limit: Limit
-              ): List<MediaItem> =
-                valueFromList { makeArtistAlbumList(artistId) }
+            override suspend fun onAlbum(
+              albumId: AlbumId,
+              extras: Bundle,
+              limit: Limit
+            ): List<MediaItem> = makeAlbumTracksList(albumId)
 
-              override suspend fun onAlbum(
-                albumId: AlbumId,
-                extras: Bundle,
-                limit: Limit
-              ): List<MediaItem> = valueFromList { makeAlbumTracksList(albumId) }
+            override suspend fun onGenre(
+              genreId: GenreId,
+              extras: Bundle,
+              limit: Limit
+            ): List<MediaItem> = makeGenreTracksList(genreId)
 
-              override suspend fun onGenre(
-                genreId: GenreId,
-                extras: Bundle,
-                limit: Limit
-              ): List<MediaItem> = valueFromList { makeGenreTracksList(genreId) }
-
-              override suspend fun onComposer(
-                composerId: ComposerId,
-                extras: Bundle,
-                limit: Limit
-              ): List<MediaItem> {
-                TODO("Not yet implemented")
-              }
-
-              override suspend fun onPlaylist(
-                playlistId: PlaylistId,
-                extras: Bundle,
-                limit: Limit
-              ): List<MediaItem> {
-                TODO("Not yet implemented")
-              }
+            override suspend fun onComposer(
+              composerId: ComposerId,
+              extras: Bundle,
+              limit: Limit
+            ): List<MediaItem> {
+              TODO("Not yet implemented")
             }
-          )
-        }
-      }.apply {
-        if (isEmpty()) listOf(MediaItem(makeEmptyMediaDesc(parentId), MediaItemFlags.Playable))
+
+            override suspend fun onPlaylist(
+              playlistId: PlaylistId,
+              extras: Bundle,
+              limit: Limit
+            ): List<MediaItem> {
+              TODO("Not yet implemented")
+            }
+          }
+        )
       }
-    } catch (e: Exception) {
-      LOG.e(e) { it("Error getChildren(\"%s\")") }
-      emptyList()
+    }.apply {
+      if (isEmpty()) listOf(MediaItem(makeEmptyMediaDesc(parentId), MediaItemFlags.Playable))
     }
+  } catch (e: Exception) {
+    LOG.e(e) { it("Error getChildren(\"%s\")") }
+    emptyList()
   }
 
   private fun makeRootList(): List<MediaItem> = listOf(
@@ -273,17 +265,40 @@ private class MediaSessionBrowserImpl(
     extras = getContentStyle(CONTENT_STYLE_GRID, CONTENT_STYLE_LIST)
   )
 
-  private suspend fun makeArtistList(): DaoResult<List<MediaItem>> =
-    artistDao
-      .getAllArtistNames(MAX_LIST_SIZE)
-      .mapAll {
-        Ok(
-          MediaItem(
-            makeItemDesc(it.artistId, it.artistName.value, ARTIST_ICON),
-            MediaItemFlags.Browsable
-          )
-        )
-      }
+  private suspend fun makeArtistList(): List<MediaItem> = artistDao
+    .getAllArtistNames(MAX_LIST_SIZE)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting all artist names") } }
+    .getOrElse { emptyList() }
+    .map { idName -> idName.toMediaItem() }
+
+  private fun AlbumDescription.toMediaItem() = MediaItem(
+    makeItemDesc(
+      albumId,
+      albumTitle.value,
+      selectAlbumArt(albumLocalArt, albumArt, ALBUM_ICON),
+      artistName.value,
+    ),
+    MediaItemFlags.Browsable
+  )
+
+  private fun ArtistIdName.toMediaItem() = MediaItem(
+    makeItemDesc(artistId, artistName.value, ARTIST_ICON),
+    MediaItemFlags.Browsable
+  )
+
+  private fun GenreIdName.toMediaItem() = MediaItem(
+    makeItemDesc(genreId, genreName.value, GENRE_ICON),
+    MediaItemFlags.Browsable
+  )
+
+  private fun AudioDescription.toMediaItem() = MediaItem(
+    makeItemDesc(
+      mediaId,
+      title.value,
+      selectAlbumArt(albumLocalArt, albumArt, TRACK_ICON)
+    ),
+    MediaItemFlags.Playable
+  )
 
   private fun makeItemDesc(
     id: String,
@@ -302,40 +317,19 @@ private class MediaSessionBrowserImpl(
   private fun makeItemDesc(id: PersistentId, name: String, icon: Uri, subtitle: String? = null) =
     makeItemDesc(id.toCompatMediaId(), name, icon, subtitle, Bundle.EMPTY)
 
-  private suspend fun makeAlbumList(): DaoResult<List<MediaItem>> =
-    albumDao
-      .getAllAlbums(limit = MAX_LIST_SIZE)
-      .mapAll {
-        Ok(
-          MediaItem(
-            makeItemDesc(
-              it.albumId,
-              it.albumTitle.value,
-              selectAlbumArt(it.albumLocalArt, it.albumArt, ALBUM_ICON),
-              it.artistName.value,
-            ),
-            MediaItemFlags.Browsable
-          )
-        )
-      }
+  private suspend fun makeAlbumList(): List<MediaItem> = albumDao
+    .getAllAlbums(limit = MAX_LIST_SIZE)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting all albums") } }
+    .getOrElse { emptyList() }
+    .map { albumDescription -> albumDescription.toMediaItem() }
 
   private suspend fun makeArtistAlbumList(
     artistId: ArtistId
-  ): DaoResult<List<MediaItem>> = albumDao
+  ): List<MediaItem> = albumDao
     .getAllAlbumsFor(artistId, ArtistType.AlbumArtist, limit = MAX_LIST_SIZE)
-    .mapAll {
-      Ok(
-        MediaItem(
-          makeItemDesc(
-            it.albumId,
-            it.albumTitle.value,
-            selectAlbumArt(it.albumLocalArt, it.albumArt, ALBUM_ICON),
-            it.artistName.value
-          ),
-          MediaItemFlags.Browsable
-        )
-      )
-    }
+    .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s", artistId) } }
+    .getOrElse { emptyList() }
+    .map { albumDescription -> albumDescription.toMediaItem() }
 
   private fun selectAlbumArt(albumLocalArt: Uri, albumArt: Uri, defaultValue: Uri): Uri {
     return when {
@@ -345,25 +339,20 @@ private class MediaSessionBrowserImpl(
     }
   }
 
-  private suspend fun makeGenreList(): DaoResult<List<MediaItem>> =
-    genreDao
-      .getAllGenreNames(MAX_LIST_SIZE)
-      .mapAll {
-        Ok(
-          MediaItem(
-            makeItemDesc(it.genreId, it.genreName.value, GENRE_ICON),
-            MediaItemFlags.Browsable
-          )
-        )
-      }
+  private suspend fun makeGenreList(): List<MediaItem> = genreDao
+    .getAllGenreNames(MAX_LIST_SIZE)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting all genres") } }
+    .getOrElse { emptyList() }
+    .map { genreIdName -> genreIdName.toMediaItem() }
 
   private fun makeGenreListItemDesc(): MediaDescriptionCompat =
     makeItemDesc(ID_GENRES, fetch(R.string.Genres), GENRE_ICON)
 
-  private suspend fun makeTrackList(): DaoResult<List<MediaItem>> =
-    audioMediaDao
-      .getAllAudio(limit = MAX_LIST_SIZE)
-      .mapToMediaList()
+  private suspend fun makeTrackList(): List<MediaItem> = audioMediaDao
+    .getAllAudio(limit = MAX_LIST_SIZE)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting all audio") } }
+    .getOrElse { emptyList() }
+    .map { audioDescription -> audioDescription.toMediaItem() }
 
   private fun makeTrackListItemDesc(): MediaDescriptionCompat =
     makeItemDesc(ID_TRACKS, fetch(R.string.Tracks), TRACK_ICON)
@@ -376,29 +365,20 @@ private class MediaSessionBrowserImpl(
 
   private suspend fun makeAlbumTracksList(
     albumId: AlbumId
-  ): DaoResult<List<MediaItem>> = audioMediaDao
+  ): List<MediaItem> = audioMediaDao
     .getAlbumAudio(id = albumId, limit = MAX_LIST_SIZE)
-    .mapToMediaList()
-
-  private fun DaoResult<Iterable<AudioDescription>>.mapToMediaList(): ItemListResult =
-    mapAll { item ->
-      Ok(
-        MediaItem(
-          makeItemDesc(
-            item.mediaId,
-            item.title(),
-            selectAlbumArt(item.albumLocalArt, item.albumArt, TRACK_ICON)
-          ),
-          MediaItemFlags.Playable
-        )
-      )
+    .getOrElse { emptyList() }
+    .map { audioDescription ->
+      audioDescription.toMediaItem()
     }
 
   private suspend fun makeGenreTracksList(
     genreId: GenreId
-  ): DaoResult<List<MediaItem>> = audioMediaDao
+  ): List<MediaItem> = audioMediaDao
     .getGenreAudio(genreId = genreId, limit = MAX_LIST_SIZE)
-    .mapToMediaList()
+    .onFailure { cause -> LOG.e(cause) { it("Error getting audio for %s", genreId) } }
+    .getOrElse { emptyList() }
+    .map { audioDescription -> audioDescription.toMediaItem() }
 
   private fun makeEmptyMediaDesc(parentId: String) = MediaDescriptionCompat.Builder()
     .setMediaId(MediaSessionBrowser.ID_NO_MEDIA)

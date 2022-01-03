@@ -21,7 +21,6 @@ package com.ealva.toque.db.smart
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.db.BaseMemento
-import com.ealva.toque.db.DaoExceptionMessage
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.Memento
 import com.ealva.toque.db.PlayListTable
@@ -46,7 +45,6 @@ import com.ealva.welite.db.table.selectWhere
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 
 interface SmartPlaylistDao {
   suspend fun getSmartPlaylist(playlistId: PlaylistId): DaoResult<SmartPlaylist>
@@ -69,7 +67,7 @@ private class SmartPlaylistDaoImpl(private val db: Database) : SmartPlaylistDao 
     playlistId: PlaylistId
   ): DaoResult<SmartPlaylist> = runSuspendCatching {
     db.query { playlist(playlistId) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Queryable.playlist(playlistId: PlaylistId): SmartPlaylist = SmartPlaylistTable
     .selectWhere { smartId eq playlistId.value }

@@ -42,14 +42,14 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
   override suspend fun addToUpNext(
     categoryMediaList: CategoryMediaList
-  ): Result<QueueSize, QueueMessage> = Err(UnknownError)
+  ): Result<QueueSize, Throwable> = Err(NotImplementedError())
 
   override suspend fun playNext(
     categoryMediaList: CategoryMediaList,
     clearUpNext: ClearQueue,
     playNow: PlayNow,
     transitionType: TransitionType
-  ): Result<QueueSize, QueueMessage> = Err(UnknownError)
+  ): Result<QueueSize, Throwable> = Err(NotImplementedError())
 
 
   override fun goToQueueItem(instanceId: InstanceId) = Unit

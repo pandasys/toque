@@ -26,14 +26,12 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.DaoExceptionMessage
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.file.isLocalScheme
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.tag.SongTag
+import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.binding.binding
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.buffer
@@ -70,7 +68,7 @@ interface MediaFileStore {
     writeToFile: Boolean,
     beforeFileWrite: suspend () -> Unit,
     afterFileWrite: suspend () -> Unit
-  ): DaoResult<Rating>
+  ): Result<Rating, Throwable>
 
 //  suspend fun getSongInfo(mediaId: Long): SongInfo
 //
@@ -127,7 +125,7 @@ private class MediaFileStoreImpl(
     writeToFile: Boolean,
     beforeFileWrite: suspend () -> Unit,
     afterFileWrite: suspend () -> Unit
-  ): DaoResult<Rating> = binding {
+  ): Result<Rating, Throwable> = binding {
     audioMediaDao.setRating(id, newRating).bind()
     if (writeToFile && fileLocation.isLocalScheme()) {
       writeRatingToFile(fileLocation, fileExt, newRating, beforeFileWrite, afterFileWrite).bind()
@@ -145,7 +143,7 @@ private class MediaFileStoreImpl(
     newRating: Rating,
     beforeFileWrite: suspend () -> Unit,
     afterFileWrite: suspend () -> Unit
-  ): DaoResult<Rating> = withContext(Dispatchers.IO) {
+  ): Result<Rating, Throwable> = withContext(Dispatchers.IO) {
     runSuspendCatching {
       doWriteToFile(
         location,
@@ -154,7 +152,7 @@ private class MediaFileStoreImpl(
         beforeFileWrite,
         afterFileWrite
       )
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+    }
   }
 
   private suspend fun doWriteToFile(

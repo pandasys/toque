@@ -30,8 +30,9 @@ import com.ealva.toque.prefs.DuckAction
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPresetFactory
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -170,13 +171,9 @@ private class SharedPlayerStateImpl(
     } else {
       scope.launch(dispatcher) {
         currentPreset.update {
-          when (val result = factory.getPreferred(mediaId, albumId, outputRoute.value)) {
-            is Ok -> result.value
-            is Err -> {
-              LOG.e { it("Error getPreferred $mediaId $albumId, map to $nonePreset") }
-              nonePreset
-            }
-          }
+          factory.getPreferred(mediaId, albumId, outputRoute.value)
+            .onFailure { cause -> LOG.e(cause) { it("Error getting preferred preset") } }
+            .getOrElse { nonePreset }
         }
       }
     }
@@ -185,10 +182,9 @@ private class SharedPlayerStateImpl(
   override fun setCurrent(id: EqPresetId) {
     if (eqMode.value.isOn()) {
       scope.launch(dispatcher) {
-        when (val result = factory.getPreset(id)) {
-          is Ok -> currentPreset.update { result.value }
-          is Err -> LOG.e { it("Error setting current preset. ${result.error}") }
-        }
+        factory.getPreset(id)
+          .onFailure { cause -> LOG.e(cause) { it("Error setting current preset %s", id) } }
+          .onSuccess { preset -> setCurrent(preset) }
       }
     }
   }

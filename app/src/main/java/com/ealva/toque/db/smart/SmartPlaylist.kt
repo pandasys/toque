@@ -24,7 +24,6 @@ import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.common.checkThen
 import com.ealva.toque.db.ArtistTable
 import com.ealva.toque.db.MediaTable
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.service.media.MediaType
 import com.ealva.welite.db.expr.and
@@ -40,10 +39,6 @@ import com.ealva.welite.db.table.toQuery
 import com.ealva.welite.db.table.where
 import com.ealva.welite.db.view.View
 import kotlinx.parcelize.Parcelize
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-
-private val LOG by lazyLogger(SmartPlaylist::class)
 
 @Immutable
 @Parcelize
@@ -65,16 +60,9 @@ data class SmartPlaylist(
   }
 
   val isValid: Boolean
-    get() = nameIsValid(name).also { valid -> LOG._e { it("valid %s", valid) } } &&
-        ruleList.isNotEmpty().also { empty -> LOG._e { it("empty %s", !empty) } } &&
-        ruleList.all { rule ->
-          if (rule.isNotValid) LOG._e { it("rule not valid %s", rule) }
-          rule.isValid
-        }
+    get() = name.isValid() && ruleList.isNotEmpty() && ruleList.all { rule -> rule.isValid }
 
-  private fun nameIsValid(name: PlaylistName): Boolean {
-    return name.value.isNotEmpty() && !name.value.startsWith("sqlite_", true)
-  }
+  private fun PlaylistName.isValid() = value.isNotEmpty() && !value.startsWith("sqlite_", true)
 
   /**
    * There must be at least 1 rule for a SmartPlaylist

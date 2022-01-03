@@ -44,8 +44,10 @@ import com.ealva.toque.ui.common.DialogPrompt
 import com.ealva.toque.ui.library.PlayUpNextPrompt
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -192,31 +194,33 @@ class LocalAudioQueueViewModelImpl(
     playNow: PlayNow
   ) {
     val size = mediaList.size
-    mainViewModel.notify(
-      when (val result = localAudioQueue.value.playNext(mediaList, clear, playNow, Manual)) {
-        is Ok -> {
-          val plural = if (appPrefsSingleton.instance().allowDuplicates() || clear()) {
-            R.plurals.AddedToUpNextNewSize
-          } else {
-            R.plurals.AddedToUpNextNewSizeLessDuplicates
-          }
-          Notification(fetchPlural(plural, size, size, result.value.value))
+    localAudioQueue.value.playNext(mediaList, clear, playNow, Manual)
+      .onSuccess { queueSize ->
+        val plural = if (appPrefsSingleton.instance().allowDuplicates() || clear()) {
+          R.plurals.AddedToUpNextNewSize
+        } else {
+          R.plurals.AddedToUpNextNewSizeLessDuplicates
         }
-        is Err -> Notification(fetchPlural(R.plurals.FailedAddingToUpNext, size))
+        mainViewModel.notify(Notification(fetchPlural(plural, size, size, queueSize.value)))
       }
-    )
+      .onFailure { cause ->
+        LOG.e(cause) { it("Error during playNext") }
+        mainViewModel.notify(Notification(fetchPlural(R.plurals.FailedAddingToUpNext, size)))
+      }
   }
 
   override fun addToUpNext(categoryMediaList: CategoryMediaList) {
     scope.launch {
       val quantity = categoryMediaList.size
       mainViewModel.notify(
-        when (val result = localAudioQueue.value.addToUpNext(categoryMediaList)) {
-          is Ok -> Notification(
-            fetchPlural(R.plurals.AddedToUpNextNewSize, quantity, quantity, result.value.value)
-          )
-          is Err -> Notification(fetchPlural(R.plurals.FailedAddingToUpNext, quantity))
-        }
+        localAudioQueue.value.addToUpNext(categoryMediaList)
+          .onFailure { cause -> LOG.e(cause) { it("Error during addToUpNext") } }
+          .map { queueSize ->
+            Notification(
+              fetchPlural(R.plurals.AddedToUpNextNewSize, quantity, quantity, queueSize.value)
+            )
+          }
+          .getOrElse { Notification(fetchPlural(R.plurals.FailedAddingToUpNext, quantity)) }
       )
     }
   }
@@ -232,14 +236,9 @@ class LocalAudioQueueViewModelImpl(
   override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
     val deferred = CompletableDeferred<PromptResult>()
     // get list of user playlists. If Empty return CreatePlaylist
-    val playlists: List<PlaylistIdNameType> =
-      when (val result = playlistDao.getAllOfType(PlayListType.UserCreated)) {
-        is Ok -> result.value
-        is Err -> {
-          LOG.e { it("Error retrieving user playlists. %s", result.error) }
-          emptyList()
-        }
-      }
+    val playlists: List<PlaylistIdNameType> = playlistDao.getAllOfType(PlayListType.UserCreated)
+      .onFailure { cause -> LOG.e(cause) { it("Error getting user created playlists.") } }
+      .getOrElse { emptyList() }
 
     fun onDismiss() {
       clearPrompt()
@@ -260,14 +259,9 @@ class LocalAudioQueueViewModelImpl(
 
     fun showCreatePrompt() {
       scope.launch {
-        val allPlaylists: List<PlaylistIdNameType> =
-          when (val result = playlistDao.getAllOfType()) {
-            is Ok -> result.value
-            is Err -> {
-              LOG.e { it("Error retrieving all playlists. %s", result.error) }
-              emptyList()
-            }
-          }
+        val allPlaylists: List<PlaylistIdNameType> = playlistDao.getAllOfType()
+          .onFailure { cause -> LOG.e(cause) { it("Error getting all playlists") } }
+          .getOrElse { emptyList() }
 
         showPrompt(
           DialogPrompt(
@@ -311,32 +305,34 @@ class LocalAudioQueueViewModelImpl(
 
   private fun addAudioToPlaylist(mediaIdList: MediaIdList, playlistIdNameType: PlaylistIdNameType) {
     scope.launch {
-      when (val result = playlistDao.addToUserPlaylist(playlistIdNameType.id, mediaIdList)) {
-        is Ok -> { mainViewModel.notify(makeAddToPlaylistNotification(result, playlistIdNameType)) }
-        is Err -> LOG.e { it("Error adding %s. %s", playlistIdNameType.name.value, result.error) }
-      }
+      playlistDao.addToUserPlaylist(playlistIdNameType.id, mediaIdList)
+        .onFailure { ex -> LOG.e(ex) { it("Error adding %s.", playlistIdNameType.name.value) } }
+        .onSuccess { count ->
+          mainViewModel.notify(makeAddToPlaylistNotification(count, playlistIdNameType))
+        }
     }
   }
 
   private fun makeAddToPlaylistNotification(
-    result: Ok<Long>,
+    count: Long,
     playlistIdNameType: PlaylistIdNameType
   ): Notification {
-    val count = result.value.toInt()
+    val value = count.toInt()
     return Notification(
-      fetchPlural(R.plurals.AddedCountToPlaylist, count, count, playlistIdNameType.name.value)
+      fetchPlural(R.plurals.AddedCountToPlaylist, value, value, playlistIdNameType.name.value)
     )
   }
 
   private fun createPlaylistWithAudio(mediaIdList: MediaIdList, playlistName: PlaylistName) {
     scope.launch {
-      when (val result = playlistDao.createUserPlaylist(playlistName, mediaIdList)) {
-        is Ok -> emitNotification(Notification(fetch(R.string.CreatedPlaylist, playlistName.value)))
-        is Err -> {
-          LOG.e { it("Error creating %s. %s", playlistName, result.error) }
+      playlistDao.createUserPlaylist(playlistName, mediaIdList)
+        .onFailure { cause ->
+          LOG.e(cause) { it("Error creating %s", playlistName) }
           emitNotification(Notification(fetch(R.string.ErrorCreatingPlaylist, playlistName.value)))
         }
-      }
+        .onSuccess {
+          emitNotification(Notification(fetch(R.string.CreatedPlaylist, playlistName.value)))
+        }
     }
   }
 

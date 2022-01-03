@@ -17,13 +17,11 @@
 package com.ealva.toque.test.db
 
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
 import com.ealva.toque.common.Amp
-import com.ealva.toque.db.DaoExceptionMessage
-import com.ealva.toque.db.DaoMessage
-import com.ealva.toque.db.DaoNotFound
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
-import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetTable
 import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.toque.test.shared.withTestDatabase
@@ -73,7 +71,8 @@ object CommonPresetDaoTest {
         )
       )
       val result = dao.updatePreset(presetData)
-      expect(result).toBeInstanceOf<Err<DaoMessage>>()
+      expect(result).toBeInstanceOf<Ok<Boolean>>()
+      expect(result.get()).toBe(false)
     }
   }
 
@@ -129,11 +128,10 @@ object CommonPresetDaoTest {
         }
       }
       dao.insertPreset(name, preAmpAndBands).let { result ->
-        expect(result).toBeInstanceOf<Err<DaoMessage>>()
+        expect(result).toBeInstanceOf<Err<Throwable>>()
         result.getError()?.let { error ->
-          expect(error).toBeInstanceOf<DaoExceptionMessage>()
-          error as DaoExceptionMessage
-          expect(error.ex).toBeInstanceOf<WeLiteUncaughtException>()
+          expect(error).toBeInstanceOf<WeLiteUncaughtException>()
+          expect(error.cause).toBeInstanceOf<SQLiteConstraintException>()
         } ?: error("unexpected null error")
       }
     }
@@ -257,7 +255,8 @@ object CommonPresetDaoTest {
       }
 
       dao.deletePreset(id).let { result ->
-        expect(result).toBeInstanceOf<Err<DaoNotFound>>()
+        expect(result).toBeInstanceOf<Ok<Boolean>>()
+        expect(result.get()).toBe(false)
       }
     }
   }

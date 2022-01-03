@@ -32,10 +32,7 @@ import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectAll
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 
 interface EqPresetDao {
   /**
@@ -136,16 +133,15 @@ private class EqPresetDaoImpl(
           it[band8] = bands[8]()
           it[band9] = bands[9]()
         }
-      })
+      }).also { if (it.value < 1) throw DaoInsertFailedException("Failed to insert $name") }
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-    .andThen { if (it.value > 0) Ok(it) else Err(DaoFailedToInsert("$name $preAmpAndBands")) }
+  }
 
   override suspend fun getPresetData(
     id: EqPresetId
-  ): DaoResult<EqPresetData> = runSuspendCatching { db.query { doGetPreset(id.value) } }
-    .mapError { cause -> DaoExceptionMessage(cause) }
-    .andThen { it?.let { data -> Ok(data) } ?: Err(DaoNotFound("Preset ID:$id")) }
+  ): DaoResult<EqPresetData> = runSuspendCatching {
+    db.query { doGetPreset(id.value) } ?: throw DaoNotFoundException("Could not find $id")
+  }
 
   private fun Queryable.doGetPreset(presetId: Long): EqPresetData? =
     EqPresetTable
@@ -169,13 +165,12 @@ private class EqPresetDaoImpl(
           .sequence { cursor -> EqPresetIdName(EqPresetId(cursor[id]), cursor[presetName]) }
           .toList()
       }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
+    }
 
   override suspend fun updatePreset(presetData: EqPresetData, duringTxn: () -> Unit): BoolResult =
     runSuspendCatching {
-      db.transaction { doUpdatePreset(presetData).also { if (it > 0) duringTxn() } }
-    }.mapError { cause -> DaoExceptionMessage(cause) }
-      .andThen { if (it > 0) Ok(true) else selectUpdateError(presetData.id, "$presetData") }
+      db.transaction { (doUpdatePreset(presetData) > 0).also { if (it) duringTxn() } }
+    }
 
   private fun TransactionInProgress.doUpdatePreset(presetData: EqPresetData) = UPDATE_ALL.update {
     it[BIND_PRESET_ID] = presetData.id.value
@@ -206,10 +201,9 @@ private class EqPresetDaoImpl(
           it[updatedTime] = Millis.currentUtcEpochMillis().value
         }
         .where { this.id eq id.value }
-        .update()
+        .update() > 0
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
-    .andThen { if (it > 0) Ok(true) else selectUpdateError(id, "PresetId:$id preamp:$amplitude") }
+  }
 
   override suspend fun updateBand(
     id: EqPresetId,
@@ -224,49 +218,13 @@ private class EqPresetDaoImpl(
         it[updatedTime] = Millis.currentUtcEpochMillis().value
       }.where {
         this.id eq id.value
-      }.update()
+      }.update() > 0
     }
-  }.mapError { cursor ->
-    DaoExceptionMessage(cursor)
-  }.andThen {
-    if (it > 0) Ok(true)
-    else selectUpdateError(id, "PresetId:$id band:$index value:$amplitude")
   }
 
   override suspend fun deletePreset(id: EqPresetId): BoolResult = runSuspendCatching {
-    db.transaction { EqPresetTable.delete { this.id eq id.value } }
-  }.mapError { cursor ->
-    DaoExceptionMessage(cursor)
-  }.andThen {
-    if (it > 0) Ok(true)
-    else {
-      selectErrorIfExists(
-        id,
-        DaoFailedToDelete("PresetId:$id"),
-        DaoNotFound("PresetId:$id")
-      )
-    }
+    db.transaction { EqPresetTable.delete { this.id eq id.value } } > 0
   }
-
-  private suspend fun selectUpdateError(id: EqPresetId, msg: String): BoolResult =
-    selectErrorIfExists(id, DaoNotFound("Preset ID:$id"), DaoFailedToUpdate(msg))
-
-  /**
-   * These error conditions shouldn't occur in practice so another txn to narrow down this issue
-   * is not a big deal
-   */
-  private suspend fun selectErrorIfExists(
-    presetId: EqPresetId,
-    existsMsg: DaoMessage,
-    notExistsMsg: DaoMessage
-  ): DaoResult<Nothing> = runSuspendCatching { db.query { presetExists(presetId) } }
-    .mapError { cause -> DaoExceptionMessage(cause) }
-    .andThen { exists ->
-      if (exists) Err(existsMsg) else Err(notExistsMsg)
-    }
-
-  private fun Queryable.presetExists(presetId: EqPresetId): Boolean =
-    EqPresetTable.select().where { id eq presetId.value }.count() > 0
 }
 
 data class EqPresetIdName(val id: EqPresetId, val name: String)
@@ -315,7 +273,7 @@ object NullEqPresetDao : EqPresetDao {
   override suspend fun insertPreset(
     name: String,
     preAmpAndBands: PreAmpAndBands
-  ): DaoResult<EqPresetId> = NotImplemented
+  ): DaoResult<EqPresetId> = Err(NotImplementedError())
 
   override suspend fun getPresetData(
     id: EqPresetId
@@ -339,5 +297,5 @@ object NullEqPresetDao : EqPresetDao {
 
   override suspend fun deletePreset(id: EqPresetId): BoolResult = NotImplemented
 
-  private val NotImplemented = Err(DaoNotImplemented)
+  private val NotImplemented = Err(NotImplementedError())
 }

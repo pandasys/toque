@@ -20,8 +20,8 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.asMillis
 import com.ealva.toque.common.asDateTimeWithMillis
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.db.QueueItemsTable.itemId
 import com.ealva.toque.db.QueueTable.queueId
 import com.ealva.toque.db.QueueTable.updatedTime
@@ -39,16 +39,14 @@ import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
 import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.where
-import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.coroutines.runSuspendCatching
-import com.github.michaelbull.result.mapError
 
 private val LOG by lazyLogger(QueueDao::class)
 
 interface QueueDao {
   /**
    * Delete all items for the queue and replace them [queueItems] and [shuffledItems]. The
-   * [shuffledItems] list may be empty. Returns [Ok] if success
+   * [shuffledItems] list may be empty.
    */
   suspend fun replaceQueueItems(
     queue: QueueId,
@@ -99,7 +97,7 @@ private class QueueDaoImpl(
       insertList(queue, queueItems, isShuffled = false)
       insertList(queue, shuffledItems, isShuffled = true)
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun replaceIfQueueUnchanged(
     queue: QueueId,
@@ -126,7 +124,7 @@ private class QueueDaoImpl(
         throw IllegalStateException("Queue has changed since ${lastUpdated.asDateTimeWithMillis}")
       }
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun addQueueItems(
     queue: QueueId,
@@ -151,11 +149,11 @@ private class QueueDaoImpl(
       }
       true
     }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   override suspend fun lastUpdatedTime(queue: QueueId): MillisResult = runSuspendCatching {
     db.query { doGetLastUpdatedTime(queue) }
-  }.mapError { cause -> DaoExceptionMessage(cause) }
+  }
 
   private fun Queryable.doGetLastUpdatedTime(queue: QueueId): Millis = QueueTable
     .select(updatedTime)

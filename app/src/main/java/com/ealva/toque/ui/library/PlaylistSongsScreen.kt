@@ -34,11 +34,11 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -181,6 +181,6 @@ private class PlaylistSongsViewModelImpl(
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): DaoResult<List<AudioDescription>> =
+  ): Result<List<AudioDescription>, Throwable> =
     audioMediaDao.getPlaylistAudio(playlistId, playListType, Filter.NoFilter, Limit.NoLimit)
 }

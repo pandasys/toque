@@ -24,7 +24,6 @@ import com.ealva.toque.common.Limit
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoMessage
 import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -34,9 +33,9 @@ import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.service.session.server.OnMediaType
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.coroutines.binding.binding
+import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import it.unimi.dsi.fastutil.longs.LongArrayList
 
 private val LOG by lazyLogger(PrepareMediaFromId::class)
@@ -49,16 +48,15 @@ class PrepareMediaFromId(
     localAudioQueue.prepareNext(CategoryMediaList(mediaId, CategoryToken.External))
 
   override suspend fun onArtist(artistId: ArtistId, extras: Bundle, limit: Limit) {
-    when (val result = binding<CategoryMediaList, DaoMessage> {
-      val list = audioMediaDao.getArtistAudio(artistId, limit = limit).bind()
-      CategoryMediaList(
-        MediaIdList(list.mapTo(LongArrayList(list.size)) { it.mediaId.value }),
-        CategoryToken(artistId)
-      )
-    }) {
-      is Ok -> localAudioQueue.prepareNext(result.value)
-      is Err -> LOG.e { it(result.toString()) }
-    }
+    audioMediaDao.getArtistAudio(artistId, limit = limit)
+      .map { list ->
+        CategoryMediaList(
+          MediaIdList(list.mapTo(LongArrayList(list.size)) { it.mediaId.value }),
+          CategoryToken(artistId)
+        )
+      }
+      .onSuccess { localAudioQueue.prepareNext(it) }
+      .onFailure { cause -> LOG.e(cause) { it("Error getArtistAudio") } }
   }
 
   override suspend fun onAlbum(albumId: AlbumId, extras: Bundle, limit: Limit) {
