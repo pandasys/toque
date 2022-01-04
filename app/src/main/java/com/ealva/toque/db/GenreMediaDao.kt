@@ -16,9 +16,6 @@
 
 package com.ealva.toque.db
 
-import com.ealva.ealvalog.i
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.MediaId
@@ -28,8 +25,6 @@ import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
-
-private val LOG by lazyLogger(GenreMediaDao::class)
 
 interface GenreMediaDao {
   /**
@@ -41,8 +36,6 @@ interface GenreMediaDao {
     newMediaId: MediaId,
     createTime: Millis
   )
-
-  fun deleteAll(txn: TransactionInProgress)
 
   companion object {
     operator fun invoke(): GenreMediaDao = GenreMediaDaoImpl()
@@ -57,6 +50,7 @@ private val INSERT_GENRE_MEDIA = GenreMediaTable.insertValues(OnConflict.Ignore)
 
 private val BIND_MEDIA_ID = bindLong()
 private val DELETE_MEDIA = GenreMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
+
 private class GenreMediaDaoImpl : GenreMediaDao {
   override fun replaceMediaGenres(
     txn: TransactionInProgress,
@@ -74,8 +68,4 @@ private class GenreMediaDaoImpl : GenreMediaDao {
     }
   }
 
-  override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = GenreMediaTable.deleteAll()
-    LOG.i { it("Deleted %d genre/media associations", count) }
-  }
 }

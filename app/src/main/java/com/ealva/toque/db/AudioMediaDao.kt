@@ -18,14 +18,11 @@ package com.ealva.toque.db
 
 import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
-import androidx.compose.runtime.Immutable
 import androidx.core.net.toUri
 import com.ealva.ealvabrainz.brainz.data.TrackMbid
 import com.ealva.ealvabrainz.brainz.data.isValidMbid
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.ealvabrainz.common.ComposerName
-import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.ealvabrainz.common.asAlbumTitle
 import com.ealva.ealvabrainz.common.asArtistName
 import com.ealva.ealvabrainz.common.asComposerName
@@ -47,13 +44,13 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.common.asTitle
 import com.ealva.toque.common.toRating
 import com.ealva.toque.common.toStarRating
+import com.ealva.toque.db.ArtistDao.Companion.AlbumArtistTable
+import com.ealva.toque.db.ArtistDao.Companion.SongArtistTable
+import com.ealva.toque.db.ArtistDao.Companion.albumArtistTableId
+import com.ealva.toque.db.ArtistDao.Companion.albumArtistTableName
+import com.ealva.toque.db.ArtistDao.Companion.songArtistTableId
+import com.ealva.toque.db.ArtistDao.Companion.songArtistTableName
 import com.ealva.toque.db.AudioMediaDao.Companion.QUEUE_ID
-import com.ealva.toque.db.AudioMediaDaoImpl.Companion.AlbumArtistTable
-import com.ealva.toque.db.AudioMediaDaoImpl.Companion.SongArtistTable
-import com.ealva.toque.db.AudioMediaDaoImpl.Companion.albumArtistTableId
-import com.ealva.toque.db.AudioMediaDaoImpl.Companion.albumArtistTableName
-import com.ealva.toque.db.AudioMediaDaoImpl.Companion.songArtistTableId
-import com.ealva.toque.db.AudioMediaDaoImpl.Companion.songArtistTableName
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.PlayListType.File
 import com.ealva.toque.db.PlayListType.Rules
@@ -113,7 +110,6 @@ import com.ealva.welite.db.table.OnConflict
 import com.ealva.welite.db.table.OrderBy
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.QueryBuilder
-import com.ealva.welite.db.table.alias
 import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.ordersBy
 import com.ealva.welite.db.table.select
@@ -144,61 +140,6 @@ sealed interface AudioDaoEvent {
   data class MediaCreated(val id: MediaId) : AudioDaoEvent
   data class MediaUpdated(val id: MediaId) : AudioDaoEvent
 }
-
-data class AudioDescription(
-  val mediaId: MediaId,
-  val title: Title,
-  val duration: Millis,
-  val rating: Rating,
-  val album: AlbumTitle,
-  val artist: ArtistName,
-  val albumLocalArt: Uri,
-  val albumArt: Uri
-)
-
-data class AudioQueueItemData(
-  val id: MediaId,
-  val title: Title,
-  val albumTitle: AlbumTitle,
-  val albumArtist: ArtistName,
-  val location: Uri,
-  val fileUri: Uri,
-  val displayName: String,
-  val albumId: AlbumId,
-  val artists: Set<ArtistName>,
-  val rating: Rating,
-  val duration: Millis,
-  val trackNumber: Int,
-  val localAlbumArt: Uri,
-  val albumArt: Uri
-)
-
-@Immutable
-data class FullAudioInfo(
-  val mediaId: MediaId,
-  val title: Title,
-  val album: AlbumTitle,
-  val albumArtist: ArtistName,
-  val songArtist: ArtistName,
-  val genre: GenreName,
-  val track: Int,
-  val totalTracks: Int,
-  val disc: Int,
-  val totalDiscs: Int,
-  val duration: Millis,
-  val year: Int,
-  val composer: ComposerName,
-  val rating: StarRating,
-  val playCount: Int,
-  val lastPlayed: Millis,
-  val skippedCount: Int,
-  val lastSkipped: Millis,
-  val dateAdded: Millis,
-  val location: Uri,
-  val file: Uri,
-  val albumId: AlbumId,
-  val albumArtistId: ArtistId,
-)
 
 typealias AudioItemListResult = Result<List<AudioQueueItemData>, Throwable>
 
@@ -340,6 +281,7 @@ interface AudioMediaDao {
   ): DaoResult<MediaIdList>
 
   suspend fun getNextCategory(token: CategoryToken, shuffleLists: ShuffleLists): CategoryMediaList
+
   suspend fun getPreviousCategory(
     token: CategoryToken,
     shuffleLists: ShuffleLists
@@ -349,21 +291,6 @@ interface AudioMediaDao {
 
   suspend fun getTitleSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
-  ): DaoResult<List<String>>
-
-  suspend fun getAlbumSuggestions(
-    partialTitle: String,
-    textSearch: TextSearch
-  ): DaoResult<List<String>>
-
-  suspend fun getArtistSuggestions(
-    partial: String,
-    textSearch: TextSearch
-  ): DaoResult<List<String>>
-
-  suspend fun getAlbumArtistSuggestions(
-    partial: String,
     textSearch: TextSearch
   ): DaoResult<List<String>>
 
@@ -388,9 +315,6 @@ interface AudioMediaDao {
       albumDao: AlbumDao,
       artistAlbumDao: ArtistAlbumDao,
       composerDao: ComposerDao,
-      artistMediaDao: ArtistMediaDao,
-      genreMediaDao: GenreMediaDao,
-      composerMediaDao: ComposerMediaDao,
       playlistDao: PlaylistDao,
       eqPresetAssociationDao: EqPresetAssociationDao,
       appPrefsSingleton: AppPrefsSingleton,
@@ -404,9 +328,6 @@ interface AudioMediaDao {
         albumDao,
         artistAlbumDao,
         composerDao,
-        artistMediaDao,
-        genreMediaDao,
-        composerMediaDao,
         playlistDao,
         eqPresetAssociationDao,
         appPrefsSingleton,
@@ -449,9 +370,6 @@ private class AudioMediaDaoImpl(
   override val albumDao: AlbumDao,
   private val artistAlbumDao: ArtistAlbumDao,
   override val composerDao: ComposerDao,
-  private val artistMediaDao: ArtistMediaDao,
-  private val genreMediaDao: GenreMediaDao,
-  private val composerMediaDao: ComposerMediaDao,
   override val playlistDao: PlaylistDao,
   private val eqPresetAssocDao: EqPresetAssociationDao,
   private val appPrefsSingleton: AppPrefsSingleton,
@@ -479,14 +397,7 @@ private class AudioMediaDaoImpl(
     db.transaction {
       val upsertResults = AudioUpsertResults { emit(it) }
       onCommit { upsertResults.onCommit() }
-      doUpsertAudio(
-        audioInfo,
-        tag,
-        minimumDuration,
-        createUpdateTime,
-        appPrefs,
-        upsertResults
-      )
+      doUpsertAudio(audioInfo, tag, minimumDuration, createUpdateTime, appPrefs, upsertResults)
     }
   }
 
@@ -502,13 +413,8 @@ private class AudioMediaDaoImpl(
       val duration = fileTagInfo.duration
       if (duration > minimumDuration) {
         val albumArtistId = upsertAlbumArtist(fileTagInfo, createUpdateTime, upsertResults)
-        val albumId = upsertAlbum(
-          fileTagInfo,
-          audioInfo.albumArt,
-          createUpdateTime,
-          upsertResults
-        )
-        artistAlbumDao.insertArtistAlbum(this, albumArtistId, albumId, createUpdateTime)
+        val albumId = upsertAlbum(fileTagInfo, audioInfo.albumArt, createUpdateTime, upsertResults)
+        with(artistAlbumDao) { insertArtistAlbum(albumArtistId, albumId, createUpdateTime) }
         val mediaArtistsIds = upsertMediaArtists(fileTagInfo, createUpdateTime, upsertResults)
         val mediaId = updateOrInsertAudioMedia(
           audioInfo,
@@ -520,9 +426,11 @@ private class AudioMediaDaoImpl(
           appPrefs,
           upsertResults
         )
-        artistMediaDao.replaceMediaArtists(this, mediaArtistsIds, mediaId, createUpdateTime)
-        replaceGenreMedia(fileTagInfo, mediaId, createUpdateTime, upsertResults)
-        replaceComposerMedia(fileTagInfo, mediaId, createUpdateTime, upsertResults)
+        with(artistDao) { replaceMediaArtists(mediaArtistsIds, mediaId, createUpdateTime) }
+        with(genreDao) { replaceGenreMedia(fileTagInfo, mediaId, createUpdateTime, upsertResults) }
+        with(composerDao) {
+          replaceComposerMedia(fileTagInfo, mediaId, createUpdateTime, upsertResults)
+        }
       } else {
         logIgnoring(audioInfo, duration, minimumDuration)
       }
@@ -533,74 +441,37 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  private fun Transaction.replaceComposerMedia(
-    fileTagInfo: MediaFileTagInfo,
-    mediaId: MediaId,
-    createUpdateTime: Millis,
-    upsertResults: AudioUpsertResults
-  ) {
-    composerMediaDao.replaceMediaComposer(
-      this,
-      composerDao.getOrCreateComposerId(
-        this,
-        fileTagInfo.composer,
-        fileTagInfo.composerSort,
-        createUpdateTime,
-        upsertResults
-      ),
-      mediaId,
-      createUpdateTime
-    )
-  }
-
-  private fun Transaction.replaceGenreMedia(
-    fileTagInfo: MediaFileTagInfo,
-    mediaId: MediaId,
-    createUpdateTime: Millis,
-    upsertResults: AudioUpsertResults
-  ) {
-    genreMediaDao.replaceMediaGenres(
-      this,
-      genreDao.getOrCreateGenreIds(
-        this,
-        fileTagInfo.genres,
-        createUpdateTime,
-        upsertResults
-      ),
-      mediaId,
-      createUpdateTime
-    )
-  }
-
   private fun Transaction.upsertAlbumArtist(
     fileTagInfo: MediaFileTagInfo,
     createUpdateTime: Millis,
     upsertResults: AudioUpsertResults
-  ) = artistDao.upsertArtist(
-    this,
-    fileTagInfo.albumArtist,
-    fileTagInfo.albumArtistSort,
-    fileTagInfo.releaseArtistMbid,
-    createUpdateTime,
-    upsertResults
-  )
+  ) = with(artistDao) {
+    upsertArtist(
+      fileTagInfo.albumArtist,
+      fileTagInfo.albumArtistSort,
+      fileTagInfo.releaseArtistMbid,
+      createUpdateTime,
+      upsertResults
+    )
+  }
 
   private fun Transaction.upsertAlbum(
     fileTagInfo: MediaFileTagInfo,
     albumArt: Uri,
     createUpdateTime: Millis,
     upsertResults: AudioUpsertResults
-  ) = albumDao.upsertAlbum(
-    this,
-    fileTagInfo.album,
-    fileTagInfo.albumSort,
-    albumArt,
-    fileTagInfo.albumArtist,
-    fileTagInfo.releaseMbid,
-    fileTagInfo.releaseGroupMbid,
-    createUpdateTime,
-    upsertResults
-  )
+  ) = with(albumDao) {
+    upsertAlbum(
+      fileTagInfo.album,
+      fileTagInfo.albumSort,
+      albumArt,
+      fileTagInfo.albumArtist,
+      fileTagInfo.releaseMbid,
+      fileTagInfo.releaseGroupMbid,
+      createUpdateTime,
+      upsertResults
+    )
+  }
 
   private fun Transaction.upsertMediaArtists(
     fileTagInfo: MediaFileTagInfo,
@@ -612,14 +483,15 @@ private class AudioMediaDaoImpl(
     return ArtistIdList().also { idList ->
       mediaArtists.forEachIndexed { index, artist ->
         val insertMbid = index == 0 && mediaArtists.size == 1 && artist != SongTag.UNKNOWN
-        idList += artistDao.upsertArtist(
-          this@upsertMediaArtists,
-          artist,
-          mediaArtistsSort.getOrElse(index) { artist.toArtistSort() },
-          if (insertMbid) fileTagInfo.artistMbid else null,
-          createUpdateTime,
-          upsertResults
-        )
+        idList += with(artistDao) {
+          upsertArtist(
+            artist,
+            mediaArtistsSort.getOrElse(index) { artist.toArtistSort() },
+            if (insertMbid) fileTagInfo.artistMbid else null,
+            createUpdateTime,
+            upsertResults
+          )
+        }
       }
     }
   }
@@ -631,16 +503,12 @@ private class AudioMediaDaoImpl(
   override suspend fun deleteAll() {
     db.transaction {
       eqPresetAssocDao.deleteMediaAndAlbumAssociations(this)
-//      playListSongFileTable.deleteAll(txn)
 //      queueTable.deleteAll(txn)
       MediaTable.deleteAll()
       albumDao.deleteAll(this)
       artistDao.deleteAll(this)
       composerDao.deleteAll(this)
       genreDao.deleteAll(this)
-      artistMediaDao.deleteAll(this)
-      genreMediaDao.deleteAll(this)
-      composerMediaDao.deleteAll(this)
       artistAlbumDao.deleteAll(this)
     }
   }
@@ -658,9 +526,6 @@ private class AudioMediaDaoImpl(
     composerDao.deleteComposersWithNoMedia(this).let { composersDeleted: Long ->
       LOG._i { it("Deleted %d composers with no media", composersDeleted) }
     }
-    /*
-    playListTable.updateTotals(txn)
-     */
   }
 
   override suspend fun getCountAllAudio(): LongResult = runSuspendCatching {
@@ -907,8 +772,8 @@ private class AudioMediaDaoImpl(
             itemQueueId eq QUEUE_ID.value and (shuffled eq true)
           }
           .orderByAsc { queueOrder }
-          .sequence { cursor -> cursor[itemId] }
-          .forEach { mediaId ->
+          .forEach { cursor ->
+            val mediaId  =cursor[itemId]
             val item = queueMap.get(mediaId)?.removeLastOrNull()
             if (item != null) {
               add(item)
@@ -917,7 +782,7 @@ private class AudioMediaDaoImpl(
               LOG.e { it("Item id=%d in shuffled that does NOT appear in upNextQueue.", mediaId) }
               clear()
               addAll(upNextQueue)
-              return@query
+              return@forEach
             }
           }
       }
@@ -1010,10 +875,10 @@ private class AudioMediaDaoImpl(
   override fun incrementPlayedCount(id: MediaId) {
     scope.launch {
       db.transaction {
-        INCREMENT_PLAYED_COUNT.update {
-          it[BIND_CURRENT_TIME] = Millis.currentUtcEpochMillis().value
-          it[BIND_MEDIA_ID] = id.value
-        }
+        MediaTable.updateColumns {
+          it[playedCount] = playedCount plus 1
+          it[lastPlayedTime] = Millis.currentUtcEpochMillis().value
+        }.where { MediaTable.id eq id.value }
       }
     }
   }
@@ -1021,10 +886,10 @@ private class AudioMediaDaoImpl(
   override fun incrementSkippedCount(id: MediaId) {
     scope.launch {
       db.transaction {
-        INCREMENT_SKIPPED_COUNT.update {
-          it[BIND_CURRENT_TIME] = Millis.currentUtcEpochMillis().value
-          it[BIND_MEDIA_ID] = id.value
-        }
+        MediaTable.updateColumns {
+          it[skippedCount] = skippedCount plus 1
+          it[lastSkippedTime] = Millis.currentUtcEpochMillis().value
+        }.where { MediaTable.id eq id.value }
       }
     }
   }
@@ -1039,17 +904,12 @@ private class AudioMediaDaoImpl(
           MediaTable.id eq id.value
         }.update()
       }
-      if (rowsUpdated == 0L)
-        LOG.e { it(CANT_UPDATE_DURATION, newDuration, id) }
+      if (rowsUpdated == 0L) LOG.e { it(CANT_UPDATE_DURATION, newDuration, id) }
     }
   }
 
-  override suspend fun setRating(
-    id: MediaId,
-    newRating: Rating
-  ): DaoResult<Rating> = runSuspendCatching {
-    db.transaction { doSetRating(id, newRating) }
-  }
+  override suspend fun setRating(id: MediaId, newRating: Rating): DaoResult<Rating> =
+    runSuspendCatching { db.transaction { doSetRating(id, newRating) } }
 
   private fun Transaction.doSetRating(id: MediaId, newRating: Rating): Rating = MediaTable
     .updateColumns {
@@ -1131,12 +991,7 @@ private class AudioMediaDaoImpl(
         .join(ComposerTable, INNER, ComposerMediaTable.composerId, ComposerTable.id)
         .select(MediaTable.id)
         .where { ComposerMediaTable.composerId inList composerIds.value }
-        .ordersBy {
-          listOf(
-            OrderBy(ComposerTable.composerSort),
-            OrderBy(MediaTable.titleSort),
-          )
-        }
+        .ordersBy { listOf(OrderBy(ComposerTable.composerSort), OrderBy(MediaTable.titleSort)) }
         .limit(limit.value)
         .sequence { cursor -> cursor[MediaTable.id] }
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
@@ -1155,12 +1010,7 @@ private class AudioMediaDaoImpl(
         .select(MediaTable.id)
         .where { GenreMediaTable.genreId inList genreIds.value }
         .distinct()
-        .ordersBy {
-          listOf(
-            OrderBy(GenreTable.genre),
-            OrderBy(MediaTable.titleSort),
-          )
-        }
+        .ordersBy { listOf(OrderBy(GenreTable.genre), OrderBy(MediaTable.titleSort)) }
         .limit(limit.value)
         .sequence { cursor -> cursor[MediaTable.id] }
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
@@ -1225,7 +1075,7 @@ private class AudioMediaDaoImpl(
       .join(PlayListTable, INNER, PlayListMediaTable.playListId, PlayListTable.id)
       .select(PlayListMediaTable.mediaId)
       .where { PlayListMediaTable.playListId eq playlistId.value }
-      .sequence { cursor -> longCollection.add(cursor[PlayListMediaTable.mediaId]) }
+      .forEach { cursor -> longCollection.add(cursor[PlayListMediaTable.mediaId]) }
   }
 
   override suspend fun getNextCategory(
@@ -1339,7 +1189,6 @@ private class AudioMediaDaoImpl(
     }
   }
 
-
   override suspend fun getTitleSuggestions(
     partialTitle: String,
     textSearch: TextSearch
@@ -1349,49 +1198,6 @@ private class AudioMediaDaoImpl(
         .select { title }
         .where { title like textSearch.applyWildcards(partialTitle) escape ESC_CHAR }
         .sequence { it[title] }
-        .toList()
-    }
-  }
-
-  override suspend fun getAlbumSuggestions(
-    partialTitle: String,
-    textSearch: TextSearch
-  ): DaoResult<List<String>> = runSuspendCatching {
-    db.query {
-      AlbumTable
-        .select { albumTitle }
-        .where { albumTitle like textSearch.applyWildcards(partialTitle) escape ESC_CHAR }
-        .sequence { it[albumTitle] }
-        .toList()
-    }
-  }
-
-  override suspend fun getArtistSuggestions(
-    partial: String,
-    textSearch: TextSearch
-  ): DaoResult<List<String>> = runSuspendCatching {
-    db.query {
-      SongArtistTable
-        .join(MediaTable, INNER, songArtistTableId, MediaTable.artistId)
-        .select { songArtistTableName }
-        .where { songArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR }
-        .distinct()
-        .sequence { it[songArtistTableName] }
-        .toList()
-    }
-  }
-
-  override suspend fun getAlbumArtistSuggestions(
-    partial: String,
-    textSearch: TextSearch
-  ): DaoResult<List<String>> = runSuspendCatching {
-    db.query {
-      AlbumArtistTable
-        .join(MediaTable, INNER, albumArtistTableId, MediaTable.albumArtistId)
-        .select { albumArtistTableName }
-        .where { albumArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR }
-        .distinct()
-        .sequence { it[albumArtistTableName] }
         .toList()
     }
   }
@@ -1552,16 +1358,6 @@ private class AudioMediaDaoImpl(
       )
     }
   }
-
-  companion object {
-    val AlbumArtistTable = ArtistTable.alias("AlbumArtist")
-    val SongArtistTable = ArtistTable.alias("SongArtist")
-
-    val albumArtistTableId = AlbumArtistTable[ArtistTable.id]
-    val albumArtistTableName = AlbumArtistTable[ArtistTable.artistName]
-    val songArtistTableId = SongArtistTable[ArtistTable.id]
-    val songArtistTableName = SongArtistTable[ArtistTable.artistName]
-  }
 }
 
 private val INSERT_AUDIO_STATEMENT = MediaTable.insertValues {
@@ -1637,8 +1433,7 @@ private val AudioViewQueueDataQuery: QueryBuilder<Join> = MediaTable
       AlbumTable.albumLocalArtUri,
       AlbumTable.albumArtUri
     )
-  }
-  .where { MediaTable.mediaType eq MediaType.Audio.id }
+  }.where { MediaTable.mediaType eq MediaType.Audio.id }
 
 object AudioViewQueueData : View(AudioViewQueueDataQuery) {
   val mediaId = column(MediaTable.id)
@@ -1656,37 +1451,6 @@ object AudioViewQueueData : View(AudioViewQueueDataQuery) {
   val localAlbumArt = column(AlbumTable.albumLocalArtUri)
   val albumArt = column(AlbumTable.albumArtUri)
 }
-
-//private val FullAudioViewQuery = MediaTable
-//  .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
-//  .join(AlbumArtistTable, INNER, MediaTable.albumArtistId, albumArtistTableId)
-//  .join(SongArtistTable, INNER, MediaTable.artistId, songArtistTableId)
-//  .join(GenreMediaTable, INNER, MediaTable.id, GenreMediaTable.mediaId)
-//  .join(GenreTable, LEFT, GenreTable.id, GenreMediaTable.genreId)
-//  .join(ComposerMediaTable, INNER, MediaTable.id, ComposerMediaTable.mediaId)
-//  .join(ComposerTable, LEFT, ComposerTable.id, ComposerMediaTable.composerId)
-//  .selects {
-//    listOf(
-//      MediaTable.id,
-//      MediaTable.title,
-//      AlbumTable.albumTitle,
-//      albumArtistTableName,
-//      SongArtistTable[ArtistTable.artistName],
-//      GenreTable.genre,
-//      ComposerTable.composer
-//    )
-//  }
-//  .where { MediaTable.mediaType eq MediaType.Audio.id }
-//
-//object FullAudioView : View(FullAudioViewQuery) {
-//  val mediaId = column(MediaTable.id)
-//  val mediaTitle = column(MediaTable.title)
-//  val albumTitle = column(AlbumTable.albumTitle)
-//  val albumArtistName = column(albumArtistTableName)
-//  val songArtistName = column(SongArtistTable[ArtistTable.artistName])
-//  val genreName = column(GenreTable.genre)
-//  val composeName = column(ComposerTable.composer)
-//}
 
 private val SINGLE_QUEUE_ITEM_DATA_QUERY by lazy {
   Query(
@@ -1712,26 +1476,6 @@ private val SINGLE_QUEUE_ITEM_DATA_QUERY by lazy {
       }
       .where { (MediaTable.mediaType eq MediaType.Audio.id) and (MediaTable.id eq bindLong()) }
   )
-}
-
-private val BIND_CURRENT_TIME = bindLong()
-private val BIND_MEDIA_ID = bindLong()
-private val INCREMENT_SKIPPED_COUNT by lazy {
-  MediaTable.updateColumns {
-    it[skippedCount] = skippedCount plus 1
-    it[lastSkippedTime] = BIND_CURRENT_TIME
-  }.where {
-    id eq BIND_MEDIA_ID
-  }
-}
-
-private val INCREMENT_PLAYED_COUNT by lazy {
-  MediaTable.updateColumns {
-    it[playedCount] = playedCount plus 1
-    it[lastPlayedTime] = BIND_CURRENT_TIME
-  }.where {
-    id eq BIND_MEDIA_ID
-  }
 }
 
 private val AUDIO_DESCRIPTION_SELECTS = listOf(

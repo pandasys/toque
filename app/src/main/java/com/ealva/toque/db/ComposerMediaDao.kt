@@ -35,8 +35,7 @@ interface ComposerMediaDao {
   /**
    * Insert or replace all artists for [replaceMediaId]
    */
-  fun replaceMediaComposer(
-    txn: TransactionInProgress,
+  fun TransactionInProgress.replaceMediaComposer(
     replaceComposerId: ComposerId,
     replaceMediaId: MediaId,
     createTime: Millis
@@ -58,12 +57,11 @@ private val INSERT_COMPOSER_MEDIA = ComposerMediaTable.insertValues(OnConflict.I
 private val BIND_MEDIA_ID = bindLong()
 private val DELETE_MEDIA = ComposerMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
 private class ComposerMediaDaoImpl : ComposerMediaDao {
-  override fun replaceMediaComposer(
-    txn: TransactionInProgress,
+  override fun TransactionInProgress.replaceMediaComposer(
     replaceComposerId: ComposerId,
     replaceMediaId: MediaId,
     createTime: Millis
-  ) = txn.run {
+  ) = run {
     DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = replaceMediaId.value }
     INSERT_COMPOSER_MEDIA.insert {
       it[composerId] = replaceComposerId.value

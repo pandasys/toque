@@ -25,6 +25,7 @@ import com.ealva.toque.R
 import com.ealva.toque.common.asLong
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
+import com.ealva.toque.db.ArtistDao
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.ComposerDao
 import com.ealva.toque.db.GenreDao
@@ -135,13 +136,13 @@ sealed interface EditorRule : Parcelable {
       ruleId: Long,
       matcher: Matcher<*>,
       data: MatcherData,
-      audioMediaDao: AudioMediaDao
+      artistDao: ArtistDao
     ): EditorRule = makeArtistEditorRule(
       update = update as? TextEditorRule,
       ruleId,
       matcher,
       data,
-      audioMediaDao
+      artistDao
     )
 
     suspend fun albumArtistRule(
@@ -149,13 +150,13 @@ sealed interface EditorRule : Parcelable {
       ruleId: Long,
       matcher: Matcher<*>,
       data: MatcherData,
-      audioMediaDao: AudioMediaDao
+      artistDao: ArtistDao
     ): EditorRule = makeAlbumArtistEditorRule(
       update = update as? TextEditorRule,
       ruleId,
       matcher,
       data,
-      audioMediaDao
+      artistDao
     )
 
     suspend fun genreRule(
@@ -336,7 +337,7 @@ private suspend fun makeAlbumEditorRule(
   ruleId: Long,
   matcher: Matcher<*>,
   data: MatcherData,
-  audioMediaDao: AlbumDao
+  albumDao: AlbumDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
   ruleId = ruleId,
   ruleField = RuleField.Album,
@@ -344,7 +345,7 @@ private suspend fun makeAlbumEditorRule(
   data = data,
   showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  audioMediaDao.getAlbumSuggestions(partial, textSearch)
+  albumDao.getAlbumSuggestions(partial, textSearch)
     .getOrElse { cause ->
       LOG.e(cause) { it("Error getting Album suggestions.") }
       emptyList()
@@ -356,7 +357,7 @@ private suspend fun makeArtistEditorRule(
   ruleId: Long,
   matcher: Matcher<*>,
   data: MatcherData,
-  audioMediaDao: AudioMediaDao
+  artistDao: ArtistDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
   ruleId = ruleId,
   ruleField = RuleField.Artist,
@@ -364,7 +365,7 @@ private suspend fun makeArtistEditorRule(
   data = data,
   showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  audioMediaDao.getArtistSuggestions(partial, textSearch)
+  artistDao.getArtistSuggestions(partial, textSearch)
     .getOrElse { cause ->
       LOG.e(cause) { it("Error getting Artist suggestions.") }
       emptyList()
@@ -376,7 +377,7 @@ private suspend fun makeAlbumArtistEditorRule(
   ruleId: Long,
   matcher: Matcher<*>,
   data: MatcherData,
-  audioMediaDao: AudioMediaDao
+  artistDao: ArtistDao
 ): EditorRule = makeTextEditorRuleWithSuggestions(
   ruleId = ruleId,
   ruleField = RuleField.AlbumArtist,
@@ -384,7 +385,7 @@ private suspend fun makeAlbumArtistEditorRule(
   data = data,
   showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
-  audioMediaDao.getAlbumArtistSuggestions(partial, textSearch)
+  artistDao.getAlbumArtistSuggestions(partial, textSearch)
     .onFailure { cause -> LOG.e(cause) { it("Error getting AlbumArtist suggestions.") } }
     .getOrElse { emptyList() }
 }

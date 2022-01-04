@@ -117,8 +117,7 @@ interface AlbumDao {
   /**
    * Update the Album if it exists otherwise insert it
    */
-  fun upsertAlbum(
-    txn: TransactionInProgress,
+  fun TransactionInProgress.upsertAlbum(
     album: String,
     albumSort: String,
     albumArt: Uri,
@@ -150,6 +149,7 @@ interface AlbumDao {
   suspend fun getMin(): DaoResult<AlbumId>
   suspend fun getMax(): DaoResult<AlbumId>
   suspend fun getRandom(): DaoResult<AlbumId>
+
   suspend fun getAlbumSuggestions(
     partialTitle: String,
     textSearch: TextSearch
@@ -178,8 +178,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
    * query/update/insert as an artist/album are processed in a group. But we'll hold a lock
    * just in case
    */
-  override fun upsertAlbum(
-    txn: TransactionInProgress,
+  override fun TransactionInProgress.upsertAlbum(
     album: String,
     albumSort: String,
     albumArt: Uri,
@@ -190,7 +189,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     upsertResults: AudioUpsertResults
   ): AlbumId = upsertLock.withLock {
     require(album.isNotBlank()) { "Album may not be blank" }
-    txn.doUpsertAlbum(
+    doUpsertAlbum(
       album,
       albumSort,
       albumArtist,

@@ -32,8 +32,7 @@ interface ArtistAlbumDao {
   /**
    * Insert the artist/album relationship replacing on conflict if the pair already exists
    */
-  fun insertArtistAlbum(
-    txn: TransactionInProgress,
+  fun TransactionInProgress.insertArtistAlbum(
     newArtistId: ArtistId,
     newAlbumId: AlbumId,
     createTime: Millis
@@ -53,12 +52,11 @@ private val INSERT_ARTIST_ALBUM = ArtistAlbumTable.insertValues(OnConflict.Repla
 }
 
 private class ArtistAlbumDaoImpl : ArtistAlbumDao {
-  override fun insertArtistAlbum(
-    txn: TransactionInProgress,
+  override fun TransactionInProgress.insertArtistAlbum(
     newArtistId: ArtistId,
     newAlbumId: AlbumId,
     createTime: Millis
-  ) = txn.run {
+  ) = run {
     INSERT_ARTIST_ALBUM.insert {
       it[artistId] = newArtistId.value
       it[albumId] = newAlbumId.value

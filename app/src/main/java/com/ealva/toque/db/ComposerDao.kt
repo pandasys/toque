@@ -25,10 +25,13 @@ import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ComposerDaoEvent.ComposerCreatedOrUpdated
 import com.ealva.toque.persist.ComposerId
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asComposerId
 import com.ealva.toque.persist.isValid
+import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
+import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.BindExpression
 import com.ealva.welite.db.expr.Expression
@@ -97,20 +100,14 @@ sealed class ComposerDaoEvent {
 interface ComposerDao {
   val composerDaoEvents: SharedFlow<ComposerDaoEvent>
 
-  /**
-   * Creates or gets the ID for for the [composer]. Throws IllegalStateException if [composer] is
-   * not found and cannot be inserted.
-   */
-  fun getOrCreateComposerId(
-    txn: TransactionInProgress,
-    composer: String,
-    composerSort: String,
-    createTime: Millis,
-    upsertResults: AudioUpsertResults
-  ): ComposerId
-
   fun deleteAll(txn: TransactionInProgress)
   fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
+
+  fun TransactionInProgress.replaceMediaComposer(
+    replaceComposerId: ComposerId,
+    replaceMediaId: MediaId,
+    createTime: Millis
+  )
 
   suspend fun getAllComposers(limit: Limit = NoLimit): DaoResult<List<ComposerDescription>>
 
@@ -124,6 +121,13 @@ interface ComposerDao {
     partial: String,
     textSearch: TextSearch
   ): DaoResult<List<String>>
+
+  fun Transaction.replaceComposerMedia(
+    fileTagInfo: MediaFileTagInfo,
+    mediaId: MediaId,
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
+  )
 
   companion object {
     operator fun invoke(
@@ -150,23 +154,39 @@ private class ComposerDaoImpl(
   dispatcher: CoroutineDispatcher
 ) : ComposerDao {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val composerMediaDao = ComposerMediaDao()
   override val composerDaoEvents = MutableSharedFlow<ComposerDaoEvent>()
 
   private fun emit(event: ComposerDaoEvent) {
     scope.launch { composerDaoEvents.emit(event) }
   }
 
-  override fun getOrCreateComposerId(
-    txn: TransactionInProgress,
+  override fun Transaction.replaceComposerMedia(
+    fileTagInfo: MediaFileTagInfo,
+    mediaId: MediaId,
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
+  ) {
+    replaceMediaComposer(
+      getOrCreateComposerId(
+        fileTagInfo.composer,
+        fileTagInfo.composerSort,
+        createUpdateTime,
+        upsertResults
+      ),
+      mediaId,
+      createUpdateTime
+    )
+  }
+
+  private fun TransactionInProgress.getOrCreateComposerId(
     composer: String,
     composerSort: String,
     createTime: Millis,
     upsertResults: AudioUpsertResults
-  ): ComposerId = txn
-    .getOrCreateComposer(composer, composerSort, createTime)
-    .also { composerId ->
-      if (composerId.isValid) upsertResults.alwaysEmit { emitUpdateOrCreated(composerId) }
-    }
+  ): ComposerId = getOrCreateComposer(composer, composerSort, createTime).also { composerId ->
+    if (composerId.isValid) upsertResults.alwaysEmit { emitUpdateOrCreated(composerId) }
+  }
 
   fun emitUpdateOrCreated(composerId: ComposerId) {
     scope.launch { emit(ComposerCreatedOrUpdated(composerId)) }
@@ -181,6 +201,14 @@ private class ComposerDaoImpl(
     ComposerTable.deleteWhere {
       literal(0) eq (ComposerMediaTable.selectCount { composerId eq id }).asExpression()
     }.delete()
+  }
+
+  override fun TransactionInProgress.replaceMediaComposer(
+    replaceComposerId: ComposerId,
+    replaceMediaId: MediaId,
+    createTime: Millis
+  ) {
+    with(composerMediaDao) { replaceMediaComposer(replaceComposerId, replaceMediaId, createTime) }
   }
 
   private val songCountColumn = ComposerMediaTable.mediaId.count()

@@ -35,9 +35,6 @@ object DbModule {
     single { AlbumDao(db = get()) }
     single { ArtistAlbumDao() }
     single { ComposerDao(db = get()) }
-    single { ArtistMediaDao() }
-    single { GenreMediaDao() }
-    single { ComposerMediaDao() }
     single { EqPresetDao(db = get()) }
     single { EqPresetAssociationDao(db = get()) }
     single { PlaylistDao(db = get()) }
@@ -51,9 +48,6 @@ object DbModule {
         albumDao = get(),
         artistAlbumDao = get(),
         composerDao = get(),
-        artistMediaDao = get(),
-        genreMediaDao = get(),
-        composerMediaDao = get(),
         playlistDao = get(),
         eqPresetAssociationDao = get(),
         appPrefsSingleton = get(AppPrefs.QUALIFIER)

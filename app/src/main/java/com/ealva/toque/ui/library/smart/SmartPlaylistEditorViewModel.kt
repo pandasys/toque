@@ -643,8 +643,8 @@ private class SmartPlaylistEditorViewModelImpl(
   ): EditorRule = when (field) {
     RuleField.Title -> titleRule(update, ruleId, matcher, data, audioMediaDao)
     RuleField.Album -> albumRule(update, ruleId, matcher, data, audioMediaDao.albumDao)
-    RuleField.Artist -> artistRule(update, ruleId, matcher, data, audioMediaDao)
-    RuleField.AlbumArtist -> albumArtistRule(update, ruleId, matcher, data, audioMediaDao)
+    RuleField.Artist -> artistRule(update, ruleId, matcher, data, audioMediaDao.artistDao)
+    RuleField.AlbumArtist -> albumArtistRule(update, ruleId, matcher, data, audioMediaDao.artistDao)
     RuleField.Genre -> genreRule(update, ruleId, matcher, data, audioMediaDao.genreDao)
     RuleField.Composer -> composerRule(update, ruleId, matcher, data, audioMediaDao.composerDao)
     RuleField.Rating -> ratingRule(ruleId, matcher, data)

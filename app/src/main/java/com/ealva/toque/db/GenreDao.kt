@@ -29,9 +29,12 @@ import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.GenreDaoEvent.GenresCreatedOrUpdated
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.GenreIdList
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asGenreId
+import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
+import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.BindExpression
 import com.ealva.welite.db.expr.Expression
@@ -133,6 +136,13 @@ interface GenreDao {
     textSearch: TextSearch
   ): DaoResult<List<String>>
 
+  fun Transaction.replaceGenreMedia(
+    fileTagInfo: MediaFileTagInfo,
+    mediaId: MediaId,
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
+  )
+
   companion object {
     operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
       GenreDaoImpl(db, dispatcher ?: Dispatchers.Main)
@@ -141,6 +151,7 @@ interface GenreDao {
 
 private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispatcher) : GenreDao {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val genreMediaDao = GenreMediaDao()
   private val getOrInsertLock: Lock = ReentrantLock()
   override val genreDaoEvents = MutableSharedFlow<GenreDaoEvent>()
 
@@ -290,6 +301,25 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .sequence { cursor -> GenreId(cursor[id]) }
         .single()
     }
+  }
+
+  override fun Transaction.replaceGenreMedia(
+    fileTagInfo: MediaFileTagInfo,
+    mediaId: MediaId,
+    createUpdateTime: Millis,
+    upsertResults: AudioUpsertResults
+  ) {
+    genreMediaDao.replaceMediaGenres(
+      this,
+      getOrCreateGenreIds(
+        this,
+        fileTagInfo.genres,
+        createUpdateTime,
+        upsertResults
+      ),
+      mediaId,
+      createUpdateTime
+    )
   }
 
   /**

@@ -30,6 +30,8 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.ArtistIdList
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asArtistId
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -112,8 +114,7 @@ interface ArtistDao {
   /**
    * Update the artist info if it exists otherwise insert it
    */
-  fun upsertArtist(
-    txn: TransactionInProgress,
+  fun TransactionInProgress.upsertArtist(
     artistName: String,
     artistSort: String,
     artistMbid: ArtistMbid?,
@@ -141,16 +142,41 @@ interface ArtistDao {
   suspend fun getMax(): DaoResult<ArtistId>
   suspend fun getRandom(): DaoResult<ArtistId>
 
+  suspend fun getArtistSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): DaoResult<List<String>>
+
+  suspend fun getAlbumArtistSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): DaoResult<List<String>>
+
+  fun TransactionInProgress.replaceMediaArtists(
+    artistIdList: ArtistIdList,
+    replaceMediaId: MediaId,
+    createTime: Millis
+  )
+
   companion object {
     operator fun invoke(
       db: Database,
       dispatcher: CoroutineDispatcher? = null
     ): ArtistDao = ArtistDaoImpl(db, dispatcher ?: Dispatchers.Main)
+
+    val AlbumArtistTable = ArtistTable.alias("AlbumArtist")
+    val SongArtistTable = ArtistTable.alias("SongArtist")
+
+    val albumArtistTableId = AlbumArtistTable[ArtistTable.id]
+    val albumArtistTableName = AlbumArtistTable[ArtistTable.artistName]
+    val songArtistTableId = SongArtistTable[ArtistTable.id]
+    val songArtistTableName = SongArtistTable[ArtistTable.artistName]
   }
 }
 
 private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispatcher) : ArtistDao {
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val artistMediaDao = ArtistMediaDao()
   private val upsertLock: Lock = ReentrantLock()
 
   override val artistDaoEvents = MutableSharedFlow<ArtistDaoEvent>()
@@ -159,8 +185,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     scope.launch { artistDaoEvents.emit(event) }
   }
 
-  override fun upsertArtist(
-    txn: TransactionInProgress,
+  override fun TransactionInProgress.upsertArtist(
     artistName: String,
     artistSort: String,
     artistMbid: ArtistMbid?,
@@ -168,7 +193,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     upsertResults: AudioUpsertResults
   ): ArtistId = upsertLock.withLock {
     require(artistName.isNotBlank()) { "Artist may not be blank" }
-    txn.doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime, upsertResults)
+    doUpsertArtist(artistName, artistSort, artistMbid, createUpdateTime, upsertResults)
   }
 
   private fun TransactionInProgress.doUpsertArtist(
@@ -406,6 +431,41 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     }
   }
 
+  override suspend fun getArtistSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): DaoResult<List<String>> = runSuspendCatching {
+    db.query {
+      ArtistDao.SongArtistTable
+        .join(MediaTable, JoinType.INNER, ArtistDao.songArtistTableId, MediaTable.artistId)
+        .select { ArtistDao.songArtistTableName }
+        .where { ArtistDao.songArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR }
+        .distinct()
+        .sequence { it[ArtistDao.songArtistTableName] }
+        .toList()
+    }
+  }
+
+  override suspend fun getAlbumArtistSuggestions(
+    partial: String,
+    textSearch: TextSearch
+  ): DaoResult<List<String>> = runSuspendCatching {
+    db.query {
+      ArtistDao.AlbumArtistTable
+        .join(MediaTable, JoinType.INNER, ArtistDao.albumArtistTableId, MediaTable.albumArtistId)
+        .select { ArtistDao.albumArtistTableName }
+        .where { ArtistDao.albumArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR }
+        .distinct()
+        .sequence { it[ArtistDao.albumArtistTableName] }
+        .toList()
+    }
+  }
+
+  override fun TransactionInProgress.replaceMediaArtists(
+    artistIdList: ArtistIdList,
+    replaceMediaId: MediaId,
+    createTime: Millis
+  ) = with(artistMediaDao) { replaceMediaArtists(artistIdList, replaceMediaId, createTime) }
 }
 
 private val songCountColumn = MediaTable.id.countDistinct()

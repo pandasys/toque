@@ -35,8 +35,7 @@ interface ArtistMediaDao {
   /**
    * Insert or replace all artists for [replaceMediaId]
    */
-  fun replaceMediaArtists(
-    txn: TransactionInProgress,
+  fun TransactionInProgress.replaceMediaArtists(
     artistIdList: ArtistIdList,
     replaceMediaId: MediaId,
     createTime: Millis
@@ -59,12 +58,11 @@ private val BIND_MEDIA_ID = bindLong()
 private val DELETE_MEDIA = ArtistMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
 
 private class ArtistMediaDaoImpl : ArtistMediaDao {
-  override fun replaceMediaArtists(
-    txn: TransactionInProgress,
+  override fun TransactionInProgress.replaceMediaArtists(
     artistIdList: ArtistIdList,
     replaceMediaId: MediaId,
     createTime: Millis
-  ) = txn.run {
+  ) {
     DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = replaceMediaId.value }
     artistIdList.forEach { newArtistId ->
       INSERT_ARTIST_MEDIA.insert {

@@ -255,10 +255,14 @@ object GenreTable : Table() {
 }
 
 object GenreMediaTable : Table() {
-  val genreId = reference("GenreMedia_GenreId", GenreTable.id, ForeignKeyAction.CASCADE)
+  val genreId = reference(
+    name = "GenreMedia_GenreId",
+    refColumn = GenreTable.id,
+    onDelete = ForeignKeyAction.CASCADE
+  )
   val mediaId = reference(
-    "GenreMedia_MediaId",
-    MediaTable.id,
+    name = "GenreMedia_MediaId",
+    refColumn = MediaTable.id,
     onDelete = ForeignKeyAction.CASCADE
   )
   val createdTime = long("GenreMediaCreated")
