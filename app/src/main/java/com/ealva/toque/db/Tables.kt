@@ -396,13 +396,6 @@ object PlayListTable : Table() {
 
   init {
     uniqueIndex(playListName)
-    // PlayListMediaTable defines column as ForeignKey with cascade on delete, no trigger necessary
-    //deleteTrigger(
-    //  name = "DeletePlayListTrigger",
-    //  beforeAfter = Trigger.BeforeAfter.BEFORE
-    //) {
-    //  PlayListMediaTable.delete { PlayListMediaTable.playListId eq old(PlayListTable.id) }
-    //}
   }
 }
 
