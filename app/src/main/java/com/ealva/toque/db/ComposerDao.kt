@@ -17,9 +17,6 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.common.ComposerName
-import com.ealva.ealvalog.i
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
@@ -77,9 +74,6 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-private val LOG by lazyLogger(ComposerDao::class)
-private val getOrInsertLock: Lock = ReentrantLock()
-
 data class ComposerDescription(
   val composerId: ComposerId,
   val composerName: ComposerName,
@@ -100,8 +94,8 @@ sealed class ComposerDaoEvent {
 interface ComposerDao {
   val composerDaoEvents: SharedFlow<ComposerDaoEvent>
 
-  fun deleteAll(txn: TransactionInProgress)
-  fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long
+  fun TransactionInProgress.deleteAll(): Long
+  fun TransactionInProgress.deleteComposersWithNoMedia(): Long
 
   fun TransactionInProgress.replaceMediaComposer(
     replaceComposerId: ComposerId,
@@ -154,6 +148,7 @@ private class ComposerDaoImpl(
   dispatcher: CoroutineDispatcher
 ) : ComposerDao {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val getOrInsertLock: Lock = ReentrantLock()
   private val composerMediaDao = ComposerMediaDao()
   override val composerDaoEvents = MutableSharedFlow<ComposerDaoEvent>()
 
@@ -192,12 +187,9 @@ private class ComposerDaoImpl(
     scope.launch { emit(ComposerCreatedOrUpdated(composerId)) }
   }
 
-  override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = ComposerTable.deleteAll()
-    LOG.i { it("Deleted %d composers", count) }
-  }
+  override fun TransactionInProgress.deleteAll() = ComposerTable.deleteAll()
 
-  override fun deleteComposersWithNoMedia(txn: TransactionInProgress): Long = txn.run {
+  override fun TransactionInProgress.deleteComposersWithNoMedia(): Long = run {
     ComposerTable.deleteWhere {
       literal(0) eq (ComposerMediaTable.selectCount { composerId eq id }).asExpression()
     }.delete()

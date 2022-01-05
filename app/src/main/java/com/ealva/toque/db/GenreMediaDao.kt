@@ -30,8 +30,7 @@ interface GenreMediaDao {
   /**
    * Insert or replace all genres for [newMediaId]
    */
-  fun replaceMediaGenres(
-    txn: TransactionInProgress,
+  fun TransactionInProgress.replaceMediaGenres(
     genreIdList: GenreIdList,
     newMediaId: MediaId,
     createTime: Millis
@@ -52,12 +51,11 @@ private val BIND_MEDIA_ID = bindLong()
 private val DELETE_MEDIA = GenreMediaTable.deleteWhere { mediaId eq BIND_MEDIA_ID }
 
 private class GenreMediaDaoImpl : GenreMediaDao {
-  override fun replaceMediaGenres(
-    txn: TransactionInProgress,
+  override fun TransactionInProgress.replaceMediaGenres(
     genreIdList: GenreIdList,
     newMediaId: MediaId,
     createTime: Millis
-  ) = txn.run {
+  ) {
     DELETE_MEDIA.delete { it[BIND_MEDIA_ID] = newMediaId.value }
     genreIdList.forEach { newGenreId ->
       INSERT_GENRE_MEDIA.insert {
@@ -67,5 +65,4 @@ private class GenreMediaDaoImpl : GenreMediaDao {
       }
     }
   }
-
 }

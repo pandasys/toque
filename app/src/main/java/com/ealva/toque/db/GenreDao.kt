@@ -17,9 +17,6 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.common.GenreName
-import com.ealva.ealvalog.i
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
@@ -80,8 +77,6 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-private val LOG by lazyLogger(GenreDao::class)
-
 sealed class GenreDaoEvent {
   data class GenresCreatedOrUpdated(val genreIdList: GenreIdList) : GenreDaoEvent()
 }
@@ -104,19 +99,8 @@ data class GenreDescription(
 interface GenreDao {
   val genreDaoEvents: SharedFlow<GenreDaoEvent>
 
-  /**
-   * Gets or creates the Ids for the list of genres. Throws IllegalStateException if a genre is
-   * not found and cannot be inserted.
-   */
-  fun getOrCreateGenreIds(
-    txn: TransactionInProgress,
-    genreList: List<String>,
-    createTime: Millis,
-    upsertResults: AudioUpsertResults
-  ): GenreIdList
-
-  fun deleteAll(txn: TransactionInProgress)
-  fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long
+  fun TransactionInProgress.deleteAll(): Long
+  fun TransactionInProgress.deleteGenresNotAssociateWithMedia(): Long
 
   suspend fun getAllGenres(
     filter: Filter = NoFilter,
@@ -159,37 +143,12 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     scope.launch { genreDaoEvents.emit(event) }
   }
 
-  override fun getOrCreateGenreIds(
-    txn: TransactionInProgress,
-    genreList: List<String>,
-    createTime: Millis,
-    upsertResults: AudioUpsertResults
-  ): GenreIdList {
-    val genreIdList = GenreIdList()
-    return GenreIdList(genreList.size).also { list ->
-      genreList.forEach { genre ->
-        list += txn.getOrCreateGenre(
-          genre,
-          createTime,
-          genreIdList
-        )
-      }
-    }.also {
-      if (genreIdList.isNotEmpty)
-        upsertResults.alwaysEmit { emit(GenresCreatedOrUpdated(genreIdList)) }
-    }
-  }
+  override fun TransactionInProgress.deleteAll() = GenreTable.deleteAll()
 
-  override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = GenreTable.deleteAll()
-    LOG.i { it("Deleted %d genres", count) }
-  }
-
-  override fun deleteGenresNotAssociateWithMedia(txn: TransactionInProgress): Long = txn.run {
-    GenreTable.deleteWhere {
+  override fun TransactionInProgress.deleteGenresNotAssociateWithMedia(): Long = GenreTable
+    .deleteWhere {
       literal(0) eq (GenreMediaTable.selectCount { genreId eq id }).asExpression()
     }.delete()
-  }
 
   private val songCountColumn = GenreMediaTable.mediaId.countDistinct()
   override suspend fun getAllGenres(
@@ -309,17 +268,37 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     createUpdateTime: Millis,
     upsertResults: AudioUpsertResults
   ) {
-    genreMediaDao.replaceMediaGenres(
-      this,
-      getOrCreateGenreIds(
-        this,
-        fileTagInfo.genres,
-        createUpdateTime,
-        upsertResults
-      ),
-      mediaId,
-      createUpdateTime
-    )
+    with(genreMediaDao) {
+      replaceMediaGenres(
+        getOrCreateGenreIds(
+          fileTagInfo.genres,
+          createUpdateTime,
+          upsertResults
+        ),
+        mediaId,
+        createUpdateTime
+      )
+    }
+  }
+
+  private fun TransactionInProgress.getOrCreateGenreIds(
+    genreList: List<String>,
+    createTime: Millis,
+    upsertResults: AudioUpsertResults
+  ): GenreIdList {
+    val genreIdList = GenreIdList()
+    return GenreIdList(genreList.size).also { list ->
+      genreList.forEach { genre ->
+        list += getOrCreateGenre(
+          genre,
+          createTime,
+          genreIdList
+        )
+      }
+    }.also {
+      if (genreIdList.isNotEmpty)
+        upsertResults.alwaysEmit { emit(GenresCreatedOrUpdated(genreIdList)) }
+    }
   }
 
   /**

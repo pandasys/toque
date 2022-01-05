@@ -344,7 +344,7 @@ sealed interface CategoryToken : Parcelable {
     override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken = getCategoryToken(
       dao = audioMediaDao.playlistDao,
       failureMsg = "Error getting random Playlist",
-      orElse = { Album(AlbumId.INVALID).getMinToken(audioMediaDao, this) },
+      orElse = { Album(AlbumId.INVALID).getRandom(audioMediaDao) },
       tokenMaker = { Playlist(it) },
       getId = { getRandom() }
     )

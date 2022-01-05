@@ -128,9 +128,9 @@ interface AlbumDao {
     upsertResults: AudioUpsertResults
   ): AlbumId
 
-  fun deleteAll(txn: TransactionInProgress): Long
+  fun TransactionInProgress.deleteAll(): Long
 
-  fun deleteAlbumsWithNoMedia(txn: TransactionInProgress): Long
+  fun TransactionInProgress.deleteAlbumsWithNoMedia(): Long
 
   suspend fun getAllAlbums(
     filter: Filter = NoFilter,
@@ -201,13 +201,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     )
   }
 
-  override fun deleteAll(txn: TransactionInProgress): Long = txn.run { AlbumTable.deleteAll() }
+  override fun TransactionInProgress.deleteAll(): Long = AlbumTable.deleteAll()
 
-  override fun deleteAlbumsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
-    AlbumTable.deleteWhere {
+  override fun TransactionInProgress.deleteAlbumsWithNoMedia(): Long = AlbumTable
+    .deleteWhere {
       literal(0) eq (MediaTable.selectCount { AlbumTable.id eq albumId }).asExpression()
     }.delete()
-  }
 
   override suspend fun getAllAlbums(
     filter: Filter,

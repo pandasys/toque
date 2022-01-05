@@ -20,7 +20,6 @@ import android.content.Context
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.OpenParams
-import com.ealva.welite.db.TransactionInProgress
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -69,23 +68,8 @@ object DbModule {
     )
   ) {
     onCreate {
-      establishQueueIds(this)
+      AudioMediaDao.establishQueueId(this)
       EqPresetDao.establishMinimumRowId(this)
     }
   }
-
-  private fun establishQueueIds(txn: TransactionInProgress) {
-    AudioMediaDao.establishQueueId(txn)
-  }
 }
-
-// class SqlExecutorSpy : SqlExecutor {
-//  val execSqlList: MutableList<String> = mutableListOf()
-//  override fun exec(sql: String, vararg bindArgs: Any) {
-//    execSqlList += sql
-//  }
-//
-//  override fun exec(sql: List<String>) {
-//    execSqlList += sql
-//  }
-// }
