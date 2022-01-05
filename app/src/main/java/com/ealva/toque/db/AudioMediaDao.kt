@@ -59,7 +59,6 @@ import com.ealva.toque.db.PlayListType.UserCreated
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.extension
 import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.AlbumIdList
 import com.ealva.toque.persist.ArtistId
@@ -502,29 +501,23 @@ private class AudioMediaDaoImpl(
    */
   override suspend fun deleteAll() {
     db.transaction {
-      eqPresetAssocDao.deleteMediaAndAlbumAssociations(this)
+      with(eqPresetAssocDao) { deleteMediaAndAlbumAssociations() }
 //      queueTable.deleteAll(txn)
       MediaTable.deleteAll()
-      albumDao.deleteAll(this)
-      artistDao.deleteAll(this)
-      composerDao.deleteAll(this)
-      genreDao.deleteAll(this)
-      artistAlbumDao.deleteAll(this)
+      with(albumDao) { deleteAll() }
+      with(artistDao) { deleteAll() }
+      with(composerDao) { deleteAll() }
+      with(genreDao) { deleteAll() }
+      with(artistAlbumDao) { deleteAll() }
     }
   }
 
-  override suspend fun deleteEntitiesWithNoMedia() = db.transaction {
-    albumDao.deleteAlbumsWithNoMedia(this).let { albumsDeleted ->
-      LOG._i { it("Deleted %d albums with no media", albumsDeleted) }
-    }
-    artistDao.deleteArtistsWithNoMedia(this).let { artistsDeleted ->
-      LOG._i { it("Deleted %d artists with no media", artistsDeleted) }
-    }
-    genreDao.deleteGenresNotAssociateWithMedia(this).let { genresDeleted ->
-      LOG._i { it("Deleted %d genres with no associated media", genresDeleted) }
-    }
-    composerDao.deleteComposersWithNoMedia(this).let { composersDeleted: Long ->
-      LOG._i { it("Deleted %d composers with no media", composersDeleted) }
+  override suspend fun deleteEntitiesWithNoMedia() {
+    db.transaction {
+      with(albumDao) { deleteAlbumsWithNoMedia() }
+      with(artistDao) { deleteArtistsWithNoMedia() }
+      with(genreDao) { deleteGenresNotAssociateWithMedia() }
+      with(composerDao) { deleteComposersWithNoMedia() }
     }
   }
 

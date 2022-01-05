@@ -16,8 +16,6 @@
 
 package com.ealva.toque.db
 
-import com.ealva.ealvalog.i
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.ComposerId
@@ -40,8 +38,6 @@ interface ComposerMediaDao {
     replaceMediaId: MediaId,
     createTime: Millis
   )
-
-  fun deleteAll(txn: TransactionInProgress)
 
   companion object {
     operator fun invoke(): ComposerMediaDao = ComposerMediaDaoImpl()
@@ -71,8 +67,4 @@ private class ComposerMediaDaoImpl : ComposerMediaDao {
     Unit
   }
 
-  override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = ComposerMediaTable.deleteAll()
-    LOG.i { it("Deleted %d composer/media associations", count) }
-  }
 }

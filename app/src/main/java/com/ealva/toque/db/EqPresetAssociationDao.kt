@@ -46,9 +46,10 @@ typealias AssociationListResult = DaoResult<List<PresetAssociation>>
 
 interface EqPresetAssociationDao {
   /**
-   * As part of [txn] delete all media and album associations. Typically done when cleaning the DB.
+   * As part of [this@deleteMediaAndAlbumAssociations] delete all media and album associations.
+   * Typically done when cleaning the DB.
    */
-  fun deleteMediaAndAlbumAssociations(txn: TransactionInProgress)
+  fun TransactionInProgress.deleteMediaAndAlbumAssociations()
 
   /**
    * Delete any current default association and then set this [preset] as the default preset. The
@@ -80,12 +81,10 @@ interface EqPresetAssociationDao {
 
 private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociationDao {
 
-  override fun deleteMediaAndAlbumAssociations(txn: TransactionInProgress) {
-    txn.run {
-      EqPresetAssociationTable.delete {
-        (associationType eq PresetAssociationType.Media.id) or
-        (associationType eq PresetAssociationType.Album.id)
-      }
+  override fun TransactionInProgress.deleteMediaAndAlbumAssociations() {
+    EqPresetAssociationTable.delete {
+      (associationType eq PresetAssociationType.Media.id) or
+      (associationType eq PresetAssociationType.Album.id)
     }
   }
 

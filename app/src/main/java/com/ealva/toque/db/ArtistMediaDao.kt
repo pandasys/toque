@@ -16,9 +16,6 @@
 
 package com.ealva.toque.db
 
-import com.ealva.ealvalog.i
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Millis
 import com.ealva.toque.persist.ArtistIdList
 import com.ealva.toque.persist.MediaId
@@ -29,8 +26,6 @@ import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.OnConflict
 
-private val LOG by lazyLogger(ArtistMediaDao::class)
-
 interface ArtistMediaDao {
   /**
    * Insert or replace all artists for [replaceMediaId]
@@ -40,8 +35,6 @@ interface ArtistMediaDao {
     replaceMediaId: MediaId,
     createTime: Millis
   )
-
-  fun deleteAll(txn: TransactionInProgress)
 
   companion object {
     operator fun invoke(): ArtistMediaDao = ArtistMediaDaoImpl()
@@ -71,10 +64,5 @@ private class ArtistMediaDaoImpl : ArtistMediaDao {
         it[createdTime] = createTime()
       }
     }
-  }
-
-  override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = ArtistMediaTable.deleteAll()
-    LOG.i { it("Deleted %d artist/media associations", count) }
   }
 }

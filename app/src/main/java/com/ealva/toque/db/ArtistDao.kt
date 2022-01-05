@@ -122,8 +122,10 @@ interface ArtistDao {
     upsertResults: AudioUpsertResults
   ): ArtistId
 
-  fun deleteAll(txn: TransactionInProgress): Long
-  fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long
+  fun TransactionInProgress.deleteAll(): Long
+
+  fun TransactionInProgress.deleteArtistsWithNoMedia(): Long
+
   suspend fun getAlbumArtists(
     filter: Filter = NoFilter,
     limit: Limit = NoLimit
@@ -276,13 +278,10 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       )
     }.singleOrNull()
 
-  override fun deleteAll(txn: TransactionInProgress): Long = txn.run {
-    ArtistTable.deleteAll()
-  }
+  override fun TransactionInProgress.deleteAll(): Long = ArtistTable.deleteAll()
 
-  override fun deleteArtistsWithNoMedia(txn: TransactionInProgress): Long = txn.run {
+  override fun TransactionInProgress.deleteArtistsWithNoMedia(): Long =
     DELETE_ARTISTS_WITH_NO_MEDIA.delete()
-  }
 
   override suspend fun getAlbumArtists(
     filter: Filter,
@@ -439,7 +438,9 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       ArtistDao.SongArtistTable
         .join(MediaTable, JoinType.INNER, ArtistDao.songArtistTableId, MediaTable.artistId)
         .select { ArtistDao.songArtistTableName }
-        .where { ArtistDao.songArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR }
+        .where {
+          ArtistDao.songArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR
+        }
         .distinct()
         .sequence { it[ArtistDao.songArtistTableName] }
         .toList()
@@ -454,7 +455,9 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       ArtistDao.AlbumArtistTable
         .join(MediaTable, JoinType.INNER, ArtistDao.albumArtistTableId, MediaTable.albumArtistId)
         .select { ArtistDao.albumArtistTableName }
-        .where { ArtistDao.albumArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR }
+        .where {
+          ArtistDao.albumArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR
+        }
         .distinct()
         .sequence { it[ArtistDao.albumArtistTableName] }
         .toList()

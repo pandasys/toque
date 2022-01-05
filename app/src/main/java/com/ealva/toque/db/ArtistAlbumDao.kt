@@ -38,7 +38,7 @@ interface ArtistAlbumDao {
     createTime: Millis
   )
 
-  fun deleteAll(txn: TransactionInProgress)
+  fun TransactionInProgress.deleteAll(): Long
 
   companion object {
     operator fun invoke(): ArtistAlbumDao = ArtistAlbumDaoImpl()
@@ -65,8 +65,5 @@ private class ArtistAlbumDaoImpl : ArtistAlbumDao {
     Unit
   }
 
-  override fun deleteAll(txn: TransactionInProgress) = txn.run {
-    val count = ArtistAlbumTable.deleteAll()
-    LOG.i { it("Deleted %d artist/album associations", count) }
-  }
+  override fun TransactionInProgress.deleteAll() = ArtistAlbumTable.deleteAll()
 }
