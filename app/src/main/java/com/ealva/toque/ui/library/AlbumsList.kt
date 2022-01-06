@@ -51,9 +51,9 @@ import com.ealva.toque.R
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.config.LocalScreenConfig
-import com.ealva.toque.ui.config.ProvideScreenConfig
-import com.ealva.toque.ui.config.makeScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.ProvideScreenConfig
+import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.LocalWindowInsets
 

@@ -22,6 +22,7 @@ import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.asAlbumTitle
+import com.ealva.ealvabrainz.common.asArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -305,11 +306,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         songCountColumn
       )
     }
-    .where {
-      if (artistId != null) (MediaTable.artistId eq artistId.value) else {
-        null
-      }
-    }
+    .where { if (artistId == null) null else MediaTable.artistId eq artistId.value }
     .groupBy { AlbumTable.albumTitle }
     .orderByAsc { AlbumTable.albumSort }
     .limit(limit.value)
@@ -319,7 +316,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         cursor[AlbumTable.albumTitle].asAlbumTitle,
         cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
         cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
-        ArtistName(cursor[ArtistTable.artistName]),
+        cursor[ArtistTable.artistName].asArtistName,
         cursor[songCountColumn]
       )
     }

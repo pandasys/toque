@@ -117,9 +117,14 @@ import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
 import com.ealva.welite.db.view.View
 import com.ealva.welite.db.view.existingView
+import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.toErrorIf
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongArrayList
@@ -131,6 +136,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 private val LOG by lazyLogger(AudioMediaDao::class)
@@ -176,7 +185,7 @@ interface AudioMediaDao {
    */
   suspend fun deleteEntitiesWithNoMedia()
 
-  suspend fun getCountAllAudio(): LongResult
+//  suspend fun getCountAllAudio(): LongResult
 
   /**
    * Get all audio media using [filter] as an LIKE query and [limit] the returned items.
@@ -360,6 +369,11 @@ private const val DEFAULT_MAP_SIZE = 1024
 
 private const val CANT_UPDATE_DURATION = "Unable to update duration=%s for media=%s"
 
+/**
+ * Given a token, traverse to the subsequent token - which may be previous or next
+ */
+typealias SubsequentToken = suspend (CategoryToken) -> CategoryToken
+
 @Suppress("LargeClass")
 private class AudioMediaDaoImpl(
   private val db: Database,
@@ -378,7 +392,7 @@ private class AudioMediaDaoImpl(
 
   override val audioDaoEvents = MutableSharedFlow<AudioDaoEvent>(extraBufferCapacity = 5)
 
-  private fun emit(event: AudioDaoEvent) {
+  private fun emitEvent(event: AudioDaoEvent) {
     scope.launch { audioDaoEvents.emit(event) }
   }
 
@@ -394,7 +408,7 @@ private class AudioMediaDaoImpl(
   ) = metadataParser.parseMetadata(audioInfo.uriToParse(), artistParserFactory.make()).use { tag ->
     val appPrefs = appPrefsSingleton.instance()
     db.transaction {
-      val upsertResults = AudioUpsertResults { emit(it) }
+      val upsertResults = AudioUpsertResults { emitEvent(it) }
       onCommit { upsertResults.onCommit() }
       doUpsertAudio(audioInfo, tag, minimumDuration, createUpdateTime, appPrefs, upsertResults)
     }
@@ -521,8 +535,19 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  override suspend fun getCountAllAudio(): LongResult = runSuspendCatching {
-    db.query { MediaTable.selectCount { mediaType eq MediaType.Audio.id }.count() }
+//  override suspend fun getCountAllAudio(): LongResult = runSuspendCatching {
+//    db.query { MediaTable.selectCount { mediaType eq MediaType.Audio.id }.count() }
+//  }
+
+  private suspend fun audioExists(): BoolResult = runSuspendCatching {
+    db.query {
+      MediaTable
+        .select { mediaType }
+        .where { mediaType eq MediaType.Audio.id }
+        .limit(1)
+        .sequence { cursor -> cursor.count > 0 }
+        .firstOrNull() ?: false
+    }
   }
 
   override suspend fun getAllAudio(
@@ -766,7 +791,7 @@ private class AudioMediaDaoImpl(
           }
           .orderByAsc { queueOrder }
           .forEach { cursor ->
-            val mediaId  =cursor[itemId]
+            val mediaId = cursor[itemId]
             val item = queueMap.get(mediaId)?.removeLastOrNull()
             if (item != null) {
               add(item)
@@ -1071,51 +1096,36 @@ private class AudioMediaDaoImpl(
       .forEach { cursor -> longCollection.add(cursor[PlayListMediaTable.mediaId]) }
   }
 
-  override suspend fun getNextCategory(
+  override suspend fun getNextCategory(token: CategoryToken, shuffleLists: ShuffleLists) =
+    getSubsequentCategory(token, shuffleLists) { last -> last.nextToken(this) }
+
+  override suspend fun getPreviousCategory(token: CategoryToken, shuffleLists: ShuffleLists) =
+    getSubsequentCategory(token, shuffleLists) { last -> last.previousToken(this) }
+
+  private suspend fun getSubsequentCategory(
     token: CategoryToken,
-    shuffleLists: ShuffleLists
-  ): CategoryMediaList {
-    var nextList = CategoryMediaList.EMPTY_ALL_LIST
-    val countResult = getCountAllAudio().getOrElse { 0 }
-    if (countResult > 0) {
-      var nextToken = if (shuffleLists.value) token.getRandom(this) else token.nextToken(this)
-      if (nextToken !== CategoryToken.All) {
-        var possibleNext = CategoryMediaList(nextToken.getAllMedia(this), nextToken)
-        while (possibleNext.isEmpty && nextToken !== CategoryToken.All) {
-          nextToken = nextToken.nextToken(this)
-          possibleNext = CategoryMediaList(nextToken.getAllMedia(this), nextToken)
-        }
-        if (nextToken !== CategoryToken.All && possibleNext.isNotEmpty) {
-          nextList = possibleNext
-        }
-      }
-    }
-    return nextList
+    shuffleLists: ShuffleLists,
+    subsequent: SubsequentToken
+  ): CategoryMediaList = audioExists()
+    .toErrorIf({ exists -> !exists }, { DaoNotFoundException("No Audio") })
+    .andThen { Ok(if (shuffleLists.value) token.getRandom(this) else subsequent(token)) }
+    .toErrorIf({ token === CategoryToken.All }, { DaoNotFoundException("No next token") })
+    .map { categoryToken -> categoryMediaFlow(categoryToken, subsequent) }
+    .onFailure { cause -> LOG.e(cause) { it("Error getting next Category media list") } }
+    .getOrElse { emptyFlow() }
+    .dropWhile { list -> list.isEmpty || list.token === CategoryToken.All }
+    .firstOrNull() ?: CategoryMediaList.EMPTY_ALL_LIST
+
+  private suspend fun categoryMediaFlow(seed: CategoryToken, subsequent: SubsequentToken) = flow {
+    val dao: AudioMediaDao = this@AudioMediaDaoImpl
+    var value = CategoryMediaList(seed.getAllMedia(dao), seed).also { emit(it) }
+    while (true) emit(
+      subsequent(value.token).let { next -> CategoryMediaList(next.getAllMedia(dao), next) }
+        .also { value = it }
+    )
   }
 
-  override suspend fun getPreviousCategory(
-    token: CategoryToken,
-    shuffleLists: ShuffleLists
-  ): CategoryMediaList {
-    var prevList = CategoryMediaList.EMPTY_ALL_LIST
-    val countResult = getCountAllAudio().getOrElse { 0 }
-    if (countResult > 0) {
-      var prevToken = if (shuffleLists.value) token.getRandom(this) else token.previousToken(this)
-      if (prevToken !== CategoryToken.All) {
-        var possiblePrev = CategoryMediaList(prevToken.getAllMedia(this), prevToken)
-        while (possiblePrev.isEmpty && prevToken !== CategoryToken.All) {
-          prevToken = prevToken.previousToken(this)
-          possiblePrev = CategoryMediaList(prevToken.getAllMedia(this), prevToken)
-        }
-        if (prevToken !== CategoryToken.All && possiblePrev.isNotEmpty) prevList = possiblePrev
-      }
-    }
-    return prevList
-  }
-
-  override suspend fun getFullInfo(
-    mediaId: MediaId
-  ): DaoResult<FullAudioInfo> = runSuspendCatching {
+  override suspend fun getFullInfo(mediaId: MediaId) = runSuspendCatching {
     db.query {
       MediaTable
         .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)

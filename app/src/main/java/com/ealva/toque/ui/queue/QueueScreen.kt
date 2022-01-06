@@ -73,7 +73,7 @@ import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.scrollToFirst
 import com.ealva.toque.ui.common.scrollToPosition
 import com.ealva.toque.ui.common.visibleIndices
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.AudioMediaInfoScreen
 import com.ealva.toque.ui.library.QueueItemsActionBar
 import com.ealva.toque.ui.library.SelectedItems

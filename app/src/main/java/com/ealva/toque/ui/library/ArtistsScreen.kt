@@ -70,9 +70,9 @@ import com.ealva.toque.persist.asArtistIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.config.LocalScreenConfig
-import com.ealva.toque.ui.config.ProvideScreenConfig
-import com.ealva.toque.ui.config.makeScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.ProvideScreenConfig
+import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen

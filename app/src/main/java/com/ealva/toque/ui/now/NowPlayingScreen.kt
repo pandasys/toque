@@ -74,7 +74,7 @@ import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.vlc.toFloat
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ARTIST
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_BUTTON_ROW

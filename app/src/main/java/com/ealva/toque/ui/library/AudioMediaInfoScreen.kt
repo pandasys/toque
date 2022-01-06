@@ -68,7 +68,7 @@ import com.ealva.toque.service.media.EmbeddedArtwork
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import com.ealva.toque.tag.ArtistParserFactory
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back

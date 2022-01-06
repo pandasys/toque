@@ -29,6 +29,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.prefstore.store.StorePref
 import com.ealva.toque.R
+import com.ealva.toque.android.telcom.isIdle
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.audioout.AudioOutputState
@@ -42,6 +43,7 @@ import com.ealva.toque.common.ShuffleMedia
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
+import com.ealva.toque.common.alsoIf
 import com.ealva.toque.common.debug
 import com.ealva.toque.common.debugCheck
 import com.ealva.toque.common.debugRequire
@@ -1390,25 +1392,17 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  private suspend fun doNextOrRepeat(): Boolean = if (repeat.current) {
+  private suspend fun doNextOrRepeat(): Boolean = repeat.current.alsoIf {
     doGoToIndex(currentItemIndex, PlayNow(true), TransitionType.AutoAdvance)
-    true
-  } else {
-    nextSong(PlayNow(true), TransitionType.AutoAdvance)
-  }
+  } || nextSong(PlayNow(true), TransitionType.AutoAdvance)
 
   private fun PlayableItemEvent.PositionUpdate.shouldAutoAdvance() =
     audioItem.supportsFade && position.shouldAutoAdvanceFrom(duration)
 
-  private fun Millis.shouldAutoAdvanceFrom(duration: Millis): Boolean {
-    //if (!atEndOfQueue() && appPrefs.autoAdvanceFade()) {
-    if (appPrefs.autoAdvanceFade()) {
-      val fadeLength = appPrefs.autoAdvanceFadeLength()
-      if (duration > fadeLength && duration - this < fadeLength + OFFSET_CONSIDERED_END) {
-        return true
-      }
-    }
-    return false
+  private fun Millis.shouldAutoAdvanceFrom(
+    duration: Millis
+  ) = appPrefs.autoAdvanceFade() && appPrefs.autoAdvanceFadeLength().let { fadeLength ->
+    duration > fadeLength && duration - this < fadeLength + OFFSET_CONSIDERED_END
   }
 
   private fun establishNewQueues(
@@ -1666,19 +1660,4 @@ fun <E> List<E>.sublistToEndFrom(fromIndex: Int): List<E> =
 
 private fun MutableList<PlayableAudioItem>.removeWithInstanceId(instanceId: InstanceId) {
   removeAt(indexOfFirst { it.instanceId == instanceId })
-}
-
-fun TelecomManager.isIdle(requestPermission: Boolean): Boolean {
-  return try {
-    if (checkSelfPermission(Toque.appContext, READ_PHONE_STATE) == PERMISSION_GRANTED) {
-      !isInCall
-    } else {
-      if (requestPermission)
-        RequestPermissionActivity.start(RequestPermissionActivity.READ_PHONE_STATE_DATA)
-      false
-    }
-  } catch (e: SecurityException) {
-    LOG.e(e) { it("Error getting phone idle state") }
-    false
-  }
 }

@@ -37,8 +37,8 @@ import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.ThemeChoice
-import com.ealva.toque.ui.config.ProvideScreenConfig
-import com.ealva.toque.ui.config.makeScreenConfig
+import com.ealva.toque.ui.common.ProvideScreenConfig
+import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
 import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.nav.goToAboveRoot

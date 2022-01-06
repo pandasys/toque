@@ -32,4 +32,4 @@ value class Title(val value: String) : Parcelable {
   }
 }
 
-inline val String?.asTitle: Title get() = Title(this?.trim() ?: "")
+inline val String?.asTitle: Title get() = this?.let { Title(it.trim()) } ?: Title.EMPTY

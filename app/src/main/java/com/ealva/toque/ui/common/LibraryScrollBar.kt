@@ -19,7 +19,6 @@ package com.ealva.toque.ui.common
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.ealva.toque.ui.config.LocalScreenConfig
 
 @Composable
 fun LibraryScrollBar(

@@ -73,7 +73,7 @@ import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorScreen

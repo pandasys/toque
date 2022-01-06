@@ -27,7 +27,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.nav.goToScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding

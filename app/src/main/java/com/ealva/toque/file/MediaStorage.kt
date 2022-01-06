@@ -33,7 +33,7 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 
 @JvmInline
-value class AudioContentId(val prop: Long)
+value class AudioContentId(val value: Long)
 
 @Suppress("NOTHING_TO_INLINE")
 inline fun Long.toAudioContentId() = AudioContentId(this)
@@ -61,7 +61,7 @@ interface MediaStorage {
   }
 }
 
-fun Uri.location(id: AudioContentId): Uri = ContentUris.withAppendedId(this, id.prop)
+fun Uri.location(id: AudioContentId): Uri = ContentUris.withAppendedId(this, id.value)
 
 private class MediaStorageImpl(
   context: Context,

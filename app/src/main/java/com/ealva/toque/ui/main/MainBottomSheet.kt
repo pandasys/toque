@@ -55,7 +55,7 @@ import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.ui.config.LocalScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.BaseLibraryItemsScreen
 import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.queue.QueueScreen

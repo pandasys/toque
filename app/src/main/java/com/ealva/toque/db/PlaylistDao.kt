@@ -174,7 +174,7 @@ private class PlaylistDaoImpl(
 
   override val playlistDaoEvents = MutableSharedFlow<PlaylistDaoEvent>()
 
-  private fun emit(event: PlaylistDaoEvent) {
+  private fun emitEvent(event: PlaylistDaoEvent) {
     scope.launch { playlistDaoEvents.emit(event) }
   }
 
@@ -212,7 +212,7 @@ private class PlaylistDaoImpl(
       } else throw IllegalStateException("Could not create $name")
       PlaylistIdNameType(playlistId, name, PlayListType.UserCreated)
     }
-  }.onSuccess { playlistIdName -> emit(PlaylistCreated(playlistId = playlistIdName.id)) }
+  }.onSuccess { playlistIdName -> emitEvent(PlaylistCreated(playlistId = playlistIdName.id)) }
 
   override suspend fun createOrUpdateSmartPlaylist(
     smartPlaylist: SmartPlaylist
@@ -226,7 +226,7 @@ private class PlaylistDaoImpl(
       }
     }
   }.onSuccess { result ->
-    emit(if (smartPlaylist.id < 0) PlaylistCreated(result.id) else PlaylistUpdated(result.id))
+    emitEvent(if (smartPlaylist.id < 0) PlaylistCreated(result.id) else PlaylistUpdated(result.id))
   }
 
   override suspend fun getMediaForPlaylists(
@@ -305,59 +305,58 @@ private class PlaylistDaoImpl(
       doAddMediaToPlaylist(mediaIdList, id, getNextSortValue(id))
       updatePlaylist(id, Millis.currentUtcEpochMillis())
     }
-  }.onSuccess { emit(PlaylistUpdated(id)) }
+  }.onSuccess { emitEvent(PlaylistUpdated(id)) }
 
 
-  override suspend fun getAllPlaylists(): DaoResult<List<PlaylistDescription>> =
-    runSuspendCatching {
-      db.query {
-        val songCountColumn = PlayListMediaTable.mediaId.count()
-        mutableListOf<PlaylistDescription>().apply {
-          PlayListTable
-            .join(
-              PlayListMediaTable,
-              JoinType.INNER,
-              PlayListTable.id,
-              PlayListMediaTable.playListId
+  override suspend fun getAllPlaylists() = runSuspendCatching {
+    db.query {
+      val songCountColumn = PlayListMediaTable.mediaId.count()
+      mutableListOf<PlaylistDescription>().apply {
+        PlayListTable
+          .join(
+            PlayListMediaTable,
+            JoinType.INNER,
+            PlayListTable.id,
+            PlayListMediaTable.playListId
+          )
+          .selects {
+            listOf(PlayListTable.id, PlayListTable.playListName, songCountColumn)
+          }
+          .where { PlayListTable.playListType eq PlayListType.UserCreated.id }
+          .groupBy { PlayListTable.playListName }
+          .sequence { cursor ->
+            PlaylistDescription(
+              PlaylistId(cursor[PlayListTable.id]),
+              cursor[PlayListTable.playListName].asPlaylistName,
+              PlayListType.UserCreated,
+              cursor[songCountColumn]
             )
-            .selects {
-              listOf(PlayListTable.id, PlayListTable.playListName, songCountColumn)
-            }
-            .where { PlayListTable.playListType eq PlayListType.UserCreated.id }
-            .groupBy { PlayListTable.playListName }
-            .sequence { cursor ->
-              PlaylistDescription(
-                PlaylistId(cursor[PlayListTable.id]),
-                cursor[PlayListTable.playListName].asPlaylistName,
-                PlayListType.UserCreated,
-                cursor[songCountColumn]
-              )
-            }
-            .forEach { add(it) }
+          }
+          .forEach { add(it) }
 
-          PlayListTable
-            .join(
-              SmartPlaylistTable,
-              JoinType.INNER,
-              PlayListTable.id,
-              SmartPlaylistTable.smartId
+        PlayListTable
+          .join(
+            SmartPlaylistTable,
+            JoinType.INNER,
+            PlayListTable.id,
+            SmartPlaylistTable.smartId
+          )
+          .selects {
+            listOf(PlayListTable.id, PlayListTable.playListName, SmartPlaylistTable.smartName)
+          }
+          .where { PlayListTable.playListType eq PlayListType.Rules.id }
+          .sequence { cursor ->
+            SmartPlaylistDescription(
+              PlaylistId(cursor[PlayListTable.id]),
+              cursor[PlayListTable.playListName].asPlaylistName,
+              cursor[SmartPlaylistTable.smartName]
             )
-            .selects {
-              listOf(PlayListTable.id, PlayListTable.playListName, SmartPlaylistTable.smartName)
-            }
-            .where { PlayListTable.playListType eq PlayListType.Rules.id }
-            .sequence { cursor ->
-              SmartPlaylistDescription(
-                PlaylistId(cursor[PlayListTable.id]),
-                cursor[PlayListTable.playListName].asPlaylistName,
-                cursor[SmartPlaylistTable.smartName]
-              )
-            }
-            .map { smart -> getSmartPlaylistSongCount(smart) }
-            .forEach { add(it) }
-        }
+          }
+          .map { smart -> getSmartPlaylistSongCount(smart) }
+          .forEach { add(it) }
       }
     }
+  }
 
   private fun Queryable.getSmartPlaylistSongCount(
     smart: SmartPlaylistDescription
@@ -373,19 +372,14 @@ private class PlaylistDaoImpl(
     )
   }
 
-  private fun Queryable.viewCount(
-    view: View,
-    viewId: ViewColumn<Long>
-  ): Long {
-    return try {
-      view
-        .join(MediaTable, JoinType.INNER, viewId, MediaTable.id)
-        .selectCount()
-        .longForQuery()
-    } catch (e: Exception) {
-      LOG.e(e) { it("Error getting SmartPlaylist view count") }
-      0L
-    }
+  private fun Queryable.viewCount(view: View, viewId: ViewColumn<Long>): Long = try {
+    view
+      .join(MediaTable, JoinType.INNER, viewId, MediaTable.id)
+      .selectCount()
+      .longForQuery()
+  } catch (e: Exception) {
+    LOG.e(e) { it("Error getting SmartPlaylist view count") }
+    0L
   }
 
   override fun Queryable.getPlaylistName(
@@ -398,7 +392,7 @@ private class PlaylistDaoImpl(
     .single()
     .asPlaylistName
 
-  override suspend fun getNext(playlistId: PlaylistId): DaoResult<PlaylistId> = runSuspendCatching {
+  override suspend fun getNext(playlistId: PlaylistId) = runSuspendCatching {
     db.query {
       PlayListTable
         .select { id }
@@ -410,9 +404,7 @@ private class PlaylistDaoImpl(
     }
   }
 
-  override suspend fun getPrevious(
-    playlistId: PlaylistId
-  ): DaoResult<PlaylistId> = runSuspendCatching {
+  override suspend fun getPrevious(playlistId: PlaylistId) = runSuspendCatching {
     db.query {
       PlayListTable
         .select { id }
@@ -458,18 +450,14 @@ private class PlaylistDaoImpl(
     }
   }
 
-  override suspend fun smartPlaylistsReferringTo(playlistId: PlaylistId): PlaylistIdList {
-    return smartPlaylistDao.playlistsReferringTo(playlistId)
-      .mapBoth(success = { it }, failure = { PlaylistIdList() })
-  }
+  override suspend fun smartPlaylistsReferringTo(playlistId: PlaylistId) = smartPlaylistDao
+    .playlistsReferringTo(playlistId).mapBoth(success = { it }, failure = { PlaylistIdList() })
 
   private fun playlistDeleteUndo(playlistData: PlaylistData) {
-    emit(PlaylistCreated(playlistData.id))
+    emitEvent(PlaylistCreated(playlistData.id))
   }
 
-  override suspend fun deletePlaylist(
-    playlistId: PlaylistId
-  ): DaoResult<Memento> = runSuspendCatching {
+  override suspend fun deletePlaylist(playlistId: PlaylistId) = runSuspendCatching {
     db.transaction {
       PlayListTable
         .selectWhere { id eq playlistId.value }
@@ -486,7 +474,7 @@ private class PlaylistDaoImpl(
         .map { playlistData -> delete(playlistData, ::playlistDeleteUndo) }
         .single()
     }
-  }.onSuccess { emit(PlaylistDaoEvent.PlaylistDeleted(playlistId)) }
+  }.onSuccess { emitEvent(PlaylistDaoEvent.PlaylistDeleted(playlistId)) }
 
   private fun TransactionInProgress.delete(
     playlistData: PlaylistData,

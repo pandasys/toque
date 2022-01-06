@@ -20,7 +20,7 @@ typealias VolumeRange = ClosedRange<Volume>
 
 /**
  * Represents a Volume value, which is typically an integer between 0 and 100. Some Android
- * streams have a difference range, so no attempt is made to coerce in 0..100 here. However,
+ * streams have a different range, so no attempt is made to coerce in 0..100 here. However,
  * constants here, such as [MAX], [HALF], and [RANGE] refer to the Toque (libVLC) range of 0..100.
  */
 @JvmInline

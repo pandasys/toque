@@ -38,9 +38,9 @@ import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.ui.common.LibraryScrollBar
-import com.ealva.toque.ui.config.LocalScreenConfig
-import com.ealva.toque.ui.config.ProvideScreenConfig
-import com.ealva.toque.ui.config.makeScreenConfig
+import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.ProvideScreenConfig
+import com.ealva.toque.ui.common.makeScreenConfig
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding

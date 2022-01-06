@@ -733,9 +733,6 @@ private fun AudioItem.toDescriptionCompat() = MediaDescriptionCompat.Builder()
   )
   .build()
 
-private inline val PlaybackStateCompat.isPlaying: Boolean
-  get() = state == STATE_PLAYING
-
 private typealias MediaSessionPrefsSingleton = PreferenceStoreSingleton<MediaSessionPrefs>
 private typealias MetadataPref = PreferenceStore.Preference<String, Metadata>
 

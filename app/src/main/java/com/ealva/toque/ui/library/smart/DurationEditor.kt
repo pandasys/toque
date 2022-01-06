@@ -38,60 +38,6 @@ import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.ui.common.ListItemPicker
 import java.util.concurrent.TimeUnit
 
-@JvmInline
-value class Hours(val value: Int) : Comparable<Hours> {
-  val asMillis: Millis get() = Millis(TimeUnit.HOURS.toMillis(value.toLong()))
-
-  operator fun minus(rhs: Int): Hours = Hours(value - rhs)
-  operator fun plus(rhs: Int): Hours = Hours(value + rhs)
-
-  override fun compareTo(other: Hours): Int = value.compareTo(other.value)
-}
-
-@JvmInline
-value class Minutes(val value: Int) : Comparable<Minutes> {
-  val asMillis: Millis get() = Millis(TimeUnit.MINUTES.toMillis(value.toLong()))
-
-  operator fun minus(rhs: Int): Minutes = Minutes(value - rhs)
-  operator fun plus(rhs: Int): Minutes = Minutes(value + rhs)
-
-  override fun compareTo(other: Minutes): Int = value.compareTo(other.value)
-
-  operator fun compareTo(range: ClosedRange<Minutes>): Int {
-    return when {
-      this < range.start -> -1
-      this > range.endInclusive -> 1
-      else -> 0
-    }
-  }
-
-  companion object {
-    val WITHIN_HOUR: ClosedRange<Minutes> = Minutes(0)..Minutes(59)
-  }
-}
-
-@JvmInline
-value class Seconds(val value: Int) : Comparable<Seconds> {
-  val asMillis: Millis get() = Millis(TimeUnit.SECONDS.toMillis(value.toLong()))
-
-  operator fun minus(rhs: Int): Seconds = Seconds(value - rhs)
-  operator fun plus(rhs: Int): Seconds = Seconds(value + rhs)
-
-  override fun compareTo(other: Seconds): Int = value.compareTo(other.value)
-
-  operator fun compareTo(range: ClosedRange<Seconds>): Int {
-    return when {
-      this < range.start -> -1
-      this > range.endInclusive -> 1
-      else -> 0
-    }
-  }
-
-  companion object {
-    val WITHIN_MINUTE = Seconds(0)..Seconds(59)
-  }
-}
-
 @Composable
 fun DurationEditor(
   editorRule: EditorRule.DurationRule,
@@ -246,3 +192,58 @@ private fun toMillis(hours: Hours, minutes: Minutes, seconds: Seconds): Millis =
 private val Millis.hours: Hours get() = Hours((value / (1000 * 60 * 60) % 24).toInt())
 private val Millis.minutes: Minutes get() = Minutes((value / (1000 * 60) % 60).toInt())
 private val Millis.seconds: Seconds get() = Seconds((value / 1000).toInt() % 60)
+
+
+@JvmInline
+value class Hours(val value: Int) : Comparable<Hours> {
+  val asMillis: Millis get() = Millis(TimeUnit.HOURS.toMillis(value.toLong()))
+
+  operator fun minus(rhs: Int): Hours = Hours(value - rhs)
+  operator fun plus(rhs: Int): Hours = Hours(value + rhs)
+
+  override fun compareTo(other: Hours): Int = value.compareTo(other.value)
+}
+
+@JvmInline
+value class Minutes(val value: Int) : Comparable<Minutes> {
+  val asMillis: Millis get() = Millis(TimeUnit.MINUTES.toMillis(value.toLong()))
+
+  operator fun minus(rhs: Int): Minutes = Minutes(value - rhs)
+  operator fun plus(rhs: Int): Minutes = Minutes(value + rhs)
+
+  override fun compareTo(other: Minutes): Int = value.compareTo(other.value)
+
+  operator fun compareTo(range: ClosedRange<Minutes>): Int {
+    return when {
+      this < range.start -> -1
+      this > range.endInclusive -> 1
+      else -> 0
+    }
+  }
+
+  companion object {
+    val WITHIN_HOUR: ClosedRange<Minutes> = Minutes(0)..Minutes(59)
+  }
+}
+
+@JvmInline
+value class Seconds(val value: Int) : Comparable<Seconds> {
+  val asMillis: Millis get() = Millis(TimeUnit.SECONDS.toMillis(value.toLong()))
+
+  operator fun minus(rhs: Int): Seconds = Seconds(value - rhs)
+  operator fun plus(rhs: Int): Seconds = Seconds(value + rhs)
+
+  override fun compareTo(other: Seconds): Int = value.compareTo(other.value)
+
+  operator fun compareTo(range: ClosedRange<Seconds>): Int {
+    return when {
+      this < range.start -> -1
+      this > range.endInclusive -> 1
+      else -> 0
+    }
+  }
+
+  companion object {
+    val WITHIN_MINUTE = Seconds(0)..Seconds(59)
+  }
+}
