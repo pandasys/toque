@@ -22,6 +22,14 @@ plugins {
   kotlin("kapt")
 }
 
+val localProperties = com.android.build.gradle.internal.cxx.configure.gradleLocalProperties(rootDir)
+val musicInfoAppName: String = localProperties.getProperty("MUSICINFO_APP_NAME", "\"\"")
+val musicInfoAppVersion: String = localProperties.getProperty("MUSICINFO_APP_VERSION", "\"\"")
+val musicInfoEmail: String = localProperties.getProperty("MUSICINFO_CONTACT_EMAIL", "\"\"")
+val lastFmApiKey: String = localProperties.getProperty("LASTFM_API_KEY", "\"\"")
+val spotifyClientId: String = localProperties.getProperty("SPOTIFY_CLIENT_ID", "\"\"")
+val spotifyClientSecret: String = localProperties.getProperty("SPOTIFY_CLIENT_SECRET", "\"\"")
+
 android {
   compileSdk = SdkVersion.COMPILE
 
@@ -37,6 +45,15 @@ android {
   }
 
   buildTypes {
+    all {
+      buildConfigField("String", "MUSICINFO_APP_NAME", musicInfoAppName)
+      buildConfigField("String", "MUSICINFO_APP_VERSION", musicInfoAppVersion)
+      buildConfigField("String", "MUSICINFO_CONTACT_EMAIL", musicInfoEmail)
+      buildConfigField("String", "LASTFM_API_KEY", lastFmApiKey)
+      buildConfigField("String", "SPOTIFY_CLIENT_ID", spotifyClientId)
+      buildConfigField("String", "SPOTIFY_CLIENT_SECRET", spotifyClientSecret)
+    }
+
     debug {
       isTestCoverageEnabled = false
     }
@@ -92,8 +109,8 @@ android {
 
   kotlinOptions {
     jvmTarget = "1.8"
-    languageVersion = "1.5"
-    apiVersion = "1.5"
+    languageVersion = "1.6"
+    apiVersion = "1.6"
     suppressWarnings = false
     verbose = true
     freeCompilerArgs = listOf(
@@ -138,6 +155,7 @@ dependencies {
   implementation(Libs.EAlvaLog.ANDROID)
   implementation(Libs.EAlvaTag.EALVATAG)
   implementation(Libs.WeLite.CORE)
+  implementation(Libs.EAlvaMusicInfo.MUSIC_INFO)
   implementation(Libs.EAlvaBrainz.BRAINZ)
   implementation(Libs.EAlvaBrainz.BRAINZ_SERVICE)
 

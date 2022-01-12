@@ -36,7 +36,6 @@ import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,11 +60,11 @@ import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.BaseAppSettingsScreen
 import com.ealva.toque.ui.theme.shapes
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
 import com.google.accompanist.pager.rememberPagerState
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
-import kotlinx.coroutines.flow.collect
 
 private const val ALPHA_ON = 1.0F
 private const val ALPHA_OFF = 0.3F
@@ -278,7 +277,7 @@ private fun CurrentItemPagerCard(
         text = item.title.value,
         textAlign = TextAlign.Start,
         maxLines = 1,
-        style = MaterialTheme.typography.caption,
+        style = toqueTypography.caption,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
           .padding(top = 2.dp)
@@ -295,7 +294,7 @@ private fun CurrentItemPagerCard(
         text = "${item.artist.value} - ${item.albumTitle.value}",
         textAlign = TextAlign.Start,
         maxLines = 1,
-        style = MaterialTheme.typography.overline,
+        style = toqueTypography.overline,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
           .padding(bottom = 2.dp)

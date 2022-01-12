@@ -34,7 +34,6 @@ import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.material.Scaffold
@@ -78,6 +77,8 @@ import com.ealva.toque.ui.library.smart.EditorRule.TextEditorRule
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.SmartPlaylistData
 import com.ealva.toque.ui.queue.DismissibleItem
 import com.ealva.toque.ui.settings.AppBarTitle
+import com.ealva.toque.ui.theme.toqueColors
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.ServiceBinder
@@ -192,7 +193,7 @@ private fun Editor(
   deleteRule: (EditorRule) -> Unit
 ) {
   Column {
-    ProvideTextStyle(value = MaterialTheme.typography.body2) {
+    ProvideTextStyle(value = toqueTypography.body2) {
       Column(
         modifier =
         Modifier
@@ -343,7 +344,7 @@ private fun TitleBar(
 ) {
   TopAppBar(
     title = { AppBarTitle(stringResource(id = R.string.SmartPlaylistEditor)) },
-    backgroundColor = MaterialTheme.colors.surface,
+    backgroundColor = toqueColors.surface,
     modifier = Modifier.fillMaxWidth(),
     navigationIcon = {
       IconButton(onClick = back) {

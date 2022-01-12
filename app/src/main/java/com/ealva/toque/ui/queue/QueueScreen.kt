@@ -36,7 +36,6 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FractionalThreshold
 import androidx.compose.material.Icon
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.SwipeToDismiss
 import androidx.compose.material.Text
 import androidx.compose.material.rememberDismissState
@@ -59,7 +58,6 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.InstanceId
@@ -70,10 +68,10 @@ import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.scrollToFirst
 import com.ealva.toque.ui.common.scrollToPosition
 import com.ealva.toque.ui.common.visibleIndices
-import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.AudioMediaInfoScreen
 import com.ealva.toque.ui.library.QueueItemsActionBar
 import com.ealva.toque.ui.library.SelectedItems
@@ -89,6 +87,7 @@ import com.ealva.toque.ui.library.selectAll
 import com.ealva.toque.ui.library.toggleSelection
 import com.ealva.toque.ui.library.turnOffSelectionMode
 import com.ealva.toque.ui.nav.goToScreen
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -271,7 +270,7 @@ private fun QueueContents(
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
- fun DismissibleItem(
+fun DismissibleItem(
   dismissState: DismissState,
   modifier: Modifier,
   item: @Composable () -> Unit,
@@ -324,7 +323,7 @@ private fun QueueItem(
       highlightBackground = isSelected,
       icon = icon,
       modifier = modifier,
-      textColor = if (isCurrent) Color.Green else Color.Unspecified
+      textColor = if (isCurrent) Color.Green.copy(green = 0.7F) else Color.Unspecified
     )
   }
 }
@@ -339,7 +338,7 @@ private fun DragHandle(index: Int, modifier: Modifier) {
       text = "${index + 1}.",
       textAlign = TextAlign.Center,
       maxLines = 1,
-      style = MaterialTheme.typography.overline,
+      style = toqueTypography.overline,
     )
     Icon(
       painter = rememberImagePainter(data = R.drawable.ic_drag_handle),

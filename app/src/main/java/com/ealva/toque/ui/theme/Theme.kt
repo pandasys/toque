@@ -54,6 +54,9 @@ private val DarkColorPalette = ToqueColors(
   selectedBackground = Color(0xFF_30_30_30),
 )
 
+
+private val LocalTypography = staticCompositionLocalOf { ToqueTypography() }
+
 private val LocalColors = staticCompositionLocalOf { DarkColorPalette }
 
 @Composable
@@ -67,16 +70,23 @@ fun ToqueTheme(
     ThemeChoice.System -> if (isSystemInDarkTheme()) DarkColorPalette else LightColorPalette
   }
 
-  CompositionLocalProvider(LocalColors provides colors) {
-    MaterialTheme(
-      colors = colors.material,
-      content = content,
-    )
+  CompositionLocalProvider(LocalTypography provides ToqueTypography()) {
+    CompositionLocalProvider(LocalColors provides colors) {
+      MaterialTheme(
+        colors = colors.material,
+        typography = LocalTypography.current.material,
+        content = content,
+      )
+    }
   }
 }
 
-@Suppress("unused")
-val MaterialTheme.toqueColors: ToqueColors
+val toqueColors: ToqueColors
   @Composable
   @ReadOnlyComposable
   get() = LocalColors.current
+
+val toqueTypography: ToqueTypography
+  @Composable
+  @ReadOnlyComposable
+  get() = LocalTypography.current

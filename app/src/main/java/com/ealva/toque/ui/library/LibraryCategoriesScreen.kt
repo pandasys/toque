@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.GridCells
 import androidx.compose.foundation.lazy.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.nav.goToScreen
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -63,7 +63,7 @@ data class LibraryCategoriesScreen(private val noArg: String = "") : BaseLibrary
         LibraryCategory(
           item = item,
           iconSize = 36.dp,
-          textStyle = MaterialTheme.typography.subtitle1,
+          textStyle = toqueTypography.subtitle1,
           textStartPadding = 4.dp,
           onClick = { viewModel.goToItem(item.key) }
         )

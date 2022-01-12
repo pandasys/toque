@@ -21,7 +21,7 @@ import androidx.compose.runtime.Immutable
 
 /**
  * Contains an optional composable [prompt] which should be displayed to the user if present. The
- * current idea is that these are always alert dialogs. The result of one prompt may be another. One
+ * current idea is that these are always dialogs. The result of one prompt may be another. One
  * example is adding items to a playlist - the user can select a playlist (first dialog) or create
  * a new playlist (second dialog).
  *

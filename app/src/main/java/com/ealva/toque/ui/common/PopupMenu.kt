@@ -53,7 +53,7 @@ fun PopupMenu(
       ) {
       Icon(
         painter = rememberImagePainter(data = R.drawable.ic_more_vert),
-        contentDescription = stringResource(id = R.string.EmbeddedArtwork),
+        contentDescription = stringResource(id = R.string.Menu),
         modifier = Modifier.size(40.dp),
         tint = LocalContentColor.current
       )

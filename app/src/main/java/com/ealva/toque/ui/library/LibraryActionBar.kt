@@ -39,6 +39,7 @@ import com.ealva.toque.R
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.LocalWindowInsets
 
 @Composable
@@ -139,7 +140,7 @@ fun LibraryActionBar(
           text = "All",
           textAlign = TextAlign.End,
           maxLines = 1,
-          style = MaterialTheme.typography.caption,
+          style = toqueTypography.caption,
         )
         if (selectActions != null) selectActions(24.dp)
         Spacer(
@@ -149,7 +150,7 @@ fun LibraryActionBar(
           text = "$selectedCount/$itemCount",
           textAlign = TextAlign.End,
           maxLines = 1,
-          style = MaterialTheme.typography.caption,
+          style = toqueTypography.caption,
         )
       }
     }

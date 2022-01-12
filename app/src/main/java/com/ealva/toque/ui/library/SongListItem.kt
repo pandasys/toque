@@ -66,7 +66,7 @@ fun SongListItem(
   ListItem(
     modifier = modifier
       .fillMaxWidth()
-      .modifyIf(highlightBackground) { background(MaterialTheme.toqueColors.selectedBackground) },
+      .modifyIf(highlightBackground) { background(toqueColors.selectedBackground) },
     icon = icon,
     text = { TitleText(songTitle, textColor) },
     secondaryText = { ArtistAndDuration(artistName, songDuration, textColor) },

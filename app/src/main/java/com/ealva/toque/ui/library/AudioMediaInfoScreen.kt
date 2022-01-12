@@ -34,7 +34,6 @@ import androidx.compose.material.ContentAlpha
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
@@ -73,6 +72,8 @@ import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.settings.AppBarTitle
+import com.ealva.toque.ui.theme.toqueColors
+import com.ealva.toque.ui.theme.toqueTypography
 import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.onSuccess
 import com.google.accompanist.insets.navigationBarsPadding
@@ -133,7 +134,7 @@ data class AudioMediaInfoScreen(
     ) {
       TopAppBar(
         title = { AppBarTitle(mediaInfo.value.title.value) },
-        backgroundColor = MaterialTheme.colors.surface,
+        backgroundColor = toqueColors.surface,
         modifier = Modifier.fillMaxWidth(),
         navigationIcon = {
           IconButton(onClick = { viewModel.goBack() }) {
@@ -329,7 +330,7 @@ private class MediaInfoViewModelImpl(
 
 @Composable
 private fun MediaInfo(mediaInfo: MediaInfoViewModel.MediaInfo) {
-  val labelColor = MaterialTheme.colors.onSurface.copy(ContentAlpha.medium)
+  val labelColor = toqueColors.onSurface.copy(ContentAlpha.medium)
   val config = LocalScreenConfig.current
 
 
@@ -420,10 +421,10 @@ private fun MediaAndDescription(embeddedArtwork: Bitmap?, artworkDescription: St
         painter = rememberImagePainter(data = embeddedArtwork),
         contentDescription = stringResource(id = R.string.EmbeddedArtwork)
       )
-      Text(text = artworkDescription, style = MaterialTheme.typography.body1)
+      Text(text = artworkDescription, style = toqueTypography.body1)
     }
   } else {
-    Text(text = stringResource(id = R.string.None), style = MaterialTheme.typography.body1)
+    Text(text = stringResource(id = R.string.None), style = toqueTypography.body1)
   }
 }
 
@@ -546,7 +547,7 @@ private fun LabeledTextValue(
     modifier = modifier,
     labelText = labelText,
     labelColor = labelColor,
-    value = { Text(text = valueText, style = MaterialTheme.typography.body1) },
+    value = { Text(text = valueText, style = toqueTypography.body1) },
   )
 }
 
@@ -564,7 +565,7 @@ private fun LabeledValue(
     Text(
       modifier = Modifier.padding(bottom = labelBottomPadding),
       text = stringResource(id = labelRes),
-      style = MaterialTheme.typography.caption,
+      style = toqueTypography.caption,
       color = labelColor
     )
     value()
@@ -585,7 +586,7 @@ private fun LabeledValue(
     Text(
       modifier = Modifier.padding(bottom = labelBottomPadding),
       text = labelText,
-      style = MaterialTheme.typography.caption,
+      style = toqueTypography.caption,
       color = labelColor
     )
     value()

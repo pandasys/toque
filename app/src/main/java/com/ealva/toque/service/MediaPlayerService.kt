@@ -233,7 +233,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       if (!inForeground) putInForeground(notificationId, notification)
     }
 
-    override fun stopForground() = removeFromForegroundAndStopSelf()
+    override fun stopForeground() = removeFromForegroundAndStopSelf()
   }
 
   private fun removeFromForegroundAndStopSelf() {

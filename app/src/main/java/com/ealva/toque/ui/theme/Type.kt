@@ -17,44 +17,35 @@
 package com.ealva.toque.ui.theme
 
 import androidx.compose.material.Typography
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Set of Material typography styles to start with
-val typography = Typography(
-  h6 = TextStyle(
-    color = Color.White,
-    fontWeight = FontWeight.Normal,
-    fontSize = 18.sp,
-    letterSpacing = 0.15.sp
+val typography = Typography()
+
+data class ToqueTypography(
+  val material: Typography = typography,
+  val nowPlayingTitle: TextStyle = material.subtitle1.copy(
+    fontSize = material.subtitle1.fontSize * 1.25
   ),
-  subtitle1 = TextStyle(
-    fontWeight = FontWeight.Normal,
-    fontSize = 16.sp,
-    letterSpacing = 0.15.sp
+  val nowPlayingArtist: TextStyle = material.body2.copy(
+    fontSize = material.body2.fontSize * 1.25
   ),
-  subtitle2 = TextStyle(
-    fontWeight = FontWeight.Normal,
-    fontSize = 14.sp,
-    letterSpacing = 0.1.sp
-  ),
-//  body1 = TextStyle(
-//    fontFamily = FontFamily.Default,
-//    fontWeight = FontWeight.Normal,
-//    fontSize = 16.sp
-//  )
-  /* Other default text styles to override
-button = TextStyle(
-  fontFamily = FontFamily.Default,
-  fontWeight = FontWeight.W500,
-  fontSize = 14.sp
-),
-caption = TextStyle(
-  fontFamily = FontFamily.Default,
-  fontWeight = FontWeight.Normal,
-  fontSize = 12.sp
-)
-*/
-)
+  val nowPlayingAlbum: TextStyle = material.overline.copy(
+    fontSize = material.overline.fontSize * 1.25,
+    letterSpacing = 0.5.sp
+  )
+) {
+  val h1: TextStyle get() = material.h1
+  val h2: TextStyle get() = material.h2
+  val h3: TextStyle get() = material.h3
+  val h4: TextStyle get() = material.h4
+  val h5: TextStyle get() = material.h5
+  val h6: TextStyle get() = material.h6
+  val subtitle1: TextStyle get() = material.subtitle1
+  val subtitle2: TextStyle get() = material.subtitle2
+  val body1: TextStyle get() = material.body1
+  val body2: TextStyle get() = material.body2
+  val button: TextStyle get() = material.button
+  val caption: TextStyle get() = material.caption
+  val overline: TextStyle get() = material.overline
+}

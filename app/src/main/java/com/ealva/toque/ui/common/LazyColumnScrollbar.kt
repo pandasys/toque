@@ -74,6 +74,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.ealva.toque.ui.theme.toqueColors
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 
@@ -250,7 +251,7 @@ interface LazyColumnScrollbarColors {
 object LazyColumnScrollbarDefaults {
   @Composable
   fun colors(
-    thumbColor: Color = MaterialTheme.colors.secondaryVariant,
+    thumbColor: Color = toqueColors.secondaryVariant,
     unselectedAlpha: Float = 0.54F,
     selectedAlpha: Float = 1F
   ): LazyColumnScrollbarColors = DefaultLazyColumnScrollbarColors(

@@ -92,7 +92,7 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
 //      StrictMode.VmPolicy.Builder()
 //        .detectNonSdkApiUsage()
 //        .penaltyListener(
-//          Executors.newSingleThreadExecutor(),
+//          Executors.newFixedThreadPool(1),
 //          { v -> v?.let { violation -> logger._e(violation) { it("strict violation") } } }
 //        )
 //        .build()

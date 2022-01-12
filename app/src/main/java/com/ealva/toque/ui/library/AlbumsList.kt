@@ -108,7 +108,7 @@ private fun AlbumItem(
   ListItem(
     modifier = Modifier
       .fillMaxWidth()
-      .modifyIf(isSelected) { background(MaterialTheme.toqueColors.selectedBackground) }
+      .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
       .combinedClickable(
         onClick = { itemClicked(albumInfo.id) },
         onLongClick = { itemLongClicked(albumInfo.id) }

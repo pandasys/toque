@@ -71,7 +71,7 @@ interface QueuePositionStateDaoFactory {
   companion object {
     operator fun invoke(
       db: Database,
-      dispatcher: CoroutineDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+      dispatcher: CoroutineDispatcher = Executors.newFixedThreadPool(1).asCoroutineDispatcher()
     ): QueuePositionStateDaoFactory = QueuePositionStateDaoFactoryImpl(db, dispatcher)
   }
 }

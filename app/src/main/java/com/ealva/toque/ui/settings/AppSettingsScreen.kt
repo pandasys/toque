@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
@@ -90,6 +89,8 @@ import com.ealva.toque.ui.settings.SettingScreenKeys.LookAndFeel
 import com.ealva.toque.ui.settings.SettingScreenKeys.MediaScannerSettings
 import com.ealva.toque.ui.settings.SettingScreenKeys.NowPlayingLookAndFeel
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
+import com.ealva.toque.ui.theme.toqueColors
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
@@ -583,7 +584,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
   ) {
     TopAppBar(
       title = { if (subtitle == null) AppBarTitle(title) else TitleAndSubtitle(title, subtitle) },
-      backgroundColor = MaterialTheme.colors.surface,
+      backgroundColor = toqueColors.surface,
       modifier = Modifier.fillMaxWidth(),
       navigationIcon = {
         IconButton(onClick = back) {
@@ -620,7 +621,7 @@ private fun TitleAndSubtitle(title: String, subtitle: String) {
     )
     Text(
       text = subtitle,
-      style = MaterialTheme.typography.subtitle2,
+      style = toqueTypography.subtitle2,
       textAlign = TextAlign.Start,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis

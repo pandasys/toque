@@ -32,7 +32,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -60,8 +59,8 @@ import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.asGenreIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
-import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.GenresViewModel.GenreInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen
@@ -187,7 +186,7 @@ private fun GenreItem(
   ListItem(
     modifier = Modifier
       .fillMaxWidth()
-      .modifyIf(isSelected) { background(MaterialTheme.toqueColors.selectedBackground) }
+      .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
       .combinedClickable(
         onClick = { itemClicked(genreInfo.id) },
         onLongClick = { itemLongClicked(genreInfo.id) }

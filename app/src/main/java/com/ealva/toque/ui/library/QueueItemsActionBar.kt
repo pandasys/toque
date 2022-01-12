@@ -38,6 +38,7 @@ import com.ealva.toque.R
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.LocalWindowInsets
 
 @Composable
@@ -123,7 +124,7 @@ fun QueueItemsActionBar(
           text = "All",
           textAlign = TextAlign.End,
           maxLines = 1,
-          style = MaterialTheme.typography.caption,
+          style = toqueTypography.caption,
         )
         ActionButton(
           buttonHeight = 24.dp,
@@ -140,7 +141,7 @@ fun QueueItemsActionBar(
           text = "$selectedCount/$itemCount",
           textAlign = TextAlign.End,
           maxLines = 1,
-          style = MaterialTheme.typography.caption,
+          style = toqueTypography.caption,
         )
       }
     }

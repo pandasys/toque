@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.ealva.toque.R
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName

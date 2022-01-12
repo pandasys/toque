@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.LocalTextStyle
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,6 +35,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.smart.DurationMatcher
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.ui.common.ListItemPicker
+import com.ealva.toque.ui.theme.toqueColors
 import java.util.concurrent.TimeUnit
 
 @Composable
@@ -166,7 +166,7 @@ private fun LabeledNumberPicker(
   value: Int,
   label: String,
   onValueChange: (Int) -> Unit,
-  dividersColor: Color = MaterialTheme.colors.primary,
+  dividersColor: Color = toqueColors.primary,
   range: IntRange,
   textStyle: TextStyle = LocalTextStyle.current,
 ) {

@@ -304,4 +304,5 @@
     <string name="ERRORNoPlaylists">ERROR - No Playlists</string>
     <string name="ErrorReadingMediaInfo">Error reading media info</string>
   <string name="ErrorReadingMediaList">Error reading media list</string>
+    <string name="Menu">Menu</string>
 </resources>

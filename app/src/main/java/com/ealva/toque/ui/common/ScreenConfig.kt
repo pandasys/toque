@@ -43,10 +43,12 @@ data class ScreenConfig(
   val navBottom: Dp,
   val density: Density
 ) {
+  inline val inLandscape: Boolean get() = !inPortrait
+
   val imageSizePx: Int
     get() = if (inPortrait) screenWidthPx else screenHeightPx
   val imageSizeDp: Dp
-    get() = if (inPortrait) screenHeightDp else screenHeightDp
+    get() = if (inPortrait) screenWidthDp else screenHeightDp
   val navOnLeft: Boolean
     get() = navLeft > navRight
 

@@ -19,6 +19,7 @@ package com.ealva.toque.ui.now
 import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,14 +34,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material.Card
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.ContentAlpha
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.LocalContentAlpha
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Slider
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -48,6 +52,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.res.stringResource
@@ -75,18 +80,19 @@ import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.vlc.toFloat
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LocalScreenConfig
-import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ALBUM
-import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ARTIST
+import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_BUTTON_ROW
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_DURATION_TEXT
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_EXTRA_INFO
+import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_ITEM_TITLES
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_POSITION_SLIDER
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_POSITION_TEXT
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_RATING_BAR_ROW
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_SLIDER_SPACE
-import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE_SPACE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TOP_SPACE
+import com.ealva.toque.ui.theme.toqueColors
+import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.ExperimentalAnimatedInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -100,7 +106,6 @@ import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
-import kotlinx.coroutines.flow.collect
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -112,9 +117,7 @@ object NowPlayingScreenIds {
   const val ID_POSITION_TEXT = 4
   const val ID_DURATION_TEXT = 5
   const val ID_EXTRA_INFO = 6
-  const val ID_TITLE = 7
-  const val ID_ARTIST = 8
-  const val ID_ALBUM = 9
+  const val ID_ITEM_TITLES = 9
   const val ID_TITLE_SPACE = 11
   const val ID_TOP_SPACE = 12
   const val ID_RATING_BAR_ROW = 13
@@ -173,7 +176,7 @@ private fun NowPlaying(
 ) {
   val screenConfig = LocalScreenConfig.current
 
-  val useDarkIcons = MaterialTheme.colors.isLight
+  val useDarkIcons = toqueColors.isLight
   val systemUiController = rememberSystemUiController()
   SideEffect {
     systemUiController.setSystemBarsColor(
@@ -185,34 +188,50 @@ private fun NowPlaying(
   Box(modifier = modifier.navigationBarsPadding()) {
     val isPortrait = screenConfig.inPortrait
     ConstraintLayout(modifier = Modifier.fillMaxSize()) {
-      val (pager, controls) = createRefs()
+      val (pager, controls, menu) = createRefs()
       MediaArtPager(
         queue = state.queue,
         queueIndex = state.queueIndex,
         size = screenConfig.imageSizePx,
         goToIndex = goToIndex,
         modifier = if (isPortrait) {
-          Modifier.constrainAs(pager) {
-            top.linkTo(parent.top)
-            start.linkTo(parent.start)
-            end.linkTo(parent.end)
-            bottom.linkTo(controls.top)
-            height = Dimension.value(screenConfig.screenWidthDp)
-          }
-        } else {
-          Modifier.constrainAs(pager) {
-            top.linkTo(parent.top)
-            if (screenConfig.navOnLeft) {
+          Modifier
+            .statusBarsPadding()
+            .constrainAs(pager) {
+              top.linkTo(parent.top)
               start.linkTo(parent.start)
-              end.linkTo(controls.start)
-            } else {
-              start.linkTo(controls.end)
               end.linkTo(parent.end)
+              bottom.linkTo(controls.top)
+              height = Dimension.value(screenConfig.screenWidthDp)
             }
-            bottom.linkTo(parent.bottom)
-            width = Dimension.value(screenConfig.imageSizeDp)
-          }
+        } else {
+          Modifier
+            .statusBarsPadding()
+            .padding(bottom = screenConfig.getNavPlusBottomSheetHeight(isExpanded = false))
+            .constrainAs(pager) {
+              top.linkTo(parent.top)
+              if (screenConfig.navOnLeft) {
+                start.linkTo(parent.start)
+                end.linkTo(controls.start)
+              } else {
+                start.linkTo(controls.end)
+                end.linkTo(parent.end)
+              }
+              bottom.linkTo(parent.bottom)
+              width = Dimension.value(screenConfig.imageSizeDp)
+            }
         }
+      )
+      CurrentItemMenu(
+        modifier = Modifier
+          .modifyIf(screenConfig.inLandscape) {
+            padding(bottom = screenConfig.getNavPlusBottomSheetHeight(isExpanded = false))
+          }
+          .constrainAs(menu) {
+            end.linkTo(pager.end)
+            bottom.linkTo(pager.bottom)
+          },
+        onClick = { }
       )
       PlayerControls(
         state = state,
@@ -254,6 +273,36 @@ private fun NowPlaying(
             .statusBarsPadding()
             .padding(bottom = screenConfig.getBottomSheetHeight(false) + 8.dp)
         }
+      )
+    }
+  }
+}
+
+@Composable
+private fun CurrentItemMenu(
+  modifier: Modifier,
+  onClick: () -> Unit
+) {
+  Row(
+    modifier = Modifier
+      .padding(end = 12.dp)
+      .then(modifier)
+  ) {
+    Box(
+      modifier = Modifier
+        .size(46.dp)
+        .padding(8.dp)
+        .clip(RoundedCornerShape(50))
+        .background(Color.Black.copy(alpha = .25F))
+        .clickable(onClick = onClick),
+    ) {
+      Icon(
+        painter = rememberImagePainter(data = R.drawable.ic_more_vert),
+        contentDescription = stringResource(id = R.string.Menu),
+        modifier = Modifier
+          .size(40.dp)
+          .align(Alignment.Center),
+        tint = Color.White
       )
     }
   }
@@ -305,33 +354,12 @@ private fun PlayerControls(
           .padding(horizontal = 12.dp)
           .fillMaxWidth()
       )
-      Text(
-        text = item.title.value,
-        textAlign = TextAlign.Center,
-        style = MaterialTheme.typography.h6,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.layoutId(ID_TITLE)
-      )
-      Text(
-        text = item.albumArtist.value,
-        style = MaterialTheme.typography.subtitle2,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.layoutId(ID_ARTIST)
-      )
-      Text(
-        text = item.albumTitle.value,
-        style = MaterialTheme.typography.subtitle1,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.layoutId(ID_ALBUM)
-      )
+      ItemTitles(item)
       Text(
         text = state.extraMediaInfo,
         textAlign = TextAlign.Center,
         maxLines = 1,
-        style = MaterialTheme.typography.caption,
+        style = toqueTypography.caption,
         modifier = Modifier
           .layoutId(ID_EXTRA_INFO)
           .padding(horizontal = 8.dp)
@@ -349,7 +377,7 @@ private fun PlayerControls(
         text = state.getPositionDisplay(),
         textAlign = TextAlign.Start,
         maxLines = 1,
-        style = MaterialTheme.typography.caption,
+        style = toqueTypography.caption,
         modifier = Modifier
           .layoutId(ID_POSITION_TEXT)
           .padding(start = 12.dp)
@@ -358,7 +386,7 @@ private fun PlayerControls(
         text = state.getDurationDisplay(),
         textAlign = TextAlign.End,
         maxLines = 1,
-        style = MaterialTheme.typography.caption,
+        style = toqueTypography.caption,
         modifier = Modifier
           .layoutId(ID_DURATION_TEXT)
           .clickable(onClick = toggleShowRemaining)
@@ -376,6 +404,41 @@ private fun PlayerControls(
           .padding(horizontal = 8.dp)
           .fillMaxWidth()
       )
+    }
+  }
+}
+
+@Composable
+private fun ItemTitles(item: AudioItem) {
+  SelectionContainer(
+    modifier = Modifier
+      .padding(horizontal = 12.dp)
+      .layoutId(ID_ITEM_TITLES)
+  ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Text(
+        text = item.albumTitle.value,
+        textAlign = TextAlign.Center,
+        style = toqueTypography.nowPlayingAlbum,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Text(
+        text = item.title.value,
+        textAlign = TextAlign.Center,
+        style = toqueTypography.nowPlayingTitle,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      CompositionLocalProvider(LocalContentAlpha provides ContentAlpha.medium) {
+        Text(
+          text = item.albumArtist.value,
+          textAlign = TextAlign.Center,
+          style = toqueTypography.nowPlayingArtist,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
   }
 }
@@ -414,10 +477,7 @@ private fun MediaArtPager(
 private fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
   if (currentPage in queue.indices) {
     val item = queue[currentPage]
-    Card(
-      modifier = Modifier.fillMaxSize(),
-      backgroundColor = Color.Transparent
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
       Image(
         painter = rememberImagePainter(
           data = if (item.localAlbumArt !== Uri.EMPTY) item.localAlbumArt else item.albumArt,
@@ -485,7 +545,7 @@ private fun RatingBarRow(
           text = "%.2fX".format(playbackRate.value),
           textAlign = TextAlign.Center,
           maxLines = 1,
-          style = MaterialTheme.typography.caption,
+          style = toqueTypography.caption,
           modifier = Modifier
             .border(1.dp, LocalContentColor.current)
             .padding(2.dp)
@@ -539,7 +599,7 @@ private fun RatingBarRow(
         text = "${queueIndex + 1}/${queueSize}",
         textAlign = TextAlign.End,
         maxLines = 1,
-        style = MaterialTheme.typography.overline,
+        style = toqueTypography.overline,
       )
     }
   }
@@ -606,9 +666,7 @@ private fun portraitConstraints(): ConstraintSet = ConstraintSet {
   val position = createRefFor(ID_POSITION_TEXT)
   val duration = createRefFor(ID_DURATION_TEXT)
   val extraInfo = createRefFor(ID_EXTRA_INFO)
-  val title = createRefFor(ID_TITLE)
-  val artist = createRefFor(ID_ARTIST)
-  val album = createRefFor(ID_ALBUM)
+  val titles = createRefFor(ID_ITEM_TITLES)
   val sliderSpace = createRefFor(ID_SLIDER_SPACE)
   val titleSpace = createRefFor(ID_TITLE_SPACE)
   val topSpace = createRefFor(ID_TOP_SPACE)
@@ -629,32 +687,18 @@ private fun portraitConstraints(): ConstraintSet = ConstraintSet {
     top.linkTo(ratingBarRow.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
-    bottom.linkTo(title.top)
+    bottom.linkTo(titles.top)
     height = Dimension.fillToConstraints
   }
-  constrain(title) {
+  constrain(titles) {
     top.linkTo(titleSpace.bottom)
-    start.linkTo(parent.start)
-    end.linkTo(parent.end)
-    bottom.linkTo(artist.top)
-    height = Dimension.wrapContent
-  }
-  constrain(artist) {
-    top.linkTo(title.bottom, margin = 2.dp)
-    start.linkTo(parent.start)
-    end.linkTo(parent.end)
-    bottom.linkTo(album.top)
-    height = Dimension.wrapContent
-  }
-  constrain(album) {
-    top.linkTo(artist.bottom, margin = 2.dp)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(sliderSpace.top)
     height = Dimension.wrapContent
   }
   constrain(sliderSpace) {
-    top.linkTo(album.bottom)
+    top.linkTo(titles.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(slider.top)
@@ -701,9 +745,7 @@ private fun landscapeConstraints(): ConstraintSet = ConstraintSet {
   val position = createRefFor(ID_POSITION_TEXT)
   val duration = createRefFor(ID_DURATION_TEXT)
   val extraInfo = createRefFor(ID_EXTRA_INFO)
-  val title = createRefFor(ID_TITLE)
-  val artist = createRefFor(ID_ARTIST)
-  val album = createRefFor(ID_ALBUM)
+  val titles = createRefFor(ID_ITEM_TITLES)
   val sliderSpace = createRefFor(ID_SLIDER_SPACE)
   val topSpace = createRefFor(ID_TOP_SPACE)
   val ratingBarRow = createRefFor(ID_RATING_BAR_ROW)
@@ -711,32 +753,18 @@ private fun landscapeConstraints(): ConstraintSet = ConstraintSet {
     top.linkTo(parent.top)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
-    bottom.linkTo(title.top)
-    height = Dimension.value(8.dp)
+    bottom.linkTo(titles.top)
+    height = Dimension.fillToConstraints
   }
-  constrain(title) {
+  constrain(titles) {
     top.linkTo(topSpace.bottom)
-    start.linkTo(parent.start)
-    end.linkTo(parent.end)
-    bottom.linkTo(artist.top)
-    height = Dimension.wrapContent
-  }
-  constrain(artist) {
-    top.linkTo(title.bottom)
-    start.linkTo(parent.start)
-    end.linkTo(parent.end)
-    bottom.linkTo(album.top)
-    height = Dimension.wrapContent
-  }
-  constrain(album) {
-    top.linkTo(artist.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(sliderSpace.top)
     height = Dimension.wrapContent
   }
   constrain(sliderSpace) {
-    top.linkTo(album.bottom)
+    top.linkTo(titles.bottom)
     start.linkTo(parent.start)
     end.linkTo(parent.end)
     bottom.linkTo(ratingBarRow.top)

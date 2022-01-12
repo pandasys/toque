@@ -27,7 +27,7 @@ object PluginsVersion {
   const val KOTLIN = "1.6.10"
   const val PUBLISH = "0.18.0"
   const val SERIALIZATION = "1.6.10"
-  const val VERSIONS = "0.39.0"
+  const val VERSIONS = "0.41.0"
 }
 
 object Libs {
@@ -115,7 +115,7 @@ object Libs {
   }
 
   object EAlvaBrainz {
-    private const val VERSION = "0.8.0-SNAPSHOT"
+    private const val VERSION = "0.10.1-SNAPSHOT"
     const val BRAINZ = "com.ealva:ealvabrainz:$VERSION"
     const val BRAINZ_SERVICE = "com.ealva:ealvabrainz-service:$VERSION"
   }
@@ -125,6 +125,11 @@ object Libs {
     const val EALVALOG = "com.ealva:ealvalog:$VERSION"
     const val ANDROID = "com.ealva:ealvalog-android:$VERSION"
     const val CORE = "com.ealva:ealvalog-core:$VERSION"
+  }
+
+  object EAlvaMusicInfo {
+    private const val VERSION = "0.1.2-SNAPSHOT"
+    const val MUSIC_INFO = "com.ealva:musicinfo:$VERSION"
   }
 
   object EAlvaTag {

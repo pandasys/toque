@@ -36,7 +36,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -247,7 +246,7 @@ private fun PlaylistItem(
     ListItem(
       modifier = Modifier
         .weight(.80F)
-        .modifyIf(isSelected) { background(MaterialTheme.toqueColors.selectedBackground) }
+        .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
         .combinedClickable(
           onClick = { itemClicked(playlistInfo) },
           onLongClick = { itemLongClicked(playlistInfo) }

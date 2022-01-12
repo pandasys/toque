@@ -151,7 +151,7 @@ interface MediaSessionState {
 
   interface NotificationListener {
     fun onPosted(notificationId: Int, notification: Notification)
-    fun stopForground()
+    fun stopForeground()
   }
 
   /** Update the current playback state clients can display */
@@ -278,10 +278,8 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
   }
 }
 
-private const val METADATA_ARTWORK_WIDTH = 144
-private const val METADATA_ARTWORK_HEIGHT = 144
+private val METADATA_BITMAP_SIZE_DP = 320.dp
 private const val MSG_START_OR_UPDATE_NOTIFICATION = 0
-private const val MSG_UPDATE_NOTIFICATION_BITMAP = 1
 
 private val Context.mediaSessionTag: String get() = "${getString(R.string.app_name)}MediaSession"
 
@@ -295,8 +293,8 @@ private class MediaSessionImpl(
   dispatcher: CoroutineDispatcher
 ) : MediaSession, DefaultLifecycleObserver {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
-
   private var allowNotifications = false
+  private val maxBitmapSize = METADATA_BITMAP_SIZE_DP.toPx()
 
   /** Primary (only?) purpose of [lastMetadata] is for fast recent media query at startup */
   private var lastMetadata: Metadata = Metadata.NullMetadata
@@ -382,9 +380,9 @@ private class MediaSessionImpl(
     lastMetadata = metadata
     scope.launch(Dispatchers.IO) {
       sessionPrefsSingleton.instance().lastMetadata.set(metadata) // save for getRecentMedia
+      session.setMetadata(metadata.toCompat(::resolveUriAsBitmap))
+      postStartOrUpdateNotification()
     }
-    session.setMetadata(metadata.toCompat())
-    postStartOrUpdateNotification()
   }
 
   private var lastQueueWindow: List<AudioItem> = emptyList()
@@ -434,43 +432,19 @@ private class MediaSessionImpl(
     scope.cancel()
   }
 
-  private var currentIconUri: Uri? = null
-  private var currentBitmap: Bitmap? = null
-  private fun getCurrentLargeIcon(iconUri: Uri?, notificationTag: Int): Bitmap? {
-    return if (currentIconUri != iconUri || currentBitmap == null) {
-
-      // Cache the bitmap for the current song so that successive calls to
-      // `getCurrentLargeIcon` don't cause the bitmap to be recreated.
-      currentIconUri = iconUri
-      scope.launch {
-        currentBitmap = iconUri?.let {
-          resolveUriAsBitmap(it)
-        }
-        currentBitmap?.let { bitmap ->
-          msgHandler
-            .obtainMessage(MSG_UPDATE_NOTIFICATION_BITMAP, notificationTag, -1, bitmap)
-            .sendToTarget()
-        }
-      }
-      null
-    } else {
-      currentBitmap
-    }
-  }
-
   fun Dp.toPx() = TypedValue.applyDimension(
     TypedValue.COMPLEX_UNIT_DIP,
     value,
     ctx.resources.displayMetrics
   ).roundToInt()
 
-  @Suppress("BlockingMethodInNonBlockingContext")
   private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
     try {
       val request = ImageRequest.Builder(ctx)
         .data(if (uri !== Uri.EMPTY) uri else R.drawable.ic_big_album)
+        .error(R.drawable.ic_big_album)
         .allowHardware(false)
-        .size(METADATA_ARTWORK_WIDTH.dp.toPx(), METADATA_ARTWORK_HEIGHT.dp.toPx())
+        .size(maxBitmapSize, maxBitmapSize)
         .build()
       (ctx.imageLoader.execute(request).drawable as BitmapDrawable).bitmap
     } catch (e: Exception) {
@@ -541,27 +515,11 @@ private class MediaSessionImpl(
 
   private fun makeHandler() = Handler(Looper.getMainLooper()) { msg -> handleMessage(msg) }
 
-  private var notificationArg = 0
   private fun handleMessage(msg: Message): Boolean {
-    return when (msg.what) {
-      MSG_START_OR_UPDATE_NOTIFICATION -> true.also {
-        startOrUpdateNotification(null)
-      }
-      MSG_UPDATE_NOTIFICATION_BITMAP -> true.also {
-        //LOG._e {
-        //  it(
-        //    "updateBitmap started=%s currentTag=%s msg.arg1=%s",
-        //    isNotificationStarted,
-        //    notificationArg,
-        //    msg.arg1
-        //  )
-        //}
-        if (isNotificationStarted && notificationArg == msg.arg1) {
-          startOrUpdateNotification(msg.obj as Bitmap)
-        }
-      }
-      else -> false
-    }
+    return if (msg.what == MSG_START_OR_UPDATE_NOTIFICATION) {
+      startOrUpdateNotification()
+      true
+    } else false
   }
 
   /**
@@ -569,26 +527,25 @@ private class MediaSessionImpl(
    * likely related to MediaPlayerService being considered a "foreground service'. Either we have to
    * pause before stopping foreground and canceling notification, or it's a timing issue.
    */
-  private fun startOrUpdateNotification(bitmap: Bitmap?) {
+  private fun startOrUpdateNotification() {
     scope.launch {
       val controller: MediaControllerCompat = session.controller
       val playbackState: PlaybackStateCompat? = controller.playbackState
       val description: MediaDescriptionCompat? = controller.metadata?.description
       val sessionActivity = controller.sessionActivity
       if (playbackState?.state == STATE_STOPPED) {
-        doStartOrUpdateNotification(bitmap, STATE_PAUSED, description, sessionActivity)
+        doStartOrUpdateNotification(STATE_PAUSED, description, sessionActivity)
       }
-      doStartOrUpdateNotification(bitmap, playbackState?.state, description, sessionActivity)
+      doStartOrUpdateNotification(playbackState?.state, description, sessionActivity)
     }
   }
 
   private suspend fun doStartOrUpdateNotification(
-    bitmap: Bitmap?,
     playbackState: Int?,
     description: MediaDescriptionCompat?,
     sessionActivity: PendingIntent
   ) {
-    makeBuilder(bitmap, playbackState, description, sessionActivity)?.let { builder ->
+    makeBuilder(playbackState, description, sessionActivity)?.let { builder ->
       val notification = builder.build()
       notificationManager.notify(NOW_PLAYING_NOTIFICATION_ID, notification)
       if (!isNotificationStarted) isNotificationStarted = true
@@ -600,18 +557,16 @@ private class MediaSessionImpl(
     if (isNotificationStarted) {
       isNotificationStarted = false
       msgHandler.removeMessages(MSG_START_OR_UPDATE_NOTIFICATION)
-      msgHandler.removeMessages(MSG_UPDATE_NOTIFICATION_BITMAP)
       cancelNotification()
     }
   }
 
   private fun cancelNotification() {
-    notificationListener.stopForground()
+    notificationListener.stopForeground()
     notificationManager.cancel(NOW_PLAYING_NOTIFICATION_ID)
   }
 
   private suspend fun makeBuilder(
-    bitmap: Bitmap?,
     state: Int?,
     description: MediaDescriptionCompat?,
     sessionActivity: PendingIntent
@@ -624,11 +579,7 @@ private class MediaSessionImpl(
       val isPlaying = state == STATE_PLAYING
       setOngoing(isPlaying)
 
-      var largeIcon = bitmap
-      if (largeIcon == null) {
-        largeIcon = getCurrentLargeIcon(description.iconUri, ++notificationArg)
-      }
-      setLargeIcon(largeIcon)
+      setLargeIcon(description.iconBitmap)
 
       setDeleteIntent(buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_STOP))
       setContentTitle(description.title)
@@ -678,7 +629,9 @@ fun Context.isCarMode(): Boolean {
   return uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_CAR
 }
 
-fun Metadata.toCompat(): MediaMetadataCompat {
+suspend fun Metadata.toCompat(
+  getBitmap: suspend (Uri) -> Bitmap? = { null }
+): MediaMetadataCompat {
   if (this === Metadata.NullMetadata) return MediaMetadataCompat.Builder().build()
 
   return MediaMetadataCompat.Builder()
@@ -686,8 +639,8 @@ fun Metadata.toCompat(): MediaMetadataCompat {
     .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistName.value)
     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, albumArtist.value)
     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumTitle.value)
-    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title())
-    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration())
+    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title.value)
+    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration.value)
     .putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, trackNumber.toLong())
     .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, location.toString())
     .apply {
@@ -698,8 +651,9 @@ fun Metadata.toCompat(): MediaMetadataCompat {
           METADATA_KEY_ALBUM_ART_URI
        */
       val artwork = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
+      putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, getBitmap(artwork))
       if (artwork !== Uri.EMPTY) {
-        putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, localAlbumArt.toString())
+        putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, artwork.toString())
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
         putRating(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())

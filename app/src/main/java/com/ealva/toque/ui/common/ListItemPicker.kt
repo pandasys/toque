@@ -53,6 +53,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.ealva.toque.ui.theme.toqueColors
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -74,7 +75,7 @@ fun <T : Comparable<T>> ListItemPicker(
   label: (T) -> String = { it.toString() },
   value: T,
   onValueChange: (T) -> Unit,
-  dividersColor: Color = MaterialTheme.colors.primary,
+  dividersColor: Color = toqueColors.primary,
   range: List<T>,
   textStyle: TextStyle = LocalTextStyle.current,
 ) {

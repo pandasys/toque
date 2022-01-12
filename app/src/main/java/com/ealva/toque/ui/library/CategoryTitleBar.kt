@@ -17,9 +17,9 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
+import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
 fun CategoryTitleBar(categoryItem: LibraryCategories.CategoryItem) {
@@ -27,7 +27,7 @@ fun CategoryTitleBar(categoryItem: LibraryCategories.CategoryItem) {
     item = categoryItem,
     boxSize = 48.dp,
     iconSize = 38.dp,
-    textStyle = MaterialTheme.typography.h6,
+    textStyle = toqueTypography.h6,
     padding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
     textStartPadding = 10.dp
   )

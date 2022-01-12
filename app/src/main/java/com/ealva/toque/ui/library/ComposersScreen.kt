@@ -183,7 +183,7 @@ private fun ComposerItem(
   ListItem(
     modifier = Modifier
       .fillMaxWidth()
-      .modifyIf(isSelected) { background(MaterialTheme.toqueColors.selectedBackground) }
+      .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
       .combinedClickable(
         onClick = { itemClicked(composerInfo.id) },
         onLongClick = { itemLongClicked(composerInfo.id) }

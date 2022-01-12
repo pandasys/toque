@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,13 +35,14 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
+import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
 fun LibraryCategory(
   item: LibraryCategories.CategoryItem,
   boxSize: Dp = 42.dp,
   iconSize: Dp = 34.dp,
-  textStyle: TextStyle = MaterialTheme.typography.subtitle1,
+  textStyle: TextStyle = toqueTypography.subtitle1,
   padding: PaddingValues = PaddingValues(vertical = 8.dp),
   textStartPadding: Dp = 4.dp,
   onClick: () -> Unit = {}

@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +39,7 @@ import com.ealva.toque.common.toRating
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.db.smart.RatingMatcher
+import com.ealva.toque.ui.theme.toqueTypography
 import com.gowtham.ratingbar.RatingBar
 import com.gowtham.ratingbar.RatingBarStyle
 import com.gowtham.ratingbar.StepSize
@@ -100,7 +100,7 @@ private fun RatingRangeEditor(
       if (newLow == StarRating.STAR_5.value) {
         high = StarRating.STAR_5.value
         low = StarRating.STAR_4_5.value
-      } else{
+      } else {
         low = newLow
         high = newLow + StarRating.STAR_0_5.value
       }
@@ -157,7 +157,7 @@ private fun RatingRangeEditor(
     Text(
       modifier = Modifier.padding(horizontal = 8.dp),
       text = stringResource(id = R.string.to),
-      style = MaterialTheme.typography.caption
+      style = toqueTypography.caption
     )
     RatingBar(
       modifier = Modifier.wrapContentSize(),
