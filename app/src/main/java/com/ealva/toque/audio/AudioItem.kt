@@ -22,6 +22,7 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 
@@ -38,4 +39,6 @@ interface AudioItem : HasId {
   val rating: Rating
   val location: Uri
   val fileUri: Uri
+  /** True if this item is valid, ie. [id] is valid */
+  val isValid: Boolean
 }

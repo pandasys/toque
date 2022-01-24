@@ -24,6 +24,7 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asMediaId
@@ -53,7 +54,8 @@ class PlayableAudioItemFake(
   override val supportsFade: Boolean = false,
   override val position: Millis = Millis(0),
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL,
-  override var fileUri: Uri = Uri.EMPTY
+  override var fileUri: Uri = Uri.EMPTY,
+  override val albumId: AlbumId = AlbumId.INVALID
 ) : PlayableAudioItem {
   override lateinit var location: Uri
   override lateinit var albumArt: Uri
@@ -83,6 +85,6 @@ class PlayableAudioItemFake(
   override fun setRating(newRating: Rating, allowFileUpdate: Boolean) = Unit
   override fun previousShouldRewind(): Boolean = false
   override fun reset(playNow: PlayNow) = Unit
-
+  override fun updateArtwork(albumId: AlbumId, albumArt: Uri, localAlbumArt: Uri) = Unit
   override val artist: ArtistName = ArtistName.UNKNOWN
 }

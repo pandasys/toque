@@ -305,4 +305,10 @@
     <string name="ErrorReadingMediaInfo">Error reading media info</string>
   <string name="ErrorReadingMediaList">Error reading media list</string>
     <string name="Menu">Menu</string>
+  <string name="Info">Info</string>
+    <string name="ArtworkSearch">Artwork Search</string>
+    <string name="MaxImageSearchResults">Maximum Image Search Results</string>
+  <string name="MaxImageResultsSummary">The maximum number of results from an image search</string>
+    <string name="CompressionQuality">Compression Quality</string>
+  <string name="CompressionQualitySummary">Downloaded artwork is compressed into JPEG. 100 = max image quality, 0 = max compression.</string>
 </resources>

@@ -24,9 +24,9 @@ import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
-import coil.compose.rememberImagePainter
 
 private const val ALPHA_ENABLED = 1.0F
 private const val ALPHA_DISABLED = 0.3F
@@ -46,7 +46,7 @@ fun ActionButton(
     modifier = modifier
   ) {
     Icon(
-      painter = rememberImagePainter(data = drawable),
+      painter = painterResource(id = drawable),
       contentDescription = stringResource(id = description),
       modifier = Modifier.size(buttonHeight),
       tint = LocalContentColor.current.copy(alpha = if (enabled) ALPHA_ENABLED else ALPHA_DISABLED)

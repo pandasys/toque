@@ -53,7 +53,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.text.isDigitsOnly
-import coil.compose.rememberImagePainter
 import com.ealva.toque.R
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.common.fetch
@@ -349,7 +348,7 @@ private fun TitleBar(
     navigationIcon = {
       IconButton(onClick = back) {
         Icon(
-          painter = rememberImagePainter(data = R.drawable.ic_arrow_left),
+          painter = painterResource(id = R.drawable.ic_arrow_left),
           contentDescription = "Back",
           modifier = Modifier.size(26.dp)
         )
@@ -358,15 +357,17 @@ private fun TitleBar(
     actions = {
       IconButton(onClick = restore) {
         Icon(
-          painter = rememberImagePainter(data = R.drawable.ic_restore),
+          painter = painterResource(id = R.drawable.ic_restore),
           contentDescription = "Restore original",
+          modifier = Modifier.size(26.dp),
           tint = LocalContentColor.current
         )
       }
       IconButton(onClick = addRow) {
         Icon(
-          painter = rememberImagePainter(data = R.drawable.ic_add_circle_outline),
+          painter = painterResource(id = R.drawable.ic_add_circle_outline),
           contentDescription = "Add Rule",
+          modifier = Modifier.size(26.dp),
           tint = LocalContentColor.current
         )
       }

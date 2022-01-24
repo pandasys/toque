@@ -16,14 +16,14 @@
 
 object SdkVersion {
   const val COMPILE = 31
-  const val MIN = 21
+  const val MIN = 23
   const val TARGET = 30
 }
 
 object PluginsVersion {
   const val AGP = "7.0.4"
   const val DETEKT = "1.19.0"
-  const val DOKKA = "1.6.0"
+  const val DOKKA = "1.6.10"
   const val KOTLIN = "1.6.10"
   const val PUBLISH = "0.18.0"
   const val SERIALIZATION = "1.6.10"
@@ -43,11 +43,11 @@ object Libs {
   }
 
   object Android {
-    const val MATERIAL = "com.google.android.material:material:1.4.0"
+    const val MATERIAL = "com.google.android.material:material:1.5.0"
   }
 
   object AndroidX {
-    const val APPCOMPAT = "androidx.appcompat:appcompat:1.4.0"
+    const val APPCOMPAT = "androidx.appcompat:appcompat:1.4.1"
     //const val PALETTE = "androidx.palette:palette:1.0.0"
 
     object Ktx {
@@ -66,6 +66,7 @@ object Libs {
       @Suppress("MemberVisibilityCanBePrivate")
       const val COMPILER_VERSION = "1.1.0-rc02"
       private const val VERSION = "1.1.0-rc01"
+
       //const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
       const val UI = "androidx.compose.ui:ui:$VERSION"
       const val MATERIAL = "androidx.compose.material:material:$VERSION"
@@ -77,11 +78,14 @@ object Libs {
 //        "androidx.compose.material:material-icons-extended:${VERSION}"
     }
 
+    const val EXIF = "androidx.exifinterface:exifinterface:1.3.3"
+
     object Lifecycle {
       private const val VERSION = "2.4.0"
       const val RUNTIME_KTX = "androidx.lifecycle:lifecycle-runtime-ktx:$VERSION"
       const val COMMON_JAVA8 = "androidx.lifecycle:lifecycle-common-java8:$VERSION"
       const val SERVICE = "androidx.lifecycle:lifecycle-service:$VERSION"
+      const val EXTS = "androidx.lifecycle:lifecycle-extensions:2.2.0"
 //    const val VIEW_MODEL_COMPOSE = "androidx.lifecycle:lifecycle-viewmodel-compose:1.0.0-alpha05"
 //    const val VIEW_MODEL_KTX = "androidx.lifecycle:lifecycle-viewmodel-ktx:$VERSION"
     }
@@ -98,6 +102,10 @@ object Libs {
       }
 
       // const val ESPRESSO_CORE = "androidx.test.espresso:espresso-core:3.2.0"
+    }
+
+    object WorkManager {
+      const val KTX_RUNTIME = "androidx.work:work-runtime-ktx:2.7.1"
     }
   }
 
@@ -128,7 +136,7 @@ object Libs {
   }
 
   object EAlvaMusicInfo {
-    private const val VERSION = "0.1.2-SNAPSHOT"
+    private const val VERSION = "0.2.5-0"
     const val MUSIC_INFO = "com.ealva:musicinfo:$VERSION"
   }
 
@@ -144,8 +152,10 @@ object Libs {
     const val FASTUTIL = "it.unimi.dsi:fastutil:7.2.1"
   }
 
+  const val GUAVA = "com.google.guava:guava:31.0.1-android"
+
   object Gowtham {
-    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.2.0"
+    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.2.1"
   }
 
   object JUnit {
@@ -154,8 +164,8 @@ object Libs {
   }
 
   object Koin {
-    private const val VERSION = "3.1.4"
-    private const val COMPOSE_VERSION = "3.1.4"
+    private const val VERSION = "3.1.5"
+    private const val COMPOSE_VERSION = "3.1.5"
     const val CORE = "io.insert-koin:koin-core:$VERSION"
     const val ANDROID = "io.insert-koin:koin-android:$VERSION"
     const val COMPOSE = "io.insert-koin:koin-androidx-compose:$COMPOSE_VERSION"
@@ -181,14 +191,18 @@ object Libs {
     }
 
     object Serialization {
-      private const val VERSION = "1.3.1"
+      private const val VERSION = "1.3.2"
       const val CORE = "org.jetbrains.kotlinx:kotlinx-serialization-core:$VERSION"
       const val JSON = "org.jetbrains.kotlinx:kotlinx-serialization-json:$VERSION"
     }
   }
 
   object LibVLC {
-    const val ALL = "org.videolan.android:libvlc-all:3.4.7"
+    const val ALL = "org.videolan.android:libvlc-all:3.4.8"
+  }
+
+  object NumberPicker {
+    const val COMPOSE = "com.chargemap.compose:numberpicker:0.0.11"
   }
 
   object Phoenix {
@@ -196,13 +210,13 @@ object Libs {
   }
 
   object PreferenceStore {
-    private const val VERSION = "0.10.7-0"
+    private const val VERSION = "0.10.13-0"
     const val STORE = "com.ealva:pref-store:$VERSION"
     const val COMPOSE = "com.ealva:compose-preference:$VERSION"
   }
 
   object Result {
-    private const val VERSION = "1.1.13"
+    private const val VERSION = "1.1.14"
     const val RESULT = "com.michael-bull.kotlin-result:kotlin-result:$VERSION"
     const val COROUTINES = "com.michael-bull.kotlin-result:kotlin-result-coroutines:$VERSION"
   }
@@ -218,10 +232,12 @@ object Libs {
   }
 
   object Square {
-    const val OKIO = "com.squareup.okio:okio:3.0.0"
+    const val BOM = "com.squareup.okhttp3:okhttp-bom:4.9.3"
+    const val OKIO = "com.squareup.okio:okio"
+    const val LOGGING_INTERCEPTOR = "com.squareup.okhttp3:logging-interceptor"
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.3.0-0"
+    const val CORE = "com.ealva:welite-core:0.3.1-SNAPSHOT"
   }
 }

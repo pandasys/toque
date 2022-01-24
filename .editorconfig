@@ -17,6 +17,6 @@ trim_trailing_whitespace = true
 # by the ruleset identifier.
 # noinspection EditorConfigKeyCorrectness
 disabled_rules = import-ordering, no-multi-spaces
-ij_continuation_indent_size = 0
+ij_continuation_indent_size = 2
 ij_kotlin_name_count_to_use_star_import_for_members = 99
 ij_any_keep_simple_lambdas_in_one_line = true

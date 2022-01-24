@@ -59,6 +59,7 @@ import com.ealva.toque.db.PlayListType.UserCreated
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.extension
 import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.AlbumIdList
 import com.ealva.toque.persist.ArtistId
@@ -72,6 +73,8 @@ import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
+import com.ealva.toque.persist.asAlbumId
+import com.ealva.toque.persist.asArtistId
 import com.ealva.toque.persist.asMediaId
 import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.persist.reifyRequire
@@ -124,6 +127,7 @@ import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onSuccess
 import com.github.michaelbull.result.toErrorIf
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
@@ -296,6 +300,12 @@ interface AudioMediaDao {
   ): CategoryMediaList
 
   suspend fun getFullInfo(mediaId: MediaId): DaoResult<FullAudioInfo>
+
+  suspend fun getAlbumId(mediaId: MediaId): DaoResult<AlbumId>
+
+  suspend fun getArtistId(mediaId: MediaId): DaoResult<ArtistId>
+
+  fun setAlbumRemoteArt(mediaId: MediaId, location: Uri)
 
   suspend fun getTitleSuggestions(
     partialTitle: String,
@@ -579,7 +589,14 @@ private class AudioMediaDaoImpl(
         .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
         .selects { AUDIO_DESCRIPTION_SELECTS }
         .where { (MediaTable.artistId eq id.value).filter(filter) }
-        .ordersBy { listOf(OrderBy(AlbumTable.albumSort), OrderBy(MediaTable.titleSort)) }
+        .ordersBy {
+          listOf(
+            OrderBy(MediaTable.year),
+            OrderBy(AlbumTable.albumSort),
+            OrderBy(MediaTable.discNumber),
+            OrderBy(MediaTable.trackNumber)
+          )
+        }
         .limit(limit.value)
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
@@ -597,7 +614,13 @@ private class AudioMediaDaoImpl(
         .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
         .selects { AUDIO_DESCRIPTION_SELECTS }
         .where { (MediaTable.albumArtistId eq id.value).filter(filter) }
-        .ordersBy { listOf(OrderBy(AlbumTable.albumSort), OrderBy(MediaTable.trackNumber)) }
+        .ordersBy {
+          listOf(
+            OrderBy(AlbumTable.albumSort),
+            OrderBy(MediaTable.discNumber),
+            OrderBy(MediaTable.trackNumber)
+          )
+        }
         .limit(limit.value)
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
@@ -616,7 +639,12 @@ private class AudioMediaDaoImpl(
         .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
         .selects { AUDIO_DESCRIPTION_SELECTS }
         .where { (MediaTable.albumId eq id.value).restrictTo(restrictTo).filter(filter) }
-        .orderByAsc { MediaTable.trackNumber }
+        .ordersBy {
+          listOf(
+            OrderBy(MediaTable.discNumber),
+            OrderBy(MediaTable.trackNumber)
+          )
+        }
         .limit(limit.value)
         .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
         .toList()
@@ -966,7 +994,13 @@ private class AudioMediaDaoImpl(
         .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
         .select(MediaTable.id)
         .where { (MediaTable.albumId inList albumsIds.value).restrictTo(restrictTo) }
-        .ordersBy { listOf(OrderBy(AlbumTable.albumSort), OrderBy(MediaTable.trackNumber)) }
+        .ordersBy {
+          listOf(
+            OrderBy(AlbumTable.albumSort),
+            OrderBy(MediaTable.discNumber),
+            OrderBy(MediaTable.trackNumber)
+          )
+        }
         .limit(limit.value)
         .sequence { cursor -> cursor[MediaTable.id] }
         .mapTo(LongArrayList(512)) { it.asMediaId.value }
@@ -1189,6 +1223,34 @@ private class AudioMediaDaoImpl(
           )
         }
         .single()
+    }
+  }
+
+  override suspend fun getAlbumId(mediaId: MediaId): DaoResult<AlbumId> = runSuspendCatching {
+    db.query {
+      MediaTable
+        .select { albumId }
+        .where { id eq mediaId.value }
+        .sequence { cursor -> cursor[albumId].asAlbumId }
+        .single()
+    }
+  }
+
+  override suspend fun getArtistId(mediaId: MediaId): DaoResult<ArtistId> = runSuspendCatching {
+    db.query {
+      MediaTable
+        .select { artistId }
+        .where { id eq mediaId.value }
+        .sequence { cursor -> cursor[artistId].asArtistId }
+        .single()
+    }
+  }
+
+  override fun setAlbumRemoteArt(mediaId: MediaId, location: Uri) {
+    scope.launch {
+      getAlbumId(mediaId)
+        .onFailure { cause -> LOG.e(cause) { it("Error getting album ID") } }
+        .onSuccess { albumId -> albumDao.setAlbumArt(albumId, location, Uri.EMPTY) }
     }
   }
 

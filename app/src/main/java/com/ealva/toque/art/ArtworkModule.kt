@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,16 @@
  * limitations under the License.
  */
 
-include("app")
+package com.ealva.toque.art
 
-pluginManagement {
-  resolutionStrategy {
-    eachPlugin {
-      if (requested.id.id == "com.android.library") {
-        useModule("com.android.tools.build:gradle:${requested.version}")
-      }
-      if (requested.id.id == "com.android.application") {
-        useModule("com.android.tools.build:gradle:${requested.version}")
-      }
-    }
-  }
-  repositories {
-    gradlePluginPortal()
-    google()
-    mavenCentral()
+import com.ealva.toque.prefs.AppPrefs
+import org.koin.dsl.module
+
+object ArtworkModule {
+  val koinModule = module {
+    single { ArtworkDownloader() }
+    single { MusicInfoProvider() }
+    single { DownloadAlbumArtWorkerFactory(get(AppPrefs.QUALIFIER), get(), get()) }
+    single { ArtworkUpdateListener(get(), get(), get(AppPrefs.QUALIFIER), get()) }
   }
 }
-
-rootProject.name = ("toque")

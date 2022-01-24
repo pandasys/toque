@@ -18,10 +18,12 @@ package com.ealva.toque.prefs
 
 import com.ealva.prefstore.store.BoolPref
 import com.ealva.prefstore.store.DoublePref
+import com.ealva.prefstore.store.IntPref
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
+import com.ealva.toque.art.ArtworkDownloader.CompressionQuality
 import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
@@ -40,13 +42,16 @@ import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MARK_PLAYED_PERCENTAGE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE_LENGTH
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_QUALITY
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SELECT_MEDIA_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_THEME_CHOICE
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MARK_PLAYED_PERCENTAGE_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.MAX_IMAGE_SEARCH_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.QUALITY_RANGE
 import org.koin.core.qualifier.named
 
 typealias AppPrefsSingleton = PreferenceStoreSingleton<AppPrefs>
@@ -86,6 +91,13 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val readTagRating: BoolPref
   val readTagSortFields: BoolPref
 
+  val autoFetchArtLocation: BoolPref
+  val downloadArt: BoolPref
+  val downloadHighResArt: BoolPref
+  val maxImageSearch: IntPref
+  val downloadUnmeteredOnly: BoolPref
+  val compressionQuality: StorePref<Int, CompressionQuality>
+
   companion object {
     val QUALIFIER = named("AppPrefs")
 
@@ -112,6 +124,11 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
 
     val MARK_PLAYED_PERCENTAGE_RANGE = 0.0..1.0
     const val DEFAULT_MARK_PLAYED_PERCENTAGE: Double = 0.5
+
+    val MAX_IMAGE_SEARCH_RANGE = 10..50
+
+    val DEFAULT_QUALITY = CompressionQuality(80)
+    val QUALITY_RANGE = 0..100
 
     fun make(storage: Storage): AppPrefs = AppPrefsImpl(storage)
   }
@@ -161,4 +178,17 @@ private class AppPrefsImpl(
   override val playOnWiredConnection: BoolPref by preference(false)
   override val readTagRating: BoolPref by preference(true)
   override val readTagSortFields: BoolPref by preference(true)
+
+  override val autoFetchArtLocation: BoolPref by preference(false)
+  override val downloadArt: BoolPref by preference(true)
+  override val downloadHighResArt: BoolPref by preference(false)
+  override val maxImageSearch: IntPref by preference(10) {
+    it.coerceIn(MAX_IMAGE_SEARCH_RANGE)
+  }
+  override val downloadUnmeteredOnly: BoolPref by preference(true)
+  override val compressionQuality: StorePref<Int, CompressionQuality> by
+    asTypePref(DEFAULT_QUALITY, { CompressionQuality(it) }, { it.value }) { quality ->
+      CompressionQuality(quality.value.coerceIn(QUALITY_RANGE))
+    }
+
 }

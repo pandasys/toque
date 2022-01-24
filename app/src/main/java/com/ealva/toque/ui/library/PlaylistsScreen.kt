@@ -43,10 +43,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -69,10 +69,10 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorScreen
@@ -253,7 +253,7 @@ private fun PlaylistItem(
         ),
       icon = {
         Icon(
-          painter = rememberImagePainter(data = playlistInfo.type.icon),
+          painter = painterResource(id = playlistInfo.type.icon),
           contentDescription = "Playlist Icon",
           modifier = Modifier.size(40.dp)
         )

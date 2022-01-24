@@ -27,6 +27,7 @@ import android.media.AudioManager
 import android.os.PowerManager
 import android.telecom.TelecomManager
 import android.view.WindowManager
+import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.util.CoilUtils
@@ -38,19 +39,21 @@ import com.ealva.ealvalog.android.AndroidLogger
 import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
 import com.ealva.toque.android.content.requireSystemService
+import com.ealva.toque.art.ArtworkModule
 import com.ealva.toque.audioout.AudioModule
-import com.ealva.toque.common.debug
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
 import com.ealva.toque.prefs.PrefsModule
 import com.ealva.toque.service.ServiceModule
 import com.ealva.toque.service.vlc.LibVlcModule
 import com.ealva.toque.tag.TagModule
-import com.ealva.welite.db.log.WeLiteLog
+import com.ealva.toque.work.Work
+import com.ealva.toque.work.WorkModule
 import com.jakewharton.processphoenix.ProcessPhoenix
 import ealvatag.logging.EalvaTagLog
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
@@ -64,7 +67,8 @@ interface Toque {
   }
 }
 
-class ToqueImpl : Application(), Toque, ImageLoaderFactory {
+class ToqueImpl : Application(), Toque, ImageLoaderFactory, Configuration.Provider {
+  private lateinit var koinApplication: KoinApplication
   private val appModule = module {
     single<Toque> { this@ToqueImpl }
     single<AudioManager> { requireSystemService() }
@@ -77,16 +81,19 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
     single<PackageManager> { requireSystemService() }
   }
 
+  override fun getWorkManagerConfiguration(): Configuration =
+    koinApplication.koin.get<Work>().getWorkManagerConfiguration()
+
   override fun onCreate() {
     super.onCreate()
     appContext = applicationContext
 
     setupLogging()
-    //val logger = logger(ToqueImpl::class)
-    debug {
-      WeLiteLog.logQueryPlans = true
-      WeLiteLog.logSql = true
-    }
+//    val logger = logger(ToqueImpl::class)
+//    debug {
+//      WeLiteLog.logQueryPlans = true
+//      WeLiteLog.logSql = true
+//    }
 
 //    val policy: StrictMode.VmPolicy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 //      StrictMode.VmPolicy.Builder()
@@ -101,7 +108,7 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
 //    }
 //    StrictMode.setVmPolicy(policy)
 
-    startKoin {
+    koinApplication = startKoin {
 //      androidLogger(Level.NONE)
       androidContext(androidContext = this@ToqueImpl)
 
@@ -114,10 +121,8 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory {
         LibVlcModule.koinModule,
         DbModule.koinModule,
         ServiceModule.koinModule,
-//        MainModule.koinModule
-//        brainzModule,
-//        spotifyModule,
-//        artModule,
+        WorkModule.koinModule,
+        ArtworkModule.koinModule,
       )
     }
   }

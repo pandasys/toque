@@ -38,9 +38,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
@@ -193,7 +193,7 @@ private fun GenreItem(
       ),
     icon = {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_guitar_acoustic),
+        painter = painterResource(id = R.drawable.ic_guitar_acoustic),
         contentDescription = "Genre icon",
         modifier = Modifier.size(40.dp)
       )

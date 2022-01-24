@@ -50,8 +50,10 @@ object ArtistTable : Table() {
   val id = long("ArtistId") { primaryKey() }
   val artistName = text("Artist") { collateNoCase() }
   val artistSort = text("ArtistSort") { collateNoCase() }
-  val artistImage = text("ArtistImageUri") { default("") }
+  val artistLocalArtUri = text("ArtistLocalArtUri") { default("") }
+  val artistArtUri = text("ArtistArt") { default("") }
   val artistMbid = text("ArtistMbid") { default("") }
+  val downloadingArtwork = bool("ArtistDownloadingArtwork") { default(false) }
   val lastArtSearchTime = long("ArtistLastArtSearch") { default(0L) }
   val createdTime = long("ArtistCreated")
   val updatedTime = long("ArtistTimeUpdated") { default(0L) }
@@ -70,6 +72,7 @@ object AlbumTable : Table() {
   val albumArtUri = text("AlbumArtUri") { default("") }
   val releaseMbid = text("AlbumReleaseMbid") { default("") }
   val releaseGroupMbid = text("AlbumReleaseGroupMbid") { default("") }
+  val downloadingArtwork = bool("AlbumDownloadingArtwork") { default(false) }
   val lastArtSearchTime = long("AlbumLastArtSearchTime") { default(0L) }
   val createdTime = long("AlbumCreated")
   val updatedTime = long("AlbumUpdated") { default(0L) }

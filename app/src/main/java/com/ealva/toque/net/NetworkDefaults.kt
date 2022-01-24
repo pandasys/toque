@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,22 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.android.os
+package com.ealva.toque.net
 
-object Build {
-  val isMarshmallowOrLater: Boolean =
-    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M
+import com.ealva.toque.app.Toque
+import okhttp3.Cache
+import okhttp3.OkHttpClient
+import java.io.File
+
+private const val TWENTY_MEG = 20L * 1024L * 1024L
+
+object NetworkDefaults {
+  private val cacheDir: File
+    get() = File(Toque.appContext.cacheDir, "OkHttpCache")
+
+  val okHttpClient: OkHttpClient by lazy {
+    OkHttpClient.Builder().apply {
+      cache(Cache(cacheDir, TWENTY_MEG))
+    }.build()
+  }
 }

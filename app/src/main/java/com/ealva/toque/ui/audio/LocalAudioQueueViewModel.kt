@@ -90,6 +90,7 @@ interface LocalAudioQueueViewModel {
   suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult
 
   fun showPrompt(prompt: DialogPrompt)
+
   fun clearPrompt()
 
   companion object {

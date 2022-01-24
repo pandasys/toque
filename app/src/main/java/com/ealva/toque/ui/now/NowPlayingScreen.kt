@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,7 +67,6 @@ import androidx.constraintlayout.compose.Dimension
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
 import com.ealva.toque.R
-import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Rating
@@ -91,6 +91,8 @@ import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_RATING_BAR_ROW
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_SLIDER_SPACE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE_SPACE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TOP_SPACE
+import com.ealva.toque.ui.now.NowPlayingViewModel.NowPlayingState
+import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
 import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.ExperimentalAnimatedInsets
@@ -110,7 +112,7 @@ import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
-object NowPlayingScreenIds {
+private object NowPlayingScreenIds {
   const val ID_SLIDER_SPACE = 1
   const val ID_BUTTON_ROW = 2
   const val ID_POSITION_SLIDER = 3
@@ -129,7 +131,7 @@ data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), Koin
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
       add(LocalAudioQueueViewModel(lookup(), get(AppPrefs.QUALIFIER), get()))
-      add(NowPlayingViewModel(lookup(), get(AppPrefs.QUALIFIER)))
+      add(NowPlayingViewModel(backstack, get(), lookup(), get(AppPrefs.QUALIFIER)))
     }
   }
 
@@ -152,6 +154,7 @@ data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), Koin
       toggleEqMode = { viewModel.toggleEqMode() },
       nextRepeatMode = { viewModel.nextRepeatMode() },
       nextShuffleMode = { viewModel.nextShuffleMode() },
+      showItemDialog = { viewModel.showCurrentItemDialog() },
       modifier
     )
   }
@@ -172,6 +175,7 @@ private fun NowPlaying(
   toggleEqMode: () -> Unit,
   nextRepeatMode: () -> Unit,
   nextShuffleMode: () -> Unit,
+  showItemDialog: () -> Unit,
   modifier: Modifier
 ) {
   val screenConfig = LocalScreenConfig.current
@@ -179,7 +183,11 @@ private fun NowPlaying(
   val useDarkIcons = toqueColors.isLight
   val systemUiController = rememberSystemUiController()
   SideEffect {
-    systemUiController.setSystemBarsColor(
+    systemUiController.setStatusBarColor(
+      color = Color(0x00000000),
+      darkIcons = useDarkIcons,
+    )
+    systemUiController.setNavigationBarColor(
       color = Color(0x44000000),
       darkIcons = useDarkIcons,
     )
@@ -231,7 +239,7 @@ private fun NowPlaying(
             end.linkTo(pager.end)
             bottom.linkTo(pager.bottom)
           },
-        onClick = { }
+        onClick = showItemDialog
       )
       PlayerControls(
         state = state,
@@ -297,7 +305,7 @@ private fun CurrentItemMenu(
         .clickable(onClick = onClick),
     ) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_more_vert),
+        painter = painterResource(id = R.drawable.ic_more_vert),
         contentDescription = stringResource(id = R.string.Menu),
         modifier = Modifier
           .size(40.dp)
@@ -409,7 +417,7 @@ private fun PlayerControls(
 }
 
 @Composable
-private fun ItemTitles(item: AudioItem) {
+private fun ItemTitles(item: QueueItem) {
   SelectionContainer(
     modifier = Modifier
       .padding(horizontal = 12.dp)
@@ -446,7 +454,7 @@ private fun ItemTitles(item: AudioItem) {
 @OptIn(ExperimentalPagerApi::class)
 @Composable
 private fun MediaArtPager(
-  queue: List<AudioItem>,
+  queue: List<QueueItem>,
   queueIndex: Int,
   size: Int,
   goToIndex: (Int) -> Unit,
@@ -474,7 +482,7 @@ private fun MediaArtPager(
 
 @OptIn(ExperimentalCoilApi::class)
 @Composable
-private fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
+private fun ArtPagerCard(queue: List<QueueItem>, currentPage: Int, size: Int) {
   if (currentPage in queue.indices) {
     val item = queue[currentPage]
     Box(modifier = Modifier.fillMaxSize()) {
@@ -484,7 +492,6 @@ private fun ArtPagerCard(queue: List<AudioItem>, currentPage: Int, size: Int) {
           builder = {
             size(size)
             error(R.drawable.ic_big_album)
-            placeholder(R.drawable.ic_big_album)
           }
         ),
         contentDescription = "${item.title()} Album Cover Art",
@@ -533,7 +540,7 @@ private fun RatingBarRow(
     ) {
       IconButton(onClick = toggleEqMode, modifier = Modifier.size(26.dp)) {
         Icon(
-          painter = rememberImagePainter(data = R.drawable.ic_audio_equalizer),
+          painter = painterResource(id = R.drawable.ic_audio_equalizer),
           contentDescription = "Toggle Equalizer",
           modifier = Modifier.size(26.dp),
           tint = LocalContentColor.current.copy(alpha = if (eqMode.isOn()) ALPHA_ON else ALPHA_OFF)
@@ -568,7 +575,7 @@ private fun RatingBarRow(
       Spacer(modifier = Modifier.height(26.dp))
       IconButton(onClick = nextRepeatMode, modifier = Modifier.size(26.dp)) {
         Icon(
-          painter = rememberImagePainter(data = repeatMode.drawable),
+          painter = painterResource(repeatMode.drawable),
           contentDescription = stringResource(id = repeatMode.titleRes),
           modifier = Modifier.size(26.dp),
           tint = LocalContentColor.current.copy(
@@ -579,7 +586,7 @@ private fun RatingBarRow(
       Spacer(modifier = Modifier.height(26.dp))
       IconButton(onClick = nextShuffleMode, modifier = Modifier.size(26.dp)) {
         Icon(
-          painter = rememberImagePainter(data = shuffleMode.drawable),
+          painter = painterResource(shuffleMode.drawable),
           contentDescription = stringResource(id = shuffleMode.titleRes),
           modifier = Modifier.size(26.dp),
           tint = LocalContentColor.current.copy(
@@ -622,22 +629,22 @@ private fun ButtonRow(
   ) {
     IconButton(onClick = prevList, modifier = Modifier.size(50.dp)) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_prev_list),
+        painter = painterResource(id = R.drawable.ic_prev_list),
         contentDescription = "Play previous list",
         modifier = Modifier.size(38.dp)
       )
     }
     IconButton(onClick = prev, modifier = Modifier.size(50.dp)) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_previous),
+        painter = painterResource(id = R.drawable.ic_previous),
         contentDescription = "Rewind or previous",
         modifier = Modifier.size(44.dp),
       )
     }
     IconButton(onClick = togglePlayPause, modifier = Modifier.size(50.dp)) {
       Icon(
-        painter = rememberImagePainter(
-          data = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+        painter = painterResource(
+          id = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
         ),
         contentDescription = "Toggle play pause",
         modifier = Modifier.size(50.dp)
@@ -645,14 +652,14 @@ private fun ButtonRow(
     }
     IconButton(onClick = next, modifier = Modifier.size(50.dp)) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_next),
+        painter = painterResource(id = R.drawable.ic_next),
         contentDescription = "Play next",
         modifier = Modifier.size(44.dp)
       )
     }
     IconButton(onClick = nextList, modifier = Modifier.size(50.dp)) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_next_list),
+        painter = painterResource(id = R.drawable.ic_next_list),
         contentDescription = "Play next list",
         modifier = Modifier.size(38.dp)
       )

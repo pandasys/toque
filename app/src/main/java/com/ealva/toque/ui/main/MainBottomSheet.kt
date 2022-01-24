@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,7 +150,7 @@ private fun MainBottomSheetButtonRow(
         .weight(1.0F)
     ) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_map),
+        painter = painterResource(id = R.drawable.ic_map),
         contentDescription = "Library",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onLibraryScreen) ALPHA_ON else ALPHA_OFF)
@@ -162,7 +163,7 @@ private fun MainBottomSheetButtonRow(
         .weight(1.0F)
     ) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_queue),
+        painter = painterResource(id = R.drawable.ic_queue),
         contentDescription = "Queue",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onQueueScreen) ALPHA_ON else ALPHA_OFF)
@@ -175,7 +176,7 @@ private fun MainBottomSheetButtonRow(
         .weight(1.0F)
     ) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_search),
+        painter = painterResource(id = R.drawable.ic_search),
         contentDescription = "Search",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onSearchScreen) ALPHA_ON else ALPHA_OFF)
@@ -188,7 +189,7 @@ private fun MainBottomSheetButtonRow(
         .weight(1.0F)
     ) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_settings),
+        painter = painterResource(id = R.drawable.ic_settings),
         contentDescription = "Settings",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onSettingScreen) ALPHA_ON else ALPHA_OFF)
@@ -319,8 +320,8 @@ private fun CurrentItemPagerCard(
           }
       ) {
         Icon(
-          painter = rememberImagePainter(
-            data = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+          painter = painterResource(
+            id = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
           ),
           contentDescription = "Toggle play pause",
           modifier = Modifier.size(miniPlayerHeight - 8.dp)

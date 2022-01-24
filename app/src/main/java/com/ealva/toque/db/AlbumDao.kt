@@ -31,8 +31,10 @@ import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
+import com.ealva.toque.db.AlbumDaoEvent.AlbumArtworkUpdated
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumId
@@ -91,9 +93,14 @@ import kotlin.concurrent.withLock
 
 private val LOG by lazyLogger(AlbumDao::class)
 
-sealed class AlbumDaoEvent {
-  data class AlbumCreated(val albumId: AlbumId) : AlbumDaoEvent()
-  data class AlbumUpdated(val albumId: AlbumId) : AlbumDaoEvent()
+sealed interface AlbumDaoEvent {
+  data class AlbumCreated(val albumId: AlbumId) : AlbumDaoEvent
+  data class AlbumUpdated(val albumId: AlbumId) : AlbumDaoEvent
+  data class AlbumArtworkUpdated(
+    val albumId: AlbumId,
+    val albumArt: Uri,
+    val localAlbumArt: Uri
+  ) : AlbumDaoEvent
 }
 
 data class AlbumDescription(
@@ -155,6 +162,10 @@ interface AlbumDao {
     partialTitle: String,
     textSearch: TextSearch
   ): DaoResult<List<String>>
+
+  fun setAlbumArt(albumId: AlbumId, remote: Uri, local: Uri)
+
+  suspend fun getArtistAlbum(albumId: AlbumId): DaoResult<Pair<ArtistName, AlbumTitle>>
 
   companion object {
     operator fun invoke(
@@ -390,6 +401,43 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .where { albumTitle like textSearch.applyWildcards(partialTitle) escape ESC_CHAR }
         .sequence { it[albumTitle] }
         .toList()
+    }
+  }
+
+  override fun setAlbumArt(albumId: AlbumId, remote: Uri, local: Uri) {
+    LOG._e { it("setAlbumArt %s remote:%s local:%s", albumId, remote, local) }
+    scope.launch {
+      val rows = db.transaction {
+        AlbumTable
+          .updateColumns {
+            it[albumArtUri] = remote.toString()
+            it[albumLocalArtUri] = local.toString()
+          }
+          .where { id eq albumId.value }
+          .update()
+      }
+      if (rows >= 1) emit(AlbumArtworkUpdated(albumId, remote, local)) else LOG.e {
+        it("Error updating artwork %s %s %s", albumId, remote, local)
+      }
+    }
+  }
+
+  override suspend fun getArtistAlbum(
+    albumId: AlbumId
+  ): DaoResult<Pair<ArtistName, AlbumTitle>> = runSuspendCatching {
+    db.query {
+      AlbumTable
+        .join(ArtistAlbumTable, JoinType.INNER, AlbumTable.id, ArtistAlbumTable.albumId)
+        .join(ArtistTable, JoinType.INNER, ArtistAlbumTable.artistId, ArtistTable.id)
+        .selects { listOf(AlbumTable.albumTitle, ArtistTable.artistName) }
+        .where { AlbumTable.id eq albumId.value }
+        .sequence { cursor ->
+          Pair(
+            cursor[ArtistTable.artistName].asArtistName,
+            cursor[AlbumTable.albumTitle].asAlbumTitle
+          )
+        }
+        .firstOrNull() ?: throw DaoNotFoundException("Could not find artist/album for $albumId")
     }
   }
 

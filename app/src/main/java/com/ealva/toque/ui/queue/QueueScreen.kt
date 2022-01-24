@@ -50,9 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -289,7 +289,7 @@ fun DismissibleItem(
         ) {
           Spacer(modifier = Modifier.weight(1F))
           Icon(
-            painter = rememberImagePainter(data = R.drawable.ic_trashcan),
+            painter = painterResource(R.drawable.ic_trashcan),
             contentDescription = "Delete indicator",
             modifier = Modifier.size(38.dp),
             tint = LocalContentColor.current
@@ -341,7 +341,7 @@ private fun DragHandle(index: Int, modifier: Modifier) {
       style = toqueTypography.overline,
     )
     Icon(
-      painter = rememberImagePainter(data = R.drawable.ic_drag_handle),
+      painter = painterResource(R.drawable.ic_drag_handle),
       contentDescription = "Drag handle",
       modifier = Modifier.size(44.dp),
       tint = LocalContentColor.current

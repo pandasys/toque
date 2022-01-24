@@ -51,10 +51,20 @@ fun Uri.isContentScheme(): Boolean = SCHEME_CONTENT == scheme
 fun Uri.isLocalScheme(): Boolean = isContentScheme() || isFileScheme()
 
 val Uri.fileExtension: String
-  get() = lastPathSegment?.substringAfterLast('.') ?: ""
+  get() = lastPathSegment?.substringAfterLast('.', "") ?: ""
 
 val Uri.mediaFormat: MediaFormat
   get() = MediaFormat.mediaFormatFromExtension(fileExtension)
+
+val Uri.fileExtensionWithDot: String
+  get() = lastPathSegment.orEmpty().getFileExtensionWithDot()
+
+private fun String.getFileExtensionWithDot(): String = lastIndexOf(".").let { dotIndex ->
+  when (dotIndex) {
+    in indices -> substring(dotIndex)
+    else -> ""
+  }
+}
 
 /**
  * Mime Type based on file extension or an empty string if no association found

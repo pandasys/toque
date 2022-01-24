@@ -41,6 +41,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.android.content.doNotHaveReadPermission
 import com.ealva.toque.android.content.orNullObject
 import com.ealva.toque.app.Toque
+import com.ealva.toque.art.ArtworkUpdateListener
 import com.ealva.toque.audioout.AudioOutputState
 import com.ealva.toque.audioout.handleAudioOutputStateBroadcasts
 import com.ealva.toque.db.AudioMediaDao
@@ -74,6 +75,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   private inline val scope: LifecycleCoroutineScope get() = lifecycleScope
   private val queueFactory: PlayableQueueFactory by inject()
   private val audioMediaDao: AudioMediaDao by inject()
+  private val artworkUpdateListener: ArtworkUpdateListener by inject()
   private var inForeground = false
   private var isStarted = false
   private lateinit var mediaSession: MediaSession
@@ -96,12 +98,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     )
     packageManager?.getLaunchIntentForPackage(packageName)?.let { sessionIntent ->
       mediaSession.setSessionActivity(
-        PendingIntent.getActivity(
-          this,
-          0,
-          sessionIntent,
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) FLAG_IMMUTABLE else 0
-        )
+        PendingIntent.getActivity(this, 0, sessionIntent, FLAG_IMMUTABLE)
       )
     }
     sessionToken = mediaSession.token
@@ -111,6 +108,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     }
     // This creates a lifecycle aware object, no unregister needed
     handleAudioOutputStateBroadcasts(audioOutputState)
+    artworkUpdateListener.start()
   }
 
   inner class MediaServiceBinder : Binder() {
@@ -185,6 +183,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     isStarted = false
     mediaSession.isActive = false
     mediaSession.release()
+    artworkUpdateListener.stop()
     LOG._e { it("onDestroy") }
   }
 

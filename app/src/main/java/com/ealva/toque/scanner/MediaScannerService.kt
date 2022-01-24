@@ -187,14 +187,10 @@ class MediaScannerService : LifecycleService() {
   }
 
   private suspend fun tryFullRescan(rescan: RescanType) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      if (checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-        doFullRescanWithPermission(rescan)
-      } else {
-        LOG.e { it("No permission %s", READ_EXTERNAL_STORAGE) }
-      }
-    } else {
+    if (checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
       doFullRescanWithPermission(rescan)
+    } else {
+      LOG.e { it("No permission %s", READ_EXTERNAL_STORAGE) }
     }
   }
 

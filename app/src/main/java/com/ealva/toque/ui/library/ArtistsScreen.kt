@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -68,10 +69,10 @@ import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asArtistIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
-import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
+import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen
@@ -204,6 +205,8 @@ private fun ArtistItem(
   itemClicked: (ArtistId, Int) -> Unit,
   itemLongClicked: (ArtistId) -> Unit
 ) {
+  val artwork =
+    if (artistInfo.localArtwork !== Uri.EMPTY) artistInfo.localArtwork else artistInfo.artwork
   ListItem(
     modifier = Modifier
       .fillMaxWidth()
@@ -213,10 +216,10 @@ private fun ArtistItem(
         onLongClick = { itemLongClicked(artistInfo.artistId) }
       ),
     icon = {
-      if (artistInfo.artwork != Uri.EMPTY) {
+      if (artwork !== Uri.EMPTY) {
         Image(
           painter = rememberImagePainter(
-            data = artistInfo.artwork,
+            data = artwork,
             builder = {
               error(artistType.typeIcon)
               placeholder(artistType.typeIcon)
@@ -227,7 +230,7 @@ private fun ArtistItem(
         )
       } else {
         Icon(
-          painter = rememberImagePainter(data = artistType.typeIcon),
+          painter = painterResource(id = artistType.typeIcon),
           contentDescription = stringResource(R.string.ArtistImage),
           modifier = Modifier.size(40.dp)
         )
@@ -272,6 +275,7 @@ private interface ArtistsViewModel : ActionsViewModel {
     val artistId: ArtistId,
     val name: ArtistName,
     val artwork: Uri,
+    val localArtwork: Uri,
     val albumCount: Int,
     val songCount: Int
   ) : Parcelable
@@ -430,6 +434,7 @@ private fun ArtistDescription.toArtistInfo() = ArtistInfo(
   artistId = artistId,
   name = name,
   artwork = artwork,
+  localArtwork = localArtwork,
   albumCount = albumCount.toInt(),
   songCount = songCount.toInt()
 )
@@ -448,6 +453,7 @@ fun AllArtistsListPreview() {
       artistId = ArtistId(1),
       name = ArtistName("George Harrison"),
       artwork = Uri.EMPTY,
+      localArtwork = Uri.EMPTY,
       albumCount = 12,
       songCount = 85
     ),
@@ -455,6 +461,7 @@ fun AllArtistsListPreview() {
       artistId = ArtistId(2),
       name = ArtistName("John Lennon"),
       artwork = Uri.EMPTY,
+      localArtwork = Uri.EMPTY,
       albumCount = 15,
       songCount = 100
     ),

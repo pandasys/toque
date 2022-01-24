@@ -16,28 +16,47 @@
 
 package com.ealva.toque.ui.now
 
+import android.net.Uri
+import com.ealva.ealvabrainz.common.AlbumTitle
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
+import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
-import com.ealva.toque.service.audio.NullPlayableAudioItem
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.StreamVolume
+import com.ealva.toque.ui.art.SelectAlbumArtScreen
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.common.DialogPrompt
+import com.ealva.toque.ui.library.AlbumSongsScreen
+import com.ealva.toque.ui.library.ArtistSongsScreen
+import com.ealva.toque.ui.library.ArtistType
+import com.ealva.toque.ui.library.AudioMediaInfoScreen
+import com.ealva.toque.ui.nav.goToScreen
+import com.ealva.toque.ui.now.NowPlayingViewModel.NowPlayingState
+import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
+import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem.Companion.NullQueueItem
+import com.github.michaelbull.result.onSuccess
+import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,49 +73,82 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.annotation.concurrent.Immutable
 
-@Immutable
-data class NowPlayingState(
-  val queue: List<AudioItem>,
-  val queueIndex: Int,
-  val position: Millis,
-  val duration: Millis,
-  val playingState: PlayState,
-  val repeatMode: RepeatMode,
-  val shuffleMode: ShuffleMode,
-  val eqMode: EqMode,
-  val currentPreset: EqPreset,
-  val extraMediaInfo: String,
-  val playbackRate: PlaybackRate,
-  val showTimeRemaining: Boolean = false
-) {
-  val currentItem: AudioItem
-    get() = if (queueIndex in queue.indices) queue[queueIndex] else NullPlayableAudioItem
-
-  fun getDurationDisplay(): String =
-    (if (showTimeRemaining) position - duration else duration).asDurationString
-
-  fun getPositionDisplay(): String = position.asDurationString
-
-  companion object {
-    val NONE = NowPlayingState(
-      queue = emptyList(),
-      queueIndex = -1,
-      position = Millis(0),
-      duration = Millis(0),
-      playingState = PlayState.Stopped,
-      repeatMode = RepeatMode.None,
-      shuffleMode = ShuffleMode.None,
-      eqMode = EqMode.Off,
-      currentPreset = EqPreset.NONE,
-      extraMediaInfo = "",
-      playbackRate = PlaybackRate.NORMAL
-    )
-  }
-}
-
 interface NowPlayingViewModel {
+  @Immutable
+  data class QueueItem(
+    val id: MediaId,
+    val title: Title,
+    val albumTitle: AlbumTitle,
+    val albumArtist: ArtistName,
+    val artist: ArtistName,
+    val duration: Millis,
+    val trackNumber: Int,
+    val localAlbumArt: Uri,
+    val albumArt: Uri,
+    val rating: Rating,
+    val isValid: Boolean
+  ) {
+    companion object {
+      val NullQueueItem by lazy {
+        QueueItem(
+          id = MediaId.INVALID,
+          title = Title.EMPTY,
+          albumTitle = AlbumTitle(""),
+          albumArtist = ArtistName(""),
+          artist = ArtistName(""),
+          duration = Millis(0),
+          trackNumber = 0,
+          localAlbumArt = Uri.EMPTY,
+          albumArt = Uri.EMPTY,
+          rating = Rating.RATING_NONE,
+          isValid = false
+        )
+      }
+    }
+  }
+
+  @Immutable
+  data class NowPlayingState(
+    val queue: List<QueueItem>,
+    val queueIndex: Int,
+    val position: Millis,
+    val duration: Millis,
+    val playingState: PlayState,
+    val repeatMode: RepeatMode,
+    val shuffleMode: ShuffleMode,
+    val eqMode: EqMode,
+    val currentPreset: EqPreset,
+    val extraMediaInfo: String,
+    val playbackRate: PlaybackRate,
+    val showTimeRemaining: Boolean = false
+  ) {
+    val currentItem: QueueItem
+      get() = if (queueIndex in queue.indices) queue[queueIndex] else NullQueueItem
+
+    fun getDurationDisplay(): String =
+      (if (showTimeRemaining) position - duration else duration).asDurationString
+
+    fun getPositionDisplay(): String = position.asDurationString
+
+    companion object {
+      val NONE = NowPlayingState(
+        queue = emptyList(),
+        queueIndex = -1,
+        position = Millis(0),
+        duration = Millis(0),
+        playingState = PlayState.Stopped,
+        repeatMode = RepeatMode.None,
+        shuffleMode = ShuffleMode.None,
+        eqMode = EqMode.Off,
+        currentPreset = EqPreset.NONE,
+        extraMediaInfo = "",
+        playbackRate = PlaybackRate.NORMAL
+      )
+    }
+  }
+
+
   val nowPlayingState: StateFlow<NowPlayingState>
-//  suspend fun getItemArt(itemId: Long, caller: String): Pair<Uri?, AlbumSongArtInfo?>
 
   fun nextShuffleMode()
   fun nextMedia()
@@ -130,14 +182,21 @@ interface NowPlayingViewModel {
 
   fun toggleShowTimeRemaining()
 
-//  fun updatePlayStatusIfCurrent(mediaId: Long, playStatus: PlayStatus): Boolean
+  fun showCurrentItemDialog()
 
   companion object {
     operator fun invoke(
+      backstack: Backstack,
+      audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       appPrefsSingleton: AppPrefsSingleton
     ): NowPlayingViewModel =
-      NowPlayingViewModelImpl(localAudioQueueModel, appPrefsSingleton)
+      NowPlayingViewModelImpl(
+        backstack,
+        audioMediaDao,
+        localAudioQueueModel,
+        appPrefsSingleton
+      )
   }
 }
 
@@ -149,6 +208,8 @@ private val LOG by lazyLogger(NowPlayingViewModelImpl::class)
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 private class NowPlayingViewModelImpl(
+  private val backstack: Backstack,
+  private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefsSingleton: AppPrefsSingleton
 ) : NowPlayingViewModel, ScopedServices.Activated {
@@ -158,6 +219,8 @@ private class NowPlayingViewModelImpl(
   private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
 
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
+
+  private val currentItem: QueueItem get() = nowPlayingState.value.currentItem
 
   private suspend fun appPrefs(): AppPrefs = appPrefsSingleton.instance()
 
@@ -180,8 +243,6 @@ private class NowPlayingViewModelImpl(
     currentQueueJob?.cancel()
     currentQueueJob = null
     handleQueueChange(NullLocalAudioQueue)
-
-
   }
 
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
@@ -207,22 +268,20 @@ private class NowPlayingViewModelImpl(
     audioQueue = NullLocalAudioQueue
   }
 
-  private fun handleServiceState(queueState: LocalAudioQueueState) {
-    nowPlayingState.update {
-      it.copy(
-        queue = queueState.queue,
-        queueIndex = queueState.queueIndex,
-        position = queueState.position,
-        duration = queueState.duration,
-        playingState = queueState.playingState,
-        repeatMode = queueState.repeatMode,
-        shuffleMode = queueState.shuffleMode,
-        eqMode = queueState.eqMode,
-        currentPreset = queueState.currentPreset,
-        extraMediaInfo = queueState.extraMediaInfo,
-        playbackRate = queueState.playbackRate
-      )
-    }
+  private fun handleServiceState(queueState: LocalAudioQueueState) = nowPlayingState.update {
+    it.copy(
+      queue = queueState.queue.toNowPlayingList(),
+      queueIndex = queueState.queueIndex,
+      position = queueState.position,
+      duration = queueState.duration,
+      playingState = queueState.playingState,
+      repeatMode = queueState.repeatMode,
+      shuffleMode = queueState.shuffleMode,
+      eqMode = queueState.eqMode,
+      currentPreset = queueState.currentPreset,
+      extraMediaInfo = queueState.extraMediaInfo,
+      playbackRate = queueState.playbackRate
+    )
   }
 
   override fun nextShuffleMode() = audioQueue.nextShuffleMode()
@@ -262,4 +321,73 @@ private class NowPlayingViewModelImpl(
       }
     }
   }
+
+  private fun displayMediaInfo(audioItem: QueueItem) {
+    localAudioQueueModel.clearPrompt()
+    backstack.goToScreen(AudioMediaInfoScreen(audioItem.id))
+  }
+
+  private fun selectAlbumArt(audioItem: QueueItem) {
+    localAudioQueueModel.clearPrompt()
+    backstack.goToScreen(SelectAlbumArtScreen(audioItem.id, audioItem.albumTitle, audioItem.artist))
+  }
+
+  private fun goToAlbum(audioItem: QueueItem) {
+    localAudioQueueModel.clearPrompt()
+    scope.launch {
+      audioMediaDao
+        .getAlbumId(audioItem.id)
+        .onSuccess { albumId -> backstack.goToScreen(AlbumSongsScreen(albumId)) }
+
+    }
+  }
+
+  private fun goToArtist(audioItem: QueueItem) {
+    localAudioQueueModel.clearPrompt()
+    scope.launch {
+      audioMediaDao
+        .getArtistId(audioItem.id)
+        .onSuccess { artistId ->
+          backstack.goToScreen(ArtistSongsScreen(artistId, ArtistType.SongArtist))
+        }
+    }
+  }
+
+  override fun showCurrentItemDialog() {
+    currentItem.let { item ->
+      if (item.isValid)
+        localAudioQueueModel.showPrompt(
+          DialogPrompt(
+            prompt = {
+              CurrentItemDialog(
+                audioItem = item,
+                onDismiss = { localAudioQueueModel.clearPrompt() },
+                showMediaInfo = ::displayMediaInfo,
+                selectAlbumArt = ::selectAlbumArt,
+                goToAlbum = ::goToAlbum,
+                goToArtist = ::goToArtist
+              )
+            }
+          )
+        )
+    }
+  }
 }
+
+private fun List<AudioItem>.toNowPlayingList(): List<QueueItem> = map { it.toQueueItem }
+
+private inline val AudioItem.toQueueItem: QueueItem
+  get() = QueueItem(
+    id,
+    title,
+    albumTitle,
+    albumArtist,
+    artist,
+    duration,
+    trackNumber,
+    localAlbumArt,
+    albumArt,
+    rating,
+    isValid
+  )
+

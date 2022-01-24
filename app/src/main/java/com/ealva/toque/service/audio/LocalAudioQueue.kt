@@ -16,11 +16,9 @@
 
 package com.ealva.toque.service.audio
 
-import android.Manifest.permission.READ_PHONE_STATE
-import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.media.AudioManager
+import android.net.Uri
 import android.telecom.TelecomManager
-import androidx.core.content.ContextCompat.checkSelfPermission
 import androidx.datastore.preferences.core.Preferences
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
@@ -51,6 +49,8 @@ import com.ealva.toque.common.ensureUiThread
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.moveItem
 import com.ealva.toque.common.toRating
+import com.ealva.toque.db.AlbumDao
+import com.ealva.toque.db.AlbumDaoEvent
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
@@ -59,6 +59,7 @@ import com.ealva.toque.db.QueuePositionState
 import com.ealva.toque.db.QueuePositionStateDao
 import com.ealva.toque.db.QueuePositionStateDaoFactory
 import com.ealva.toque.log._i
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -96,7 +97,6 @@ import com.ealva.toque.service.session.server.MediaSessionState
 import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.LibVlcSingleton
-import com.ealva.toque.ui.main.RequestPermissionActivity
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import com.github.michaelbull.result.getOrElse
@@ -302,6 +302,7 @@ private class LocalAudioQueueImpl(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
   private val audioMediaDao: AudioMediaDao by inject()
+  private val albumDao: AlbumDao by inject()
   private val queueDao: QueueDao by inject()
   private val eqPresetFactory: EqPresetFactory by inject()
   private val audioOutputState: AudioOutputState by inject()
@@ -417,10 +418,11 @@ private class LocalAudioQueueImpl(
     reactToShuffleChanges()
     reactToRepeatModeChanges()
     reactToLibVlcPrefs()
+    reactToAlbumUpdates()
     sessionState.contentType = AudioFocusManager.ContentType.Audio
     sessionState.setQueueTitle(fetch(R.string.LocalAudio))
     upNextQueue = itemFactory.makeUpNextQueue(false, focusRequest, sharedPlayerState)
-    upNextShuffled = itemFactory.makeUpNextQueue(true, focusRequest, sharedPlayerState)
+    upNextShuffled = itemFactory.makeShuffledQueue(upNextQueue)
     val currentQueue = queue
     if (currentQueue.isNotEmpty()) {
       var startingIndex = 0
@@ -469,6 +471,26 @@ private class LocalAudioQueueImpl(
    */
   private fun setSessionQueue(queue: List<PlayableAudioItem>, indexChange: Boolean = false) {
     sessionState.setQueue(queue, currentItemIndex, indexChange)
+  }
+
+  private fun reactToAlbumUpdates() {
+    albumDao.albumDaoEvents
+      .onEach { event ->
+        when (event) {
+          is AlbumDaoEvent.AlbumArtworkUpdated ->
+            handleAlbumArtChange(event.albumId, event.albumArt, event.localAlbumArt)
+          else -> Unit
+        }
+      }
+      .launchIn(scope)
+  }
+
+  private fun handleAlbumArtChange(albumId: AlbumId, albumArt: Uri, localAlbumArt: Uri) {
+    val updated = upNextQueue
+      .filter { it.albumId == albumId }
+      .onEach { it.updateArtwork(albumId, albumArt, localAlbumArt) }
+      .isNotEmpty()
+    if (updated) queueState.update { it.copy(queue = queue) }
   }
 
   private fun reactToEqModeChanges() {

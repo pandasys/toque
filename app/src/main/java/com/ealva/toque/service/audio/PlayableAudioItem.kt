@@ -25,6 +25,7 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.Title
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.queue.ForceTransition
@@ -40,8 +41,6 @@ interface PlayableAudioItem : AudioItem {
 
   val position: Millis
 
-  val isValid: Boolean
-
   val isPlaying: Boolean
 
   val isPausable: Boolean
@@ -49,6 +48,8 @@ interface PlayableAudioItem : AudioItem {
   val supportsFade: Boolean
 
   var playbackRate: PlaybackRate
+
+  val albumId: AlbumId
 
   fun play(forceTransition: ForceTransition)
 
@@ -107,6 +108,8 @@ interface PlayableAudioItem : AudioItem {
 
   fun previousShouldRewind(): Boolean
   fun reset(playNow: PlayNow)
+
+  fun updateArtwork(albumId: AlbumId, albumArt: Uri, localAlbumArt: Uri)
 
   override val id: MediaId
     get() = metadata.id
@@ -180,6 +183,7 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override fun seekTo(position: Millis) = Unit
   override val position: Millis = Millis(0)
   override val duration: Millis = Millis(0)
+  override val albumId: AlbumId = AlbumId.INVALID
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL
   override fun shutdown() = Unit
   override fun duck() = Unit
@@ -199,5 +203,6 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override fun setRating(newRating: Rating, allowFileUpdate: Boolean): Unit = Unit
   override fun previousShouldRewind(): Boolean = false
   override fun reset(playNow: PlayNow) = Unit
+  override fun updateArtwork(albumId: AlbumId, albumArt: Uri, localAlbumArt: Uri) = Unit
   override val instanceId: InstanceId = InstanceId.INVALID
 }

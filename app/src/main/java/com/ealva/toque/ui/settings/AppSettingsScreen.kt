@@ -36,11 +36,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.comppref.pref.CallbackSettingItem
 import com.ealva.comppref.pref.CheckboxSettingItem
 import com.ealva.comppref.pref.DefaultSettingMakers
@@ -55,6 +55,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.toque.R
+import com.ealva.toque.art.ArtworkDownloader.CompressionQuality
 import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.AmpRange
@@ -67,8 +68,10 @@ import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.MAX_IMAGE_SEARCH_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.QUALITY_RANGE
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.DuckAction
 import com.ealva.toque.prefs.EndOfQueueAction
@@ -189,7 +192,7 @@ data class AppSettingsScreen(
       LibrarySettings -> makeLibraryItems(backstack, prefs)
       MediaScannerSettings -> makeMediaScannerItems(prefs)
       //MediaFileTag -> makeMediaFileTagItems(prefs)
-      ArtworkSettings -> makeArtworkItems()
+      ArtworkSettings -> makeArtworkItems(prefs)
       AudioSettings -> makeAudioSettingsItems(backstack, prefs)
       FadeAudioSettings -> makeFadeAudioSettings(prefs)
       //SocialSettings -> makeSocialSettings(prefs)
@@ -487,8 +490,50 @@ data class AppSettingsScreen(
   //private fun makeMediaFileTagItems(prefs: AppPrefs): List<SettingItem> = listOf(
   //)
 
-  private fun makeArtworkItems(): List<SettingItem> = listOf(
-
+  private fun makeArtworkItems(prefs: AppPrefs): List<SettingItem> = listOf(
+    SwitchSettingItem(
+      preference = prefs.autoFetchArtLocation,
+      title = "Auto Fetch Art Location",
+      summary = "Automatically find album/artist artwork in the Cloud",
+      offSummary = "Do not auto fetch artwork from the Cloud",
+      singleLineTitle = true
+    ),
+    SwitchSettingItem(
+      preference = prefs.downloadArt,
+      title = "Download Artwork",
+      summary = "Artwork is downloaded and always available",
+      offSummary = "Artwork is from the Cloud and may not always be available",
+      singleLineTitle = true,
+    ),
+    SwitchSettingItem(
+      preference = prefs.downloadUnmeteredOnly,
+      title = "Unmetered Only",
+      summary = "Only download artwork on unmetered network, such as WiFi",
+      offSummary = "Always download artwork. Possibly incurring data fees.",
+      singleLineTitle = true,
+    ),
+    SliderSettingItem(
+      preference = prefs.maxImageSearch,
+      title = fetch(R.string.MaxImageSearchResults),
+      singleLineTitle = true,
+      summary = fetch(R.string.MaxImageResultsSummary),
+      steps = 0,
+      valueRepresentation = { floatValue -> floatValue.toInt().toString() },
+      valueRange = MAX_IMAGE_SEARCH_RANGE.toFloatRange(),
+      floatToType = { value -> value.roundToInt() },
+      typeToFloat = { it.toFloat() }
+    ),
+    SliderSettingItem(
+      preference = prefs.compressionQuality,
+      title = fetch(R.string.CompressionQuality),
+      singleLineTitle = true,
+      summary = fetch(R.string.CompressionQualitySummary),
+      steps = 0,
+      valueRepresentation = { floatValue -> floatValue.toInt().toString() },
+      valueRange = QUALITY_RANGE.toFloatRange(),
+      floatToType = { value -> CompressionQuality(value) },
+      typeToFloat = { compressionQuality -> compressionQuality.toFloat() }
+    ),
   )
 
   //private fun makeSocialSettings(prefs: AppPrefs): List<SettingItem> = listOf(
@@ -556,6 +601,9 @@ data class AppSettingsScreen(
   )
 }
 
+private fun IntRange.toFloatRange(): ClosedFloatingPointRange<Float> =
+  start.toFloat()..endInclusive.toFloat()
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun <T : PreferenceStore<T>> ToqueSettingsScreen(
@@ -589,7 +637,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
       navigationIcon = {
         IconButton(onClick = back) {
           Icon(
-            painter = rememberImagePainter(data = R.drawable.ic_arrow_left),
+            painter = painterResource(R.drawable.ic_arrow_left),
             contentDescription = "Back",
             modifier = Modifier.size(26.dp)
           )

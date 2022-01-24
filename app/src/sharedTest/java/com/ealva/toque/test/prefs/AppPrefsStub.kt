@@ -17,9 +17,13 @@
 package com.ealva.toque.test.prefs
 
 import com.ealva.prefstore.store.BoolPref
+import com.ealva.prefstore.store.DoublePref
+import com.ealva.prefstore.store.IntPref
 import com.ealva.prefstore.store.MutablePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.StoreHolder
+import com.ealva.prefstore.store.StorePref
+import com.ealva.toque.art.ArtworkDownloader
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPrefs
@@ -46,8 +50,8 @@ class AppPrefsStub : AppPrefs {
     TODO("Not yet implemented")
   }
 
-  override val firstRun = BoolPrefStub()
-  override val allowDuplicates = BoolPrefStub()
+  override val firstRun: BoolPref = PrefStub()
+  override val allowDuplicates: BoolPref = PrefStub()
   override val goToNowPlaying = BoolPrefStub()
   override val ignoreSmallFiles = BoolPrefStub()
   override val ignoreThreshold = MillisPrefStub()
@@ -64,7 +68,7 @@ class AppPrefsStub : AppPrefs {
   override val endOfQueueAction = PrefStub<Int, EndOfQueueAction>()
   override val selectMediaAction = PrefStub<Int, SelectMediaAction>()
   override val themeChoice = PrefStub<Int, ThemeChoice>()
-  override val markPlayedPercentage = PrefStub<Double, Double>()
+  override val markPlayedPercentage: DoublePref = PrefStub()
   override val rewindThenPrevious: BoolPref = BoolPrefStub()
   override val scanAfterMediaScanner: BoolPref = BoolPrefStub()
   override val saveRatingToFile: BoolPref = BoolPrefStub()
@@ -74,4 +78,11 @@ class AppPrefsStub : AppPrefs {
   override val playOnWiredConnection: BoolPref = BoolPrefStub()
   override val readTagRating: BoolPref = BoolPrefStub()
   override val readTagSortFields: BoolPref = BoolPrefStub()
+  override val autoFetchArtLocation = BoolPrefStub()
+  override val downloadArt = BoolPrefStub()
+  override val downloadHighResArt: BoolPref = BoolPrefStub()
+  override val maxImageSearch: IntPref = PrefStub()
+  override val downloadUnmeteredOnly: BoolPref = BoolPrefStub()
+  override val compressionQuality: StorePref<Int, ArtworkDownloader.CompressionQuality> =
+    PrefStub()
 }

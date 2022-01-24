@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,13 @@
  * limitations under the License.
  */
 
-include("app")
+package com.ealva.toque.work
 
-pluginManagement {
-  resolutionStrategy {
-    eachPlugin {
-      if (requested.id.id == "com.android.library") {
-        useModule("com.android.tools.build:gradle:${requested.version}")
-      }
-      if (requested.id.id == "com.android.application") {
-        useModule("com.android.tools.build:gradle:${requested.version}")
-      }
-    }
-  }
-  repositories {
-    gradlePluginPortal()
-    google()
-    mavenCentral()
+import org.koin.android.ext.koin.androidContext
+import org.koin.dsl.module
+
+object WorkModule {
+  val koinModule = module {
+    single { Work(androidContext()) }
   }
 }
-
-rootProject.name = ("toque")

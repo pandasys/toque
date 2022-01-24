@@ -32,16 +32,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
@@ -57,8 +56,8 @@ import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.asComposerIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
-import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.goToScreen
@@ -190,7 +189,7 @@ private fun ComposerItem(
       ),
     icon = {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_person),
+        painter = painterResource(id = R.drawable.ic_person),
         contentDescription = "Composer icon",
         modifier = Modifier.size(40.dp)
       )

@@ -60,6 +60,7 @@ android {
 
     release {
       isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }
@@ -124,40 +125,44 @@ dependencies {
   coreLibraryDesugaring(Libs.DESUGAR)
   implementation(kotlin("stdlib-jdk8"))
 
-  implementation("com.chargemap.compose:numberpicker:0.0.10")
+  implementation(Libs.NumberPicker.COMPOSE)
 
   implementation(Libs.AndroidX.APPCOMPAT)
+  implementation(Libs.AndroidX.EXIF)
+  implementation(Libs.AndroidX.Activity.COMPOSE)
+  implementation(Libs.AndroidX.Constraint.LAYOUT_COMPOSE)
   implementation(Libs.AndroidX.Ktx.CORE)
   implementation(Libs.AndroidX.Lifecycle.RUNTIME_KTX)
   implementation(Libs.AndroidX.Lifecycle.SERVICE)
   implementation(Libs.AndroidX.Lifecycle.COMMON_JAVA8)
+  implementation(Libs.AndroidX.Lifecycle.EXTS)
+  implementation(Libs.AndroidX.WorkManager.KTX_RUNTIME)
+
+  implementation(Libs.AndroidX.Compose.UI)
+  implementation(Libs.AndroidX.Compose.MATERIAL)
+  implementation(Libs.AndroidX.Compose.TOOLING)
+
   implementation(Libs.Datastore.PREFERENCES)
 
   implementation(Libs.Kotlin.Serialization.CORE)
   implementation(Libs.Kotlin.Serialization.JSON)
 
-  implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
-
   implementation(Libs.Android.MATERIAL)
-  implementation(Libs.AndroidX.Compose.UI)
-  implementation(Libs.AndroidX.Compose.MATERIAL)
-  implementation(Libs.AndroidX.Compose.TOOLING)
-  implementation(Libs.AndroidX.Activity.COMPOSE)
-  implementation(Libs.AndroidX.Constraint.LAYOUT_COMPOSE)
 
   implementation(Libs.ComposeReorder.REORDERABLE)
 
   implementation(Libs.LibVLC.ALL)
+
   implementation(Libs.PreferenceStore.STORE)
   implementation(Libs.PreferenceStore.COMPOSE)
   implementation(Libs.EAlvaLog.EALVALOG)
   implementation(Libs.EAlvaLog.CORE)
   implementation(Libs.EAlvaLog.ANDROID)
   implementation(Libs.EAlvaTag.EALVATAG)
-  implementation(Libs.WeLite.CORE)
   implementation(Libs.EAlvaMusicInfo.MUSIC_INFO)
   implementation(Libs.EAlvaBrainz.BRAINZ)
   implementation(Libs.EAlvaBrainz.BRAINZ_SERVICE)
+  implementation(Libs.WeLite.CORE)
 
   implementation(Libs.Coil.COIL)
   implementation(Libs.Coil.COIL_COMPOSE)
@@ -168,9 +173,10 @@ dependencies {
   implementation(Libs.Accompanist.PAGER)
 
   implementation(Libs.Gowtham.RATING_BAR)
-  //implementation(Libs.Scrollbar.LAZY_COLUMN)
 
+  implementation(platform(Libs.Square.BOM))
   implementation(Libs.Square.OKIO)
+  implementation(Libs.Square.LOGGING_INTERCEPTOR)
 
   implementation(Libs.FastUtil.FASTUTIL)
   implementation(Libs.Kotlin.Coroutines.CORE)
@@ -189,6 +195,8 @@ dependencies {
   implementation(Libs.Result.COROUTINES)
 
   implementation(Libs.Phoenix.PHOENIX)
+
+  implementation(Libs.GUAVA)
 
   testImplementation(Libs.JUnit.JUNIT)
   testImplementation(Libs.AndroidX.Test.CORE)

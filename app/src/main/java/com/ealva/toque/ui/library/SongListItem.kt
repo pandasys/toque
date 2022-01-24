@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ListItem
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -74,6 +73,42 @@ fun SongListItem(
   )
 }
 
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+fun SongListItem(
+  songTitle: Title,
+  albumTitle: AlbumTitle,
+  artistName: ArtistName,
+  highlightBackground: Boolean,
+  icon: @Composable () -> Unit,
+  modifier: Modifier = Modifier,
+  textColor: Color = Color.Unspecified
+) {
+  ListItem(
+    modifier = modifier
+      .fillMaxWidth()
+      .modifyIf(highlightBackground) { background(toqueColors.selectedBackground) },
+    icon = icon,
+    text = { TitleText(songTitle, textColor) },
+    secondaryText = {
+      Text(
+        text = artistName.value,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        color = textColor
+      )
+    },
+    overlineText = {
+      Text(
+        text = albumTitle.value,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        color = textColor,
+      )
+    }
+  )
+}
+
 @Composable
 private fun TitleText(songTitle: Title, textColor: Color) {
   Text(text = songTitle.value, maxLines = 1, overflow = TextOverflow.Ellipsis, color = textColor)
@@ -89,7 +124,7 @@ fun SongListItemIcon(artwork: Uri) {
         placeholder(R.drawable.ic_big_album)
       }
     ),
-    contentDescription = "Toggle Equalizer",
+    contentDescription = "Artwork",
     modifier = Modifier.size(56.dp)
   )
 }

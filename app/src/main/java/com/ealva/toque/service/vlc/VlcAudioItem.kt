@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.vlc
 
+import android.net.Uri
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
@@ -28,6 +29,7 @@ import com.ealva.toque.common.StartPaused
 import com.ealva.toque.common.debug
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
+import com.ealva.toque.persist.isValid
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.MediaFileStore
 import com.ealva.toque.service.audio.PlayableAudioItem
@@ -79,10 +81,10 @@ private const val SEEK_TO_ZERO_MIN_POSITION = 5000
 /** If position is within this range when checked for skip, item should be marked skipped */
 private val SKIP_RANGE = Millis(3)..Millis(10)
 
-class VlcAudioItem(
+class VlcAudioItem private constructor(
   override var metadata: Metadata,
   private val displayName: String,
-  private val albumId: AlbumId,
+  override val albumId: AlbumId,
   private val artistSet: Set<ArtistName>,
   private val libVlcSingleton: LibVlcSingleton,
   private val mediaFileStore: MediaFileStore,
@@ -91,7 +93,7 @@ class VlcAudioItem(
   private val libVlcPrefs: LibVlcPrefs,
   private val wakeLockFactory: WakeLockFactory,
   private val requestFocus: AvPlayer.FocusRequest,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Main
+  private val dispatcher: CoroutineDispatcher
 ) : PlayableAudioItem {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -109,7 +111,7 @@ class VlcAudioItem(
   override val eventFlow = MutableSharedFlow<PlayableItemEvent>(extraBufferCapacity = 10)
 
   override val isValid: Boolean
-    get() = id.value > 0
+    get() = id.isValid
 
   override val isPlaying: Boolean
     get() = (isPreparing && startOnPrepared) || (avPlayer.isValid && avPlayer.isPlaying)
@@ -185,6 +187,16 @@ class VlcAudioItem(
         previousTimePlayed,
         countTimeFrom
       )
+    }
+  }
+
+  override fun updateArtwork(
+    albumId: AlbumId,
+    albumArt: Uri,
+    localAlbumArt: Uri
+  ) {
+    if (this.albumId == albumId) {
+      metadata = metadata.copy(albumArt = albumArt, localAlbumArt = localAlbumArt)
     }
   }
 
@@ -411,27 +423,60 @@ class VlcAudioItem(
 //private fun fallbackIfEmptyOrUnknown(artist: ArtistName, fallback: () -> ArtistName): ArtistName =
 //    if (artist.value.isNotEmpty() && artist != ArtistName.UNKNOWN) artist else fallback()
 
-  override val instanceId: InstanceId = InstanceId(nextId.getAndIncrement())
-
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (other !is VlcAudioItem) return false
-
-    if (id != other.id) return false
-    if (instanceId != other.instanceId) return false
-
-    return true
-  }
-
-  override fun hashCode(): Int {
-    return instanceId.hashCode()
-  }
+  override val instanceId = InstanceId(nextId.getAndIncrement())
 
   override fun toString(): String = """VlcAudioItem[isActive=${scope.isActive},
     |isShutdown=${isShutdown},
     |title=${metadata.title},
     |avPlayer=${avPlayer}
     |]""".trimMargin()
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is VlcAudioItem) return false
+
+    if (metadata != other.metadata) return false
+    if (instanceId != other.instanceId) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int {
+    var result = metadata.hashCode()
+    result = 31 * result + instanceId.hashCode()
+    return result
+  }
+
+  companion object {
+    operator fun invoke(
+      metadata: Metadata,
+      displayName: String,
+      albumId: AlbumId,
+      artistSet: Set<ArtistName>,
+      libVlcSingleton: LibVlcSingleton,
+      mediaFileStore: MediaFileStore,
+      sharedPlayerState: SharedPlayerState,
+      appPrefs: AppPrefs,
+      libVlcPrefs: LibVlcPrefs,
+      wakeLockFactory: WakeLockFactory,
+      requestFocus: AvPlayer.FocusRequest,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): PlayableAudioItem =
+      VlcAudioItem(
+        metadata,
+        displayName,
+        albumId,
+        artistSet,
+        libVlcSingleton,
+        mediaFileStore,
+        sharedPlayerState,
+        appPrefs,
+        libVlcPrefs,
+        wakeLockFactory,
+        requestFocus,
+        dispatcher
+      )
+  }
 }
 
 inline fun <T : IMedia, R> T.use(block: (T) -> R): R {

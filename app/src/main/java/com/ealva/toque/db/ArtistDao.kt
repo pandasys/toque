@@ -27,8 +27,10 @@ import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
+import com.ealva.toque.db.ArtistDaoEvent.ArtistArtworkUpdated
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ArtistIdList
 import com.ealva.toque.persist.MediaId
@@ -90,15 +92,21 @@ data class ArtistDescription(
   val artistId: ArtistId,
   val name: ArtistName,
   val artwork: Uri,
+  val localArtwork: Uri,
   val albumCount: Long,
   val songCount: Long
 )
 
 data class ArtistIdName(val artistId: ArtistId, val artistName: ArtistName)
 
-sealed class ArtistDaoEvent {
-  data class ArtistCreated(val artistId: ArtistId) : ArtistDaoEvent()
-  data class ArtistUpdated(val artistId: ArtistId) : ArtistDaoEvent()
+sealed interface ArtistDaoEvent {
+  data class ArtistCreated(val artistId: ArtistId) : ArtistDaoEvent
+  data class ArtistUpdated(val artistId: ArtistId) : ArtistDaoEvent
+  data class ArtistArtworkUpdated(
+    val artistId: ArtistId,
+    val albumArt: Uri,
+    val localAlbumArt: Uri
+  ) : ArtistDaoEvent
 }
 
 /**
@@ -159,6 +167,8 @@ interface ArtistDao {
     replaceMediaId: MediaId,
     createTime: Millis
   )
+
+  fun setArtistArt(artistId: ArtistId, remote: Uri, local: Uri)
 
   companion object {
     operator fun invoke(
@@ -299,7 +309,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         listOf(
           ArtistTable.id,
           ArtistTable.artistName,
-          ArtistTable.artistImage,
+          ArtistTable.artistArtUri,
+          ArtistTable.artistLocalArtUri,
           songCountColumn,
           albumArtistAlbumCountColumn
         )
@@ -312,7 +323,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         ArtistDescription(
           ArtistId(cursor[ArtistTable.id]),
           ArtistName(cursor[ArtistTable.artistName]),
-          cursor[ArtistTable.artistImage].toUriOrEmpty(),
+          cursor[ArtistTable.artistArtUri].toUriOrEmpty(),
+          cursor[ArtistTable.artistLocalArtUri].toUriOrEmpty(),
           cursor[albumArtistAlbumCountColumn],
           cursor[songCountColumn]
         )
@@ -336,7 +348,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         listOf(
           ArtistTable.id,
           ArtistTable.artistName,
-          ArtistTable.artistImage,
+          ArtistTable.artistArtUri,
+          ArtistTable.artistLocalArtUri,
           songCountColumn,
           songArtistAlbumCountColumn
         )
@@ -349,7 +362,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
         ArtistDescription(
           ArtistId(cursor[ArtistTable.id]),
           ArtistName(cursor[ArtistTable.artistName]),
-          cursor[ArtistTable.artistImage].toUriOrEmpty(),
+          cursor[ArtistTable.artistArtUri].toUriOrEmpty(),
+          cursor[ArtistTable.artistLocalArtUri].toUriOrEmpty(),
           cursor[songArtistAlbumCountColumn],
           cursor[songCountColumn]
         )
@@ -469,6 +483,24 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     replaceMediaId: MediaId,
     createTime: Millis
   ) = with(artistMediaDao) { replaceMediaArtists(artistIdList, replaceMediaId, createTime) }
+
+  override fun setArtistArt(artistId: ArtistId, remote: Uri, local: Uri) {
+    LOG._e { it("setArtistArt %s remote:%s local:%s", artistId, remote, local) }
+    scope.launch {
+      val rows = db.transaction {
+        ArtistTable
+          .updateColumns {
+            it[artistArtUri] = remote.toString()
+            it[artistLocalArtUri] = local.toString()
+          }
+          .where { id eq artistId.value }
+          .update()
+      }
+      if (rows >= 1) emit(ArtistArtworkUpdated(artistId, remote, local)) else LOG.e {
+        it("Error updating artwork %s %s %s", artistId, remote, local)
+      }
+    }
+  }
 }
 
 private val songCountColumn = MediaTable.id.countDistinct()
@@ -502,11 +534,11 @@ private data class ArtistUpdateInfo(
 
 private val DELETE_ARTISTS_WITH_NO_MEDIA: DeleteStatement<ArtistTable> = ArtistTable.deleteWhere {
   literal(0L) eq (
-  ArtistMediaTable.select { mediaId }.where { artistId eq id } union
-  MediaTable.select { id }.where {
-    (artistId eq ArtistTable.id) or (albumArtistId eq ArtistTable.id)
-  }
-  ).selectCount().asExpression()
+    ArtistMediaTable.select { mediaId }.where { artistId eq id } union
+      MediaTable.select { id }.where {
+        (artistId eq ArtistTable.id) or (albumArtistId eq ArtistTable.id)
+      }
+    ).selectCount().asExpression()
 }
 
 fun ArtistName.isEmpty(): Boolean = value.isEmpty()

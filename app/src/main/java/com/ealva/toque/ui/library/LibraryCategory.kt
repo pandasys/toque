@@ -31,10 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
@@ -61,7 +61,7 @@ fun LibraryCategory(
       contentAlignment = Alignment.Center
     ) {
       Icon(
-        painter = rememberImagePainter(data = item.icon),
+        painter = painterResource(id = item.icon),
         contentDescription = item.title,
         modifier = Modifier.size(iconSize),
         tint = Color.White

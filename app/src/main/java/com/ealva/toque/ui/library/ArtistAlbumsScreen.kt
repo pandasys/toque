@@ -31,10 +31,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
@@ -131,7 +131,7 @@ private fun AllArtistSongsHeader(
       .clickable(onClick = { doAllSongsSelected() }),
     icon = {
       Icon(
-        painter = rememberImagePainter(data = artistType.typeIcon),
+        painter = painterResource(id = artistType.typeIcon),
         contentDescription = stringResource(id = artistType.allSongsRes),
         modifier = Modifier.size(40.dp),
         tint = LocalContentColor.current

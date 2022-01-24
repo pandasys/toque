@@ -41,6 +41,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -139,7 +140,7 @@ data class AudioMediaInfoScreen(
         navigationIcon = {
           IconButton(onClick = { viewModel.goBack() }) {
             Icon(
-              painter = rememberImagePainter(data = R.drawable.ic_arrow_left),
+              painter = painterResource(id = R.drawable.ic_arrow_left),
               contentDescription = "Back",
               modifier = Modifier.size(26.dp)
             )
@@ -332,7 +333,6 @@ private class MediaInfoViewModelImpl(
 private fun MediaInfo(mediaInfo: MediaInfoViewModel.MediaInfo) {
   val labelColor = toqueColors.onSurface.copy(ContentAlpha.medium)
   val config = LocalScreenConfig.current
-
 
   Column(
     modifier = Modifier

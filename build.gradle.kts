@@ -32,7 +32,6 @@ allprojects {
     maven { setUrl("https://jitpack.io") }
     google()
     mavenCentral()
-    jcenter()
     maven(url = "https://oss.sonatype.org/content/repositories/snapshots/")
   }
 }
@@ -44,19 +43,13 @@ subprojects {
 
   detekt {
     config = rootProject.files("config/detekt/detekt.yml")
-    reports {
-      html {
-        enabled = true
-        destination = file("build/reports/detekt.html")
-      }
-    }
   }
 }
 
 buildscript {
   repositories {
     google()
-    jcenter()
+    mavenCentral()
   }
   dependencies {
     classpath(Libs.AGP)

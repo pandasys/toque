@@ -28,12 +28,12 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.toque.R
 
 @Composable
@@ -52,7 +52,7 @@ fun PopupMenu(
 
       ) {
       Icon(
-        painter = rememberImagePainter(data = R.drawable.ic_more_vert),
+        painter = painterResource(id = R.drawable.ic_more_vert),
         contentDescription = stringResource(id = R.string.Menu),
         modifier = Modifier.size(40.dp),
         tint = LocalContentColor.current
