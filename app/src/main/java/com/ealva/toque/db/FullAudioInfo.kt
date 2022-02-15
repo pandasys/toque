@@ -54,4 +54,6 @@ data class FullAudioInfo(
   val file: Uri,
   val albumId: AlbumId,
   val albumArtistId: ArtistId,
+  val albumArt: Uri,
+  val localAlbumArt: Uri
 )

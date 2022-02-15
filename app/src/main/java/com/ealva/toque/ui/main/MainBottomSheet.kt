@@ -22,6 +22,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Card
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -60,7 +62,7 @@ import com.ealva.toque.ui.library.BaseLibraryItemsScreen
 import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.BaseAppSettingsScreen
-import com.ealva.toque.ui.theme.shapes
+import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
@@ -84,12 +86,12 @@ fun MainBottomSheet(
 ) {
   val config = LocalScreenConfig.current
 
-  Column(
+  Box(
     modifier = modifier
   ) {
     Card(
-      shape = shapes.medium,
-      elevation = 8.dp
+      shape = RoundedCornerShape(20),
+      elevation = if (toqueColors.isLight) 4.dp else 1.dp
     ) {
       Column(modifier = Modifier.fillMaxWidth()) {
         if (isExpanded) {
@@ -144,13 +146,13 @@ private fun MainBottomSheetButtonRow(
     horizontalArrangement = Arrangement.SpaceAround
   ) {
     IconButton(
-      onClick = if (!onLibraryScreen) goToLibrary else ::doNothing,
+      onClick = goToLibrary,
       modifier = Modifier
         .fillMaxHeight()
         .weight(1.0F)
     ) {
       Icon(
-        painter = painterResource(id = R.drawable.ic_map),
+        painter = painterResource(id = R.drawable.ic_grid_view),
         contentDescription = "Library",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onLibraryScreen) ALPHA_ON else ALPHA_OFF)
@@ -163,7 +165,7 @@ private fun MainBottomSheetButtonRow(
         .weight(1.0F)
     ) {
       Icon(
-        painter = painterResource(id = R.drawable.ic_queue),
+        painter = painterResource(id = R.drawable.ic_reorder),
         contentDescription = "Queue",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onQueueScreen) ALPHA_ON else ALPHA_OFF)
@@ -183,7 +185,7 @@ private fun MainBottomSheetButtonRow(
       )
     }
     IconButton(
-      onClick = if (!onSettingScreen) goToSettings else ::doNothing,
+      onClick = goToSettings, // if (!onSettingScreen) goToSettings else ::doNothing,
       modifier = Modifier
         .height(48.dp)
         .weight(1.0F)
@@ -269,7 +271,7 @@ private fun CurrentItemPagerCard(
           .padding(2.dp)
           .constrainAs(albumArt) {
             top.linkTo(parent.top)
-            start.linkTo(parent.start)
+            start.linkTo(parent.start, 6.dp)
             end.linkTo(title.start)
             bottom.linkTo(parent.bottom)
           }
@@ -278,7 +280,7 @@ private fun CurrentItemPagerCard(
         text = item.title.value,
         textAlign = TextAlign.Start,
         maxLines = 1,
-        style = toqueTypography.caption,
+        style = toqueTypography.miniPlayerTitle,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
           .padding(top = 2.dp)
@@ -295,7 +297,7 @@ private fun CurrentItemPagerCard(
         text = "${item.artist.value} - ${item.albumTitle.value}",
         textAlign = TextAlign.Start,
         maxLines = 1,
-        style = toqueTypography.overline,
+        style = toqueTypography.miniPlayerSecond,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
           .padding(bottom = 2.dp)

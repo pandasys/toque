@@ -24,6 +24,7 @@ data class ToqueColors(
   val warning: Color,
   val onWarning: Color,
   val selectedBackground: Color,
+  val shadedBackground: Color = Color.Black.copy(alpha = 0.3F)
 ) {
   val primary: Color get() = material.primary
   val primaryVariant: Color get() = material.primaryVariant

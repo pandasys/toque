@@ -47,7 +47,7 @@ class DateMatcherTest {
     val matcher = DateMatcher.Is
     val clause = matcher.makeWhereClause(AlbumTable.updatedTime, MatcherData("", firstDate, 0L))
     expect(clause.toString())
-      .toBe(""""Album"."AlbumUpdated" BETWEEN $firstDateMin AND $firstDateMax""")
+      .toBe("Album.AlbumUpdated BETWEEN $firstDateMin AND $firstDateMax")
   }
 
   @Test
@@ -55,7 +55,7 @@ class DateMatcherTest {
     val matcher = DateMatcher.IsNot
     val clause = matcher.makeWhereClause(AlbumTable.updatedTime, MatcherData("", secondDate, 0L))
     expect(clause.toString())
-      .toBe(""""Album"."AlbumUpdated" NOT BETWEEN $secondDateMin AND $secondDateMax""")
+      .toBe("Album.AlbumUpdated NOT BETWEEN $secondDateMin AND $secondDateMax")
   }
 
   @Test
@@ -63,7 +63,7 @@ class DateMatcherTest {
     val matcher = DateMatcher.IsAfter
     val clause = matcher.makeWhereClause(AlbumTable.updatedTime, MatcherData("", firstDate, 0L))
     expect(clause.toString())
-      .toBe(""""Album"."AlbumUpdated" > $firstDateMax""")
+      .toBe("Album.AlbumUpdated > $firstDateMax")
   }
 
   @Test
@@ -71,7 +71,7 @@ class DateMatcherTest {
     val matcher = DateMatcher.IsBefore
     val clause = matcher.makeWhereClause(AlbumTable.updatedTime, MatcherData("", firstDate, 0L))
     expect(clause.toString())
-      .toBe(""""Album"."AlbumUpdated" < $firstDateMin""")
+      .toBe("Album.AlbumUpdated < $firstDateMin")
   }
 
   @Test
@@ -82,21 +82,21 @@ class DateMatcherTest {
       MatcherData(TheLast.Units(5), TheLast.Days)
     ).let { clause ->
       expect(clause.toString())
-        .toBe(""""Album"."AlbumUpdated" >= (strftime('%s','now','-5 days') * 1000)""")
+        .toBe("Album.AlbumUpdated >= (strftime('%s','now','-5 days') * 1000)")
     }
     matcher.makeWhereClause(
       AlbumTable.updatedTime,
       MatcherData(TheLast.Units(3), TheLast.Weeks)
     ).let { clause ->
       expect(clause.toString())
-        .toBe(""""Album"."AlbumUpdated" >= (strftime('%s','now','-21 days') * 1000)""")
+        .toBe("Album.AlbumUpdated >= (strftime('%s','now','-21 days') * 1000)")
     }
     matcher.makeWhereClause(
       AlbumTable.updatedTime,
       MatcherData(TheLast.Units(2), TheLast.Months)
     ).let { clause ->
       expect(clause.toString())
-        .toBe(""""Album"."AlbumUpdated" >= (strftime('%s','now','-2 months') * 1000)""")
+        .toBe("Album.AlbumUpdated >= (strftime('%s','now','-2 months') * 1000)")
     }
   }
 
@@ -108,21 +108,21 @@ class DateMatcherTest {
       MatcherData(TheLast.Units(5), TheLast.Days)
     ).let { clause ->
       expect(clause.toString())
-        .toBe(""""Album"."AlbumUpdated" < (strftime('%s','now','-5 days') * 1000)""")
+        .toBe("""Album.AlbumUpdated < (strftime('%s','now','-5 days') * 1000)""")
     }
     matcher.makeWhereClause(
       AlbumTable.updatedTime,
       MatcherData(TheLast.Units(3), TheLast.Weeks)
     ).let { clause ->
       expect(clause.toString())
-        .toBe(""""Album"."AlbumUpdated" < (strftime('%s','now','-21 days') * 1000)""")
+        .toBe("Album.AlbumUpdated < (strftime('%s','now','-21 days') * 1000)")
     }
     matcher.makeWhereClause(
       AlbumTable.updatedTime,
       MatcherData(TheLast.Units(2), TheLast.Months)
     ).let { clause ->
       expect(clause.toString())
-        .toBe(""""Album"."AlbumUpdated" < (strftime('%s','now','-2 months') * 1000)""")
+        .toBe("Album.AlbumUpdated < (strftime('%s','now','-2 months') * 1000)")
     }
   }
 
@@ -134,7 +134,7 @@ class DateMatcherTest {
       MatcherData("", firstDate, secondDate)
     )
     expect(clause.toString())
-      .toBe(""""Album"."AlbumUpdated" BETWEEN $firstDateMin AND $secondDateMax""")
+      .toBe("Album.AlbumUpdated BETWEEN $firstDateMin AND $secondDateMax")
   }
 
   @Test

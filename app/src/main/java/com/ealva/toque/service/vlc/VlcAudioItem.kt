@@ -410,19 +410,6 @@ class VlcAudioItem private constructor(
   override fun previousShouldRewind(): Boolean =
     appPrefs.rewindThenPrevious() && position >= SEEK_TO_ZERO_MIN_POSITION
 
-//  override fun getArtist(preferAlbumArtist: Boolean): ArtistName {
-//    return if (preferAlbumArtist) {
-//      fallbackIfEmptyOrUnknown(albumArtist) { joinToArtistName() }
-//    } else {
-//      fallbackIfEmptyOrUnknown(joinToArtistName()) { albumArtist }
-//    }
-//  }
-
-//  private fun joinToArtistName(): ArtistName = ArtistName(artistSet.joinToString { it.value })
-//
-//private fun fallbackIfEmptyOrUnknown(artist: ArtistName, fallback: () -> ArtistName): ArtistName =
-//    if (artist.value.isNotEmpty() && artist != ArtistName.UNKNOWN) artist else fallback()
-
   override val instanceId = InstanceId(nextId.getAndIncrement())
 
   override fun toString(): String = """VlcAudioItem[isActive=${scope.isActive},

@@ -17,6 +17,8 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.common.ComposerName
+import com.ealva.toque.common.Filter
+import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
@@ -46,6 +48,7 @@ import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
+import com.ealva.welite.db.table.Cursor
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -103,7 +106,10 @@ interface ComposerDao {
     createTime: Millis
   )
 
-  suspend fun getAllComposers(limit: Limit = NoLimit): DaoResult<List<ComposerDescription>>
+  suspend fun getAllComposers(
+    filter: Filter = NoFilter,
+    limit: Limit = NoLimit
+  ): DaoResult<List<ComposerDescription>>
 
   suspend fun getNext(composerId: ComposerId): DaoResult<ComposerId>
   suspend fun getPrevious(composerId: ComposerId): DaoResult<ComposerId>
@@ -205,26 +211,31 @@ private class ComposerDaoImpl(
 
   private val songCountColumn = ComposerMediaTable.mediaId.count()
   override suspend fun getAllComposers(
+    filter: Filter,
     limit: Limit
   ): DaoResult<List<ComposerDescription>> = runSuspendCatching {
     db.query {
       ComposerTable
         .join(ComposerMediaTable, JoinType.INNER, ComposerTable.id, ComposerMediaTable.composerId)
         .selects { listOf(ComposerTable.id, ComposerTable.composer, songCountColumn) }
-        .all()
+        .where { filter.whereCondition() }
         .groupBy { ComposerTable.composer }
         .orderByAsc { ComposerTable.composerSort }
         .limit(limit.value)
-        .sequence { cursor ->
-          ComposerDescription(
-            composerId = ComposerId(cursor[ComposerTable.id]),
-            composerName = ComposerName(cursor[ComposerTable.composer]),
-            songCount = cursor[songCountColumn]
-          )
-        }
+        .sequence { cursor -> cursor.asComposerDescription }
         .toList()
     }
   }
+
+  private fun Filter.whereCondition() =
+    if (isEmpty) null else ComposerTable.composer like value escape DaoCommon.ESC_CHAR
+
+  private val Cursor.asComposerDescription: ComposerDescription
+    get() = ComposerDescription(
+      composerId = ComposerId(this[ComposerTable.id]),
+      composerName = ComposerName(this[ComposerTable.composer]),
+      songCount = this[songCountColumn]
+    )
 
   override suspend fun getNext(composerId: ComposerId): DaoResult<ComposerId> = runSuspendCatching {
     db.query {

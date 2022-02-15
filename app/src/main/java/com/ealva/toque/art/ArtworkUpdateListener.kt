@@ -21,7 +21,9 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.db.AlbumDao
-import com.ealva.toque.db.AlbumDaoEvent
+import com.ealva.toque.db.AlbumDaoEvent.AlbumArtworkUpdated
+import com.ealva.toque.db.ArtistDao
+import com.ealva.toque.db.ArtistDaoEvent.ArtistArtworkUpdated
 import com.ealva.toque.log._e
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -43,8 +45,10 @@ private val LOG by lazyLogger(ArtworkUpdateListener::class)
 class ArtworkUpdateListener(
   private val work: Work,
   private val albumDao: AlbumDao,
+  private val artistDao: ArtistDao,
   private val appPrefs: AppPrefsSingleton,
   private val albumArtWorkerFactory: DownloadAlbumArtWorkerFactory,
+  private val artistArtWorkerFactory: DownloadArtistArtWorkerFactory,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) {
   private lateinit var scope: CoroutineScope
@@ -53,9 +57,15 @@ class ArtworkUpdateListener(
     loadFactories(work)
     scope = CoroutineScope(SupervisorJob() + dispatcher)
     albumDao.albumDaoEvents
-      .onEach { event -> if (event is AlbumDaoEvent.AlbumArtworkUpdated) handleAlbumUpdate(event) }
+      .onEach { event -> if (event is AlbumArtworkUpdated) handleAlbumUpdate(event) }
       .catch { cause -> LOG.e(cause) { it("Error updating from Album Dao events") } }
       .onCompletion { LOG._e { it("Completed ArtworkUpdate album dao event flow") } }
+      .launchIn(scope)
+
+    artistDao.artistDaoEvents
+      .onEach { event -> if (event is ArtistArtworkUpdated) handleArtistUpdate(event) }
+      .catch { cause -> LOG.e(cause) { it("Error updating from Artist Dao events") } }
+      .onCompletion { LOG._e { it("Completed ArtworkUpdate artist dao event flow") } }
       .launchIn(scope)
   }
 
@@ -63,27 +73,44 @@ class ArtworkUpdateListener(
     scope.cancel()
   }
 
-  private suspend fun handleAlbumUpdate(artworkUpdated: AlbumDaoEvent.AlbumArtworkUpdated) {
-    if (artworkUpdated.shouldDownload(appPrefs.instance())) {
-      albumDao.getArtistAlbum(artworkUpdated.albumId)
+  private suspend fun handleAlbumUpdate(update: AlbumArtworkUpdated) {
+    if (shouldDownload(update.localAlbumArt, update.albumArt, appPrefs.instance())) {
+      albumDao.getArtistAlbum(update.albumId)
         .onFailure { cause -> LOG.e(cause) { it("Error getting artist/album") } }
         .onSuccess { (artistName, albumTitle) ->
           work.enqueue(
             DownloadAlbumArtWorker.makeDownloadRequest(
-              albumId = artworkUpdated.albumId,
+              albumId = update.albumId,
               artistName = artistName,
               albumTitle = albumTitle,
-              source = artworkUpdated.albumArt,
+              source = update.albumArt,
             )
           )
         }
     }
   }
 
-  private fun AlbumDaoEvent.AlbumArtworkUpdated.shouldDownload(appPrefs: AppPrefs) =
-    localAlbumArt === Uri.EMPTY && albumArt !== Uri.EMPTY && appPrefs.downloadArt()
+  private suspend fun handleArtistUpdate(update: ArtistArtworkUpdated) {
+    if (shouldDownload(update.localArtwork, update.remoteArtwork, appPrefs.instance())) {
+      artistDao.getArtistName(update.artistId)
+        .onFailure { cause -> LOG.e(cause) { it("Error getting artist name") } }
+        .onSuccess { artistName ->
+          work.enqueue(
+            DownloadArtistArtWorker.makeDownloadRequest(
+              artistId = update.artistId,
+              artistName = artistName,
+              source = update.remoteArtwork,
+            )
+          )
+        }
+    }
+  }
+
+  private fun shouldDownload(localArt: Uri, remoteArt: Uri, appPrefs: AppPrefs): Boolean =
+    localArt == Uri.EMPTY && remoteArt != Uri.EMPTY && appPrefs.downloadArt()
 
   private fun loadFactories(work: Work) {
     work.addFactory(DownloadAlbumArtWorker.workerClassName, albumArtWorkerFactory)
+    work.addFactory(DownloadArtistArtWorker.workerClassName, artistArtWorkerFactory)
   }
 }

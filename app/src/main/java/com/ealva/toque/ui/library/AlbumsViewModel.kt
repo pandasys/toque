@@ -38,6 +38,9 @@ interface AlbumsViewModel : ActionsViewModel {
   val searchFlow: StateFlow<String>
 
   fun setSearch(search: String)
-  fun itemClicked(albumId: AlbumId)
-  fun itemLongClicked(albumId: AlbumId)
+  fun itemClicked(album: AlbumInfo)
+  fun itemLongClicked(album: AlbumInfo)
+
+  fun selectAlbumArt()
+  fun goBack()
 }

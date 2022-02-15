@@ -100,7 +100,7 @@ class ArtworkField(private val artwork: Artwork?) {
       var desc = ""
       if (artwork != null) {
         if (isBinaryData) {
-          desc = PictureTypes.getInstanceOf().getValue(artwork!!.pictureType)
+          desc = PictureTypes.getInstanceOf().getValue(artwork.pictureType)
         } else if (isUrl) {
           desc = url
         }

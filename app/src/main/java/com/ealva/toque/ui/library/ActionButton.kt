@@ -18,38 +18,65 @@ package com.ealva.toque.ui.library
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.ButtonColors
+import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.ContentAlpha
 import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
+import androidx.compose.material.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
-
-private const val ALPHA_ENABLED = 1.0F
-private const val ALPHA_DISABLED = 0.3F
+import androidx.compose.ui.unit.dp
+import com.ealva.toque.ui.theme.toqueColors
 
 @Composable
 fun ActionButton(
-  buttonHeight: Dp,
   modifier: Modifier,
+  iconSize: Dp,
   @DrawableRes drawable: Int,
   @StringRes description: Int,
-  onClick: () -> Unit,
-  enabled: Boolean = true
+  enabled: Boolean = true,
+  colors: ButtonColors,
+  onClick: () -> Unit
 ) {
-  IconButton(
+  OutlinedButton(
     onClick = onClick,
     enabled = enabled,
+    shape = CircleShape,
+    border = null,
+    contentPadding = PaddingValues(0.dp),
+    colors = colors,
     modifier = modifier
   ) {
     Icon(
       painter = painterResource(id = drawable),
       contentDescription = stringResource(id = description),
-      modifier = Modifier.size(buttonHeight),
-      tint = LocalContentColor.current.copy(alpha = if (enabled) ALPHA_ENABLED else ALPHA_DISABLED)
+      modifier = Modifier.size(iconSize),
+      tint = colors.contentColor(enabled = enabled).value
     )
   }
 }
+
+object ActionButtonDefaults {
+  @Composable
+  fun overArtworkColors(): ButtonColors = ButtonDefaults.outlinedButtonColors(
+    backgroundColor = toqueColors.shadedBackground,
+    contentColor = Color.White,
+    disabledContentColor = Color.White.copy(alpha = ContentAlpha.disabled)
+  )
+
+  @Composable
+  fun colors(): ButtonColors = ButtonDefaults.outlinedButtonColors(
+    backgroundColor = Color.Transparent,
+    contentColor = LocalContentColor.current,
+    disabledContentColor = LocalContentColor.current.copy(alpha = ContentAlpha.disabled)
+  )
+}
+

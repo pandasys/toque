@@ -19,9 +19,11 @@ package com.ealva.toque.db
 import android.net.Uri
 import com.ealva.ealvabrainz.brainz.data.ArtistMbid
 import com.ealva.ealvabrainz.common.ArtistName
+import com.ealva.ealvabrainz.common.asArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.EntityArtwork
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
@@ -30,7 +32,6 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ArtistDaoEvent.ArtistArtworkUpdated
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ArtistIdList
 import com.ealva.toque.persist.MediaId
@@ -42,6 +43,7 @@ import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.BindExpression
 import com.ealva.welite.db.expr.Expression
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
@@ -91,11 +93,11 @@ private val LOG by lazyLogger(ArtistDao::class)
 data class ArtistDescription(
   val artistId: ArtistId,
   val name: ArtistName,
-  val artwork: Uri,
-  val localArtwork: Uri,
+  override val remoteArtwork: Uri,
+  override val localArtwork: Uri,
   val albumCount: Long,
   val songCount: Long
-)
+) : EntityArtwork
 
 data class ArtistIdName(val artistId: ArtistId, val artistName: ArtistName)
 
@@ -104,9 +106,9 @@ sealed interface ArtistDaoEvent {
   data class ArtistUpdated(val artistId: ArtistId) : ArtistDaoEvent
   data class ArtistArtworkUpdated(
     val artistId: ArtistId,
-    val albumArt: Uri,
-    val localAlbumArt: Uri
-  ) : ArtistDaoEvent
+    override val remoteArtwork: Uri,
+    override val localArtwork: Uri
+  ) : ArtistDaoEvent, EntityArtwork
 }
 
 /**
@@ -168,7 +170,13 @@ interface ArtistDao {
     createTime: Millis
   )
 
+  suspend fun downloadArt(artistId: ArtistId, block: (ArtistDao) -> Unit)
+
   fun setArtistArt(artistId: ArtistId, remote: Uri, local: Uri)
+
+  suspend fun getArtistName(artistId: ArtistId): DaoResult<ArtistName>
+
+  suspend fun getArtwork(artistId: ArtistId): DaoResult<EntityArtwork>
 
   companion object {
     operator fun invoke(
@@ -297,7 +305,9 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     filter: Filter,
     limit: Limit
   ): DaoResult<List<ArtistDescription>> = runSuspendCatching {
-    db.query { doGetAlbumArtists(filter, limit) }
+    db.query {
+      doGetAlbumArtists(filter, limit)
+    }
   }
 
   private fun Queryable.doGetAlbumArtists(filter: Filter, limit: Limit): List<ArtistDescription> {
@@ -484,8 +494,32 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     createTime: Millis
   ) = with(artistMediaDao) { replaceMediaArtists(artistIdList, replaceMediaId, createTime) }
 
+  override suspend fun downloadArt(artistId: ArtistId, block: (ArtistDao) -> Unit) {
+    val locked = db.transaction {
+      ArtistTable
+        .updateColumns { it[downloadingArtwork] = true }
+        .where { id eq artistId.value and (downloadingArtwork eq false) }
+        .update() > 0
+    }
+    if (locked) {
+      try {
+        block(this)
+      } catch (e: Throwable) {
+        LOG.e(e) { it("Uncaught exception downloading art for %s", artistId) }
+        throw e
+      } finally {
+        val unlocked = db.transaction {
+          ArtistTable
+            .updateColumns { it[downloadingArtwork] = false }
+            .where { id eq artistId.value }
+            .update() > 0
+        }
+        if (!unlocked) LOG.e { it("Failed to set %s as 'not downloading'", artistId) }
+      }
+    }
+  }
+
   override fun setArtistArt(artistId: ArtistId, remote: Uri, local: Uri) {
-    LOG._e { it("setArtistArt %s remote:%s local:%s", artistId, remote, local) }
     scope.launch {
       val rows = db.transaction {
         ArtistTable
@@ -499,6 +533,35 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       if (rows >= 1) emit(ArtistArtworkUpdated(artistId, remote, local)) else LOG.e {
         it("Error updating artwork %s %s %s", artistId, remote, local)
       }
+    }
+  }
+
+  override suspend fun getArtistName(
+    artistId: ArtistId
+  ): DaoResult<ArtistName> = runSuspendCatching {
+    db.query {
+      ArtistTable
+        .select { artistName }
+        .where { id eq artistId.value }
+        .sequence { cursor -> cursor[artistName].asArtistName }
+        .firstOrNull() ?: throw DaoNotFoundException("Could not find name for $artistId")
+    }
+  }
+
+  override suspend fun getArtwork(
+    artistId: ArtistId
+  ): DaoResult<EntityArtwork> = runSuspendCatching {
+    db.query {
+      ArtistTable
+        .selects { listOf(artistArtUri, artistLocalArtUri) }
+        .where { id eq artistId.value }
+        .sequence { cursor ->
+          EntityArtwork(
+            cursor[artistArtUri].toUriOrEmpty(),
+            cursor[artistLocalArtUri].toUriOrEmpty()
+          )
+        }
+        .firstOrNull() ?: throw DaoNotFoundException("Could not find artwork for $artistId")
     }
   }
 }

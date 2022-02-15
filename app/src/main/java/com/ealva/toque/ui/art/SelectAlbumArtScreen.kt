@@ -17,6 +17,7 @@
 package com.ealva.toque.ui.art
 
 import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
 import android.util.Size
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -71,7 +72,7 @@ import com.ealva.toque.app.Toque.Companion.appContext
 import com.ealva.toque.art.MusicInfoProvider
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.persist.MediaId
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.art.SelectAlbumArtViewModel.SelectState
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.nav.back
@@ -111,7 +112,7 @@ private val LOG by lazyLogger(SelectAlbumArtScreen::class)
 @Immutable
 @Parcelize
 data class SelectAlbumArtScreen(
-  private val mediaId: MediaId,
+  private val albumId: AlbumId,
   private val albumTitle: AlbumTitle,
   private val artistName: ArtistName
 ) : ComposeKey(), KoinComponent {
@@ -119,7 +120,7 @@ data class SelectAlbumArtScreen(
     with(serviceBinder) {
       add(
         SelectAlbumArtViewModel(
-          mediaId = mediaId,
+          albumId = albumId,
           albumTitle = albumTitle,
           artistName = artistName,
           backstack = backstack,
@@ -327,7 +328,7 @@ interface SelectAlbumArtViewModel {
 
   companion object {
     operator fun invoke(
-      mediaId: MediaId,
+      albumId: AlbumId,
       albumTitle: AlbumTitle,
       artistName: ArtistName,
       backstack: Backstack,
@@ -335,7 +336,7 @@ interface SelectAlbumArtViewModel {
       musicInfoProvider: MusicInfoProvider
     ): SelectAlbumArtViewModel =
       SelectAlbumArtViewModelImpl(
-        mediaId,
+        albumId,
         albumTitle,
         artistName,
         backstack,
@@ -346,7 +347,7 @@ interface SelectAlbumArtViewModel {
 }
 
 private class SelectAlbumArtViewModelImpl(
-  private val mediaId: MediaId,
+  private val albumId: AlbumId,
   private val albumTitle: AlbumTitle,
   private val artistName: ArtistName,
   private val backstack: Backstack,
@@ -452,7 +453,7 @@ private class SelectAlbumArtViewModelImpl(
   }
 
   override fun selectImage(image: RemoteImage) {
-    audioMediaDao.setAlbumRemoteArt(mediaId, image.location)
+    audioMediaDao.albumDao.setAlbumArt(albumId, image.location, Uri.EMPTY)
     goBack()
   }
 

@@ -44,28 +44,28 @@ class RatingMatcherTest {
   fun testIs() {
     val matcher = RatingMatcher.Is
     val clause = matcher.makeWhereClause(MediaTable.rating, MatcherData(StarRating.STAR_NONE))
-    expect(clause.toString()).toBe(""""Media"."MediaRating" = -1""")
+    expect(clause.toString()).toBe("""Media.MediaRating = -1""")
   }
 
   @Test
   fun testIsNot() {
     val matcher = RatingMatcher.IsNot
     val clause = matcher.makeWhereClause(MediaTable.rating, MatcherData(StarRating.STAR_5))
-    expect(clause.toString()).toBe(""""Media"."MediaRating" <> 100""")
+    expect(clause.toString()).toBe("""Media.MediaRating <> 100""")
   }
 
   @Test
   fun testIsGreaterThan() {
     val matcher = RatingMatcher.IsGreaterThan
     val clause = matcher.makeWhereClause(MediaTable.rating, MatcherData(StarRating.STAR_4))
-    expect(clause.toString()).toBe(""""Media"."MediaRating" > 80""")
+    expect(clause.toString()).toBe("""Media.MediaRating > 80""")
   }
 
   @Test
   fun testIsLessThan() {
     val matcher = RatingMatcher.IsLessThan
     val clause = matcher.makeWhereClause(MediaTable.rating, MatcherData(StarRating.STAR_2))
-    expect(clause.toString()).toBe(""""Media"."MediaRating" < 40""")
+    expect(clause.toString()).toBe("""Media.MediaRating < 40""")
   }
 
   @Test
@@ -73,7 +73,7 @@ class RatingMatcherTest {
     val matcher = RatingMatcher.IsInTheRange
     val clause =
       matcher.makeWhereClause(MediaTable.rating, MatcherData(StarRating.STAR_0, StarRating.STAR_3))
-    expect(clause.toString()).toBe(""""Media"."MediaRating" BETWEEN 0 AND 60""")
+    expect(clause.toString()).toBe("""Media.MediaRating BETWEEN 0 AND 60""")
   }
 
   @Test

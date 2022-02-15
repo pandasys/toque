@@ -191,8 +191,8 @@
   <string name="StartPlayerOnWiredConnection">Start player on wired headset/speaker connection</string>
   <string name="PlayOnBluetoothConnection">Play on Bluetooth Connection</string>
   <string name="StartPlayerOnBluetoothConnection">Start player on Bluetooth connection</string>
-  <string name="AlbumArt">Album art</string>
-  <string name="ArtistImage">Artist image</string>
+  <string name="AlbumArt">Album Art</string>
+  <string name="ArtistArt">Artist Art</string>
   <string name="AllAlbumArtistSongs">All Album Artist Songs</string>
   <string name="AllArtistSongs">All Artist Songs</string>
   <string name="ReadPhoneIdleState">Read Phone Idle State</string>
@@ -311,4 +311,8 @@
   <string name="MaxImageResultsSummary">The maximum number of results from an image search</string>
     <string name="CompressionQuality">Compression Quality</string>
   <string name="CompressionQualitySummary">Downloaded artwork is compressed into JPEG. 100 = max image quality, 0 = max compression.</string>
+    <string name="LocalAlbumArt">Local Album Art</string>
+    <string name="AllSongs">All Songs</string>
+  <string name="AlbumArtists">Album Artists</string>
+  <string name="Composers">Composers</string>
 </resources>

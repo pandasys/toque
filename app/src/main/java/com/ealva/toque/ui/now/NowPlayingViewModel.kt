@@ -22,6 +22,7 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
@@ -30,9 +31,11 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
 import com.ealva.toque.log._i
+import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -55,6 +58,7 @@ import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.now.NowPlayingViewModel.NowPlayingState
 import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
 import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem.Companion.NullQueueItem
+import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
@@ -86,8 +90,12 @@ interface NowPlayingViewModel {
     val localAlbumArt: Uri,
     val albumArt: Uri,
     val rating: Rating,
+    val albumId: AlbumId,
     val isValid: Boolean
   ) {
+    val artwork: Uri
+      get() = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
+
     companion object {
       val NullQueueItem by lazy {
         QueueItem(
@@ -101,6 +109,7 @@ interface NowPlayingViewModel {
           localAlbumArt = Uri.EMPTY,
           albumArt = Uri.EMPTY,
           rating = Rating.RATING_NONE,
+          albumId = AlbumId.INVALID,
           isValid = false
         )
       }
@@ -324,31 +333,75 @@ private class NowPlayingViewModelImpl(
 
   private fun displayMediaInfo(audioItem: QueueItem) {
     localAudioQueueModel.clearPrompt()
-    backstack.goToScreen(AudioMediaInfoScreen(audioItem.id))
+    backstack.goToScreen(
+      AudioMediaInfoScreen(
+        audioItem.id,
+        audioItem.title,
+        audioItem.albumTitle,
+        audioItem.albumArtist,
+        audioItem.rating,
+        audioItem.duration
+      )
+    )
   }
 
   private fun selectAlbumArt(audioItem: QueueItem) {
     localAudioQueueModel.clearPrompt()
-    backstack.goToScreen(SelectAlbumArtScreen(audioItem.id, audioItem.albumTitle, audioItem.artist))
+    backstack.goToScreen(
+      SelectAlbumArtScreen(audioItem.albumId, audioItem.albumTitle, audioItem.artist)
+    )
   }
 
-  private fun goToAlbum(audioItem: QueueItem) {
+  private fun goToAlbum(item: QueueItem) {
     localAudioQueueModel.clearPrompt()
-    scope.launch {
-      audioMediaDao
-        .getAlbumId(audioItem.id)
-        .onSuccess { albumId -> backstack.goToScreen(AlbumSongsScreen(albumId)) }
-
-    }
+    backstack.goToScreen(
+      AlbumSongsScreen(
+        item.albumId,
+        item.albumTitle,
+        item.artwork,
+        item.albumArtist,
+        fetch(R.string.NowPlaying)
+      )
+    )
   }
 
   private fun goToArtist(audioItem: QueueItem) {
+    LOG._e { it("goToArtist") }
     localAudioQueueModel.clearPrompt()
     scope.launch {
       audioMediaDao
         .getArtistId(audioItem.id)
         .onSuccess { artistId ->
-          backstack.goToScreen(ArtistSongsScreen(artistId, ArtistType.SongArtist))
+          backstack.goToScreen(
+            ArtistSongsScreen(
+              artistId = artistId,
+              artistType = ArtistType.SongArtist,
+              artistName = audioItem.artist,
+              artwork = Uri.EMPTY,
+              backTo = fetch(R.string.NowPlaying)
+            )
+          )
+        }
+    }
+  }
+
+  private fun goToAlbumArtist(audioItem: QueueItem) {
+    LOG._e { it("goToAlbumArtist") }
+    localAudioQueueModel.clearPrompt()
+    scope.launch {
+      audioMediaDao
+        .getAlbumArtistId(audioItem.id)
+        .onFailure { cause -> LOG.e(cause) { it("Error getting Album ArtistId %s", audioItem.id) } }
+        .onSuccess { artistId ->
+          backstack.goToScreen(
+            ArtistSongsScreen(
+              artistId = artistId,
+              artistType = ArtistType.AlbumArtist,
+              artistName = audioItem.albumArtist,
+              artwork = Uri.EMPTY,
+              backTo = fetch(R.string.NowPlaying)
+            )
+          )
         }
     }
   }
@@ -365,7 +418,8 @@ private class NowPlayingViewModelImpl(
                 showMediaInfo = ::displayMediaInfo,
                 selectAlbumArt = ::selectAlbumArt,
                 goToAlbum = ::goToAlbum,
-                goToArtist = ::goToArtist
+                goToArtist = ::goToArtist,
+                goToAlbumArtist = ::goToAlbumArtist
               )
             }
           )
@@ -388,6 +442,7 @@ private inline val AudioItem.toQueueItem: QueueItem
     localAlbumArt,
     albumArt,
     rating,
+    albumId,
     isValid
   )
 

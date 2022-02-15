@@ -51,9 +51,6 @@ import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.service.session.common.toCompatMediaId
 import com.ealva.toque.service.session.common.toPersistentId
 import com.ealva.toque.ui.library.ArtistType
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.onFailure
 import kotlinx.coroutines.CoroutineDispatcher
@@ -275,7 +272,7 @@ private class MediaSessionBrowserImpl(
     makeItemDesc(
       albumId,
       albumTitle.value,
-      selectAlbumArt(albumLocalArt, albumArt, ALBUM_ICON),
+      selectAlbumArt(localArtwork, remoteArtwork, ALBUM_ICON),
       artistName.value,
     ),
     MediaItemFlags.Browsable
@@ -295,7 +292,7 @@ private class MediaSessionBrowserImpl(
     makeItemDesc(
       mediaId,
       title.value,
-      selectAlbumArt(albumLocalArt, albumArt, TRACK_ICON)
+      selectAlbumArt(localArtwork, remoteArtwork, TRACK_ICON)
     ),
     MediaItemFlags.Playable
   )

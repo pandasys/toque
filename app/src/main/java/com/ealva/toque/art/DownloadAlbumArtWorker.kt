@@ -54,22 +54,25 @@ class DownloadAlbumArtWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
   override suspend fun doWork(): Result {
+    val albumId = inputData.albumId
     val artist = inputData.artistName.value
     val album = inputData.albumTitle.value
+    val source = inputData.sourceUri
     val dest = Artwork.getArtworkDestination("$artist-$album", FOLDER_NAME, true)
     return try {
-      artworkDownloader.download(
-        inputData.sourceUri,
-        dest,
-        ORIGINAL_SIZE,
-        appPrefs.instance().compressionQuality(),
-      )
-      albumDao.setAlbumArt(inputData.albumId, inputData.sourceUri, dest)
+      val quality = appPrefs.instance().compressionQuality()
+      albumDao.downloadArt(albumId) {
+        artworkDownloader.download(
+          source,
+          dest,
+          ORIGINAL_SIZE,
+          quality,
+        )
+        albumDao.setAlbumArt(albumId, source, dest)
+      }
       Result.success()
     } catch (e: Exception) {
-      LOG.e(e) {
-        it("Error downloading %s to %s for %s-%s", inputData.sourceUri, dest, artist, album)
-      }
+      LOG.e(e) { it("Error downloading %s to %s for %s-%s", source, dest, artist, album) }
       Result.failure()
     }
   }

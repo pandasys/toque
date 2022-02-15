@@ -62,7 +62,7 @@ private class MediaMetadataParserImpl(private val libVlc: LibVlcSingleton) : Med
     artistParser: ArtistParser,
     ignoreArtwork: Boolean
   ): MediaFileTagInfo {
-    return if (uri.isFileScheme() && uri.tagCanParseExtension()) {
+    return if (uri.isFileScheme && uri.tagCanParseExtension()) {
       try {
         FileTagInfo(File(uri.path.orEmpty()), artistParser, ignoreArtwork)
       } catch (e: Exception) {
@@ -304,7 +304,7 @@ private class VlcTagInfo private constructor(
     }
 
     private fun parseFlagFromUri(uri: Uri): Int =
-      if (uri.isNetworkScheme()) PARSE_NETWORK else PARSE_LOCAL
+      if (uri.isNetworkScheme) PARSE_NETWORK else PARSE_LOCAL
 
     /** Parse metadata if the file is local. Doesn't bother with artwork */
     private const val PARSE_LOCAL = IMedia.Parse.ParseLocal

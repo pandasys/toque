@@ -476,17 +476,20 @@ private class QueueViewModelImpl(
     val selected = selectedFlow.value
 
     if (selected.selectedCount == 1) {
-      val instanceId: InstanceId = selected.single()
-
-      backstack.goToScreen(
-        AudioMediaInfoScreen(
-          queueState.value
-            .queue
-            .first { item -> item.instanceId == instanceId }
-            .item
-            .id
-        )
-      )
+      queueState.value.queue
+        .find { info -> info.instanceId == selected.single() }
+        ?.let { info ->
+          backstack.goToScreen(
+            AudioMediaInfoScreen(
+              info.id,
+              info.title,
+              info.albumTitle,
+              info.albumArtist,
+              info.rating,
+              info.duration
+            )
+          )
+        }
     }
   }
 

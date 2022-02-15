@@ -26,6 +26,7 @@ import com.ealva.ealvabrainz.common.asArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.EntityArtwork
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
@@ -34,16 +35,20 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.db.AlbumDaoEvent.AlbumArtworkUpdated
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.ComposerId
+import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.asAlbumId
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
+import com.ealva.welite.db.compound.CompoundSelect
+import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.BindExpression
 import com.ealva.welite.db.expr.Expression
+import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.SqlTypeExpression
 import com.ealva.welite.db.expr.and
@@ -57,10 +62,12 @@ import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
+import com.ealva.welite.db.expr.neq
 import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
+import com.ealva.welite.db.table.Join
 import com.ealva.welite.db.table.JoinType
 import com.ealva.welite.db.table.Query
 import com.ealva.welite.db.table.alias
@@ -106,11 +113,11 @@ sealed interface AlbumDaoEvent {
 data class AlbumDescription(
   val albumId: AlbumId,
   val albumTitle: AlbumTitle,
-  val albumLocalArt: Uri,
-  val albumArt: Uri,
+  override val localArtwork: Uri,
+  override val remoteArtwork: Uri,
   val artistName: ArtistName,
   val songCount: Long
-)
+) : EntityArtwork
 
 /**
  * If a function receives a transaction parameter it is not suspending, whereas suspend functions
@@ -163,9 +170,17 @@ interface AlbumDao {
     textSearch: TextSearch
   ): DaoResult<List<String>>
 
+  suspend fun downloadArt(albumId: AlbumId, block: (AlbumDao) -> Unit)
+
   fun setAlbumArt(albumId: AlbumId, remote: Uri, local: Uri)
 
   suspend fun getArtistAlbum(albumId: AlbumId): DaoResult<Pair<ArtistName, AlbumTitle>>
+
+  suspend fun getAlbumArtFor(artistId: ArtistId, artistType: ArtistType): DaoResult<Uri>
+
+  suspend fun getAlbumArtFor(genreId: GenreId): DaoResult<Uri>
+
+  suspend fun getAlbumArtFor(composerId: ComposerId): DaoResult<Uri>
 
   companion object {
     operator fun invoke(
@@ -258,7 +273,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
 
   private fun Filter.whereCondition() =
     if (isEmpty) null else (AlbumTable.albumTitle like value escape ESC_CHAR) or
-    (ArtistTable.artistName like value escape ESC_CHAR)
+      (ArtistTable.artistName like value escape ESC_CHAR)
 
   override suspend fun getAllAlbumsFor(
     artistId: ArtistId,
@@ -404,8 +419,32 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }
 
+  override suspend fun downloadArt(albumId: AlbumId, block: (AlbumDao) -> Unit) {
+    val locked = db.transaction {
+      AlbumTable
+        .updateColumns { it[downloadingArtwork] = true }
+        .where { id eq albumId.value and (downloadingArtwork eq false) }
+        .update() > 0
+    }
+    if (locked) {
+      try {
+        block(this)
+      } catch (e: Throwable) {
+        LOG.e(e) { it("Uncaught exception downloading art for %s", albumId) }
+        throw e
+      } finally {
+        val unlocked = db.transaction {
+          AlbumTable
+            .updateColumns { it[downloadingArtwork] = false }
+            .where { id eq albumId.value }
+            .update() > 0
+        }
+        if (!unlocked) LOG.e { it("Failed to set %s as 'not downloading'", albumId) }
+      }
+    }
+  }
+
   override fun setAlbumArt(albumId: AlbumId, remote: Uri, local: Uri) {
-    LOG._e { it("setAlbumArt %s remote:%s local:%s", albumId, remote, local) }
     scope.launch {
       val rows = db.transaction {
         AlbumTable
@@ -440,6 +479,71 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .firstOrNull() ?: throw DaoNotFoundException("Could not find artist/album for $albumId")
     }
   }
+
+  override suspend fun getAlbumArtFor(
+    artistId: ArtistId,
+    artistType: ArtistType
+  ): DaoResult<Uri> = runSuspendCatching {
+    db.query {
+      if (artistType === ArtistType.AlbumArtist) {
+        getArtwork(
+          join = ArtistAlbumTable
+            .join(AlbumTable, JoinType.INNER, ArtistAlbumTable.albumId, AlbumTable.id),
+          where = ArtistAlbumTable.artistId eq artistId.value
+        )
+      } else {
+        getArtwork(
+          join = ArtistMediaTable
+            .join(MediaTable, JoinType.INNER, ArtistMediaTable.mediaId, MediaTable.id)
+            .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id),
+          where = ArtistMediaTable.artistId eq artistId.value
+        )
+      }
+    }
+  }
+
+  override suspend fun getAlbumArtFor(genreId: GenreId): DaoResult<Uri> = runSuspendCatching {
+    db.query {
+      getArtwork(
+        join = GenreMediaTable
+          .join(MediaTable, JoinType.INNER, GenreMediaTable.mediaId, MediaTable.id)
+          .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id),
+        where = GenreMediaTable.genreId eq genreId.value
+      )
+    }
+  }
+
+  override suspend fun getAlbumArtFor(
+    composerId: ComposerId
+  ): DaoResult<Uri> = runSuspendCatching {
+    db.query {
+      getArtwork(
+        join = ComposerMediaTable
+          .join(MediaTable, JoinType.INNER, ComposerMediaTable.mediaId, MediaTable.id)
+          .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id),
+        where = ComposerMediaTable.composerId eq composerId.value
+      )
+    }
+  }
+
+  private fun Queryable.getArtwork(
+    join: Join,
+    where: Op<Boolean>,
+    columnAlias: SqlTypeExpression<String> = localArtAlias.aliasOrSelf()
+  ): Uri = buildUnion(join, where)
+    .select { columnAlias }
+    .where { columnAlias neq "" }
+    .sequence { cursor -> cursor[columnAlias].toUriOrEmpty() }
+    .filterNot { uri -> uri == Uri.EMPTY }
+    .firstOrNull() ?: Uri.EMPTY
+
+  private fun buildUnion(join: Join, where: Op<Boolean>): CompoundSelect<Join> = join
+    .select { localArtAlias }
+    .where(where)
+    .distinct() union join
+    .select { remoteArtAlias }
+    .where(where)
+    .distinct()
 
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,
@@ -582,3 +686,7 @@ private val SELECT_ALBUM_SORT_FROM_BIND_ID: Expression<String> = AlbumTable
   .select { albumSort }
   .where { id eq BIND_ALBUM_ID }
   .asExpression()
+
+private const val ARTWORK_COLUMN_ALIAS = "album_art_alias"
+private val localArtAlias by lazy { AlbumTable.albumLocalArtUri.alias(ARTWORK_COLUMN_ALIAS) }
+private val remoteArtAlias by lazy { AlbumTable.albumArtUri.alias(ARTWORK_COLUMN_ALIAS) }

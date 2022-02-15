@@ -42,35 +42,35 @@ class NumberMatcherTest {
   fun testIs() {
     val matcher = NumberMatcher.Is
     val clause = matcher.makeWhereClause(MediaTable.year, MatcherData("", 1960, 0))
-    expect(clause.toString()).toBe(""""Media"."MediaYear" = 1960""")
+    expect(clause.toString()).toBe("""Media.MediaYear = 1960""")
   }
 
   @Test
   fun testIsNot() {
     val matcher = NumberMatcher.IsNot
     val clause = matcher.makeWhereClause(MediaTable.year, MatcherData("", 1960, 0))
-    expect(clause.toString()).toBe(""""Media"."MediaYear" <> 1960""")
+    expect(clause.toString()).toBe("""Media.MediaYear <> 1960""")
   }
 
   @Test
   fun testIsGreaterThan() {
     val matcher = NumberMatcher.IsGreaterThan
     val clause = matcher.makeWhereClause(MediaTable.year, MatcherData("", 1960, 0))
-    expect(clause.toString()).toBe(""""Media"."MediaYear" > 1960""")
+    expect(clause.toString()).toBe("""Media.MediaYear > 1960""")
   }
 
   @Test
   fun testIsLessThan() {
     val matcher = NumberMatcher.IsLessThan
     val clause = matcher.makeWhereClause(MediaTable.year, MatcherData("", 1960, 0))
-    expect(clause.toString()).toBe(""""Media"."MediaYear" < 1960""")
+    expect(clause.toString()).toBe("""Media.MediaYear < 1960""")
   }
 
   @Test
   fun testIsInTheRange() {
     val matcher = NumberMatcher.IsInTheRange
     val clause = matcher.makeWhereClause(MediaTable.year, MatcherData("", 1960, 1970))
-    expect(clause.toString()).toBe(""""Media"."MediaYear" BETWEEN 1960 AND 1970""")
+    expect(clause.toString()).toBe("""Media.MediaYear BETWEEN 1960 AND 1970""")
   }
 
   @Test

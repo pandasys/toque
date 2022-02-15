@@ -20,6 +20,9 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.ButtonColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -47,11 +50,12 @@ import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.ealva.toque.ui.main.Notification
+import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -65,11 +69,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import javax.annotation.concurrent.Immutable
@@ -122,6 +124,8 @@ interface SongsViewModel : ActionsViewModel {
   fun setSearch(search: String)
 
   fun displayMediaInfo()
+
+  fun goBack()
 }
 
 abstract class BaseSongsViewModel(
@@ -129,9 +133,12 @@ abstract class BaseSongsViewModel(
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : SongsViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
-  private lateinit var scope: CoroutineScope
+) : SongsViewModel, ScopedServices.Registered, ScopedServices.Activated, ScopedServices.HandlesBack,
+  Bundleable {
+
+  protected lateinit var scope: CoroutineScope
   private var requestJob: Job? = null
+  private var daoEventsJob: Job? = null
   private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
   protected abstract val categoryToken: CategoryToken
@@ -139,7 +146,7 @@ abstract class BaseSongsViewModel(
   override val songsFlow = MutableStateFlow<List<SongInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<MediaId>(SelectedItems())
   override val searchFlow = MutableStateFlow("")
-  private val filterFlow = MutableStateFlow(NoFilter)
+  private val filterFlow: MutableStateFlow<Filter> = MutableStateFlow(NoFilter)
 
 
   override fun selectAll() = selectedItems.selectAll(getSongKeys())
@@ -156,49 +163,53 @@ abstract class BaseSongsViewModel(
     filter: Filter
   ): Result<List<AudioDescription>, Throwable>
 
-  override fun onServiceActive() {
+  override fun onServiceRegistered() {
     scope = CoroutineScope(Job() + dispatcher)
     filterFlow
-      .drop(1)
       .onEach { requestAudio() }
+      .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
       .launchIn(scope)
+  }
 
-    audioMediaDao.audioDaoEvents
-      .onStart { requestAudio() }
+  override fun onServiceUnregistered() {
+    scope.cancel()
+  }
+
+  override fun onServiceActive() {
+    daoEventsJob = audioMediaDao.audioDaoEvents
       .onEach { requestAudio() }
       .catch { cause -> LOG.e(cause) { it("Error collecting AudioDao events") } }
       .onCompletion { LOG._i { it("End collecting AudioDao events") } }
       .launchIn(scope)
   }
 
+  override fun onServiceInactive() {
+    daoEventsJob?.cancel()
+    daoEventsJob = null
+  }
+
   /** Called whenever this view model is created and also whenever the dao emits an AudioDaoEvent */
   private fun requestAudio() {
-    if (requestJob?.isActive == true) requestJob?.cancel()
-
+    requestJob?.cancel()
     requestJob = scope.launch {
-      getAudioList(audioMediaDao, filterFlow.value)
+      songsFlow.value = getAudioList(audioMediaDao, filterFlow.value)
         .onFailure { cause ->
           LOG.e(cause) { it("Error getting audio list") }
           localAudioQueueModel.emitNotification(Notification(fetch(R.string.ErrorReadingMediaList)))
         }
-        .onSuccess { list -> handleAudioList(list) }
+        .getOrElse { emptyList() }
+        .mapIndexed { index, audioDescription -> makeSongInfo(index, audioDescription) }
     }
   }
 
-  private fun handleAudioList(list: List<AudioDescription>) {
-    songsFlow.value = list.mapIndexedTo(ArrayList(list.size)) { index, audioDescription ->
-      makeSongInfo(index, audioDescription)
-    }
-  }
-
-  protected open fun makeSongInfo(index: Int, it: AudioDescription) = SongInfo(
-    id = it.mediaId,
-    title = it.title,
-    duration = it.duration,
-    rating = it.rating,
-    album = it.album,
-    artist = it.artist,
-    artwork = if (it.albumLocalArt !== Uri.EMPTY) it.albumLocalArt else it.albumArt
+  protected open fun makeSongInfo(index: Int, audio: AudioDescription) = SongInfo(
+    id = audio.mediaId,
+    title = audio.title,
+    duration = audio.duration,
+    rating = audio.rating,
+    album = audio.album,
+    artist = audio.artist,
+    artwork = if (audio.localArtwork !== Uri.EMPTY) audio.localArtwork else audio.remoteArtwork
   )
 
   override fun mediaClicked(mediaId: MediaId) =
@@ -246,9 +257,26 @@ abstract class BaseSongsViewModel(
   override fun displayMediaInfo() {
     val selected = selectedItems.value
     if (selected.selectedCount == 1) {
-      val mediaId = selected.single()
-      backstack.goToScreen(AudioMediaInfoScreen(mediaId))
+      songsFlow.value
+        .find { info -> info.id == selected.single() }
+        ?.let { info ->
+          backstack.goToScreen(
+            AudioMediaInfoScreen(
+              info.id,
+              info.title,
+              info.album,
+              info.artist,
+              info.rating,
+              info.duration
+            )
+          )
+        }
     }
+  }
+
+  override fun goBack() {
+    selectedItems.inSelectionModeThenTurnOff()
+    backstack.back()
   }
 
   override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
@@ -261,46 +289,41 @@ abstract class BaseSongsViewModel(
     get() = javaClass.name
 
   override fun toBundle(): StateBundle = StateBundle().apply {
-    putParcelable(stateKey, SongsViewModelState(selectedItems.value))
+    putParcelable(stateKey, SongsViewModelState(selectedItems.value, searchFlow.value))
   }
 
   override fun fromBundle(bundle: StateBundle?) {
     bundle?.getParcelable<SongsViewModelState>(stateKey)?.let {
       selectedItems.value = it.selected
+      setSearch(it.search)
     }
-  }
-
-  override fun onServiceInactive() {
-    scope.cancel()
-    songsFlow.value = emptyList()
   }
 }
 
 @Parcelize
 private data class SongsViewModelState(
-  val selected: SelectedItems<MediaId>
+  val selected: SelectedItems<MediaId>,
+  val search: String
 ) : Parcelable
 
 @Composable
 fun SongsItemsActions(
+  modifier: Modifier = Modifier,
   itemCount: Int,
   selectedItems: SelectedItems<*>,
-  viewModel: SongsViewModel
+  viewModel: SongsViewModel,
+  buttonColors: ButtonColors
 ) {
-  LibraryActionBar(
+  LibraryItemsActions(
+    modifier = modifier,
     itemCount = itemCount,
-    inSelectionMode = selectedItems.inSelectionMode,
-    selectedCount = selectedItems.selectedCount,
-    play = { viewModel.play() },
-    shuffle = { viewModel.shuffle() },
-    playNext = { viewModel.playNext() },
-    addToUpNext = { viewModel.addToUpNext() },
-    addToPlaylist = { viewModel.addToPlaylist() },
-    selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
-    startSearch = {},
+    selectedItems = selectedItems,
+    viewModel = viewModel,
+    buttonColors = buttonColors,
     selectActions = {
       SongSelectActions(
         selectedCount = selectedItems.selectedCount,
+        buttonColors = buttonColors,
         mediaInfoClick = { viewModel.displayMediaInfo() }
       )
     }
@@ -310,18 +333,24 @@ fun SongsItemsActions(
 @Composable
 fun SongSelectActions(
   selectedCount: Int,
+  buttonColors: ButtonColors,
   mediaInfoClick: () -> Unit
 ) {
+  val buttonHeight = 24.dp
+  val buttonModifier = Modifier
+    .height(buttonHeight)
+    .width(buttonHeight * 1.4F)
   Row(
-    modifier = Modifier
+    modifier = Modifier.padding(start = 4.dp)
   ) {
     ActionButton(
-      buttonHeight = 24.dp,
-      modifier = Modifier.height(24.dp),
+      modifier = buttonModifier,
+      iconSize = buttonHeight,
       drawable = R.drawable.ic_info,
       description = R.string.MediaInfo,
-      onClick = mediaInfoClick,
-      enabled = selectedCount == 1
+      enabled = selectedCount == 1,
+      colors = buttonColors,
+      onClick = mediaInfoClick
     )
   }
 }

@@ -17,18 +17,37 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ealva.toque.ui.common.PopupMenu
+import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
-fun CategoryTitleBar(categoryItem: LibraryCategories.CategoryItem) {
+fun CategoryTitleBar(
+  categoryItem: LibraryCategories.CategoryItem,
+  menuItems: List<PopupMenuItem> = emptyList()
+) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    CategoryTitle(categoryItem)
+    if (menuItems.isNotEmpty())
+      Spacer(modifier = Modifier.weight(1.0F, fill = true))
+    PopupMenu(items = menuItems)
+  }
+}
+
+@Composable
+private fun CategoryTitle(categoryItem: LibraryCategories.CategoryItem) {
   LibraryCategory(
     item = categoryItem,
     boxSize = 48.dp,
     iconSize = 38.dp,
-    textStyle = toqueTypography.h6,
-    padding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+    textStyle = toqueTypography.h5,
+    padding = PaddingValues(vertical = 8.dp),
     textStartPadding = 10.dp
   )
 }

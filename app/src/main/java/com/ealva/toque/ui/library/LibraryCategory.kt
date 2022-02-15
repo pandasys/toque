@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -62,13 +63,13 @@ fun LibraryCategory(
     ) {
       Icon(
         painter = painterResource(id = item.icon),
-        contentDescription = item.title,
+        contentDescription = stringResource(id = item.title),
         modifier = Modifier.size(iconSize),
         tint = Color.White
       )
     }
     Text(
-      text = item.title,
+      text = stringResource(id = item.title),
       style = textStyle,
       modifier = Modifier
         .align(Alignment.CenterVertically)

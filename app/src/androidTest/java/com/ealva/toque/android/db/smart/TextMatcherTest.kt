@@ -42,7 +42,7 @@ class TextMatcherTest {
   fun testContains() {
     val matcher = TextMatcher.Contains
     val clause = matcher.makeWhereClause(AlbumTable.albumTitle, MatcherData("ZZ Top", 0, 0))
-    expect(clause.toString()).toBe(""""Album"."Album" LIKE '%ZZ Top%' ESCAPE '\'""")
+    expect(clause.toString()).toBe("""Album.Album LIKE '%ZZ Top%' ESCAPE '\'""")
   }
 
 
@@ -50,35 +50,35 @@ class TextMatcherTest {
   fun testDoesNotContain() {
     val matcher = TextMatcher.DoesNotContain
     val clause = matcher.makeWhereClause(AlbumTable.albumTitle, MatcherData("ZZ Top", 0, 0))
-    expect(clause.toString()).toBe(""""Album"."Album" NOT LIKE '%ZZ Top%' ESCAPE '\'""")
+    expect(clause.toString()).toBe("""Album.Album NOT LIKE '%ZZ Top%' ESCAPE '\'""")
   }
 
   @Test
   fun testIs() {
     val matcher = TextMatcher.Is
     val clause = matcher.makeWhereClause(AlbumTable.albumTitle, MatcherData("ZZ Top", 0, 0))
-    expect(clause.toString()).toBe(""""Album"."Album" = 'ZZ Top'""")
+    expect(clause.toString()).toBe("""Album.Album = 'ZZ Top'""")
   }
 
   @Test
   fun testIsNot() {
     val matcher = TextMatcher.IsNot
     val clause = matcher.makeWhereClause(AlbumTable.albumTitle, MatcherData("ZZ Top", 0, 0))
-    expect(clause.toString()).toBe(""""Album"."Album" <> 'ZZ Top'""")
+    expect(clause.toString()).toBe("""Album.Album <> 'ZZ Top'""")
   }
 
   @Test
   fun testBeginsWith() {
     val matcher = TextMatcher.BeginsWith
     val clause = matcher.makeWhereClause(AlbumTable.albumTitle, MatcherData("ZZ Top", 0, 0))
-    expect(clause.toString()).toBe(""""Album"."Album" LIKE 'ZZ Top%' ESCAPE '\'""")
+    expect(clause.toString()).toBe("""Album.Album LIKE 'ZZ Top%' ESCAPE '\'""")
   }
 
   @Test
   fun testEndsWith() {
     val matcher = TextMatcher.EndsWith
     val clause = matcher.makeWhereClause(AlbumTable.albumTitle, MatcherData("ZZ Top", 0, 0))
-    expect(clause.toString()).toBe(""""Album"."Album" LIKE '%ZZ Top' ESCAPE '\'""")
+    expect(clause.toString()).toBe("""Album.Album LIKE '%ZZ Top' ESCAPE '\'""")
   }
 
   @Test

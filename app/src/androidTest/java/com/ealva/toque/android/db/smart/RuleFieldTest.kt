@@ -69,7 +69,7 @@ class RuleFieldTest {
     val matcher = TextMatcher.Is
     val data = MatcherData("TheTitle", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaTitle" = 'TheTitle'""")
+      .toBe("""Media.MediaTitle = 'TheTitle'""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -88,9 +88,9 @@ class RuleFieldTest {
     val matcher = TextMatcher.Is
     val data = MatcherData("AlbumTitle", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Album"."Album" = 'AlbumTitle'""")
+      .toBe("""Album.Album = 'AlbumTitle'""")
     expect(field.makeJoinClause(matcher, data)?.joinTo(MediaTable)?.toString())
-      .toBe(""""Media" INNER JOIN "Album" ON "Media"."Media_AlbumId" = "Album"."AlbumId"""")
+      .toBe("""Media INNER JOIN Album ON Media.Media_AlbumId = Album.AlbumId""")
   }
 
   @Test(expected = NoSuchElementException::class)
@@ -108,11 +108,11 @@ class RuleFieldTest {
     val matcher = TextMatcher.Is
     val data = MatcherData("An Artist", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""SongArtist"."Artist" = 'An Artist'""")
+      .toBe("""SongArtist.Artist = 'An Artist'""")
     expect(field.makeJoinClause(matcher, data)?.joinTo(MediaTable)?.toString())
       .toBe(
-        """"Media" INNER JOIN Artist AS SongArtist ON "Media"."Media_ArtistId"""" +
-          """ = "SongArtist"."ArtistId""""
+        """Media INNER JOIN Artist AS SongArtist ON Media.Media_ArtistId""" +
+          """ = SongArtist.ArtistId"""
       )
   }
 
@@ -131,11 +131,11 @@ class RuleFieldTest {
     val matcher = TextMatcher.Is
     val data = MatcherData("Album Artist", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""AlbumArtist"."Artist" = 'Album Artist'""")
+      .toBe("""AlbumArtist.Artist = 'Album Artist'""")
     expect(field.makeJoinClause(matcher, data)?.joinTo(MediaTable)?.toString())
       .toBe(
-        """"Media" INNER JOIN Artist AS AlbumArtist ON "Media"."Media_ArtistId"""" +
-        """ = "AlbumArtist"."ArtistId""""
+        """Media INNER JOIN Artist AS AlbumArtist ON Media.Media_ArtistId""" +
+        """ = AlbumArtist.ArtistId"""
       )
   }
 
@@ -154,12 +154,12 @@ class RuleFieldTest {
     val matcher = GenreMatcher.Contains
     val data = MatcherData("Rock", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Genre"."Genre" LIKE '%Rock%' ESCAPE '\'""")
+      .toBe("""Genre.Genre LIKE '%Rock%' ESCAPE '\'""")
     expect(field.makeJoinClause(matcher, data)?.joinTo(MediaTable)?.toString())
       .toBe(
-        """"Media" INNER JOIN "GenreMedia" ON "Media"."MediaId" =""" +
-          """ "GenreMedia"."GenreMedia_MediaId" INNER JOIN "Genre" ON""" +
-          """ "GenreMedia"."GenreMedia_GenreId" = "Genre"."GenreId""""
+        """Media INNER JOIN GenreMedia ON Media.MediaId =""" +
+          """ GenreMedia.GenreMedia_MediaId INNER JOIN Genre ON""" +
+          """ GenreMedia.GenreMedia_GenreId = Genre.GenreId"""
       )
   }
 
@@ -178,12 +178,12 @@ class RuleFieldTest {
     val matcher = TextMatcher.Is
     val data = MatcherData("Bob Dylan", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Composer"."Composer" = 'Bob Dylan'""")
+      .toBe("""Composer.Composer = 'Bob Dylan'""")
     expect(field.makeJoinClause(matcher, data)?.joinTo(MediaTable)?.toString())
       .toBe(
-        """"Media" INNER JOIN "ComposerMedia" ON "Media"."MediaId" =""" +
-          """ "ComposerMedia"."ComposerMedia_MediaId" INNER JOIN "Composer" ON""" +
-          """ "ComposerMedia"."ComposerMedia_ComposerId" = "Composer"."ComposerId""""
+        """Media INNER JOIN ComposerMedia ON Media.MediaId =""" +
+          """ ComposerMedia.ComposerMedia_MediaId INNER JOIN Composer ON""" +
+          """ ComposerMedia.ComposerMedia_ComposerId = Composer.ComposerId"""
       )
   }
 
@@ -202,7 +202,7 @@ class RuleFieldTest {
     val matcher = RatingMatcher.Is
     val data = MatcherData(StarRating.STAR_5)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaRating" = 100""")
+      .toBe("""Media.MediaRating = 100""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -221,7 +221,7 @@ class RuleFieldTest {
     val matcher = NumberMatcher.Is
     val data = MatcherData("", 1970, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaYear" = 1970""")
+      .toBe("""Media.MediaYear = 1970""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -240,7 +240,7 @@ class RuleFieldTest {
     val matcher = DateMatcher.Is
     val data = MatcherData("", dateMillis, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaTimeCreated" BETWEEN $dateMin AND $dateMax""")
+      .toBe("""Media.MediaTimeCreated BETWEEN $dateMin AND $dateMax""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -259,7 +259,7 @@ class RuleFieldTest {
     val matcher = NumberMatcher.Is
     val data = MatcherData("", 20, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaPlayedCount" = 20""")
+      .toBe("""Media.MediaPlayedCount = 20""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -278,7 +278,7 @@ class RuleFieldTest {
     val matcher = DateMatcher.Is
     val data = MatcherData("", dateMillis, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaLastPlayedTime" BETWEEN $dateMin AND $dateMax""")
+      .toBe("""Media.MediaLastPlayedTime BETWEEN $dateMin AND $dateMax""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -297,7 +297,7 @@ class RuleFieldTest {
     val matcher = NumberMatcher.Is
     val data = MatcherData("", 5, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaSkippedCount" = 5""")
+      .toBe("""Media.MediaSkippedCount = 5""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -316,7 +316,7 @@ class RuleFieldTest {
     val matcher = DateMatcher.Is
     val data = MatcherData("", dateMillis, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaLastSkippedTime" BETWEEN $dateMin AND $dateMax""")
+      .toBe("""Media.MediaLastSkippedTime BETWEEN $dateMin AND $dateMax""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -338,7 +338,7 @@ class RuleFieldTest {
     val high = asMillis + 499
     val data = MatcherData("", first, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaDuration" BETWEEN $low AND $high""")
+      .toBe("""Media.MediaDuration BETWEEN $low AND $high""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -356,17 +356,17 @@ class RuleFieldTest {
     val matcher = PlaylistMatcher.Is
     MatcherData("ViewName", PlayListType.Rules.id.toLong(), 5L).let { data ->
       expect(field.makeWhereClause(matcher, data).toString())
-        .toBe(""""ViewName"."MediaId" IS NOT NULL""")
+        .toBe("""ViewName.MediaId IS NOT NULL""")
       val joinTemplate = field.makeJoinClause(matcher, data)
       expect(joinTemplate?.joinTo(MediaTable)?.toString())
-        .toBe(""""Media" LEFT JOIN "ViewName" ON "Media"."MediaId" = "ViewName"."MediaId"""")
+        .toBe("""Media LEFT JOIN ViewName ON Media.MediaId = ViewName.MediaId""")
     }
 
     MatcherData("", PlayListType.UserCreated.id.toLong(), 5).let { data ->
       expect(field.makeWhereClause(matcher, data).toString())
         .toBe(
-          """"Media"."MediaId" IN (SELECT "PlayListMedia"."PlayListMedia_MediaId" FROM""" +
-            """ "PlayListMedia" WHERE "PlayListMedia"."PlayListMedia_PlayListId" = 5)"""
+          """Media.MediaId IN (SELECT PlayListMedia.PlayListMedia_MediaId FROM""" +
+            """ PlayListMedia WHERE PlayListMedia.PlayListMedia_PlayListId = 5)"""
         )
       expect(field.makeJoinClause(matcher, data)?.toString()).toBeNull()
     }
@@ -387,7 +387,7 @@ class RuleFieldTest {
     val matcher = TextMatcher.Is
     val data = MatcherData("Awesome song", 0, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaContentComment" = 'Awesome song'""")
+      .toBe("""Media.MediaContentComment = 'Awesome song'""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 
@@ -406,7 +406,7 @@ class RuleFieldTest {
     val matcher = NumberMatcher.Is
     val data = MatcherData("", 2, 0)
     expect(field.makeWhereClause(matcher, data).toString())
-      .toBe(""""Media"."MediaTotalDiscs" = 2""")
+      .toBe("""Media.MediaTotalDiscs = 2""")
     expect(field.makeJoinClause(matcher, data)).toBeNull()
   }
 

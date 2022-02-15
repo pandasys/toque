@@ -23,7 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
 import com.ealva.toque.common.Filter
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
@@ -31,9 +34,7 @@ import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
-import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
@@ -43,6 +44,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+
+@Suppress("unused")
+private val LOG by lazyLogger(LibrarySongsScreen::class)
 
 @Immutable
 @Parcelize
@@ -64,14 +68,15 @@ data class LibrarySongsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      CategoryTitleBar(viewModel.categoryItem)
-      SongsItemsActions(
+      CategoryScreenHeader(
+        viewModel = viewModel,
+        categoryItem = viewModel.categoryItem,
         itemCount = songs.value.size,
         selectedItems = selected.value,
-        viewModel = viewModel
+        backTo = fetch(R.string.Library),
+        back = { viewModel.goBack() }
       )
       SongItemList(
         list = songs.value,
@@ -94,7 +99,7 @@ private class LibrarySongsViewModel(
   localAudioQueueModel,
   backstack,
   dispatcher
-), ScopedServices.Activated {
+) {
   private val categories = LibraryCategories()
 
   val categoryItem: LibraryCategories.CategoryItem

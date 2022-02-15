@@ -42,14 +42,14 @@ class GenreMatcherTest {
   fun testContains() {
     val matcher = GenreMatcher.Contains
     val clause = matcher.makeWhereClause(MediaTable.genre, MatcherData("Rock", 0, 0))
-    expect(clause.toString()).toBe(""""Genre"."Genre" LIKE '%Rock%' ESCAPE '\'""")
+    expect(clause.toString()).toBe("""Genre.Genre LIKE '%Rock%' ESCAPE '\'""")
   }
 
   @Test
   fun testDoesNotContain() {
     val matcher = GenreMatcher.DoesNotContain
     val clause = matcher.makeWhereClause(MediaTable.genre, MatcherData("Rock", 0, 0))
-    expect(clause.toString()).toBe(""""Genre"."Genre" NOT LIKE '%Rock%' ESCAPE '\'""")
+    expect(clause.toString()).toBe("""Genre.Genre NOT LIKE '%Rock%' ESCAPE '\'""")
   }
 
   @Test
@@ -57,7 +57,7 @@ class GenreMatcherTest {
     val matcher = GenreMatcher.Is
     val clause = matcher.makeWhereClause(MediaTable.genre, MatcherData("Rock", 0, 0))
     expect(clause.toString())
-      .toBe(""""Genre"."Genre" = 'Rock'""")
+      .toBe("""Genre.Genre = 'Rock'""")
   }
 
   @Test
@@ -65,7 +65,7 @@ class GenreMatcherTest {
     val matcher = GenreMatcher.IsNot
     val clause = matcher.makeWhereClause(MediaTable.genre, MatcherData("Rock", 0, 0))
     expect(clause.toString())
-      .toBe(""""Genre"."Genre" <> 'Rock'""")
+      .toBe("""Genre.Genre <> 'Rock'""")
   }
 
   @Test
@@ -73,7 +73,7 @@ class GenreMatcherTest {
     val matcher = GenreMatcher.BeginsWith
     val clause = matcher.makeWhereClause(MediaTable.genre, MatcherData("Rock", 0, 0))
     expect(clause.toString())
-      .toBe(""""Genre"."Genre" LIKE 'Rock%' ESCAPE '\'""")
+      .toBe("""Genre.Genre LIKE 'Rock%' ESCAPE '\'""")
   }
 
   @Test
@@ -81,7 +81,7 @@ class GenreMatcherTest {
     val matcher = GenreMatcher.EndsWith
     val clause = matcher.makeWhereClause(MediaTable.genre, MatcherData("Rock", 0, 0))
     expect(clause.toString())
-      .toBe(""""Genre"."Genre" LIKE '%Rock' ESCAPE '\'""")
+      .toBe("""Genre.Genre LIKE '%Rock' ESCAPE '\'""")
   }
 
   @Test

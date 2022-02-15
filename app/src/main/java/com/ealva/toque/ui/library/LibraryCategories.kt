@@ -17,6 +17,7 @@
 package com.ealva.toque.ui.library
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import com.ealva.toque.R
@@ -39,12 +40,12 @@ interface LibraryCategories {
   @Immutable
   data class CategoryItem(
     @DrawableRes val icon: Int,
-    val title: String,
+    @StringRes val title: Int,
     val key: ComposeKey,
     val color: Color
   ) {
     companion object {
-      val NullCategoryItem = CategoryItem(0, "Null", NullComposeKey, Color.Unspecified)
+      val NullCategoryItem = CategoryItem(0, R.string.None, NullComposeKey, Color.Unspecified)
     }
   }
 
@@ -61,43 +62,43 @@ private class LibraryCategoriesImpl : LibraryCategories {
   private val categoryList = listOf(
     CategoryItem(
       R.drawable.ic_treble_clef,
-      "All Songs",
+      R.string.AllSongs,
       LibrarySongsScreen(),
       Color.AllSongs
     ),
     CategoryItem(
       R.drawable.ic_album,
-      "Albums",
+      R.string.Albums,
       AlbumsScreen(),
       Color.Albums
     ),
     CategoryItem(
       R.drawable.ic_microphone,
-      "Artists",
+      R.string.Artists,
       ArtistsScreen(ArtistType.SongArtist),
       Color.Artists
     ),
     CategoryItem(
       R.drawable.ic_account_box,
-      "Album Artists",
+      R.string.AlbumArtists,
       ArtistsScreen(ArtistType.AlbumArtist),
       Color.AlbumArtists
     ),
     CategoryItem(
       R.drawable.ic_guitar_acoustic,
-      "Genres",
+      R.string.Genres,
       GenresScreen(),
       Color.Genres
     ),
     CategoryItem(
       R.drawable.ic_person,
-      "Composers",
+      R.string.Composers,
       ComposersScreen(),
       Color.Composers
     ),
     CategoryItem(
       R.drawable.ic_list,
-      "Playlists",
+      R.string.Playlists,
       PlaylistsScreen(),
       Color.Playlists
     ),

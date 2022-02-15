@@ -127,7 +127,7 @@ private class MediaFileStoreImpl(
     afterFileWrite: suspend () -> Unit
   ): Result<Rating, Throwable> = binding {
     audioMediaDao.setRating(id, newRating).bind()
-    if (writeToFile && fileLocation.isLocalScheme()) {
+    if (writeToFile && fileLocation.isLocalScheme) {
       writeRatingToFile(fileLocation, fileExt, newRating, beforeFileWrite, afterFileWrite).bind()
     } else newRating
   }
@@ -162,7 +162,7 @@ private class MediaFileStoreImpl(
     beforeFileWrite: suspend () -> Unit,
     afterFileWrite: suspend () -> Unit
   ): Rating {
-    require(location.isLocalScheme())
+    require(location.isLocalScheme)
     makeTempEditorFile(location.lastPathSegment, fileExt).useTempFile { tempEditorFile ->
       location.copyTo(tempEditorFile)
       SongTag(tempEditorFile, ignoreArtwork = true, createMissingTag = false).use { songTag ->

@@ -17,12 +17,18 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.ButtonColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.ealva.toque.R
 import com.ealva.toque.common.Filter
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.AudioMediaDao
@@ -30,15 +36,14 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -68,14 +73,22 @@ data class AlbumsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      CategoryTitleBar(viewModel.categoryItem)
-      LibraryItemsActions(
+      CategoryScreenHeader(
+        viewModel = viewModel,
+        categoryItem = viewModel.categoryItem,
         itemCount = albums.value.size,
         selectedItems = selected.value,
-        viewModel = viewModel
+        backTo = fetch(R.string.Library),
+        back = { viewModel.goBack() },
+        selectActions = {
+          AlbumSelectActions(
+            selectedCount = selected.value.selectedCount,
+            buttonColors = ActionButtonDefaults.colors(),
+            selectAlbumArt = { viewModel.selectAlbumArt() }
+          )
+        }
       )
       AlbumsList(
         list = albums.value,
@@ -104,10 +117,12 @@ private class AllAlbumsViewModel(
     filter: Filter
   ): DaoResult<List<AlbumDescription>> = albumDao.getAllAlbums(filter)
 
-  override fun goToAlbumSongs(albumId: AlbumId) = backstack.goToScreen(AlbumSongsScreen(albumId))
+  override fun goToAlbumSongs(album: AlbumInfo) = backstack.goToScreen(
+    AlbumSongsScreen(album.id, album.title, album.artwork, album.artist, fetch(R.string.Albums))
+  )
 
   override suspend fun makeCategoryMediaList(
-    albumList: List<AlbumsViewModel.AlbumInfo>
+    albumList: List<AlbumInfo>
   ): Result<CategoryMediaList, Throwable> = audioMediaDao
     .getMediaForAlbums(
       albumList
@@ -116,4 +131,25 @@ private class AllAlbumsViewModel(
     )
     .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
     .map { idList -> CategoryMediaList(idList, CategoryToken(albumList.last().id)) }
+}
+
+@Composable
+private fun AlbumSelectActions(
+  selectedCount: Int,
+  buttonColors: ButtonColors,
+  selectAlbumArt: () -> Unit
+) {
+  Row(
+    modifier = Modifier
+  ) {
+    ActionButton(
+      modifier = Modifier.height(24.dp),
+      iconSize = 24.dp,
+      drawable = R.drawable.ic_image,
+      description = R.string.MediaInfo,
+      enabled = selectedCount == 1,
+      colors = buttonColors,
+      onClick = selectAlbumArt
+    )
+  }
 }

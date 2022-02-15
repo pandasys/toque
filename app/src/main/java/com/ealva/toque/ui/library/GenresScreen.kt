@@ -16,8 +16,10 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -39,14 +41,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.GenreName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
@@ -59,10 +64,12 @@ import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.asGenreIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.GenresViewModel.GenreInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
+import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
@@ -71,7 +78,6 @@ import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -89,11 +95,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
@@ -103,9 +107,7 @@ private val LOG by lazyLogger(GenresScreen::class)
 
 @Immutable
 @Parcelize
-data class GenresScreen(
-  private val noArg: String = ""
-) : BaseLibraryItemsScreen(), KoinComponent {
+data class GenresScreen(private val noArg: String = "") : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
     with(serviceBinder) { add(GenresViewModel(key, get(), lookup(), backstack)) }
@@ -120,19 +122,20 @@ data class GenresScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      CategoryTitleBar(viewModel.categoryItem)
-      LibraryItemsActions(
+      CategoryScreenHeader(
+        viewModel = viewModel,
+        categoryItem = viewModel.categoryItem,
         itemCount = genres.value.size,
         selectedItems = selected.value,
-        viewModel = viewModel
+        backTo = fetch(R.string.Library),
+        back = { viewModel.goBack() }
       )
       AllGenres(
         list = genres.value,
         selected = selected.value,
-        itemClicked = { viewModel.itemClicked(it) },
+        itemClicked = { genreInfo -> viewModel.itemClicked(genreInfo) },
         itemLongClicked = { viewModel.itemLongClicked(it) }
       )
     }
@@ -143,7 +146,7 @@ data class GenresScreen(
 private fun AllGenres(
   list: List<GenreInfo>,
   selected: SelectedItems<GenreId>,
-  itemClicked: (GenreId) -> Unit,
+  itemClicked: (GenreInfo) -> Unit,
   itemLongClicked: (GenreId) -> Unit
 ) {
   val listState = rememberLazyListState()
@@ -180,7 +183,7 @@ private fun AllGenres(
 private fun GenreItem(
   genreInfo: GenreInfo,
   isSelected: Boolean,
-  itemClicked: (GenreId) -> Unit,
+  itemClicked: (GenreInfo) -> Unit,
   itemLongClicked: (GenreId) -> Unit
 ) {
   ListItem(
@@ -188,17 +191,28 @@ private fun GenreItem(
       .fillMaxWidth()
       .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
       .combinedClickable(
-        onClick = { itemClicked(genreInfo.id) },
+        onClick = { itemClicked(genreInfo) },
         onLongClick = { itemLongClicked(genreInfo.id) }
       ),
     icon = {
-      Icon(
-        painter = painterResource(id = R.drawable.ic_guitar_acoustic),
-        contentDescription = "Genre icon",
-        modifier = Modifier.size(40.dp)
-      )
+      if (genreInfo.artwork !== Uri.EMPTY) {
+        Image(
+          painter = rememberImagePainter(
+            data = genreInfo.artwork,
+            builder = { error(R.drawable.ic_guitar_acoustic) }
+          ),
+          contentDescription = stringResource(R.string.ArtistArt),
+          modifier = Modifier.size(56.dp)
+        )
+      } else {
+        Icon(
+          painter = painterResource(id = R.drawable.ic_guitar_acoustic),
+          contentDescription = "Genre icon",
+          modifier = Modifier.size(40.dp)
+        )
+      }
     },
-    text = { Text(text = genreInfo.name.value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    text = { ListItemText(text = genreInfo.name.value) },
     secondaryText = {
       Text(
         text = LocalContext.current.resources.getQuantityString(
@@ -217,7 +231,8 @@ private interface GenresViewModel : ActionsViewModel {
   data class GenreInfo(
     val id: GenreId,
     val name: GenreName,
-    val songCount: Int
+    val songCount: Int,
+    val artwork: Uri
   ) : Parcelable
 
   val categoryItem: LibraryCategories.CategoryItem
@@ -225,11 +240,13 @@ private interface GenresViewModel : ActionsViewModel {
   val genreFlow: StateFlow<List<GenreInfo>>
   val selectedItems: SelectedItemsFlow<GenreId>
 
-  fun itemClicked(genreId: GenreId)
+  fun itemClicked(genreInfo: GenreInfo)
   fun itemLongClicked(genreId: GenreId)
 
   val searchFlow: StateFlow<String>
   fun setSearch(search: String)
+
+  fun goBack()
 
   companion object {
     operator fun invoke(
@@ -254,8 +271,13 @@ private class GenresViewModelImpl(
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
-) : GenresViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
+) : GenresViewModel, ScopedServices.Registered, ScopedServices.Activated,
+  ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
+  private var requestJob: Job? = null
+  private var daoEventsJob: Job? = null
+  private var wentInactive = false
+
   private val categories = LibraryCategories()
   private val genreDao: GenreDao = audioMediaDao.genreDao
 
@@ -268,10 +290,81 @@ private class GenresViewModelImpl(
   private val filterFlow = MutableStateFlow(Filter.NoFilter)
   private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
+  override fun onServiceRegistered() {
+    scope = CoroutineScope(Job() + dispatcher)
+    filterFlow
+      .onEach { requestGenres(processChunks = true) }
+      .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
+      .launchIn(scope)
+  }
+
+  override fun onServiceUnregistered() {
+    scope.cancel()
+  }
+
+  override fun onServiceActive() {
+    daoEventsJob = genreDao.genreDaoEvents
+      .onEach { requestGenres(processChunks = false) }
+      .catch { cause -> LOG.e(cause) { it("Error collecting GenreDao events") } }
+      .onCompletion { LOG._i { it("End collecting GenreDao events") } }
+      .launchIn(scope)
+    if (wentInactive) {
+      wentInactive = false
+      requestGenres(processChunks = false)
+    }
+  }
+
+  override fun onServiceInactive() {
+    daoEventsJob?.cancel()
+    daoEventsJob = null
+    wentInactive = true
+  }
+
+  private fun requestGenres(processChunks: Boolean) {
+    requestJob?.cancel()
+
+    requestJob = scope.launch {
+      val genreList = genreDao
+        .getAllGenres(filterFlow.value)
+        .onFailure { cause -> LOG.e(cause) { it("Error getting Genres") } }
+        .getOrElse { emptyList() }
+
+      if (processChunks) {
+        // We convert to sequence and break into chunks because we may be querying the DB for
+        // artwork and this gets the first chunk to the UI quickly.
+        val infoList = ArrayList<GenreInfo>(genreList.size)
+        genreList
+          .asSequence()
+          .chunked(20)
+          .forEach { sublist ->
+            genreFlow.value = sublist
+              .mapTo(infoList) { genreDescription -> genreDescription.toGenreInfo() }
+              .toList()
+          }
+      } else {
+        genreFlow.value = genreList.map { genreDescription -> genreDescription.toGenreInfo() }
+      }
+    }
+  }
+
+  private suspend fun GenreDescription.toGenreInfo(): GenreInfo = GenreInfo(
+    id = genreId,
+    name = genreName,
+    songCount = songCount.toInt(),
+    artwork = audioMediaDao.albumDao
+      .getAlbumArtFor(genreId)
+      .onFailure { cause -> LOG.e(cause) { it("Error getting art for %s %s", genreId, genreName) } }
+      .getOrElse { Uri.EMPTY }
+  )
 
   override fun setSearch(search: String) {
     searchFlow.value = search
     filterFlow.value = search.wrapAsFilter()
+  }
+
+  override fun goBack() {
+    selectedItems.inSelectionModeThenTurnOff()
+    backstack.back()
   }
 
   override fun selectAll() = selectedItems.selectAll(getGenreKeys())
@@ -315,44 +408,17 @@ private class GenresViewModelImpl(
     scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
   }
 
-  private fun goToGenreSongs(genreId: GenreId) = backstack.goToScreen(GenreSongsScreen(genreId))
+  private fun goToGenreSongs(info: GenreInfo) =
+    backstack.goToScreen(
+      GenreSongsScreen(info.id, info.name, info.artwork, fetch(R.string.Genres))
+    )
 
-  override fun onServiceActive() {
-    scope = CoroutineScope(Job() + dispatcher)
-    filterFlow
-      .drop(1)
-      .onEach { requestGenres() }
-      .launchIn(scope)
-
-    genreDao.genreDaoEvents
-      .onStart { requestGenres() }
-      .onEach { requestGenres() }
-      .catch { cause -> LOG.e(cause) { it("Error collecting GenreDao events") } }
-      .onCompletion { LOG._i { it("End collecting GenreDao events") } }
-      .launchIn(scope)
-  }
-
-  private fun requestGenres() {
-    scope.launch {
-      genreFlow.value = genreDao
-        .getAllGenres(filterFlow.value)
-        .onFailure { cause -> LOG.e(cause) { it("Error getting Genres") } }
-        .getOrElse { emptyList() }
-        .map { genreDescription -> genreDescription.toGenreInfo() }
-    }
-  }
-
-  override fun itemClicked(genreId: GenreId) =
-    selectedItems.ifInSelectionModeToggleElse(genreId) { goToGenreSongs(it) }
+  override fun itemClicked(genreInfo: GenreInfo) =
+    selectedItems.ifInSelectionModeToggleElse(genreInfo.id) { goToGenreSongs(genreInfo) }
 
   override fun itemLongClicked(genreId: GenreId) = selectedItems.toggleSelection(genreId)
 
   override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
-
-  override fun onServiceInactive() {
-    scope.cancel()
-    genreFlow.value = emptyList()
-  }
 
   override fun toBundle(): StateBundle = StateBundle().apply {
     putParcelable(KEY_MODEL_STATE, GenresViewModelState(selectedItems.value))
@@ -364,12 +430,6 @@ private class GenresViewModelImpl(
     }
   }
 }
-
-private fun GenreDescription.toGenreInfo() = GenreInfo(
-  id = genreId,
-  name = genreName,
-  songCount = songCount.toInt()
-)
 
 @Parcelize
 private data class GenresViewModelState(val selected: SelectedItems<GenreId>) : Parcelable

@@ -19,6 +19,7 @@ package com.ealva.toque.db
 import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
+import com.ealva.toque.common.EntityArtwork
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
@@ -31,6 +32,6 @@ data class AudioDescription(
   val rating: Rating,
   val album: AlbumTitle,
   val artist: ArtistName,
-  val albumLocalArt: Uri,
-  val albumArt: Uri
-)
+  override val localArtwork: Uri,
+  override val remoteArtwork: Uri
+) : EntityArtwork

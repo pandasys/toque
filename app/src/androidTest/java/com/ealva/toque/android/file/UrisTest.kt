@@ -59,18 +59,18 @@ class UrisTest {
   @Test
   fun testNetworkScheme() {
     networkUris.forEach { uri ->
-      expect(uri.isNetworkScheme()).toBe(true)
+      expect(uri.isNetworkScheme).toBe(true)
     }
   }
 
   @Test
   fun testFileScheme() {
-    expect(fileUri.isFileScheme()).toBe(true)
+    expect(fileUri.isFileScheme).toBe(true)
   }
 
   @Test
   fun testContentScheme() {
-    expect(contentUri.isContentScheme()).toBe(true)
+    expect(contentUri.isContentScheme).toBe(true)
   }
 
   @Test

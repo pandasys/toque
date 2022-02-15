@@ -23,6 +23,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import com.ealva.toque.common.Millis
 import com.ealva.toque.prefs.AppPrefsSingleton
 import kotlinx.coroutines.flow.Flow
@@ -38,7 +39,7 @@ value class AudioContentId(val value: Long)
 @Suppress("NOTHING_TO_INLINE")
 inline fun Long.toAudioContentId() = AudioContentId(this)
 
-private val ARTWORK_URI = Uri.parse("content://media/external/audio/albumart")
+private val ARTWORK_URI = "content://media/external/audio/albumart".toUri()
 
 /**
  * MediaStorage provides an interface to read and write the device MediaStore.

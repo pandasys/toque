@@ -16,7 +16,10 @@
 
 package com.ealva.toque.ui.library
 
+import androidx.compose.material.ButtonColors
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 
 interface ActionsViewModel {
   fun selectAll()
@@ -30,11 +33,15 @@ interface ActionsViewModel {
 
 @Composable
 fun LibraryItemsActions(
+  modifier: Modifier = Modifier,
   itemCount: Int,
   selectedItems: SelectedItems<*>,
-  viewModel: ActionsViewModel
+  viewModel: ActionsViewModel,
+  buttonColors: ButtonColors = ActionButtonDefaults.colors(),
+  selectActions: (@Composable (Dp) -> Unit)? = null,
 ) {
   LibraryActionBar(
+    modifier = modifier,
     itemCount = itemCount,
     inSelectionMode = selectedItems.inSelectionMode,
     selectedCount = selectedItems.selectedCount,
@@ -44,6 +51,8 @@ fun LibraryItemsActions(
     addToUpNext = { viewModel.addToUpNext() },
     addToPlaylist = { viewModel.addToPlaylist() },
     selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
-    startSearch = {}
+    startSearch = {},
+    buttonColors = buttonColors,
+    selectActions = selectActions
   )
 }

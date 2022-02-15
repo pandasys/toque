@@ -16,12 +16,15 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvabrainz.common.AlbumTitle
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
@@ -29,7 +32,6 @@ import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
@@ -47,11 +49,25 @@ import javax.annotation.concurrent.Immutable
 @Parcelize
 data class AlbumSongsForArtistScreen(
   private val albumId: AlbumId,
-  private val artistId: ArtistId
+  private val artistId: ArtistId,
+  private val artistType: ArtistType,
+  private val artistName: ArtistName,
+  private val albumTitle: AlbumTitle,
+  private val artwork: Uri,
+  private val backTo: String = artistName.value
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(AlbumSongsForArtistViewModel(albumId, artistId, get(), lookup(), backstack))
+      add(
+        AlbumSongsForArtistViewModel(
+          albumId = albumId,
+          artistId = artistId,
+          artistType = artistType,
+          audioMediaDao = get(),
+          localAudioQueueModel = lookup(),
+          backstack = backstack
+        )
+      )
     }
   }
 
@@ -65,14 +81,20 @@ data class AlbumSongsForArtistScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      SongsItemsActions(
-        itemCount = songs.value.size,
-        selectedItems = selected.value,
-        viewModel = viewModel
-      )
+      ScreenHeaderWithArtwork(artwork = artwork) {
+        SongListHeaderInfo(
+          title = albumTitle.value,
+          subtitle = artistName.value,
+          itemCount = songs.value.size,
+          selectedItems = selected.value,
+          viewModel = viewModel,
+          buttonColors = ActionButtonDefaults.overArtworkColors(),
+          backTo = backTo,
+          back = { viewModel.goBack() }
+        )
+      }
       SongItemList(
         list = songs.value,
         selectedItems = selected.value,
@@ -86,6 +108,7 @@ data class AlbumSongsForArtistScreen(
 private class AlbumSongsForArtistViewModel(
   private val albumId: AlbumId,
   private val artistId: ArtistId,
+  private val artistType: ArtistType,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   backstack: Backstack,
@@ -95,5 +118,9 @@ private class AlbumSongsForArtistViewModel(
   override val categoryToken: CategoryToken get() = CategoryToken(albumId)
 
   override suspend fun getAudioList(audioMediaDao: AudioMediaDao, filter: Filter) =
-    audioMediaDao.getAlbumAudio(id = albumId, restrictTo = artistId, filter = filter)
+    audioMediaDao.getAlbumAudio(
+      id = albumId,
+      restrictTo = if (artistType === ArtistType.SongArtist) artistId else null,
+      filter = filter
+    )
 }

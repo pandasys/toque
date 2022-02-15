@@ -55,10 +55,12 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
 import com.ealva.toque.common.fetch
+import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.FullAudioInfo
 import com.ealva.toque.persist.AlbumId
@@ -107,12 +109,22 @@ private val LOG by lazyLogger(AudioMediaInfoScreen::class)
 @Immutable
 @Parcelize
 data class AudioMediaInfoScreen(
-  private val mediaId: MediaId
+  private val mediaId: MediaId,
+  private val title: Title,
+  private val albumTitle: AlbumTitle,
+  private val albumArtist: ArtistName,
+  private val rating: Rating,
+  private val duration: Millis,
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     serviceBinder.add(
       MediaInfoViewModel(
         mediaId = mediaId,
+        title = title,
+        albumTitle = albumTitle,
+        albumArtist = albumArtist,
+        rating = rating,
+        duration = duration,
         mainViewModel = serviceBinder.lookup(),
         audioMediaDao = get(),
         mediaDataParserFactory = get(),
@@ -140,7 +152,7 @@ data class AudioMediaInfoScreen(
         navigationIcon = {
           IconButton(onClick = { viewModel.goBack() }) {
             Icon(
-              painter = painterResource(id = R.drawable.ic_arrow_left),
+              painter = painterResource(id = R.drawable.ic_navigate_before),
               contentDescription = "Back",
               modifier = Modifier.size(26.dp)
             )
@@ -184,6 +196,8 @@ interface MediaInfoViewModel {
     val mediaId: MediaId = MediaId.INVALID,
     val albumId: AlbumId = AlbumId.INVALID,
     val albumArtistId: ArtistId = ArtistId.INVALID,
+    val albumArt: Uri = Uri.EMPTY,
+    val localAlbumArt: Uri = Uri.EMPTY
   )
 
   val mediaInfo: StateFlow<MediaInfo>
@@ -193,6 +207,11 @@ interface MediaInfoViewModel {
   companion object {
     operator fun invoke(
       mediaId: MediaId,
+      title: Title,
+      albumTitle: AlbumTitle,
+      albumArtist: ArtistName,
+      rating: Rating,
+      duration: Millis,
       mainViewModel: MainViewModel,
       audioMediaDao: AudioMediaDao,
       mediaDataParserFactory: MediaMetadataParserFactory,
@@ -201,6 +220,11 @@ interface MediaInfoViewModel {
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): MediaInfoViewModel = MediaInfoViewModelImpl(
       mediaId,
+      title,
+      albumTitle,
+      albumArtist,
+      rating,
+      duration,
       mainViewModel,
       audioMediaDao,
       mediaDataParserFactory,
@@ -213,6 +237,11 @@ interface MediaInfoViewModel {
 
 private class MediaInfoViewModelImpl(
   private val mediaId: MediaId,
+  title: Title,
+  albumTitle: AlbumTitle,
+  albumArtist: ArtistName,
+  rating: Rating,
+  duration: Millis,
   private val mainViewModel: MainViewModel,
   private val audioMediaDao: AudioMediaDao,
   mediaDataParserFactory: MediaMetadataParserFactory,
@@ -223,7 +252,15 @@ private class MediaInfoViewModelImpl(
   private lateinit var scope: CoroutineScope
   private val metadataParser = mediaDataParserFactory.make()
 
-  override val mediaInfo = MutableStateFlow(MediaInfoViewModel.MediaInfo())
+  override val mediaInfo = MutableStateFlow(
+    MediaInfoViewModel.MediaInfo(
+      title = title,
+      album = albumTitle,
+      albumArtist = albumArtist,
+      rating = rating.toStarRating(),
+      duration = duration
+    )
+  )
   override fun goBack() {
     backstack.back()
   }
@@ -284,7 +321,9 @@ private class MediaInfoViewModelImpl(
         location = if (fullInfo.file === Uri.EMPTY) fullInfo.location else fullInfo.file,
         mediaId = fullInfo.mediaId,
         albumId = fullInfo.albumId,
-        albumArtistId = fullInfo.albumArtistId
+        albumArtistId = fullInfo.albumArtistId,
+        albumArt = fullInfo.albumArt,
+        localAlbumArt = fullInfo.localAlbumArt
       )
     }
   }
@@ -384,6 +423,16 @@ private fun MediaInfo(mediaInfo: MediaInfoViewModel.MediaInfo) {
       labelColor = labelColor
     )
     IdRow(mediaInfo.mediaId, mediaInfo.albumId, mediaInfo.albumArtistId, labelColor)
+    LabeledTextValue(
+      labelRes = R.string.AlbumArt,
+      valueText = mediaInfo.albumArt.toString(),
+      labelColor = labelColor
+    )
+    LabeledTextValue(
+      labelRes = R.string.LocalAlbumArt,
+      valueText = mediaInfo.localAlbumArt.toString(),
+      labelColor = labelColor
+    )
   }
 }
 
@@ -593,10 +642,10 @@ private fun LabeledValue(
   }
 }
 
-private val DATE_FORMATTER = DateFormat.getDateTimeInstance(
+private fun dateFormatter() = DateFormat.getDateTimeInstance(
   DateFormat.MEDIUM,
   DateFormat.SHORT,
   Locale.getDefault()
 )
 
-private fun Millis.asDateTime(): String = DATE_FORMATTER.format(value)
+private fun Millis.asDateTime(): String = dateFormatter().format(value)

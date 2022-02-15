@@ -16,6 +16,7 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -24,12 +25,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -69,6 +68,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
@@ -78,6 +78,7 @@ import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorScreen
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
+import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
@@ -87,7 +88,6 @@ import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.onSuccess
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -145,17 +145,16 @@ data class PlaylistsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      TitleBar(
+      CategoryScreenHeader(
+        viewModel = viewModel,
         categoryItem = viewModel.categoryItem,
-        newSmartPlaylist = { viewModel.newSmartPlaylist() }
-      )
-      LibraryItemsActions(
+        menuItems = makeMenuItems(viewModel),
         itemCount = playlists.value.size,
         selectedItems = selected.value,
-        viewModel = viewModel
+        backTo = fetch(R.string.Library),
+        back = { viewModel.goBack() }
       )
       AllPlaylists(
         list = playlists.value,
@@ -169,23 +168,12 @@ data class PlaylistsScreen(
   }
 
   @Composable
-  private fun TitleBar(
-    categoryItem: LibraryCategories.CategoryItem,
-    newSmartPlaylist: () -> Unit
-  ) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      CategoryTitleBar(categoryItem)
-      Spacer(modifier = Modifier.weight(1.0F, fill = true))
-      PopupMenu(
-        items = listOf(
-          PopupMenuItem(stringResource(id = R.string.NewSmartPlaylist), newSmartPlaylist)
-        )
-      )
-      Spacer(modifier = Modifier.width(8.dp))
-    }
-  }
+  private fun makeMenuItems(viewModel: PlaylistsViewModel) = listOf(
+    PopupMenuItem(
+      title = stringResource(id = R.string.NewSmartPlaylist),
+      onClick = { viewModel.newSmartPlaylist() }
+    ),
+  )
 }
 
 @Composable
@@ -258,9 +246,7 @@ private fun PlaylistItem(
           modifier = Modifier.size(40.dp)
         )
       },
-      text = {
-        Text(text = playlistInfo.name.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      },
+      text = { ListItemText(text = playlistInfo.name.value) },
       secondaryText = {
         Text(
           text = LocalContext.current.resources.getQuantityString(
@@ -270,9 +256,10 @@ private fun PlaylistItem(
           ), maxLines = 1, overflow = TextOverflow.Ellipsis
         )
       },
+      trailing = {
+        PopupMenu(items = playlistInfo.makePopupMenuItems(editSmartPlaylist, deletePlaylist))
+      }
     )
-    PopupMenu(items = playlistInfo.makePopupMenuItems(editSmartPlaylist, deletePlaylist))
-    Spacer(modifier = Modifier.width(8.dp))
   }
 }
 
@@ -325,6 +312,8 @@ private interface PlaylistsViewModel : ActionsViewModel {
   fun newSmartPlaylist()
   fun editSmartPlaylist(playlistInfo: PlaylistInfo)
   fun deletePlaylist(playlistInfo: PlaylistInfo)
+
+  fun goBack()
 
   companion object {
     operator fun invoke(
@@ -476,8 +465,21 @@ private class PlaylistsViewModelImpl(
     }
   }
 
+  override fun goBack() {
+    selectedItems.inSelectionModeThenTurnOff()
+    backstack.back()
+  }
+
   private fun goToPlaylistSongs(playlistInfo: PlaylistInfo) =
-    backstack.goToScreen(PlaylistSongsScreen(playlistInfo.id, playlistInfo.type))
+    backstack.goToScreen(
+      PlaylistSongsScreen(
+        playlistId = playlistInfo.id,
+        playListType = playlistInfo.type,
+        playlistName = playlistInfo.name,
+        artwork = Uri.EMPTY,
+        backTo = fetch(R.string.Playlists)
+      )
+    )
 
   override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
 

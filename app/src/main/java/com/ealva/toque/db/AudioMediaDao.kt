@@ -305,6 +305,8 @@ interface AudioMediaDao {
 
   suspend fun getArtistId(mediaId: MediaId): DaoResult<ArtistId>
 
+  suspend fun getAlbumArtistId(mediaId: MediaId): DaoResult<ArtistId>
+
   fun setAlbumRemoteArt(mediaId: MediaId, location: Uri)
 
   suspend fun getTitleSuggestions(
@@ -608,6 +610,7 @@ private class AudioMediaDaoImpl(
     filter: Filter,
     limit: Limit
   ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
+    LOG._e { it("getAlbumArtistAudio") }
     db.query {
       MediaTable
         .join(ArtistTable, INNER, MediaTable.albumArtistId, ArtistTable.id)
@@ -1191,7 +1194,9 @@ private class AudioMediaDaoImpl(
             MediaTable.location,
             MediaTable.fileUri,
             MediaTable.albumId,
-            MediaTable.albumArtistId
+            MediaTable.albumArtistId,
+            AlbumTable.albumArtUri,
+            AlbumTable.albumLocalArtUri
           )
         }
         .where { MediaTable.id eq mediaId.value }
@@ -1219,7 +1224,9 @@ private class AudioMediaDaoImpl(
             cursor[MediaTable.location].toUriOrEmpty(),
             cursor[MediaTable.fileUri].toUriOrEmpty(),
             AlbumId(cursor[MediaTable.albumId]),
-            ArtistId(cursor[MediaTable.albumArtistId])
+            ArtistId(cursor[MediaTable.albumArtistId]),
+            cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
+            cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
           )
         }
         .single()
@@ -1242,6 +1249,18 @@ private class AudioMediaDaoImpl(
         .select { artistId }
         .where { id eq mediaId.value }
         .sequence { cursor -> cursor[artistId].asArtistId }
+        .single()
+    }
+  }
+
+  override suspend fun getAlbumArtistId(
+    mediaId: MediaId
+  ): DaoResult<ArtistId> = runSuspendCatching {
+    db.query {
+      MediaTable
+        .select { albumArtistId }
+        .where { id eq mediaId.value }
+        .sequence { cursor -> cursor[albumArtistId].asArtistId }
         .single()
     }
   }
@@ -1558,8 +1577,8 @@ private val BIND_FILTER_ONE = bindString()
 private val BIND_FILTER_TWO = bindString()
 private val BIND_FILTER_THREE = bindString()
 private val AUDIO_LIKE_CONDITION = (MediaTable.title like BIND_FILTER_ONE escape ESC_CHAR) or
-(AlbumTable.albumTitle like BIND_FILTER_TWO escape ESC_CHAR) or
-(ArtistTable.artistName like BIND_FILTER_THREE escape ESC_CHAR)
+  (AlbumTable.albumTitle like BIND_FILTER_TWO escape ESC_CHAR) or
+  (ArtistTable.artistName like BIND_FILTER_THREE escape ESC_CHAR)
 
 private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> =
   if (filter.isEmpty) this else this and AUDIO_LIKE_CONDITION

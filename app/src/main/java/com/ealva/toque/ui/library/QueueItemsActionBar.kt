@@ -23,12 +23,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Checkbox
-import androidx.compose.material.MaterialTheme
+import androidx.compose.material.ContentAlpha
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +60,11 @@ fun QueueItemsActionBar(
 ) {
   val config = LocalScreenConfig.current
   val buttonHeight = config.actionBarButtonHeight
+  val buttonColors = ButtonDefaults.outlinedButtonColors(
+    backgroundColor = Color.Transparent,
+    contentColor = LocalContentColor.current,
+    disabledContentColor = LocalContentColor.current.copy(alpha = ContentAlpha.disabled)
+  )
   Column(
     modifier = Modifier
       .fillMaxWidth()
@@ -70,40 +79,45 @@ fun QueueItemsActionBar(
     ) {
       val buttonModifier = Modifier
         .height(buttonHeight)
-        .weight(1F)
+        .width(buttonHeight * 1.4F)
       ActionButton(
-        buttonHeight = buttonHeight,
         modifier = buttonModifier,
+        iconSize = buttonHeight,
         drawable = R.drawable.ic_go_to_current,
         description = R.string.GoToCurrent,
+        colors = buttonColors,
         onClick = goToCurrent,
       )
       ActionButton(
-        buttonHeight = buttonHeight,
         modifier = buttonModifier,
+        iconSize = buttonHeight,
         drawable = R.drawable.ic_vertical_align_top,
         description = R.string.GoToTop,
+        colors = buttonColors,
         onClick = goToTop
       )
       ActionButton(
-        buttonHeight = buttonHeight,
         modifier = buttonModifier,
+        iconSize = buttonHeight,
         drawable = R.drawable.ic_vertical_align_bottom,
         description = R.string.GoToBottom,
+        colors = buttonColors,
         onClick = goToBottom
       )
       ActionButton(
-        buttonHeight = buttonHeight,
         modifier = buttonModifier,
+        iconSize = buttonHeight,
         drawable = R.drawable.ic_playlist_add,
         description = R.string.AddToPlaylist,
+        colors = buttonColors,
         onClick = addToPlaylist
       )
       ActionButton(
-        buttonHeight = buttonHeight,
         modifier = buttonModifier,
+        iconSize = buttonHeight,
         drawable = R.drawable.ic_search,
         description = R.string.Search,
+        colors = buttonColors,
         onClick = startSearch
       )
     }
@@ -127,12 +141,13 @@ fun QueueItemsActionBar(
           style = toqueTypography.caption,
         )
         ActionButton(
-          buttonHeight = 24.dp,
           modifier = Modifier.height(24.dp),
+          iconSize = 24.dp,
           drawable = R.drawable.ic_info,
           description = R.string.MediaInfo,
-          onClick = mediaInfoClicked,
-          enabled = selectedCount == 1
+          enabled = selectedCount == 1,
+          colors = buttonColors,
+          onClick = mediaInfoClicked
         )
         Spacer(
           modifier = Modifier.weight(1F)

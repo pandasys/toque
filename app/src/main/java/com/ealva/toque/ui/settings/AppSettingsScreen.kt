@@ -599,6 +599,8 @@ data class AppSettingsScreen(
       singleLineTitle = true
     )
   )
+
+
 }
 
 private fun IntRange.toFloatRange(): ClosedFloatingPointRange<Float> =
@@ -626,9 +628,8 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
   }
   Column(
     modifier = Modifier
-      .navigationBarsPadding()
+      .navigationBarsPadding(bottom = false)
       .statusBarsPadding()
-      .padding(bottom = 92.dp)
   ) {
     TopAppBar(
       title = { if (subtitle == null) AppBarTitle(title) else TitleAndSubtitle(title, subtitle) },
@@ -637,7 +638,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
       navigationIcon = {
         IconButton(onClick = back) {
           Icon(
-            painter = painterResource(R.drawable.ic_arrow_left),
+            painter = painterResource(R.drawable.ic_navigate_before),
             contentDescription = "Back",
             modifier = Modifier.size(26.dp)
           )

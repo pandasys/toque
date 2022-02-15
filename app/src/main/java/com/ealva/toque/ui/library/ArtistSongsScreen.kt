@@ -16,43 +16,69 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvabrainz.common.ArtistName
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Filter
+import com.ealva.toque.common.preferredArt
+import com.ealva.toque.db.AlbumDao
+import com.ealva.toque.db.ArtistDao
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.map
+import com.github.michaelbull.result.onFailure
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
-import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import javax.annotation.concurrent.Immutable
 
+private val LOG by lazyLogger(ArtistSongsScreen::class)
+
 @Immutable
 @Parcelize
 data class ArtistSongsScreen(
   private val artistId: ArtistId,
-  private val artistType: ArtistType
+  private val artistType: ArtistType,
+  private val artistName: ArtistName,
+  private val artwork: Uri,
+  private val backTo: String
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(ArtistSongsViewModel(artistId, artistType, get(), lookup(), backstack))
+      add(
+        ArtistSongsViewModel(
+          artistId = artistId,
+          artistType = artistType,
+          artwork = artwork,
+          audioMediaDao = get(),
+          localAudioQueueModel = lookup(),
+          backstack = backstack
+        )
+      )
     }
   }
 
@@ -62,18 +88,25 @@ data class ArtistSongsScreen(
     val viewModel = rememberService<ArtistSongsViewModel>()
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
+    val artwork = viewModel.artistArt.collectAsState()
 
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      SongsItemsActions(
-        itemCount = songs.value.size,
-        selectedItems = selected.value,
-        viewModel = viewModel
-      )
+      ScreenHeaderWithArtwork(artwork = artwork.value) {
+        SongListHeaderInfo(
+          title = artistName.value,
+          subtitle = null,
+          itemCount = songs.value.size,
+          selectedItems = selected.value,
+          viewModel = viewModel,
+          buttonColors = ActionButtonDefaults.overArtworkColors(),
+          backTo = backTo,
+          back = { viewModel.goBack() }
+        )
+      }
       SongItemList(
         list = songs.value,
         selectedItems = selected.value,
@@ -84,15 +117,58 @@ data class ArtistSongsScreen(
   }
 }
 
-private class ArtistSongsViewModel(
+interface ArtistSongsViewModel : SongsViewModel {
+  val artistArt: StateFlow<Uri>
+
+  companion object {
+    operator fun invoke(
+      artistId: ArtistId,
+      artistType: ArtistType,
+      artwork: Uri,
+      audioMediaDao: AudioMediaDao,
+      localAudioQueueModel: LocalAudioQueueViewModel,
+      backstack: Backstack,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): ArtistSongsViewModel = ArtistSongsViewModelImpl(
+      artistId, artistType, artwork, audioMediaDao, localAudioQueueModel, backstack, dispatcher
+    )
+  }
+}
+
+private class ArtistSongsViewModelImpl(
   private val artistId: ArtistId,
   private val artistType: ArtistType,
+  artwork: Uri,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   backstack: Backstack,
-  dispatcher: CoroutineDispatcher = Dispatchers.Main
+  dispatcher: CoroutineDispatcher
 ) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),
-  ScopedServices.Activated {
+  ArtistSongsViewModel {
+  private val artistDao: ArtistDao = audioMediaDao.artistDao
+  private val albumDao: AlbumDao = audioMediaDao.albumDao
+
+  override val artistArt = MutableStateFlow(artwork)
+
+  override fun onServiceRegistered() {
+    super.onServiceRegistered()
+    if (artistArt.value === Uri.EMPTY) {
+      scope.launch {
+        artistArt.value = artistDao.getArtwork(artistId)
+          .onFailure { cause -> LOG.e(cause) { it("Error getting artwork for %s", artistId) } }
+          .map { artwork -> artwork.preferredArt }
+          .map { artwork ->
+            if (artwork !== Uri.EMPTY) artwork else {
+              albumDao.getAlbumArtFor(artistId, artistType)
+                .onFailure { cause -> LOG.e(cause) { it("Error getting art for %s", artistId) } }
+                .getOrElse { Uri.EMPTY }
+            }
+          }
+          .getOrElse { Uri.EMPTY }
+      }
+    }
+  }
+
   override val categoryToken: CategoryToken
     get() = CategoryToken(artistId)
 

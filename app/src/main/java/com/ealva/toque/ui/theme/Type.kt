@@ -18,9 +18,37 @@ package com.ealva.toque.ui.theme
 
 import androidx.compose.material.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.ealva.toque.R
 
-val typography = Typography()
+val FONT_FAMILY = FontFamily(
+  Font(R.font.sourcesanspro_regular),
+  Font(R.font.sourcesanspro_bold, weight = FontWeight.Bold),
+  Font(R.font.sourcesanspro_semibold, weight = FontWeight.SemiBold),
+  Font(R.font.sourcesanspro_light, weight = FontWeight.Light)
+)
+
+val typography = Typography(
+  defaultFontFamily = FONT_FAMILY,
+  h6 = TextStyle(
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 20.sp,
+    letterSpacing = 0.15.sp
+  ),
+  subtitle2 = TextStyle(
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 14.sp,
+    letterSpacing = 0.1.sp
+  ),
+  button = TextStyle(
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 14.sp,
+    letterSpacing = 1.25.sp
+  )
+)
 
 data class ToqueTypography(
   val material: Typography = typography,
@@ -33,6 +61,20 @@ data class ToqueTypography(
   val nowPlayingAlbum: TextStyle = material.overline.copy(
     fontSize = material.overline.fontSize * 1.25,
     letterSpacing = 0.5.sp
+  ),
+  val listItemText: TextStyle = material.subtitle1.copy(letterSpacing = 0.1.sp),
+  val miniPlayerTitle: TextStyle = material.caption.copy(
+    fontWeight = FontWeight.Medium,
+    letterSpacing = 0.1.sp
+  ),
+  val miniPlayerSecond: TextStyle = material.overline.copy(letterSpacing = 0.1.sp),
+  val headerPrimary: TextStyle = material.subtitle1.copy(
+    fontFamily = FONT_FAMILY,
+    fontWeight = FontWeight.Bold
+  ),
+  val headerSecondary: TextStyle = material.body2.copy(
+    fontFamily = FONT_FAMILY,
+    letterSpacing = 0.1.sp
   )
 ) {
   val h1: TextStyle get() = material.h1

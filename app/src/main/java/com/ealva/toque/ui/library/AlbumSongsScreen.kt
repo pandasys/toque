@@ -16,21 +16,23 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvabrainz.common.AlbumTitle
+import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
-import com.github.michaelbull.result.Result
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
@@ -47,7 +49,11 @@ import javax.annotation.concurrent.Immutable
 @Immutable
 @Parcelize
 data class AlbumSongsScreen(
-  private val albumId: AlbumId
+  private val albumId: AlbumId,
+  private val title: AlbumTitle,
+  private val artwork: Uri,
+  private val artist: ArtistName,
+  private val backTo: String
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) { add(AlbumSongsViewModel(albumId, get(), lookup(), backstack)) }
@@ -63,14 +69,20 @@ data class AlbumSongsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      SongsItemsActions(
-        itemCount = songs.value.size,
-        selectedItems = selected.value,
-        viewModel = viewModel
-      )
+      ScreenHeaderWithArtwork(artwork = artwork) {
+        SongListHeaderInfo(
+          title = title.value,
+          subtitle = artist.value,
+          itemCount = songs.value.size,
+          selectedItems = selected.value,
+          viewModel = viewModel,
+          buttonColors = ActionButtonDefaults.overArtworkColors(),
+          backTo = backTo,
+          back = { viewModel.goBack() }
+        )
+      }
       SongItemList(
         list = songs.value,
         selectedItems = selected.value,

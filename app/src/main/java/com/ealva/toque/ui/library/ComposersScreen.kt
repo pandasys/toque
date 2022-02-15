@@ -16,8 +16,10 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -39,27 +41,35 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
+import com.ealva.toque.common.Filter
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.ComposerDescription
+import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.asComposerIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
+import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
+import com.ealva.toque.ui.library.LibraryCategories.CategoryItem
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
+import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
@@ -68,7 +78,6 @@ import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
@@ -89,7 +98,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
@@ -116,14 +124,15 @@ data class ComposersScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      CategoryTitleBar(viewModel.categoryItem)
-      LibraryItemsActions(
+      CategoryScreenHeader(
+        viewModel = viewModel,
+        categoryItem = viewModel.categoryItem,
         itemCount = composers.value.size,
         selectedItems = selected.value,
-        viewModel = viewModel
+        backTo = fetch(R.string.Library),
+        back = { viewModel.goBack() }
       )
       AllComposers(
         list = composers.value,
@@ -139,7 +148,7 @@ data class ComposersScreen(
 private fun AllComposers(
   list: List<ComposerInfo>,
   selected: SelectedItems<ComposerId>,
-  itemClicked: (ComposerId) -> Unit,
+  itemClicked: (ComposerInfo) -> Unit,
   itemLongClicked: (ComposerId) -> Unit
 ) {
   val listState = rememberLazyListState()
@@ -176,7 +185,7 @@ private fun AllComposers(
 private fun ComposerItem(
   composerInfo: ComposerInfo,
   isSelected: Boolean,
-  itemClicked: (ComposerId) -> Unit,
+  itemClicked: (ComposerInfo) -> Unit,
   itemLongClicked: (ComposerId) -> Unit
 ) {
   ListItem(
@@ -184,17 +193,28 @@ private fun ComposerItem(
       .fillMaxWidth()
       .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
       .combinedClickable(
-        onClick = { itemClicked(composerInfo.id) },
+        onClick = { itemClicked(composerInfo) },
         onLongClick = { itemLongClicked(composerInfo.id) }
       ),
     icon = {
-      Icon(
-        painter = painterResource(id = R.drawable.ic_person),
-        contentDescription = "Composer icon",
-        modifier = Modifier.size(40.dp)
-      )
+      if (composerInfo.artwork !== Uri.EMPTY) {
+        Image(
+          painter = rememberImagePainter(
+            data = composerInfo.artwork,
+            builder = { error(R.drawable.ic_person) }
+          ),
+          contentDescription = stringResource(R.string.ArtistArt),
+          modifier = Modifier.size(56.dp)
+        )
+      } else {
+        Icon(
+          painter = painterResource(id = R.drawable.ic_person),
+          contentDescription = "Composer icon",
+          modifier = Modifier.size(40.dp)
+        )
+      }
     },
-    text = { Text(text = composerInfo.name.value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    text = { ListItemText(text = composerInfo.name.value) },
     secondaryText = {
       Text(
         text = LocalContext.current.resources.getQuantityString(
@@ -212,15 +232,21 @@ private interface ComposersViewModel : ActionsViewModel {
   data class ComposerInfo(
     val id: ComposerId,
     val name: ComposerName,
-    val songCount: Int
+    val songCount: Int,
+    val artwork: Uri
   )
 
-  val categoryItem: LibraryCategories.CategoryItem
+  val categoryItem: CategoryItem
   val composerFlow: StateFlow<List<ComposerInfo>>
   val selectedItems: SelectedItemsFlow<ComposerId>
 
-  fun itemClicked(composerId: ComposerId)
+  fun itemClicked(composer: ComposerInfo)
   fun itemLongClicked(composerId: ComposerId)
+
+  val searchFlow: StateFlow<String>
+  fun setSearch(search: String)
+
+  fun goBack()
 
   companion object {
     operator fun invoke(
@@ -240,17 +266,24 @@ private class ComposersViewModelImpl(
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
-) : ComposersViewModel, ScopedServices.Activated, ScopedServices.HandlesBack, Bundleable {
+) : ComposersViewModel, ScopedServices.Registered, ScopedServices.Activated,
+  ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
+  private var requestJob: Job? = null
+  private var daoEventsJob: Job? = null
+  private var wentInactive = false
+
   private val composerDao = audioMediaDao.composerDao
   private val categories = LibraryCategories()
 
-  override val categoryItem: LibraryCategories.CategoryItem
+  override val categoryItem: CategoryItem
     get() = categories[key]
 
   override val composerFlow = MutableStateFlow<List<ComposerInfo>>(emptyList())
 
   override val selectedItems = SelectedItemsFlow<ComposerId>()
+  override val searchFlow = MutableStateFlow("")
+  private val filterFlow = MutableStateFlow(Filter.NoFilter)
   private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
   override fun selectAll() = selectedItems.selectAll(getGenreKeys())
@@ -294,40 +327,103 @@ private class ComposersViewModelImpl(
     scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
   }
 
-  private fun goToComposersSongs(composerId: ComposerId) =
-    backstack.goToScreen(ComposerSongsScreen(composerId))
+  private fun goToComposersSongs(info: ComposerInfo) =
+    backstack.goToScreen(
+      ComposerSongsScreen(
+        composerId = info.id,
+        composerName = info.name,
+        artwork = info.artwork,
+        fetch(R.string.Composers)
+      )
+    )
 
-  override fun onServiceActive() {
+  override fun onServiceRegistered() {
     scope = CoroutineScope(Job() + dispatcher)
-    composerDao.composerDaoEvents
-      .onStart { requestComposers() }
-      .onEach { requestComposers() }
-      .catch { cause -> LOG.e(cause) { it("Error collecting ComposerDao events") } }
-      .onCompletion { LOG._i { it("End collecting ComposerDao events") } }
+    // may want onStart+drop(1) for chunking and onEach to not chunk
+    filterFlow
+      .onEach { requestComposers(processChunks = true) }
+      .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
       .launchIn(scope)
   }
 
-  private fun requestComposers() {
-    scope.launch {
-      composerFlow.value = composerDao
-        .getAllComposers()
-        .onFailure { cause -> LOG.e(cause) { it("Error getting Composers") } }
-        .getOrElse { emptyList() }
-        .map { composerDescription -> composerDescription.toComposerInfo() }
+  override fun onServiceUnregistered() {
+    scope.cancel()
+  }
+
+  override fun onServiceActive() {
+    daoEventsJob = composerDao.composerDaoEvents
+      .onEach { requestComposers(processChunks = false) }
+      .catch { cause -> LOG.e(cause) { it("Error collecting ComposerDao events") } }
+      .onCompletion { LOG._i { it("End collecting ComposerDao events") } }
+      .launchIn(scope)
+    if (wentInactive) {
+      wentInactive = false
+      requestComposers(processChunks = false)
     }
   }
 
-  override fun itemClicked(composerId: ComposerId) =
-    selectedItems.ifInSelectionModeToggleElse(composerId) { goToComposersSongs(composerId) }
+  override fun onServiceInactive() {
+    daoEventsJob?.cancel()
+    daoEventsJob = null
+    wentInactive = true
+  }
+
+  private fun requestComposers(processChunks: Boolean) {
+    requestJob?.cancel()
+
+    requestJob = scope.launch {
+      val composerList = composerDao
+        .getAllComposers(filterFlow.value)
+        .onFailure { cause -> LOG.e(cause) { it("Error getting Composers") } }
+        .getOrElse { emptyList() }
+
+      if (processChunks) {
+        // We convert to sequence and break into chunks because we may be querying the DB for
+        // artwork and this gets the first chunk to the UI quickly.
+        val infoList = ArrayList<ComposerInfo>(composerList.size)
+        composerList
+          .asSequence()
+          .chunked(20)
+          .forEach { sublist ->
+            composerFlow.value = sublist
+              .mapTo(infoList) { composerDescription -> composerDescription.toComposerInfo() }
+              .toList()
+          }
+      } else {
+        composerFlow.value = composerList
+          .map { composerDescription -> composerDescription.toComposerInfo() }
+      }
+    }
+  }
+
+  private suspend fun ComposerDescription.toComposerInfo() = ComposerInfo(
+    id = composerId,
+    name = composerName,
+    songCount = songCount.toInt(),
+    artwork = audioMediaDao.albumDao
+      .getAlbumArtFor(composerId)
+      .onFailure { cause ->
+        LOG.e(cause) { it("Error getting art for %s %s", composerId, composerName) }
+      }
+      .getOrElse { Uri.EMPTY }
+  )
+
+  override fun setSearch(search: String) {
+    searchFlow.value = search
+    filterFlow.value = search.wrapAsFilter()
+  }
+
+  override fun goBack() {
+    selectedItems.inSelectionModeThenTurnOff()
+    backstack.back()
+  }
+
+  override fun itemClicked(composer: ComposerInfo) =
+    selectedItems.ifInSelectionModeToggleElse(composer.id) { goToComposersSongs(composer) }
 
   override fun itemLongClicked(composerId: ComposerId) = selectedItems.toggleSelection(composerId)
 
   override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
-
-  override fun onServiceInactive() {
-    scope.cancel()
-    composerFlow.value = emptyList()
-  }
 
   override fun toBundle(): StateBundle = StateBundle().apply {
     putParcelable(KEY_MODEL_STATE, ComposersViewModelState(selectedItems.value))
@@ -339,12 +435,6 @@ private class ComposersViewModelImpl(
     }
   }
 }
-
-private fun ComposerDescription.toComposerInfo() = ComposerInfo(
-  id = composerId,
-  name = composerName,
-  songCount = songCount.toInt()
-)
 
 @Parcelize
 private data class ComposersViewModelState(val selected: SelectedItems<ComposerId>) : Parcelable

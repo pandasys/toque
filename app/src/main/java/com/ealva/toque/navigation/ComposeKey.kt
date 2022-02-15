@@ -20,29 +20,31 @@ import android.os.Parcelable
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.ealva.ealvalog.lazyLogger
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.core.DefaultComposeKey
 import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
 import kotlinx.parcelize.Parcelize
 
+@Suppress("unused")
+private val LOG by lazyLogger(ComposeKey::class)
+
 abstract class ComposeKey : DefaultComposeKey(), Parcelable, DefaultServiceProvider.HasServices,
   AllowableNavigation {
+
   override val saveableStateProviderKey: Any
     get() = this
 
   override fun getScopeTag(): String = javaClass.name
 
-  override fun bindServices(serviceBinder: ServiceBinder) {
-  }
+  override fun bindServices(serviceBinder: ServiceBinder) = Unit
 
   /**
    * If allowed to navigate away from the top screen, perform the [command]. By default all
    * navigation commands are allowed. Editor screens may disallow navigation until the user has been
    * prompted.
    */
-  override fun navigateIfAllowed(command: () -> Unit) {
-    command()
-  }
+  override fun navigateIfAllowed(command: () -> Unit) = command()
 }
 
 @Parcelize

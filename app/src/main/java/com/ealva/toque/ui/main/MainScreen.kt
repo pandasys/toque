@@ -125,7 +125,7 @@ fun MainScreen(
                 .fillMaxWidth()
                 .height(bottomBarHeight)
                 .navigationBarsPadding(bottom = false)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = if (screenConfig.inPortrait) 12.dp else 40.dp)
                 .offset { IntOffset(x = 0, y = -bottomBarOffsetHeightPx.value.roundToInt()) }
             )
           },

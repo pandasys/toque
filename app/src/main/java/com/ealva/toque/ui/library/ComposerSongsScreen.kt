@@ -16,12 +16,14 @@
 
 package com.ealva.toque.ui.library
 
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
@@ -30,7 +32,6 @@ import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
@@ -48,6 +49,9 @@ import javax.annotation.concurrent.Immutable
 @Parcelize
 data class ComposerSongsScreen(
   private val composerId: ComposerId,
+  private val composerName: ComposerName,
+  private val artwork: Uri,
+  private val backTo: String
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) { add(ComposerSongsViewModel(composerId, get(), lookup(), backstack)) }
@@ -63,14 +67,20 @@ data class ComposerSongsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      SongsItemsActions(
-        itemCount = songs.value.size,
-        selectedItems = selected.value,
-        viewModel = viewModel
-      )
+      ScreenHeaderWithArtwork(artwork = artwork) {
+        SongListHeaderInfo(
+          title = composerName.value,
+          subtitle = null,
+          itemCount = songs.value.size,
+          selectedItems = selected.value,
+          viewModel = viewModel,
+          buttonColors = ActionButtonDefaults.overArtworkColors(),
+          backTo = backTo,
+          back = { viewModel.goBack() }
+        )
+      }
       SongItemList(
         list = songs.value,
         selectedItems = selected.value,

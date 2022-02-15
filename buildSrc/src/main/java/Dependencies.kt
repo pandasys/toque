@@ -21,7 +21,7 @@ object SdkVersion {
 }
 
 object PluginsVersion {
-  const val AGP = "7.0.4"
+  const val AGP = "7.1.1"
   const val DETEKT = "1.19.0"
   const val DOKKA = "1.6.10"
   const val KOTLIN = "1.6.10"
@@ -123,7 +123,7 @@ object Libs {
   }
 
   object EAlvaBrainz {
-    private const val VERSION = "0.10.1-SNAPSHOT"
+    private const val VERSION = "0.10.2-0"
     const val BRAINZ = "com.ealva:ealvabrainz:$VERSION"
     const val BRAINZ_SERVICE = "com.ealva:ealvabrainz-service:$VERSION"
   }
@@ -136,7 +136,7 @@ object Libs {
   }
 
   object EAlvaMusicInfo {
-    private const val VERSION = "0.2.5-0"
+    private const val VERSION = "0.2.11-0"
     const val MUSIC_INFO = "com.ealva:musicinfo:$VERSION"
   }
 
@@ -238,6 +238,6 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.3.1-SNAPSHOT"
+    const val CORE = "com.ealva:welite-core:0.5.0-SNAPSHOT"
   }
 }

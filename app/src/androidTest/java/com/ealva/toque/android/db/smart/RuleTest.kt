@@ -56,7 +56,7 @@ class RuleTest {
   @Test
   fun testMakeWhereClause() {
     val rule = Rule(1, RuleField.Title, TextMatcher.Is, MatcherData("Value", 0L, 0L))
-    expect(rule.makeWhereClause().toString()).toBe(""""Media"."MediaTitle" = 'Value'""")
+    expect(rule.makeWhereClause().toString()).toBe("""Media.MediaTitle = 'Value'""")
     expect(rule.makeJoinTemplate()?.toString()).toBeNull()
   }
 
@@ -68,10 +68,10 @@ class RuleTest {
       PlaylistMatcher.Is,
       MatcherData("TheView", PlayListType.Rules.id.toLong(), 10L)
     )
-    expect(rule.makeWhereClause().toString()).toBe(""""TheView"."MediaId" IS NOT NULL""")
+    expect(rule.makeWhereClause().toString()).toBe("""TheView.MediaId IS NOT NULL""")
     val template = rule.makeJoinTemplate()
     expect(template).toNotBeNull { "template was null" }
     expect(template?.joinTo(MediaTable)?.toString())
-      .toBe(""""Media" LEFT JOIN "TheView" ON "Media"."MediaId" = "TheView"."MediaId"""")
+      .toBe("""Media LEFT JOIN TheView ON Media.MediaId = TheView.MediaId""")
   }
 }

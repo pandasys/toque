@@ -49,8 +49,6 @@ interface PlayableAudioItem : AudioItem {
 
   var playbackRate: PlaybackRate
 
-  val albumId: AlbumId
-
   fun play(forceTransition: ForceTransition)
 
   fun stop()

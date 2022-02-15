@@ -17,14 +17,20 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.GridCells
 import androidx.compose.foundation.lazy.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.nav.goToScreen
@@ -52,21 +58,29 @@ data class LibraryCategoriesScreen(private val noArg: String = "") : BaseLibrary
     val viewModel = rememberService<LibraryItemsViewModel>()
     val inPortrait = LocalScreenConfig.current.inPortrait
 
-    LazyVerticalGrid(
-      cells = GridCells.Fixed(if (inPortrait) 2 else 4),
+    Column(
       modifier = Modifier
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false),
-      contentPadding = PaddingValues(horizontal = 12.dp)
     ) {
-      items(viewModel.getItems()) { item ->
-        LibraryCategory(
-          item = item,
-          iconSize = 36.dp,
-          textStyle = toqueTypography.subtitle1,
-          textStartPadding = 4.dp,
-          onClick = { viewModel.goToItem(item.key) }
-        )
+      Text(
+        modifier = Modifier.padding(start = 18.dp, top = 20.dp, bottom = 20.dp),
+        text = stringResource(id = R.string.Library),
+        style = toqueTypography.h5
+      )
+      LazyVerticalGrid(
+        cells = GridCells.Fixed(if (inPortrait) 2 else 4),
+        contentPadding = PaddingValues(horizontal = 12.dp)
+      ) {
+        items(viewModel.getItems()) { item ->
+          LibraryCategory(
+            item = item,
+            iconSize = 36.dp,
+            textStyle = toqueTypography.subtitle1,
+            textStartPadding = 4.dp,
+            onClick = { viewModel.goToItem(item.key) }
+          )
+        }
       }
     }
   }

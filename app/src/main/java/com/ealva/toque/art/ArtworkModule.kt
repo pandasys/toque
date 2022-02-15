@@ -23,7 +23,29 @@ object ArtworkModule {
   val koinModule = module {
     single { ArtworkDownloader() }
     single { MusicInfoProvider() }
-    single { DownloadAlbumArtWorkerFactory(get(AppPrefs.QUALIFIER), get(), get()) }
-    single { ArtworkUpdateListener(get(), get(), get(AppPrefs.QUALIFIER), get()) }
+    single {
+      DownloadAlbumArtWorkerFactory(
+        appPrefs = get(AppPrefs.QUALIFIER),
+        albumDao = get(),
+        artworkDownloader = get()
+      )
+    }
+    single {
+      DownloadArtistArtWorkerFactory(
+        appPrefs = get(AppPrefs.QUALIFIER),
+        artistDao = get(),
+        artworkDownloader = get()
+      )
+    }
+    single {
+      ArtworkUpdateListener(
+        work = get(),
+        albumDao = get(),
+        artistDao = get(),
+        appPrefs = get(AppPrefs.QUALIFIER),
+        albumArtWorkerFactory = get(),
+        artistArtWorkerFactory = get()
+      )
+    }
   }
 }

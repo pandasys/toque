@@ -16,7 +16,6 @@
 
 package com.ealva.toque.ui.now
 
-import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -36,11 +35,13 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.ealva.toque.R
+import com.ealva.toque.ui.library.ArtistType
 import com.ealva.toque.ui.library.SongListItem
 import com.ealva.toque.ui.library.SongListItemIcon
 import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
@@ -54,12 +55,14 @@ fun CurrentItemDialog(
   showMediaInfo: (QueueItem) -> Unit,
   selectAlbumArt: (QueueItem) -> Unit,
   goToAlbum: (QueueItem) -> Unit,
-  goToArtist: (QueueItem) -> Unit
+  goToArtist: (QueueItem) -> Unit,
+  goToAlbumArtist: (QueueItem) -> Unit
 ) {
   Dialog(onDismissRequest = onDismiss) {
     Surface(
       modifier = Modifier.padding(8.dp),
-      shape = RoundedCornerShape(10)
+      shape = RoundedCornerShape(10),
+      elevation = 1.dp
     ) {
       Column {
         SongListItem(
@@ -98,8 +101,15 @@ fun CurrentItemDialog(
           item {
             DialogItem(
               title = R.string.Artist,
-              icon = R.drawable.ic_microphone,
+              icon = ArtistType.SongArtist.typeIcon,
               onClick = { goToArtist(audioItem) }
+            )
+          }
+          item {
+            DialogItem(
+              title = R.string.AlbumArtist,
+              icon = ArtistType.AlbumArtist.typeIcon,
+              onClick = { goToAlbumArtist(audioItem) }
             )
           }
         }
@@ -109,7 +119,7 @@ fun CurrentItemDialog(
 }
 
 @Composable
-fun DialogItem(
+private fun DialogItem(
   @StringRes title: Int,
   @DrawableRes icon: Int,
   onClick: () -> Unit
@@ -135,6 +145,3 @@ fun DialogItem(
     )
   }
 }
-
-private val QueueItem.artwork: Uri
-  get() = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt

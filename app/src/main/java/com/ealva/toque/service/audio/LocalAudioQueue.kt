@@ -489,8 +489,12 @@ private class LocalAudioQueueImpl(
     val updated = upNextQueue
       .filter { it.albumId == albumId }
       .onEach { it.updateArtwork(albumId, albumArt, localAlbumArt) }
-      .isNotEmpty()
-    if (updated) queueState.update { it.copy(queue = queue) }
+    if (updated.isNotEmpty()) {
+      queueState.update { it.copy(queue = queue) }
+      if (updated.any { audioItem -> audioItem.instanceId == currentItem.instanceId }) {
+        updateMetadata()
+      }
+    }
   }
 
   private fun reactToEqModeChanges() {

@@ -65,11 +65,11 @@ class SmartPlaylistTest {
     ).asQuery()
 
     expect(query.toString()).toBe(
-      """SELECT "Media"."MediaId" FROM "Media" INNER JOIN "Album" ON "Media"."Media_AlbumId"""" +
-        """ = "Album"."AlbumId" INNER JOIN Artist AS AlbumArtist ON "Media"."Media_ArtistId"""" +
-        """ = "AlbumArtist"."ArtistId" WHERE "Media"."MediaType" = 1 AND "Album"."Album" LIKE""" +
-        """ '%Blue%' ESCAPE '\' AND "AlbumArtist"."Artist" LIKE '%Dylan%' ESCAPE '\' GROUP BY""" +
-        """ "Media"."MediaId""""
+      """SELECT Media.MediaId FROM Media INNER JOIN Album ON Media.Media_AlbumId""" +
+        """ = Album.AlbumId INNER JOIN Artist AS AlbumArtist ON Media.Media_ArtistId""" +
+        """ = AlbumArtist.ArtistId WHERE Media.MediaType = 1 AND Album.Album LIKE""" +
+        """ '%Blue%' ESCAPE '\' AND AlbumArtist.Artist LIKE '%Dylan%' ESCAPE '\' GROUP BY""" +
+        """ Media.MediaId"""
     )
   }
 
@@ -89,15 +89,15 @@ class SmartPlaylistTest {
       rules
     ).asQuery()
     expect(query.toString()).toBe(
-      """SELECT "Media"."MediaId" FROM "Media" INNER JOIN "GenreMedia" ON "Media"."MediaId" =""" +
-        """ "GenreMedia"."GenreMedia_MediaId" INNER JOIN "Genre" ON""" +
-        """ "GenreMedia"."GenreMedia_GenreId" = "Genre"."GenreId" INNER JOIN""" +
-        """ "ComposerMedia" ON "Media"."MediaId" = "ComposerMedia"."ComposerMedia_MediaId"""" +
-        """ INNER JOIN "Composer" ON "ComposerMedia"."ComposerMedia_ComposerId" =""" +
-        """ "Composer"."ComposerId" INNER JOIN "Album" ON "Media"."Media_AlbumId" =""" +
-        """ "Album"."AlbumId" WHERE "Media"."MediaType" = 1 AND "Genre"."Genre" = 'Rock' AND""" +
-        """ "Composer"."Composer" LIKE '%Dylan%' ESCAPE '\' GROUP BY "Media"."MediaId" ORDER BY""" +
-        """ "Album"."AlbumSort""""
+      """SELECT Media.MediaId FROM Media INNER JOIN GenreMedia ON Media.MediaId =""" +
+        """ GenreMedia.GenreMedia_MediaId INNER JOIN Genre ON""" +
+        """ GenreMedia.GenreMedia_GenreId = Genre.GenreId INNER JOIN""" +
+        """ ComposerMedia ON Media.MediaId = ComposerMedia.ComposerMedia_MediaId""" +
+        """ INNER JOIN Composer ON ComposerMedia.ComposerMedia_ComposerId =""" +
+        """ Composer.ComposerId INNER JOIN Album ON Media.Media_AlbumId =""" +
+        """ Album.AlbumId WHERE Media.MediaType = 1 AND Genre.Genre = 'Rock' AND""" +
+        """ Composer.Composer LIKE '%Dylan%' ESCAPE '\' GROUP BY Media.MediaId ORDER BY""" +
+        """ Album.AlbumSort"""
     )
   }
 
@@ -117,12 +117,12 @@ class SmartPlaylistTest {
       rules
     ).asQuery()
     expect(query.toString()).toBe(
-      """SELECT "Media"."MediaId" FROM "Media" INNER JOIN "GenreMedia" ON "Media"."MediaId"""" +
-        """ = "GenreMedia"."GenreMedia_MediaId" INNER JOIN "Genre" ON""" +
-        """ "GenreMedia"."GenreMedia_GenreId" = "Genre"."GenreId" INNER JOIN "Album" ON""" +
-        """ "Media"."Media_AlbumId" = "Album"."AlbumId" WHERE "Media"."MediaType" = 1 AND""" +
-        """ ("Genre"."Genre" = 'Rock' OR "Genre"."Genre" = 'Alternative') GROUP BY""" +
-        """ "Media"."MediaId" ORDER BY "Album"."AlbumSort""""
+      """SELECT Media.MediaId FROM Media INNER JOIN GenreMedia ON Media.MediaId""" +
+        """ = GenreMedia.GenreMedia_MediaId INNER JOIN Genre ON""" +
+        """ GenreMedia.GenreMedia_GenreId = Genre.GenreId INNER JOIN Album ON""" +
+        """ Media.Media_AlbumId = Album.AlbumId WHERE Media.MediaType = 1 AND""" +
+        """ (Genre.Genre = 'Rock' OR Genre.Genre = 'Alternative') GROUP BY""" +
+        """ Media.MediaId ORDER BY Album.AlbumSort"""
     )
   }
 }

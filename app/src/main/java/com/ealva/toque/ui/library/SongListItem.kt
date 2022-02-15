@@ -43,6 +43,7 @@ import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
 import com.ealva.toque.common.toStarRating
+import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.theme.toqueColors
 import com.gowtham.ratingbar.RatingBar
@@ -67,7 +68,7 @@ fun SongListItem(
       .fillMaxWidth()
       .modifyIf(highlightBackground) { background(toqueColors.selectedBackground) },
     icon = icon,
-    text = { TitleText(songTitle, textColor) },
+    text = { ListItemText(text = songTitle.value, color = textColor) },
     secondaryText = { ArtistAndDuration(artistName, songDuration, textColor) },
     overlineText = { AlbumAndRating(albumTitle, rating, textColor) }
   )
@@ -89,7 +90,7 @@ fun SongListItem(
       .fillMaxWidth()
       .modifyIf(highlightBackground) { background(toqueColors.selectedBackground) },
     icon = icon,
-    text = { TitleText(songTitle, textColor) },
+    text = { ListItemText(text = songTitle.value, color = textColor) },
     secondaryText = {
       Text(
         text = artistName.value,
@@ -107,11 +108,6 @@ fun SongListItem(
       )
     }
   )
-}
-
-@Composable
-private fun TitleText(songTitle: Title, textColor: Color) {
-  Text(text = songTitle.value, maxLines = 1, overflow = TextOverflow.Ellipsis, color = textColor)
 }
 
 @Composable

@@ -38,17 +38,17 @@ private val supportedSet = setOf(
 
 private val networkSet = setOf("http", "https", "smb", "ssh", "nfs", "ftp", "ftps")
 
-inline fun String?.toUriOrEmpty(): Uri = if (isNullOrEmpty()) Uri.EMPTY else Uri.parse(this)
+inline fun String?.toUriOrEmpty(): Uri = if (isNullOrBlank()) Uri.EMPTY else Uri.parse(this)
 
 fun Uri.schemeIsSupported(): Boolean = supportedSet.contains(scheme)
 
-fun Uri.isNetworkScheme(): Boolean = networkSet.contains(scheme)
+val Uri.isNetworkScheme: Boolean get() = networkSet.contains(scheme)
 
-fun Uri.isFileScheme(): Boolean = SCHEME_FILE == scheme
+inline val Uri.isFileScheme: Boolean get() = SCHEME_FILE == scheme
 
-fun Uri.isContentScheme(): Boolean = SCHEME_CONTENT == scheme
+inline val Uri.isContentScheme: Boolean get() = SCHEME_CONTENT == scheme
 
-fun Uri.isLocalScheme(): Boolean = isContentScheme() || isFileScheme()
+inline val Uri.isLocalScheme: Boolean get() = isContentScheme || isFileScheme
 
 val Uri.fileExtension: String
   get() = lastPathSegment?.substringAfterLast('.', "") ?: ""
@@ -81,3 +81,5 @@ private fun mimeTypeFromLookup(ext: String): String = when {
   FileExtensions.video.contains(ext.lowercase()) -> "video/*"
   else -> ""
 }
+
+fun Uri.elseIfEmpty(remote: Uri): Uri = if (this === Uri.EMPTY) remote else this

@@ -29,8 +29,10 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
+import com.ealva.toque.common.preferredArt
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
@@ -40,7 +42,6 @@ import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -56,7 +57,10 @@ import org.koin.core.component.get
 @Parcelize
 data class PlaylistSongsScreen(
   private val playlistId: PlaylistId,
-  private val playListType: PlayListType
+  private val playListType: PlayListType,
+  private val playlistName: PlaylistName,
+  private val artwork: Uri,
+  private val backTo: String
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
@@ -74,14 +78,20 @@ data class PlaylistSongsScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
-      SongsItemsActions(
-        itemCount = songs.value.size,
-        selectedItems = selected.value,
-        viewModel = viewModel
-      )
+      ScreenHeaderWithArtwork(artwork = artwork) {
+        SongListHeaderInfo(
+          title = playlistName.value,
+          subtitle = null,
+          itemCount = songs.value.size,
+          selectedItems = selected.value,
+          viewModel = viewModel,
+          buttonColors = ActionButtonDefaults.overArtworkColors(),
+          backTo = backTo,
+          back = { viewModel.goBack() }
+        )
+      }
       SongItemList(
         list = songs.value,
         selectedItems = selected.value,
@@ -165,16 +175,16 @@ private class PlaylistSongsViewModelImpl(
   override val categoryToken: CategoryToken
     get() = CategoryToken(playlistId)
 
-  override fun makeSongInfo(index: Int, it: AudioDescription): SongsViewModel.SongInfo {
+  override fun makeSongInfo(index: Int, audio: AudioDescription): SongsViewModel.SongInfo {
     return PlaylistSongsViewModel.PlaylistSongInfo(
       position = index,
-      id = it.mediaId,
-      title = it.title,
-      duration = it.duration,
-      rating = it.rating,
-      album = it.album,
-      artist = it.artist,
-      artwork = if (it.albumLocalArt !== Uri.EMPTY) it.albumLocalArt else it.albumArt
+      id = audio.mediaId,
+      title = audio.title,
+      duration = audio.duration,
+      rating = audio.rating,
+      album = audio.album,
+      artist = audio.artist,
+      artwork = audio.preferredArt
     )
   }
 

@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ListItem
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -42,28 +41,28 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.constraintlayout.compose.ConstraintLayout
-import androidx.constraintlayout.compose.Dimension
 import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.R
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.common.LibraryScrollBar
-import com.ealva.toque.ui.common.modifyIf
+import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
+import com.ealva.toque.ui.common.modifyIf
+import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.LocalWindowInsets
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumsList(
-  list: List<AlbumsViewModel.AlbumInfo>,
+  list: List<AlbumInfo>,
   selectedItems: SelectedItems<AlbumId>,
-  itemClicked: (AlbumId) -> Unit,
-  itemLongClicked: (AlbumId) -> Unit,
+  itemClicked: (AlbumInfo) -> Unit,
+  itemLongClicked: (AlbumInfo) -> Unit,
   header: (@Composable LazyItemScope.() -> Unit)? = null
 ) {
   val config = LocalScreenConfig.current
@@ -88,8 +87,8 @@ fun AlbumsList(
         AlbumItem(
           albumInfo = albumInfo,
           isSelected = selectedItems.isSelected(albumInfo.id),
-          itemClicked = { albumId -> itemClicked(albumId) },
-          itemLongClicked = { albumId -> itemLongClicked(albumId) }
+          itemClicked = { album -> itemClicked(album) },
+          itemLongClicked = { album -> itemLongClicked(album) }
         )
       }
     }
@@ -100,18 +99,18 @@ fun AlbumsList(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun AlbumItem(
-  albumInfo: AlbumsViewModel.AlbumInfo,
+  albumInfo: AlbumInfo,
   isSelected: Boolean,
-  itemClicked: (AlbumId) -> Unit,
-  itemLongClicked: (AlbumId) -> Unit
+  itemClicked: (AlbumInfo) -> Unit,
+  itemLongClicked: (AlbumInfo) -> Unit
 ) {
   ListItem(
     modifier = Modifier
       .fillMaxWidth()
       .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
       .combinedClickable(
-        onClick = { itemClicked(albumInfo.id) },
-        onLongClick = { itemLongClicked(albumInfo.id) }
+        onClick = { itemClicked(albumInfo) },
+        onLongClick = { itemLongClicked(albumInfo) }
       ),
     icon = {
       Image(
@@ -123,57 +122,47 @@ private fun AlbumItem(
           }
         ),
         contentDescription = stringResource(R.string.AlbumArt),
-        modifier = Modifier.size(40.dp)
+        modifier = Modifier.size(56.dp)
       )
     },
-    text = { Text(text = albumInfo.title.value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    text = { ListItemText(text = albumInfo.title.value) },
     secondaryText = { ArtistAndSongCount(albumInfo = albumInfo) },
+    overlineText = {
+      Text(
+        text = LocalContext.current.resources.getQuantityString(
+          R.plurals.SongCount,
+          albumInfo.songCount,
+          albumInfo.songCount,
+        ),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+    }
   )
 }
 
 @Composable
-private fun ArtistAndSongCount(albumInfo: AlbumsViewModel.AlbumInfo) {
-  ConstraintLayout(modifier = Modifier.fillMaxWidth()) {
-    val (artist, count) = createRefs()
-    Text(
-      text = albumInfo.artist.value,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.constrainAs(artist) {
-        start.linkTo(parent.start)
-        end.linkTo(count.start)
-        width = Dimension.fillToConstraints
-      }
-    )
-    Text(
-      text = LocalContext.current.resources.getQuantityString(
-        R.plurals.SongCount,
-        albumInfo.songCount,
-        albumInfo.songCount,
-      ),
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.constrainAs(count) {
-        start.linkTo(artist.end)
-        end.linkTo(parent.end)
-        width = Dimension.wrapContent
-      }
-    )
-  }
+private fun ArtistAndSongCount(albumInfo: AlbumInfo) {
+  Text(
+    text = albumInfo.artist.value,
+    maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
+    modifier = Modifier
+  )
 }
 
 @Preview
 @Composable
 fun AlbumsListPreview() {
   val list = listOf(
-    AlbumsViewModel.AlbumInfo(
+    AlbumInfo(
       AlbumId(1),
       AlbumTitle("Album Title 1"),
       Uri.EMPTY,
       ArtistName("Artist Name 1"),
       5
     ),
-    AlbumsViewModel.AlbumInfo(
+    AlbumInfo(
       AlbumId(1),
       AlbumTitle("Album Title 2"),
       Uri.EMPTY,

@@ -55,12 +55,12 @@ data class ScreenConfig(
   val actionBarButtonHeight: Dp
     get() = if (inPortrait) PORTRAIT_ACTION_BTN_HEIGHT else LANDSCAPE_ACTION_BTN_HEIGHT
 
-  fun getBottomSheetButtonBarHeight(): Dp = MainBottomSheet.getButtonBarHeight(inPortrait)
+  fun getBottomSheetButtonBarHeight(): Dp = MainBottomSheetConfig.getButtonBarHeight(inPortrait)
 
-  fun getMiniPlayerHeight(): Dp = MainBottomSheet.getMiniPlayerHeight(inPortrait)
+  fun getMiniPlayerHeight(): Dp = MainBottomSheetConfig.getMiniPlayerHeight(inPortrait)
 
   fun getBottomSheetHeight(isExpanded: Boolean): Dp =
-    MainBottomSheet.getBottomSheetHeight(isExpanded, inPortrait)
+    MainBottomSheetConfig.getBottomSheetHeight(isExpanded, inPortrait)
 
   /**
    * Get the amount to pad LazyColumn-contentPadding.bottom to be above the bottom sheet. If
@@ -108,7 +108,7 @@ fun makeScreenConfig(config: Configuration, density: Density, insets: WindowInse
   )
 }
 
-object MainBottomSheet {
+private object MainBottomSheetConfig {
   private val portraitHeight: Dp = 46.dp
   private val portraitMiniPlayerHeight: Dp = 42.dp
   private val landscapeHeight: Dp = 42.dp

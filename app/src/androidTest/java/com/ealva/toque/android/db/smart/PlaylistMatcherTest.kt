@@ -46,13 +46,13 @@ class PlaylistMatcherTest {
       MediaTable.id,
       MatcherData("TheView", PlayListType.Rules.id.toLong(), 100)
     )
-    expect(clause.toString()).toBe(""""TheView"."MediaId" IS NOT NULL""")
+    expect(clause.toString()).toBe("""TheView.MediaId IS NOT NULL""")
 
     val joinTemplate =
       matcher.makeJoinTemplate(MatcherData("TheView", PlayListType.Rules.id.toLong(), 100))
 
     expect(joinTemplate?.joinTo(MediaTable)?.toString())
-      .toBe(""""Media" LEFT JOIN "TheView" ON "Media"."MediaId" = "TheView"."MediaId"""")
+      .toBe("""Media LEFT JOIN TheView ON Media.MediaId = TheView.MediaId""")
   }
 
   @Test
@@ -62,12 +62,12 @@ class PlaylistMatcherTest {
       MediaTable.id,
       MatcherData("TheView", PlayListType.Rules.id.toLong(), 100)
     )
-    expect(clause.toString()).toBe(""""TheView"."MediaId" IS NULL""")
+    expect(clause.toString()).toBe("""TheView.MediaId IS NULL""")
 
     val joinTemplate =
       matcher.makeJoinTemplate(MatcherData("TheView", PlayListType.Rules.id.toLong(), 100))
     expect(joinTemplate?.joinTo(MediaTable)?.toString())
-      .toBe(""""Media" LEFT JOIN "TheView" ON "Media"."MediaId" = "TheView"."MediaId"""")
+      .toBe("""Media LEFT JOIN TheView ON Media.MediaId = TheView.MediaId""")
   }
 
   @Test
@@ -78,8 +78,8 @@ class PlaylistMatcherTest {
       MatcherData("", PlayListType.UserCreated.id.toLong(), 100)
     )
     expect(clause.toString())
-      .toBe(""""Media"."MediaId" IN (SELECT "PlayListMedia"."PlayListMedia_MediaId"""" +
-        """ FROM "PlayListMedia" WHERE "PlayListMedia"."PlayListMedia_PlayListId" = 100)""")
+      .toBe("""Media.MediaId IN (SELECT PlayListMedia.PlayListMedia_MediaId""" +
+        """ FROM PlayListMedia WHERE PlayListMedia.PlayListMedia_PlayListId = 100)""")
   }
 
   @Test
@@ -90,7 +90,7 @@ class PlaylistMatcherTest {
       MatcherData("", PlayListType.UserCreated.id.toLong(), 100)
     )
     expect(clause.toString())
-      .toBe(""""Media"."MediaId" NOT IN (SELECT "PlayListMedia"."PlayListMedia_MediaId"""" +
-        """ FROM "PlayListMedia" WHERE "PlayListMedia"."PlayListMedia_PlayListId" = 100)""")
+      .toBe("""Media.MediaId NOT IN (SELECT PlayListMedia.PlayListMedia_MediaId""" +
+        """ FROM PlayListMedia WHERE PlayListMedia.PlayListMedia_PlayListId = 100)""")
   }
 }

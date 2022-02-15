@@ -348,7 +348,7 @@ private fun TitleBar(
     navigationIcon = {
       IconButton(onClick = back) {
         Icon(
-          painter = painterResource(id = R.drawable.ic_arrow_left),
+          painter = painterResource(id = R.drawable.ic_navigate_before),
           contentDescription = "Back",
           modifier = Modifier.size(26.dp)
         )

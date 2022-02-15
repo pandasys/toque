@@ -180,16 +180,12 @@ private fun NowPlaying(
 ) {
   val screenConfig = LocalScreenConfig.current
 
-  val useDarkIcons = toqueColors.isLight
+//  val useDarkIcons = toqueColors.isLight
   val systemUiController = rememberSystemUiController()
   SideEffect {
-    systemUiController.setStatusBarColor(
-      color = Color(0x00000000),
-      darkIcons = useDarkIcons,
-    )
-    systemUiController.setNavigationBarColor(
-      color = Color(0x44000000),
-      darkIcons = useDarkIcons,
+    systemUiController.setSystemBarsColor(
+      color = Color.Black.copy(alpha = .25F),
+      darkIcons = false,
     )
   }
 
@@ -236,7 +232,7 @@ private fun NowPlaying(
             padding(bottom = screenConfig.getNavPlusBottomSheetHeight(isExpanded = false))
           }
           .constrainAs(menu) {
-            end.linkTo(pager.end)
+            end.linkTo(pager.end, 16.dp)
             bottom.linkTo(pager.bottom)
           },
         onClick = showItemDialog
@@ -291,28 +287,21 @@ private fun CurrentItemMenu(
   modifier: Modifier,
   onClick: () -> Unit
 ) {
-  Row(
-    modifier = Modifier
-      .padding(end = 12.dp)
-      .then(modifier)
+  Box(
+    modifier = modifier
+      .size(42.dp)
+      .clip(RoundedCornerShape(50))
+      .background(Color.Black.copy(alpha = .25F))
+      .clickable(onClick = onClick),
   ) {
-    Box(
+    Icon(
       modifier = Modifier
-        .size(46.dp)
-        .padding(8.dp)
-        .clip(RoundedCornerShape(50))
-        .background(Color.Black.copy(alpha = .25F))
-        .clickable(onClick = onClick),
-    ) {
-      Icon(
-        painter = painterResource(id = R.drawable.ic_more_vert),
-        contentDescription = stringResource(id = R.string.Menu),
-        modifier = Modifier
-          .size(40.dp)
-          .align(Alignment.Center),
-        tint = Color.White
-      )
-    }
+        .size(28.dp)
+        .align(Alignment.Center),
+      painter = painterResource(id = R.drawable.ic_more_vert),
+      contentDescription = stringResource(id = R.string.Menu),
+      tint = Color.White
+    )
   }
 }
 
