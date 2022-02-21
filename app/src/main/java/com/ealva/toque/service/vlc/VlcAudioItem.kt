@@ -79,7 +79,7 @@ private const val LOCK_TAG_PREFIX = "toque:VlcAudioItem"
 private const val SEEK_TO_ZERO_MIN_POSITION = 5000
 
 /** If position is within this range when checked for skip, item should be marked skipped */
-private val SKIP_RANGE = Millis(3)..Millis(10)
+private val SKIP_RANGE: ClosedRange<Millis> = Millis.THREE_SECONDS..Millis.TEN_SECONDS
 
 class VlcAudioItem private constructor(
   override var metadata: Metadata,
@@ -98,8 +98,6 @@ class VlcAudioItem private constructor(
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
   private var hasBeenMarkedPlayed = false
-  private var countTimeFrom = Millis(0)
-  private var previousTimePlayed = Millis(0)
 
   private var avPlayer: AvPlayer = NullAvPlayer
   private var isShutdown = false
@@ -183,9 +181,7 @@ class VlcAudioItem private constructor(
       prepareSeekMaybePlay(
         currentTime,
         if (playNow.value) PlayImmediateTransition() else NoOpPlayerTransition,
-        shouldPlayNow,
-        previousTimePlayed,
-        countTimeFrom
+        shouldPlayNow
       )
     }
   }
@@ -227,8 +223,6 @@ class VlcAudioItem private constructor(
     startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
-    timePlayed: Millis,
-    countFrom: Millis,
     startPaused: StartPaused
   ) {
     if (!isPreparing) {
@@ -240,8 +234,6 @@ class VlcAudioItem private constructor(
         startOnPrepared = playNow.value
         isShutdown = false
         isStopped = false
-        previousTimePlayed = timePlayed
-        countTimeFrom = countFrom
         avPlayer = libVlcSingleton.withInstance { libVlc ->
           libVlc
             .makeAudioMedia(fileUri, startPosition, startPaused, libVlcPrefs)
@@ -310,36 +302,19 @@ class VlcAudioItem private constructor(
    * required, or total time exceeds 4 minutes, the media is marked played.
    */
   private suspend fun onPositionUpdate(event: AvPlayerEvent.PositionUpdate) {
-    if (!hasBeenMarkedPlayed) {
-      if (event.position > countTimeFrom) {
-        if (avPlayer.isPlaying) {
-          val currentTimePlayed = event.position - countTimeFrom
-          val total = previousTimePlayed + currentTimePlayed
-          val percentagePlayed = total.asPercentageOf(event.duration)
-          if (percentagePlayed > appPrefs.markPlayedPercentage() || total > Millis.FOUR_MINUTES) {
-            mediaFileStore.incrementPlayedCountAsync(id)
-            hasBeenMarkedPlayed = true
-          }
-        } else {
-          // This is a user seek so establish a new count start time and save the previous total
-          previousTimePlayed += position - countTimeFrom
-          countTimeFrom = event.position
-        }
-      } else {
-        // user seek backward, crude calc just to set previousTimePlayed to max of position then
-        // establish new count start time
-        previousTimePlayed = previousTimePlayed.coerceAtMost(event.position)
-        countTimeFrom = event.position
+    position = event.position
+    if (!hasBeenMarkedPlayed && event.isPlaying) {
+      val percentagePlayed = position.asPercentageOf(event.duration)
+      if (percentagePlayed > appPrefs.markPlayedPercentage() || position > Millis.FOUR_MINUTES) {
+        hasBeenMarkedPlayed = true
+        mediaFileStore.incrementPlayedCountAsync(id)
       }
     }
-    position = event.position
     eventFlow.emit(
       PlayableItemEvent.PositionUpdate(
         this,
         event.position,
-        event.duration,
-        previousTimePlayed,
-        countTimeFrom
+        event.duration
       )
     )
   }

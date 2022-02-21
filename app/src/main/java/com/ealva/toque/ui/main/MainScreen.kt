@@ -41,13 +41,12 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.ui.common.SwipeableSnackbarHost
 import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.SwipeableSnackbarHost
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
-import kotlinx.coroutines.flow.collect
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterialApi::class)

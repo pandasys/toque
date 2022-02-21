@@ -29,6 +29,7 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
 import com.ealva.toque.db.PlaylistIdNameType
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -124,6 +125,28 @@ class LocalAudioQueueViewModelImpl(
   override val localAudioQueue = MutableStateFlow<LocalAudioQueue>(NullLocalAudioQueue)
   override val playUpNextAction = MutableStateFlow(PlayUpNextAction.Prompt)
   override var queueSize: Int = 0
+
+  override fun onServiceRegistered() {
+    LOG._e { it("onServiceRegistered") }
+    scope = CoroutineScope(SupervisorJob() + dispatcher)
+    scope.launch {
+      val appPrefs = appPrefsSingleton.instance()
+      prefsHolder.value = PrefsHolder(appPrefs)
+      appPrefs.playUpNextAction
+        .asFlow()
+        .onEach { playUpNextAction.value = it }
+        .launchIn(scope)
+    }
+
+    mainViewModel.currentQueue
+      .onEach { queue -> handleQueueChange(queue) }
+      .launchIn(scope)
+  }
+
+  override fun onServiceUnregistered() {
+    LOG._e { it("onServiceUnregistered") }
+    scope.cancel()
+  }
 
   override fun emitNotification(notification: Notification) {
     mainViewModel.notify(notification)
@@ -337,22 +360,6 @@ class LocalAudioQueueViewModelImpl(
     }
   }
 
-  override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
-    scope.launch {
-      val appPrefs = appPrefsSingleton.instance()
-      prefsHolder.value = PrefsHolder(appPrefs)
-      appPrefs.playUpNextAction
-        .asFlow()
-        .onEach { playUpNextAction.value = it }
-        .launchIn(scope)
-    }
-
-    mainViewModel.currentQueue
-      .onEach { queue -> handleQueueChange(queue) }
-      .launchIn(scope)
-  }
-
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) = when (queue) {
     is NullLocalAudioQueue -> queueInactive()
     is LocalAudioQueue -> queueActive(queue)
@@ -372,10 +379,6 @@ class LocalAudioQueueViewModelImpl(
     queue.notification
       .onEach { serviceNotification -> mainViewModel.notify(serviceNotification) }
       .launchIn(scope)
-  }
-
-  override fun onServiceUnregistered() {
-    scope.cancel()
   }
 }
 

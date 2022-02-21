@@ -123,7 +123,7 @@ object Libs {
   }
 
   object EAlvaBrainz {
-    private const val VERSION = "0.10.2-0"
+    private const val VERSION = "0.10.3-0"
     const val BRAINZ = "com.ealva:ealvabrainz:$VERSION"
     const val BRAINZ_SERVICE = "com.ealva:ealvabrainz-service:$VERSION"
   }
@@ -136,7 +136,7 @@ object Libs {
   }
 
   object EAlvaMusicInfo {
-    private const val VERSION = "0.2.11-0"
+    private const val VERSION = "0.2.12-0"
     const val MUSIC_INFO = "com.ealva:musicinfo:$VERSION"
   }
 
@@ -151,8 +151,6 @@ object Libs {
   object FastUtil {
     const val FASTUTIL = "it.unimi.dsi:fastutil:7.2.1"
   }
-
-  const val GUAVA = "com.google.guava:guava:31.0.1-android"
 
   object Gowtham {
     const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.2.1"
@@ -238,6 +236,6 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.5.0-SNAPSHOT"
+    const val CORE = "com.ealva:welite-core:0.5.1-0"
   }
 }

@@ -73,7 +73,7 @@ fun SongItemList(
         end = 8.dp
       ),
     ) {
-      items(items = list, key = { it.id }) { songInfo ->
+      items(items = list, key = { it.id.value }) { songInfo ->
         SongListItem(
           songTitle = songInfo.title,
           albumTitle = songInfo.album,

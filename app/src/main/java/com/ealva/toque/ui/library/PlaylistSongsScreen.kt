@@ -43,6 +43,7 @@ import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
@@ -61,7 +62,12 @@ data class PlaylistSongsScreen(
   private val playlistName: PlaylistName,
   private val artwork: Uri,
   private val backTo: String
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
       add(PlaylistSongsViewModel(playlistId, playListType, get(), lookup(), backstack))

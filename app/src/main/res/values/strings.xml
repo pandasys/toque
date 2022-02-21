@@ -315,4 +315,5 @@
     <string name="AllSongs">All Songs</string>
   <string name="AlbumArtists">Album Artists</string>
   <string name="Composers">Composers</string>
+    <string name="Queue">Queue</string>
 </resources>

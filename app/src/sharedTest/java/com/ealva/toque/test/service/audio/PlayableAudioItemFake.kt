@@ -74,8 +74,6 @@ class PlayableAudioItemFake(
     startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
-    timePlayed: Millis,
-    countFrom: Millis,
     startPaused: StartPaused
   ) = Unit
 

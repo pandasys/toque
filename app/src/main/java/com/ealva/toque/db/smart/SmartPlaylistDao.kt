@@ -146,15 +146,16 @@ private class SmartPlaylistDaoImpl(private val db: Database) : SmartPlaylistDao 
     val oldPlaylist = playlist(smartPlaylist.id).apply {
       if (isValid) asView().drop()
     }
-    val updated = SmartPlaylistTable.updateColumns {
-      it[smartName] = name.value
-      it[smartAnyOrAll] = anyOrAll.id
-      it[smartLimit] = limit.value
-      it[smartOrderBy] = selectBy.id
-      it[smartEndOfListAction] = endOfListAction.id
-    }.where {
-      smartId eq smartPlaylist.id.value
-    }.update()
+    val updated = SmartPlaylistTable
+      .updateColumns {
+        it[smartName] = name.value
+        it[smartAnyOrAll] = anyOrAll.id
+        it[smartLimit] = limit.value
+        it[smartOrderBy] = selectBy.id
+        it[smartEndOfListAction] = endOfListAction.id
+      }
+      .where { smartId eq smartPlaylist.id.value }
+      .update()
 
     check(updated > 0) { "Could not update smart playlist $smartPlaylist" }
     replacePlaylistRules(smartPlaylist.id, smartPlaylist.ruleList)

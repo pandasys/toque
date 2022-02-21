@@ -52,7 +52,11 @@ data class SmartPlaylist(
   val ruleList: List<Rule> = emptyList()
 ) : Parcelable {
   fun asView(): View = checkThen(isValid) {
-    View(buildQuery(anyOrAll, ruleList, limit, selectBy), name.value)
+    View(
+      query = buildQuery(anyOrAll, ruleList, limit, selectBy),
+      name = name.value,
+      forceQuoteName = true
+    )
   }
 
   fun asQuery(): Query<ColumnSet> = checkThen(isValid) {

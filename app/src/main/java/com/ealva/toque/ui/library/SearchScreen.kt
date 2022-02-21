@@ -21,18 +21,55 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.ealva.ealvalog.e
 import com.ealva.toque.navigation.ComposeKey
+import com.zhuinden.simplestack.ScopedServices
 import kotlinx.parcelize.Parcelize
 import javax.annotation.concurrent.Immutable
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.zhuinden.simplestack.ServiceBinder
+import com.zhuinden.simplestackcomposeintegration.services.rememberService
+import com.zhuinden.simplestackextensions.servicesktx.add
+
+@Suppress("unused")
+private val LOG by lazyLogger(SearchScreen::class)
 
 @Immutable
 @Parcelize
 data class SearchScreen(private val noArg: String = "") : ComposeKey() {
+  override fun bindServices(serviceBinder: ServiceBinder) {
+    serviceBinder.add(SearchModel())
+  }
 
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
+    val viewModel = rememberService<SearchModel>()
     Column(modifier = Modifier.fillMaxSize()) {
       Text(text = "Search")
     }
   }
+}
+
+class SearchModel : ScopedServices.Registered, ScopedServices.Activated {
+  init {
+    LOG.e { it("SearchModel") }
+  }
+
+  override fun onServiceRegistered() {
+    LOG.e { it("onServiceRegistered") }
+  }
+
+  override fun onServiceUnregistered() {
+    LOG.e { it("onServiceUnregistered") }
+  }
+
+  override fun onServiceActive() {
+    LOG.e { it("onServiceActive") }
+  }
+
+  override fun onServiceInactive() {
+    LOG.e { it("onServiceInactive") }
+  }
+
 }

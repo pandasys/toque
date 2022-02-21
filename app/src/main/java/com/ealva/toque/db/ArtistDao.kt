@@ -264,12 +264,15 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     }
 
     if (updateNeeded) {
-      val updated = ArtistTable.updateColumns {
-        updateArtist?.let { update -> it[artistName] = update }
-        updateSort?.let { update -> it[artistSort] = update }
-        updateMbid?.let { update -> it[artistMbid] = update.value }
-        it[updatedTime] = newUpdateTime()
-      }.where { id eq info.id.value }.update()
+      val updated = ArtistTable
+        .updateColumns {
+          updateArtist?.let { update -> it[artistName] = update }
+          updateSort?.let { update -> it[artistSort] = update }
+          updateMbid?.let { update -> it[artistMbid] = update.value }
+          it[updatedTime] = newUpdateTime()
+        }
+        .where { id eq info.id.value }
+        .update()
 
       if (updated >= 1) upsertResults.alwaysEmit { emitUpdated(info.id) } else {
         LOG.e { it("Could not update $info") }

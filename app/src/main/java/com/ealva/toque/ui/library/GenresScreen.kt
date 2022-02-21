@@ -80,6 +80,7 @@ import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -107,7 +108,14 @@ private val LOG by lazyLogger(GenresScreen::class)
 
 @Immutable
 @Parcelize
-data class GenresScreen(private val noArg: String = "") : BaseLibraryItemsScreen(), KoinComponent {
+data class GenresScreen(
+  private val noArg: String = ""
+) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
     with(serviceBinder) { add(GenresViewModel(key, get(), lookup(), backstack)) }
@@ -323,7 +331,7 @@ private class GenresViewModelImpl(
   private fun requestGenres(processChunks: Boolean) {
     requestJob?.cancel()
 
-    requestJob = scope.launch {
+    requestJob = scope.launch(Dispatchers.IO) {
       val genreList = genreDao
         .getAllGenres(filterFlow.value)
         .onFailure { cause -> LOG.e(cause) { it("Error getting Genres") } }

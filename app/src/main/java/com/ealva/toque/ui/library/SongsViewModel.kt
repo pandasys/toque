@@ -191,7 +191,7 @@ abstract class BaseSongsViewModel(
   /** Called whenever this view model is created and also whenever the dao emits an AudioDaoEvent */
   private fun requestAudio() {
     requestJob?.cancel()
-    requestJob = scope.launch {
+    requestJob = scope.launch(Dispatchers.IO) {
       songsFlow.value = getAudioList(audioMediaDao, filterFlow.value)
         .onFailure { cause ->
           LOG.e(cause) { it("Error getting audio list") }

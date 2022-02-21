@@ -69,6 +69,8 @@ fun SongListItem(
       .modifyIf(highlightBackground) { background(toqueColors.selectedBackground) },
     icon = icon,
     text = { ListItemText(text = songTitle.value, color = textColor) },
+//    secondaryText = { Text(text = artistName.value, color = textColor) },
+//    overlineText = { Text(text = albumTitle.value, color = textColor) }
     secondaryText = { ArtistAndDuration(artistName, songDuration, textColor) },
     overlineText = { AlbumAndRating(albumTitle, rating, textColor) }
   )
@@ -112,17 +114,22 @@ fun SongListItem(
 
 @Composable
 fun SongListItemIcon(artwork: Uri) {
-  Image(
-    painter = rememberImagePainter(
-      data = artwork,
-      builder = {
-        error(R.drawable.ic_big_album)
-        placeholder(R.drawable.ic_big_album)
-      }
-    ),
-    contentDescription = "Artwork",
-    modifier = Modifier.size(56.dp)
-  )
+  if (artwork === Uri.EMPTY) {
+    Image(
+      painter = rememberImagePainter(data = R.drawable.ic_big_album),
+      contentDescription = "Artwork",
+      modifier = Modifier.size(56.dp)
+    )
+  } else {
+    Image(
+      painter = rememberImagePainter(
+        data = artwork,
+        builder = { error(R.drawable.ic_big_album) }
+      ),
+      contentDescription = "Artwork",
+      modifier = Modifier.size(56.dp)
+    )
+  }
 }
 
 @Composable

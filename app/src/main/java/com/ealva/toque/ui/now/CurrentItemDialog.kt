@@ -27,20 +27,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.GridCells
 import androidx.compose.foundation.lazy.LazyVerticalGrid
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
 import androidx.compose.material.LocalContentColor
-import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.ealva.toque.R
+import com.ealva.toque.ui.common.ToqueDialog
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.toque.ui.library.SongListItem
 import com.ealva.toque.ui.library.SongListItemIcon
@@ -58,60 +55,54 @@ fun CurrentItemDialog(
   goToArtist: (QueueItem) -> Unit,
   goToAlbumArtist: (QueueItem) -> Unit
 ) {
-  Dialog(onDismissRequest = onDismiss) {
-    Surface(
-      modifier = Modifier.padding(8.dp),
-      shape = RoundedCornerShape(10),
-      elevation = 1.dp
-    ) {
-      Column {
-        SongListItem(
-          songTitle = audioItem.title,
-          albumTitle = audioItem.albumTitle,
-          artistName = audioItem.artist,
-          highlightBackground = false,
-          icon = { SongListItemIcon(audioItem.artwork) },
-        )
-        LazyVerticalGrid(
-          cells = GridCells.Fixed(2),
-          modifier = Modifier.padding(horizontal = 8.dp),
-          contentPadding = PaddingValues(horizontal = 12.dp)
-        ) {
-          item {
-            DialogItem(
-              title = R.string.Info,
-              icon = R.drawable.ic_info,
-              onClick = { showMediaInfo(audioItem) }
-            )
-          }
-          item {
-            DialogItem(
-              title = R.string.AlbumArt,
-              icon = R.drawable.ic_image,
-              onClick = { selectAlbumArt(audioItem) }
-            )
-          }
-          item {
-            DialogItem(
-              title = R.string.Album,
-              icon = R.drawable.ic_album,
-              onClick = { goToAlbum(audioItem) }
-            )
-          }
-          item {
-            DialogItem(
-              title = R.string.Artist,
-              icon = ArtistType.SongArtist.typeIcon,
-              onClick = { goToArtist(audioItem) }
-            )
-          }
-          item {
-            DialogItem(
-              title = R.string.AlbumArtist,
-              icon = ArtistType.AlbumArtist.typeIcon,
-              onClick = { goToAlbumArtist(audioItem) }
-            )
-          }
+  ToqueDialog(onDismissRequest = onDismiss) {
+    Column {
+      SongListItem(
+        songTitle = audioItem.title,
+        albumTitle = audioItem.albumTitle,
+        artistName = audioItem.artist,
+        highlightBackground = false,
+        icon = { SongListItemIcon(audioItem.artwork) },
+      )
+      LazyVerticalGrid(
+        cells = GridCells.Fixed(2),
+        modifier = Modifier.padding(horizontal = 8.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp)
+      ) {
+        item {
+          DialogItem(
+            title = R.string.Info,
+            icon = R.drawable.ic_info,
+            onClick = { showMediaInfo(audioItem) }
+          )
+        }
+        item {
+          DialogItem(
+            title = R.string.AlbumArt,
+            icon = R.drawable.ic_image,
+            onClick = { selectAlbumArt(audioItem) }
+          )
+        }
+        item {
+          DialogItem(
+            title = R.string.Album,
+            icon = R.drawable.ic_album,
+            onClick = { goToAlbum(audioItem) }
+          )
+        }
+        item {
+          DialogItem(
+            title = R.string.Artist,
+            icon = ArtistType.SongArtist.typeIcon,
+            onClick = { goToArtist(audioItem) }
+          )
+        }
+        item {
+          DialogItem(
+            title = R.string.AlbumArtist,
+            icon = ArtistType.AlbumArtist.typeIcon,
+            onClick = { goToAlbumArtist(audioItem) }
+          )
         }
       }
     }

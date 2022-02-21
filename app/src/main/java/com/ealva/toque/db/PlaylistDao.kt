@@ -361,7 +361,7 @@ private class PlaylistDaoImpl(
   private fun Queryable.getSmartPlaylistSongCount(
     smart: SmartPlaylistDescription
   ): PlaylistDescription {
-    val view = existingView(smart.viewName)
+    val view = existingView(smart.viewName, forceQuoteName = true)
     val viewId = view.column(MediaTable.id, MediaTable.id.name)
 
     return PlaylistDescription(

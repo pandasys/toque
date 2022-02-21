@@ -734,7 +734,7 @@ private class AudioMediaDaoImpl(
     filter: Filter,
     limit: Limit
   ): List<AudioDescription> = db.query {
-    val view = existingView(with(playlistDao) { getPlaylistName(playlistId, Rules) }.value)
+    val view = existingView(with(playlistDao) { getPlaylistName(playlistId, Rules) }.value, true)
     val viewId = view.column(MediaTable.id, MediaTable.id.name)
 
     view
@@ -924,10 +924,13 @@ private class AudioMediaDaoImpl(
   override fun incrementPlayedCount(id: MediaId) {
     scope.launch {
       db.transaction {
-        MediaTable.updateColumns {
-          it[playedCount] = playedCount plus 1
-          it[lastPlayedTime] = Millis.currentUtcEpochMillis().value
-        }.where { MediaTable.id eq id.value }
+        MediaTable
+          .updateColumns {
+            it[playedCount] = playedCount plus 1
+            it[lastPlayedTime] = Millis.currentUtcEpochMillis().value
+          }
+          .where { MediaTable.id eq id.value }
+          .update()
       }
     }
   }
@@ -935,10 +938,13 @@ private class AudioMediaDaoImpl(
   override fun incrementSkippedCount(id: MediaId) {
     scope.launch {
       db.transaction {
-        MediaTable.updateColumns {
-          it[skippedCount] = skippedCount plus 1
-          it[lastSkippedTime] = Millis.currentUtcEpochMillis().value
-        }.where { MediaTable.id eq id.value }
+        MediaTable
+          .updateColumns {
+            it[skippedCount] = skippedCount plus 1
+            it[lastSkippedTime] = Millis.currentUtcEpochMillis().value
+          }
+          .where { MediaTable.id eq id.value }
+          .update()
       }
     }
   }
@@ -946,12 +952,13 @@ private class AudioMediaDaoImpl(
   override fun updateDuration(id: MediaId, newDuration: Millis) {
     scope.launch {
       val rowsUpdated = db.transaction {
-        MediaTable.updateColumns {
-          it[duration] = newDuration()
-          it[updatedTime] = Millis.currentUtcEpochMillis().value
-        }.where {
-          MediaTable.id eq id.value
-        }.update()
+        MediaTable
+          .updateColumns {
+            it[duration] = newDuration()
+            it[updatedTime] = Millis.currentUtcEpochMillis().value
+          }
+          .where { MediaTable.id eq id.value }
+          .update()
       }
       if (rowsUpdated == 0L) LOG.e { it(CANT_UPDATE_DURATION, newDuration, id) }
     }
@@ -1112,7 +1119,7 @@ private class AudioMediaDaoImpl(
     playlistId: PlaylistId,
     longCollection: LongCollection
   ) {
-    val view = existingView(with(playlistDao) { getPlaylistName(playlistId, Rules) }.value)
+    val view = existingView(with(playlistDao) { getPlaylistName(playlistId, Rules) }.value, true)
     val viewId = view.column(MediaTable.id, MediaTable.id.name)
 
     view
@@ -1385,24 +1392,27 @@ private class AudioMediaDaoImpl(
     }
 
     if (updateNeeded) {
-      val updated = MediaTable.updateColumns {
-        updateTitle?.let { update -> it[title] = update }
-        updateTitleSort?.let { update -> it[titleSort] = update }
-        updateAlbumId?.let { update -> it[albumId] = update.value }
-        updateAlbumArtistId?.let { update -> it[albumArtistId] = update.value }
-        updateArtistId?.let { update -> it[artistId] = update.value }
-        updateGenre?.let { update -> it[genre] = update }
-        updateYear?.let { update -> it[year] = update }
-        updateRating?.let { update -> it[rating] = update.toRating().value }
-        updateDuration?.let { update -> it[duration] = update() }
-        updateTrackNumber?.let { update -> it[trackNumber] = update }
-        updateTotalTracks?.let { update -> it[totalTracks] = update }
-        updateDiscNumber?.let { update -> it[discNumber] = update }
-        updateTotalDiscs?.let { update -> it[totalDiscs] = update }
-        updateComment?.let { update -> it[comment] = update }
-        updateTrackMbid?.let { update -> it[trackMbid] = update.value }
-        it[updatedTime] = newUpdateTime()
-      }.where { id eq info.id.value }.update()
+      val updated = MediaTable
+        .updateColumns {
+          updateTitle?.let { update -> it[title] = update }
+          updateTitleSort?.let { update -> it[titleSort] = update }
+          updateAlbumId?.let { update -> it[albumId] = update.value }
+          updateAlbumArtistId?.let { update -> it[albumArtistId] = update.value }
+          updateArtistId?.let { update -> it[artistId] = update.value }
+          updateGenre?.let { update -> it[genre] = update }
+          updateYear?.let { update -> it[year] = update }
+          updateRating?.let { update -> it[rating] = update.toRating().value }
+          updateDuration?.let { update -> it[duration] = update() }
+          updateTrackNumber?.let { update -> it[trackNumber] = update }
+          updateTotalTracks?.let { update -> it[totalTracks] = update }
+          updateDiscNumber?.let { update -> it[discNumber] = update }
+          updateTotalDiscs?.let { update -> it[totalDiscs] = update }
+          updateComment?.let { update -> it[comment] = update }
+          updateTrackMbid?.let { update -> it[trackMbid] = update.value }
+          it[updatedTime] = newUpdateTime()
+        }
+        .where { id eq info.id.value }
+        .update()
 
       if (updated >= 1) upsertResults.mediaUpdated(info.id)
       else LOG.e { it("Could not update ${info.title}") }

@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ealva.ealvalog.e
@@ -91,6 +92,7 @@ import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -124,7 +126,12 @@ private val LOG by lazyLogger(QueueScreen::class)
 
 @Immutable
 @Parcelize
-data class QueueScreen(private val noArg: String = "") : ComposeKey() {
+data class QueueScreen(private val noArg: String = "") : ComposeKey(), ScopeKey.Child {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
       add(QueueViewModel(lookup(), backstack))
@@ -143,7 +150,6 @@ data class QueueScreen(private val noArg: String = "") : ComposeKey() {
 
     Column(
       modifier = Modifier
-        .fillMaxSize()
         .statusBarsPadding()
         .navigationBarsPadding(bottom = false)
     ) {
@@ -152,6 +158,11 @@ data class QueueScreen(private val noArg: String = "") : ComposeKey() {
       val queueIndex = state.queueIndex
       val selected = selectedItems.value
 
+      Text(
+        modifier = Modifier.padding(start = 18.dp, top = 20.dp, bottom = 20.dp),
+        text = stringResource(id = R.string.Queue),
+        style = toqueTypography.h5
+      )
       QueueItemsActionBar(
         itemCount = queue.size,
         inSelectionMode = selected.inSelectionMode,
@@ -396,9 +407,8 @@ private class QueueViewModelImpl(
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
-) : QueueViewModel, ScopedServices.Activated, ScopedServices.HandlesBack {
+) : QueueViewModel, ScopedServices.Registered, ScopedServices.HandlesBack {
   private lateinit var scope: CoroutineScope
-  private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
   private var localAudioQueue: LocalAudioQueue = NullLocalAudioQueue
 
@@ -496,17 +506,14 @@ private class QueueViewModelImpl(
   private fun getSelectedItems(queue: List<QueueAudioItem>) =
     queue.filterIfHasSelection(selectedFlow.value) { it.instanceId }
 
-  override fun onServiceActive() {
+  override fun onServiceRegistered() {
     scope = CoroutineScope(SupervisorJob() + dispatcher)
-    currentQueueJob = localAudioQueueModel.localAudioQueue
+    localAudioQueueModel.localAudioQueue
       .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)
   }
 
-  override fun onServiceInactive() {
-    currentQueueJob?.cancel()
-    currentQueueJob = null
-    handleQueueChange(NullLocalAudioQueue)
+  override fun onServiceUnregistered() {
     scope.cancel()
   }
 

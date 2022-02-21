@@ -33,6 +33,7 @@ import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -55,7 +56,12 @@ data class AlbumSongsForArtistScreen(
   private val albumTitle: AlbumTitle,
   private val artwork: Uri,
   private val backTo: String = artistName.value
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
       add(

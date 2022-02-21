@@ -27,6 +27,7 @@ import com.ealva.toque.common.Rating
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.isLocalScheme
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.tag.SongTag
 import com.github.michaelbull.result.Result
@@ -110,6 +111,7 @@ private class MediaFileStoreImpl(
   }
 
   override fun incrementSkippedCountAsync(id: MediaId) {
+    LOG._e { it("incrementSkippedCountAsync %s", id) }
     audioMediaDao.incrementSkippedCount(id)
   }
 

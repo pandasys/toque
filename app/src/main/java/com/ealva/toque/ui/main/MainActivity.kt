@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity(), MainBridge {
     backstack = Navigator.configure()
       .addStateChangeCompletionListener { topOfStackFlow.value = it.topNewKey() }
       .setGlobalServices(ToqueGlobalServicesFactory(this, appPrefsSingleton))
-      .setScopedServices(DefaultServiceProvider())
+      .setScopedServices(ServiceProvider())
       .setStateChanger(AsyncStateChanger(composeStateChanger))
       .install(this, androidContentFrame, makeInitialHistory())
 
@@ -144,9 +144,7 @@ class MainActivity : ComponentActivity(), MainBridge {
       // and SplashScreen is not at the top, we should have the permission and need to behave as
       // such
       if (backstack.top<ComposeKey>() !is SplashScreen) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-          checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        ) {
+        if (checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
           backstack.lookup<MainViewModel>().gainedReadExternalPermission()
         }
       }

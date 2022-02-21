@@ -354,12 +354,12 @@ class RuleFieldTest {
     }
     expectSuggestionProviderNotCalled(field)
     val matcher = PlaylistMatcher.Is
-    MatcherData("ViewName", PlayListType.Rules.id.toLong(), 5L).let { data ->
+    MatcherData("View Name", PlayListType.Rules.id.toLong(), 5L).let { data ->
       expect(field.makeWhereClause(matcher, data).toString())
-        .toBe("""ViewName.MediaId IS NOT NULL""")
+        .toBe(""""View Name".MediaId IS NOT NULL""")
       val joinTemplate = field.makeJoinClause(matcher, data)
       expect(joinTemplate?.joinTo(MediaTable)?.toString())
-        .toBe("""Media LEFT JOIN ViewName ON Media.MediaId = ViewName.MediaId""")
+        .toBe("""Media LEFT JOIN "View Name" ON Media.MediaId = "View Name".MediaId""")
     }
 
     MatcherData("", PlayListType.UserCreated.id.toLong(), 5).let { data ->

@@ -93,7 +93,6 @@ import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TITLE_SPACE
 import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TOP_SPACE
 import com.ealva.toque.ui.now.NowPlayingViewModel.NowPlayingState
 import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
-import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.ExperimentalAnimatedInsets
 import com.google.accompanist.insets.navigationBarsPadding
@@ -104,6 +103,7 @@ import com.google.accompanist.pager.rememberPagerState
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.gowtham.ratingbar.RatingBar
 import com.gowtham.ratingbar.RatingBarStyle
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
@@ -127,10 +127,16 @@ private object NowPlayingScreenIds {
 
 @Immutable
 @Parcelize
-data class NowPlayingScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
+data class NowPlayingScreen(
+  private val noArg: String = ""
+) : ComposeKey(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(LocalAudioQueueViewModel(lookup(), get(AppPrefs.QUALIFIER), get()))
       add(NowPlayingViewModel(backstack, get(), lookup(), get(AppPrefs.QUALIFIER)))
     }
   }

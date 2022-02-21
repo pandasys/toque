@@ -77,7 +77,7 @@ object GenreJoinTemplate : JoinTemplate {
 }
 
 data class RulesPlaylistJoinTemplate(val viewName: String) : JoinTemplate {
-  private val view = existingView(viewName)
+  private val view = existingView(viewName, forceQuoteName = true)
   private val id: ViewColumn<Long> = view.column(MediaTable.id, MediaTable.id.name)
 
   override fun joinTo(lhs: ColumnSet): Join = lhs.join(

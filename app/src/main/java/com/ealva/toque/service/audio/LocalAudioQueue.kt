@@ -455,9 +455,7 @@ private class LocalAudioQueueImpl(
           item,
           if (playNow.value) DirectTransition() else NoOpMediaTransition,
           playNow,
-          startingPosition,
-          positionState.timePlayed,
-          positionState.countingFrom
+          startingPosition
         )
       }
     } else {
@@ -1218,9 +1216,7 @@ private class LocalAudioQueueImpl(
     nextItem: PlayableAudioItem,
     transition: PlayerTransitionPair,
     playNow: PlayNow,
-    position: Millis,
-    timePlayed: Millis = Millis(0),
-    countFrom: Millis = Millis(0)
+    position: Millis
   ) {
     if (currentItem.isValid) {
       currentItemFlowJob?.cancel()
@@ -1231,9 +1227,7 @@ private class LocalAudioQueueImpl(
       nextItem.prepareSeekMaybePlay(
         position,
         if (playNow.value) transition.enterTransition else NoOpPlayerTransition,
-        playNow,
-        timePlayed,
-        countFrom
+        playNow
       )
     })
   }

@@ -94,6 +94,7 @@ import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -133,7 +134,12 @@ enum class ArtistType(
 @Parcelize
 data class ArtistsScreen(
   private val artistType: ArtistType
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
     with(serviceBinder) { add(ArtistsViewModel(key, get(), lookup(), artistType, backstack)) }
@@ -427,7 +433,7 @@ private class ArtistsViewModelImpl(
 
   private fun requestArtists(processChunks: Boolean) {
     requestJob?.cancel()
-    requestJob = scope.launch {
+    requestJob = scope.launch(Dispatchers.IO) {
       val artistList = when (artistType) {
         ArtistType.AlbumArtist -> artistDao.getAlbumArtists(filterFlow.value)
         ArtistType.SongArtist -> artistDao.getSongArtists(filterFlow.value)

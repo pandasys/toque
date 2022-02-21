@@ -35,6 +35,7 @@ import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
@@ -52,7 +53,12 @@ private val LOG by lazyLogger(LibrarySongsScreen::class)
 @Parcelize
 data class LibrarySongsScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
     with(serviceBinder) { add(LibrarySongsViewModel(key, get(), lookup(), backstack)) }

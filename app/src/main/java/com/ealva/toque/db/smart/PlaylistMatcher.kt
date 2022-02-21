@@ -148,7 +148,8 @@ enum class PlaylistMatcher(override val id: Int, private val stringRes: Int) : M
       .select { mediaId }
       .where { playListId eq playlistId }
 
-    private fun makeRulesWhereClause(inList: Boolean, viewName: String) = existingView(viewName)
+    private fun makeRulesWhereClause(inList: Boolean, viewName: String) =
+      existingView(viewName, true)
       .column(MediaTable.id, MediaTable.id.name)
       .run { if (inList) isNotNull() else isNull() }
   }

@@ -32,6 +32,7 @@ import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.db.AlbumDaoEvent.AlbumArtworkUpdated
 import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
@@ -39,6 +40,7 @@ import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.GenreId
+import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.asAlbumId
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.welite.db.Database
@@ -57,6 +59,7 @@ import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
+import com.ealva.welite.db.expr.isNotNull
 import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
@@ -85,6 +88,7 @@ import com.ealva.welite.db.table.select
 import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
+import com.ealva.welite.db.view.existingView
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
 import kotlinx.coroutines.CoroutineDispatcher
@@ -181,6 +185,12 @@ interface AlbumDao {
   suspend fun getAlbumArtFor(genreId: GenreId): DaoResult<Uri>
 
   suspend fun getAlbumArtFor(composerId: ComposerId): DaoResult<Uri>
+
+  suspend fun getAlbumArtFor(
+    playlistId: PlaylistId,
+    playlistType: PlayListType,
+    playlistName: PlaylistName
+  ): DaoResult<Uri>
 
   companion object {
     operator fun invoke(
@@ -526,6 +536,32 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }
 
+  override suspend fun getAlbumArtFor(
+    playlistId: PlaylistId,
+    playlistType: PlayListType,
+    playlistName: PlaylistName
+  ): DaoResult<Uri> = runSuspendCatching {
+    db.query {
+      when (playlistType) {
+        PlayListType.UserCreated, PlayListType.File, PlayListType.System -> getArtwork(
+          join = PlayListMediaTable
+            .join(MediaTable, JoinType.INNER, PlayListMediaTable.mediaId, MediaTable.id)
+            .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id),
+          where = PlayListMediaTable.playListId eq playlistId.value
+        )
+
+        PlayListType.Rules -> {
+          val view = existingView(playlistName.value, forceQuoteName = true)
+          val viewId = view.column(MediaTable.id, MediaTable.id.name)
+          getArtwork(
+            join = view.join(AlbumTable, JoinType.INNER, viewId, AlbumTable.id),
+            where = viewId.isNotNull()
+          )
+        }
+      }
+    }
+  }
+
   private fun Queryable.getArtwork(
     join: Join,
     where: Op<Boolean>,
@@ -609,14 +645,17 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       )
     }
     if (updateNeeded) {
-      val updated = AlbumTable.updateColumns {
-        updateAlbum?.let { update -> it[albumTitle] = update }
-        updateAlbumSort?.let { update -> it[albumSort] = update }
-        updateAlbumArtist?.let { update -> it[albumArtist] = update }
-        updateReleaseMbid?.let { update -> it[releaseMbid] = update.value }
-        updateReleaseGroupMbid?.let { update -> it[releaseGroupMbid] = update.value }
-        it[updatedTime] = newUpdateTime()
-      }.where { id eq info.id.value }.update()
+      val updated = AlbumTable
+        .updateColumns {
+          updateAlbum?.let { update -> it[albumTitle] = update }
+          updateAlbumSort?.let { update -> it[albumSort] = update }
+          updateAlbumArtist?.let { update -> it[albumArtist] = update }
+          updateReleaseMbid?.let { update -> it[releaseMbid] = update.value }
+          updateReleaseGroupMbid?.let { update -> it[releaseGroupMbid] = update.value }
+          it[updatedTime] = newUpdateTime()
+        }
+        .where { id eq info.id.value }
+        .update()
 
       if (updated >= 1) emitUpdate(info.id) else {
         LOG.e { it("Could not update $info") }

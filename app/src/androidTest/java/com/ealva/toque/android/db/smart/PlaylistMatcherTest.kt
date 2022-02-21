@@ -44,15 +44,15 @@ class PlaylistMatcherTest {
     val matcher = PlaylistMatcher.Is
     val clause = matcher.makeWhereClause(
       MediaTable.id,
-      MatcherData("TheView", PlayListType.Rules.id.toLong(), 100)
+      MatcherData("The View", PlayListType.Rules.id.toLong(), 100)
     )
-    expect(clause.toString()).toBe("""TheView.MediaId IS NOT NULL""")
+    expect(clause.toString()).toBe(""""The View".MediaId IS NOT NULL""")
 
     val joinTemplate =
-      matcher.makeJoinTemplate(MatcherData("TheView", PlayListType.Rules.id.toLong(), 100))
+      matcher.makeJoinTemplate(MatcherData("The View", PlayListType.Rules.id.toLong(), 100))
 
     expect(joinTemplate?.joinTo(MediaTable)?.toString())
-      .toBe("""Media LEFT JOIN TheView ON Media.MediaId = TheView.MediaId""")
+      .toBe("""Media LEFT JOIN "The View" ON Media.MediaId = "The View".MediaId""")
   }
 
   @Test
@@ -60,14 +60,14 @@ class PlaylistMatcherTest {
     val matcher = PlaylistMatcher.IsNot
     val clause = matcher.makeWhereClause(
       MediaTable.id,
-      MatcherData("TheView", PlayListType.Rules.id.toLong(), 100)
+      MatcherData("The View", PlayListType.Rules.id.toLong(), 100)
     )
-    expect(clause.toString()).toBe("""TheView.MediaId IS NULL""")
+    expect(clause.toString()).toBe(""""The View".MediaId IS NULL""")
 
     val joinTemplate =
-      matcher.makeJoinTemplate(MatcherData("TheView", PlayListType.Rules.id.toLong(), 100))
+      matcher.makeJoinTemplate(MatcherData("The View", PlayListType.Rules.id.toLong(), 100))
     expect(joinTemplate?.joinTo(MediaTable)?.toString())
-      .toBe("""Media LEFT JOIN TheView ON Media.MediaId = TheView.MediaId""")
+      .toBe("""Media LEFT JOIN "The View" ON Media.MediaId = "The View".MediaId""")
   }
 
   @Test

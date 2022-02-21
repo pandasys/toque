@@ -257,7 +257,9 @@ private class MediaInfoViewModelImpl(
       title = title,
       album = albumTitle,
       albumArtist = albumArtist,
+      songArtist = albumArtist,  // often the same, will update if incorrect
       rating = rating.toStarRating(),
+      tagRating = rating.toStarRating(), // usually the same, will update if incorrect
       duration = duration
     )
   )

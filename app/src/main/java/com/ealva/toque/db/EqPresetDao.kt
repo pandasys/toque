@@ -58,14 +58,14 @@ interface EqPresetDao {
   suspend fun updatePreset(presetData: EqPresetData, duringTxn: () -> Unit = {}): BoolResult
 
   /**
-   * Update [id]'s PreAmp [amplitude]
+   * Update [presetId]'s PreAmp [amplitude]
    */
-  suspend fun updatePreAmp(id: EqPresetId, amplitude: Amp): BoolResult
+  suspend fun updatePreAmp(presetId: EqPresetId, amplitude: Amp): BoolResult
 
   /**
-   * Update [id]'s band [amplitude] at band column [index]
+   * Update [presetId]'s band [amplitude] at band column [index]
    */
-  suspend fun updateBand(id: EqPresetId, index: Int, amplitude: Amp): BoolResult
+  suspend fun updateBand(presetId: EqPresetId, index: Int, amplitude: Amp): BoolResult
 
   suspend fun deletePreset(id: EqPresetId): BoolResult
 
@@ -191,7 +191,7 @@ private class EqPresetDaoImpl(
   }
 
   override suspend fun updatePreAmp(
-    id: EqPresetId,
+    presetId: EqPresetId,
     amplitude: Amp
   ): BoolResult = runSuspendCatching {
     db.transaction {
@@ -200,25 +200,26 @@ private class EqPresetDaoImpl(
           it[preAmp] = amplitude()
           it[updatedTime] = Millis.currentUtcEpochMillis().value
         }
-        .where { this.id eq id.value }
+        .where { id eq presetId.value }
         .update() > 0
     }
   }
 
   override suspend fun updateBand(
-    id: EqPresetId,
+    presetId: EqPresetId,
     index: Int,
     amplitude: Amp
   ): BoolResult = runSuspendCatching {
     db.transaction {
       val columnIndices = EqPresetTable.bandColumns.indices
       require(index in columnIndices) { "Index $index not in bounds $columnIndices" }
-      EqPresetTable.updateColumns {
-        it[bandColumns[index]] = amplitude()
-        it[updatedTime] = Millis.currentUtcEpochMillis().value
-      }.where {
-        this.id eq id.value
-      }.update() > 0
+      EqPresetTable
+        .updateColumns {
+          it[bandColumns[index]] = amplitude()
+          it[updatedTime] = Millis.currentUtcEpochMillis().value
+        }
+        .where { id eq presetId.value }
+        .update() > 0
     }
   }
 
@@ -287,10 +288,11 @@ object NullEqPresetDao : EqPresetDao {
     duringTxn: () -> Unit
   ): BoolResult = NotImplemented
 
-  override suspend fun updatePreAmp(id: EqPresetId, amplitude: Amp): BoolResult = NotImplemented
+  override suspend fun updatePreAmp(presetId: EqPresetId, amplitude: Amp): BoolResult =
+    NotImplemented
 
   override suspend fun updateBand(
-    id: EqPresetId,
+    presetId: EqPresetId,
     index: Int,
     amplitude: Amp
   ): BoolResult = NotImplemented

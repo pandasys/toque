@@ -59,6 +59,7 @@ android {
     }
 
     release {
+      signingConfig = signingConfigs["debug"]
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -195,8 +196,6 @@ dependencies {
   implementation(Libs.Result.COROUTINES)
 
   implementation(Libs.Phoenix.PHOENIX)
-
-  implementation(Libs.GUAVA)
 
   testImplementation(Libs.JUnit.JUNIT)
   testImplementation(Libs.AndroidX.Test.CORE)

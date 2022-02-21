@@ -116,12 +116,9 @@ private fun AlbumItem(
       Image(
         painter = rememberImagePainter(
           data = albumInfo.artwork,
-          builder = {
-            error(R.drawable.ic_big_album)
-            placeholder(R.drawable.ic_big_album)
-          }
+          builder = { error(R.drawable.ic_big_album) }
         ),
-        contentDescription = stringResource(R.string.AlbumArt),
+        contentDescription = stringResource(R.string.Artwork),
         modifier = Modifier.size(56.dp)
       )
     },

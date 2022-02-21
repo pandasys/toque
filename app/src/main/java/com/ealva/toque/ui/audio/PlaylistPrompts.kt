@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
@@ -36,11 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.ealva.toque.R
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.db.PlaylistIdNameType
+import com.ealva.toque.ui.common.ToqueAlertDialog
 
 @Composable
 fun SelectPlaylistPrompt(
@@ -49,7 +48,7 @@ fun SelectPlaylistPrompt(
   listSelected: (PlaylistIdNameType) -> Unit,
   createPlaylist: () -> Unit
 ) {
-  AlertDialog(
+  ToqueAlertDialog(
     onDismissRequest = onDismiss,
     buttons = {},
     text = {
@@ -92,7 +91,7 @@ fun CreatePlaylistPrompt(
     name = newName
   }
 
-  AlertDialog(
+  ToqueAlertDialog(
     onDismissRequest = dismiss,
     buttons = {
       Row(
@@ -118,7 +117,7 @@ fun CreatePlaylistPrompt(
     },
     text = {
       OutlinedTextField(
-        modifier = Modifier.defaultMinSize(minWidth = 200.dp),
+        modifier = Modifier.fillMaxWidth(),
         value = name,
         onValueChange = { nameValidity(it) },
         label = { Text(text = stringResource(R.string.NewPlaylist)) },

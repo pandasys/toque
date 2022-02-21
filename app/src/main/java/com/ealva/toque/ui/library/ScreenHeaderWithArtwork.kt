@@ -32,7 +32,7 @@ import com.ealva.toque.R
 import com.ealva.toque.ui.common.LocalScreenConfig
 
 
-private val MIN_IMAGE_HEIGHT_PORTRAIT = 200.dp
+private val MIN_IMAGE_HEIGHT_PORTRAIT = 240.dp
 private val MIN_IMAGE_HEIGHT_LANDSCAPE = 150.dp
 
 @Composable

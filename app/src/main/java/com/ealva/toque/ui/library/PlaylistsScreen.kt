@@ -19,6 +19,7 @@ package com.ealva.toque.ui.library
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,12 +47,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.fetch
+import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
@@ -90,6 +93,7 @@ import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
+import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -120,7 +124,11 @@ private val LOG by lazyLogger(PlaylistsScreen::class)
 @Parcelize
 data class PlaylistsScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+
+  override fun getParentScopes(): List<String> = listOf(
+    LocalAudioQueueViewModel::class.java.name
+  )
 
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
@@ -240,11 +248,22 @@ private fun PlaylistItem(
           onLongClick = { itemLongClicked(playlistInfo) }
         ),
       icon = {
-        Icon(
-          painter = painterResource(id = playlistInfo.type.icon),
-          contentDescription = "Playlist Icon",
-          modifier = Modifier.size(40.dp)
-        )
+        if (playlistInfo.artwork !== Uri.EMPTY) {
+          Image(
+            painter = rememberImagePainter(
+              data = playlistInfo.artwork,
+              builder = { error(playlistInfo.type.icon) }
+            ),
+            contentDescription = stringResource(R.string.Artwork),
+            modifier = Modifier.size(56.dp)
+          )
+        } else {
+          Icon(
+            painter = painterResource(id = playlistInfo.type.icon),
+            contentDescription = "Playlist Icon",
+            modifier = Modifier.size(40.dp)
+          )
+        }
       },
       text = { ListItemText(text = playlistInfo.name.value) },
       secondaryText = {
@@ -299,7 +318,8 @@ private interface PlaylistsViewModel : ActionsViewModel {
     val id: PlaylistId,
     val name: PlaylistName,
     val type: PlayListType,
-    val songCount: Int
+    val songCount: Int,
+    val artwork: Uri
   ) : Parcelable
 
   val categoryItem: LibraryCategories.CategoryItem
@@ -348,6 +368,7 @@ private class PlaylistsViewModelImpl(
 ) : PlaylistsViewModel, ScopedServices.Registered, ScopedServices.HandlesBack, Bundleable {
   private lateinit var scope: CoroutineScope
   private val playlistDao: PlaylistDao = audioMediaDao.playlistDao
+  private val albumDao: AlbumDao = audioMediaDao.albumDao
 
   private val categories = LibraryCategories()
 
@@ -428,6 +449,16 @@ private class PlaylistsViewModelImpl(
     }
   }
 
+  private suspend fun PlaylistDescription.toPlaylistInfo() = PlaylistInfo(
+    id = id,
+    name = name,
+    type = type,
+    songCount = songCount.toInt(),
+    artwork = albumDao.getAlbumArtFor(id, type, name)
+      .onFailure { LOG.e { it("Error getting artwork for %s %s %s", id, type, name) } }
+      .getOrElse { Uri.EMPTY }
+  )
+
   override fun itemClicked(playlistInfo: PlaylistInfo) =
     selectedItems.ifInSelectionModeToggleElse(playlistInfo.id) { goToPlaylistSongs(playlistInfo) }
 
@@ -476,7 +507,7 @@ private class PlaylistsViewModelImpl(
         playlistId = playlistInfo.id,
         playListType = playlistInfo.type,
         playlistName = playlistInfo.name,
-        artwork = Uri.EMPTY,
+        artwork = playlistInfo.artwork,
         backTo = fetch(R.string.Playlists)
       )
     )
@@ -493,13 +524,6 @@ private class PlaylistsViewModelImpl(
     }
   }
 }
-
-private fun PlaylistDescription.toPlaylistInfo() = PlaylistInfo(
-  id = id,
-  name = name,
-  type = type,
-  songCount = songCount.toInt()
-)
 
 @Parcelize
 private data class PlaylistsViewModelState(val selected: SelectedItems<PlaylistId>) : Parcelable

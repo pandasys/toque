@@ -83,8 +83,6 @@ interface PlayableAudioItem : AudioItem {
     startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
-    timePlayed: Millis = Millis(0),
-    countFrom: Millis = Millis(0),
     startPaused: StartPaused = StartPaused(true)
   )
 
@@ -146,9 +144,7 @@ sealed interface PlayableItemEvent {
   data class PositionUpdate(
     val audioItem: PlayableAudioItem,
     val position: Millis,
-    val duration: Millis,
-    val timePlayed: Millis,
-    val countingFrom: Millis
+    val duration: Millis
   ) : PlayableItemEvent
 
   data class Start(
@@ -191,8 +187,6 @@ object NullPlayableAudioItem : PlayableAudioItem {
     startPosition: Millis,
     onPreparedTransition: PlayerTransition,
     playNow: PlayNow,
-    timePlayed: Millis,
-    countFrom: Millis,
     startPaused: StartPaused
   ) = Unit
 
