@@ -18,13 +18,16 @@
 
 package com.ealva.toque.test.service.player
 
-import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.service.player.TransitionPlayer
 import com.nhaarman.expect.fail
+import kotlin.time.Duration
 
 class TransitionPlayerStub : TransitionPlayer {
+  override val mediaTitle: Title = Title.UNKNOWN
+
   var _isPlaying = false
   var _isPlayingCalled = 0
   override val isPlaying: Boolean
@@ -84,9 +87,9 @@ class TransitionPlayerStub : TransitionPlayer {
       _allowVolumeChange = value
     }
 
-  var _remainingTime = Millis(0)
+  var _remainingTime = Duration.ZERO
   var _remainingTimeCalled = 0
-  override val remainingTime: Millis
+  override val remainingTime: Duration
     get() {
       _remainingTimeCalled++
       return _remainingTime
@@ -117,13 +120,6 @@ class TransitionPlayerStub : TransitionPlayer {
     _shutdownCalled++
   }
 
-  var _shouldContinue = false
-  var _shouldContinueCalled = 0
-  override fun shouldContinue(): Boolean {
-    _shouldContinueCalled++
-    return _shouldContinue
-  }
-
   fun verifyZeroInteractions() {
     when {
       _isPlayingCalled > 0 -> fail("isPlaying called")
@@ -138,7 +134,6 @@ class TransitionPlayerStub : TransitionPlayer {
       _pauseCalled > 0 -> fail("pause called")
       _playCalled > 0 -> fail("play called")
       _shutdownCalled > 0 -> fail("shutdown called")
-      _shouldContinueCalled > 0 -> fail("shouldContinue called")
     }
   }
 }

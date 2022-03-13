@@ -24,7 +24,6 @@ import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.provider.MediaStore
 import androidx.core.net.toUri
-import com.ealva.toque.common.Millis
 import com.ealva.toque.prefs.AppPrefsSingleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -32,6 +31,7 @@ import kotlinx.coroutines.flow.flow
 import java.io.File
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
 
 @JvmInline
 value class AudioContentId(val value: Long)
@@ -49,7 +49,7 @@ interface MediaStorage {
    * Get all audio [modifiedAfter] a particular time with a [minimumDuration]. There is no
    * particular ordering of the results.
    */
-  fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<AudioInfo>
+  fun audioFlow(modifiedAfter: Date, minimumDuration: Duration): Flow<AudioInfo>
 
   companion object {
     operator fun invoke(
@@ -98,7 +98,7 @@ private class MediaStorageImpl(
   fun Cursor.longColumnToDate(columnIndex: Int): Date =
     Date(TimeUnit.SECONDS.toMillis(getLong(columnIndex)))
 
-  override fun audioFlow(modifiedAfter: Date, minimumDuration: Millis): Flow<AudioInfo> = flow {
+  override fun audioFlow(modifiedAfter: Date, minimumDuration: Duration): Flow<AudioInfo> = flow {
     emitAudioCollection(externalAudioCollectionUri, modifiedAfter, minimumDuration)
     if (appPrefsSingleton.instance().scanInternalVolume()) {
       emitAudioCollection(internalAudioCollectionUri, modifiedAfter, minimumDuration)
@@ -108,7 +108,7 @@ private class MediaStorageImpl(
   private suspend fun FlowCollector<AudioInfo>.emitAudioCollection(
     collectionUri: Uri,
     modifiedAfter: Date,
-    minimumDuration: Millis
+    minimumDuration: Duration
   ) {
     resolver.query(
       collectionUri,
@@ -145,9 +145,10 @@ private class MediaStorageImpl(
     }
   }
 
-  private fun makeAudioQueryWhereClause(lastScan: Date, minimumDuration: Millis) =
+  private fun makeAudioQueryWhereClause(lastScan: Date, minimumDuration: Duration) =
     """${MediaStore.MediaColumns.DATE_MODIFIED} > ${TimeUnit.MILLISECONDS.toSeconds(lastScan.time)}
-      | AND ${MediaStore.Audio.Media.DURATION} >= ${minimumDuration()}""".trimMargin()
+      | AND ${MediaStore.Audio.Media.DURATION} >= ${minimumDuration.inWholeMilliseconds}"""
+      .trimMargin()
 
   private fun Long.albumArtFor(): Uri = ContentUris.withAppendedId(ARTWORK_URI, this).let { uri ->
     if (uri.exists()) uri else Uri.EMPTY

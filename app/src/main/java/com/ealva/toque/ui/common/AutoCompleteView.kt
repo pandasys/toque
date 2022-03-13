@@ -30,11 +30,13 @@ import androidx.compose.material.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.log._e
 
+@Suppress("unused")
 private val LOG by lazyLogger("AutoCompleteView")
 
 @Composable
@@ -79,6 +81,7 @@ fun AutoCompleteTextView(
   modifier: Modifier = Modifier,
   query: String,
   suggestions: List<String>,
+  capitalization: KeyboardCapitalization,
   isError: Boolean,
   onTextChanged: (String) -> Unit,
   onSelected: (String) -> Unit,
@@ -95,6 +98,7 @@ fun AutoCompleteTextView(
     QuerySearch(
       modifier = Modifier.fillMaxWidth(),
       query = query,
+      capitalization = capitalization,
       label = label,
       isError = isError,
       onQueryChanged = onTextChanged,

@@ -273,6 +273,8 @@
   <string name="LeastRecentlyAdded">Least Recently Added</string>
   <string name="MostRecentlyPlayed">Most Recently Played</string>
   <string name="LeastRecentlyPlayed">Least Recently Played</string>
+  <string name="MostOftenSkipped">Most Often Skipped</string>
+  <string name="MostRecentlySkipped">Most Recently Skipped</string>
   <string name="NewSmartPlaylist">New Smart Playlist</string>
   <string name="SmartPlaylistEditor">Smart Playlist Editor</string>
   <string name="Name">Name</string>

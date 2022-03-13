@@ -59,7 +59,8 @@ object CommonQueueStateDaoTest {
       }
       dao.getState().let { result ->
         expect(result).toBeInstanceOf<Ok<QueuePositionState>>()
-        expect(result.get()).toBe(QueuePositionState(mediaId, queueIndex + 10, playbackPosition))
+        expect(result.get())
+          .toBe(QueuePositionState(mediaId, queueIndex + 10, playbackPosition))
       }
     }
   }

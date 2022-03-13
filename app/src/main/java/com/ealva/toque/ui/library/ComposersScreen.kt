@@ -65,6 +65,7 @@ import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
 import com.ealva.toque.ui.library.LibraryCategories.CategoryItem
@@ -429,7 +430,9 @@ private class ComposersViewModelImpl(
 
   override fun itemLongClicked(composerId: ComposerId) = selectedItems.toggleSelection(composerId)
 
-  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedItems
+    .inSelectionModeThenTurnOff()
+    .cancelFlingOnBack(composerFlow)
 
   override fun toBundle(): StateBundle = StateBundle().apply {
     putParcelable(KEY_MODEL_STATE, ComposersViewModelState(selectedItems.value))

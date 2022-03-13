@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.player
+package com.ealva.toque.android.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.NullSuspendingThrottle
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.service.player.FadeInTransition
+import com.ealva.toque.service.player.PauseFadeOutTransition
+import com.ealva.toque.service.player.PauseImmediateTransition
+import com.ealva.toque.service.player.PlayImmediateTransition
+import com.ealva.toque.service.player.ShutdownFadeOutTransition
+import com.ealva.toque.service.player.ShutdownImmediateTransition
 import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
@@ -28,9 +32,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class PauseFadeoutTransitionTest {
+class PlayImmediateTransitionTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
@@ -40,56 +45,44 @@ class PauseFadeoutTransitionTest {
   @Before
   fun init() {
     player = TransitionPlayerStub()
-    transition = PauseFadeOutTransition(
-      Millis(2000),
-      NullSuspendingThrottle,
-      coroutineRule.testDispatcher
-    )
+    transition = PlayImmediateTransition()
     transition.setPlayer(player)
   }
 
   @Test
   fun isPlaying() {
-    player._isPlaying = true
-    expect(transition.isPlaying).toBe(false) // shouldn't ask the player, always true
+    player._isPlaying = false
+    player._isPaused = true
+    expect(transition.isPlaying).toBe(false)
+    expect(transition.isPaused).toBe(true)
   }
 
   @Test
   fun isPaused() {
+    player._isPlaying = true
     player._isPaused = false
-    expect(transition.isPaused).toBe(true) // shouldn't ask the player, always false
+    expect(transition.isPlaying).toBe(true)
+    expect(transition.isPaused).toBe(false)
   }
 
   @Test
   fun accept() {
-    expect(transition.accept(PlayImmediateTransition())).toBe(true)
-    expect(transition.accept(FadeInTransition(Millis(0), false))).toBe(true)
-    expect(transition.accept(ShutdownFadeOutTransition(Millis(0)))).toBe(false)
+    expect(transition.accept(PlayImmediateTransition())).toBe(false)
+    expect(transition.accept(FadeInTransition(Duration.ZERO))).toBe(false)
+    expect(transition.accept(ShutdownFadeOutTransition(Duration.ZERO))).toBe(true)
     expect(transition.accept(ShutdownImmediateTransition())).toBe(true)
-    expect(transition.accept(PauseImmediateTransition())).toBe(false)
-    expect(transition.accept(PauseFadeOutTransition(Millis(0)))).toBe(false)
+    expect(transition.accept(PauseImmediateTransition())).toBe(true)
+    expect(transition.accept(PauseFadeOutTransition(Duration.ZERO))).toBe(true)
   }
 
   @Test
   fun execute() = runTest {
-    // given
-    player._volume = Volume.MAX
-    player._isPlaying = true
-    player._remainingTime = Millis(2000)
-    player._shouldContinue = true
-
-    // when
+    transition.setPlayer(player)
     transition.execute()
-
-    // then
-    expect(player._shutdownCalled).toBe(0)
-    expect(player._pauseCalled).toBe(1)
-    expect(player._notifyPausedCalled).toBe(1)
-    expect(player._volumeGetCalled).toBe(1)
-    expect(player._shouldContinueCalled).toBeGreaterThan(0)
-    expect(player._remainingTimeCalled).toBe(1)
-    expect(player._volumeSetCalled).toBeGreaterThan(20)
-    expect(player._volume).toBe(Volume.NONE)
+    expect(player._playCalled).toBe(1)
+    expect(player._volumeSetCalled).toBe(1)
+    expect(player._volume).toBe(Volume.MAX)
+    expect(player._notifyPlayingCalled).toBe(1)
     expect(transition.isCancelled).toBe(false)
     expect(transition.isFinished).toBe(true)
   }

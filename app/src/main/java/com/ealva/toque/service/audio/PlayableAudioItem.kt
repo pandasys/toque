@@ -28,11 +28,12 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.MayFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlin.time.Duration
 
 interface PlayableAudioItem : AudioItem {
   val eventFlow: Flow<PlayableItemEvent>
@@ -49,11 +50,11 @@ interface PlayableAudioItem : AudioItem {
 
   var playbackRate: PlaybackRate
 
-  fun play(forceTransition: ForceTransition)
+  fun play(mayFade: MayFade)
 
   fun stop()
 
-  fun pause(forceTransition: ForceTransition)
+  fun pause(mayFade: MayFade)
 
   fun togglePlayPause()
 
@@ -170,13 +171,13 @@ object NullPlayableAudioItem : PlayableAudioItem {
   override val isPlaying: Boolean = false
   override val isPausable: Boolean = false
   override val supportsFade: Boolean = false
-  override fun play(forceTransition: ForceTransition) = Unit
+  override fun play(mayFade: MayFade) = Unit
   override fun stop() = Unit
-  override fun pause(forceTransition: ForceTransition) = Unit
+  override fun pause(mayFade: MayFade) = Unit
   override fun togglePlayPause() = Unit
   override fun seekTo(position: Millis) = Unit
   override val position: Millis = Millis(0)
-  override val duration: Millis = Millis(0)
+  override val duration: Duration = Duration.ZERO
   override val albumId: AlbumId = AlbumId.INVALID
   override var playbackRate: PlaybackRate = PlaybackRate.NORMAL
   override fun shutdown() = Unit

@@ -29,6 +29,11 @@ import com.ealva.toque.service.player.TransitionPlayer
  * between media before a transition completes.
  */
 interface PlayerTransition {
+  /**
+   * [Type] represents the final state of the transition if it runs to completion
+   */
+  val type: Type
+
   /** Has the transition finished, either by completing or being cancelled */
   val isFinished: Boolean
 
@@ -67,17 +72,12 @@ interface PlayerTransition {
   /**
    * Execute the transition
    */
-  suspend fun execute()
+  fun execute()
 
   /**
    * Notify this transition that it should "wrap it up" ASAP
    */
   fun setCancelled()
-
-  /**
-   * [Type] represents the final state of the transition if it runs to completion
-   */
-  val type: Type
 
   /**
    * Represents the type of transition - the final player state if the transition runs to

@@ -42,8 +42,8 @@ import com.ealva.toque.scanner.MediaScannerService
 import com.ealva.toque.service.audio.LocalAudioCommand.DeferredResult
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.queue.ClearQueue
-import com.ealva.toque.service.queue.ForceTransition
-import com.ealva.toque.service.queue.ForceTransition.AllowFade
+import com.ealva.toque.service.queue.MayFade
+import com.ealva.toque.service.queue.MayFade.AllowFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.server.MediaSessionBrowser
 import com.ealva.toque.service.session.server.MediaSessionControl
@@ -105,8 +105,8 @@ class LocalAudioCommandProcessor(
 
   override fun goToQueueItem(instanceId: InstanceId) = asyncCommand { goToQueueItem(instanceId) }
   override fun seekTo(position: Millis) = asyncCommand { seekTo(position) }
-  override fun play(forceTransition: ForceTransition) = asyncCommand { play(forceTransition) }
-  override fun pause(forceTransition: ForceTransition) = asyncCommand { pause(forceTransition) }
+  override fun play(mayFade: MayFade) = asyncCommand { play(mayFade) }
+  override fun pause(mayFade: MayFade) = asyncCommand { pause(mayFade) }
   override fun stop() = asyncCommand { stop() }
   override fun togglePlayPause() = asyncCommand { togglePlayPause() }
   override fun next() = asyncCommand { next() }

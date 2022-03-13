@@ -554,7 +554,8 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
           val view = existingView(playlistName.value, forceQuoteName = true)
           val viewId = view.column(MediaTable.id, MediaTable.id.name)
           getArtwork(
-            join = view.join(AlbumTable, JoinType.INNER, viewId, AlbumTable.id),
+            join = view.join(MediaTable, JoinType.INNER, viewId, MediaTable.id)
+              .join(AlbumTable, JoinType.INNER, MediaTable.albumId, AlbumTable.id),
             where = viewId.isNotNull()
           )
         }

@@ -18,6 +18,7 @@ package com.ealva.toque.ui.library.smart
 
 import android.os.Parcelable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -65,6 +66,7 @@ sealed interface EditorRule : Parcelable {
     val editing: Boolean,
     val nameValidity: SmartPlaylistEditorViewModel.NameValidity,
     val suggestions: List<String>,
+    val capitalization: KeyboardCapitalization
   ) : EditorRule
 
   @Immutable
@@ -308,7 +310,8 @@ private suspend fun makeTextEditorRuleWithSuggestions(
     rule = Rule(ruleId, ruleField, matcher, data),
     editing = showSuggestions,
     nameValidity = newName.isValidName,
-    suggestions = suggestions
+    suggestions = suggestions,
+    capitalization = KeyboardCapitalization.Words
   )
 }
 
@@ -326,10 +329,8 @@ private suspend fun makeTitleEditorRule(
   showSuggestions = update.showSuggestions
 ) { partial, textSearch ->
   audioMediaDao.getTitleSuggestions(partial, textSearch)
-    .getOrElse { cause ->
-      LOG.e(cause) { it("Error getting Title suggestions.") }
-      emptyList()
-    }
+    .onFailure { cause -> LOG.e(cause) { it("Error getting Title suggestions.") } }
+    .getOrElse { emptyList() }
 }
 
 private suspend fun makeAlbumEditorRule(
@@ -435,7 +436,8 @@ private fun makeCommentEditorRule(
     rule = Rule(ruleId, RuleField.Comment, matcher, data),
     editing = false,
     nameValidity = SmartPlaylistEditorViewModel.NameValidity.IsValid,
-    suggestions = emptyList()
+    suggestions = emptyList(),
+    capitalization = KeyboardCapitalization.Sentences
   )
 
 private suspend fun makePlaylistEditorRule(

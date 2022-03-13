@@ -24,6 +24,9 @@ import com.ealva.toque.db.smart.SmartPlaylistRuleTable
 import com.ealva.toque.db.smart.SmartPlaylistTable
 import com.ealva.welite.db.table.ForeignKeyAction
 import com.ealva.welite.db.table.Table
+import com.ealva.welite.db.table.duration
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
 
 val setOfAllTables = setOf(
   ArtistTable,
@@ -159,7 +162,7 @@ object MediaTable : Table() {
 
   val year = integer("MediaYear") { default(0) }
   val rating = integer("MediaRating") { default(-1) }
-  val duration = long("MediaDuration") { default(0) }
+  val duration = duration("MediaDuration", DurationUnit.MILLISECONDS) { default(Duration.ZERO) }
   val trackNumber = integer("MediaTrackNumber") { default(0) }
   val totalTracks = integer("MediaTotalTracks") { default(0) }
   val discNumber = integer("MediaDiscNumber") { default(0) }
@@ -381,8 +384,6 @@ object QueueStateTable : Table() {
   val mediaId = long("QueueState_MediaId") { default(-1) }
   val queueIndex = integer("QueueState_QueueIndex") { default(0) }
   val playbackPosition = long("QueueState_PlaybackPosition") { default(0) }
-  val timePlayed = long("QueueState_TimePlayed") { default(0) }
-  val countingFrom = long("QueueState_CountingFrom") { default(0) }
 }
 
 object PlayListTable : Table() {

@@ -20,15 +20,15 @@ import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.EntityArtwork
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.MediaId
+import kotlin.time.Duration
 
 data class AudioDescription(
   val mediaId: MediaId,
   val title: Title,
-  val duration: Millis,
+  val duration: Duration,
   val rating: Rating,
   val album: AlbumTitle,
   val artist: ArtistName,

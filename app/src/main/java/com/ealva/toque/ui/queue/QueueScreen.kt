@@ -59,6 +59,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.InstanceId
@@ -419,7 +420,9 @@ private class QueueViewModelImpl(
   override fun selectAll() = selectedFlow.selectAll(getSongKeys())
   private fun getSongKeys() = queueState.value.queue.mapTo(mutableSetOf()) { it.instanceId }
   override fun clearSelection() = selectedFlow.clearSelection()
-  override fun onBackEvent(): Boolean = selectedFlow.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedFlow
+    .inSelectionModeThenTurnOff()
+    .also { if (!it) queueState.value = QueueState(emptyList(), -1) } // if going back, clear Q
 
   override fun swapViewItems(index1: Int, index2: Int) {
     inDragMode.value = true

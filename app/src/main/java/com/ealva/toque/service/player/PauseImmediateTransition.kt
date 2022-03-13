@@ -23,7 +23,7 @@ import com.ealva.toque.service.audio.PlayerTransition.Type
  * Immediately pause a player
  */
 class PauseImmediateTransition : BasePlayerTransition(Type.Pause) {
-  override suspend fun doExecute(player: TransitionPlayer) {
+  override fun doExecute(player: TransitionPlayer) {
     player.playerVolume = Volume.NONE
     player.pause()
     player.notifyPaused()

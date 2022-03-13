@@ -54,6 +54,9 @@ import java.io.IOException
 import java.nio.charset.Charset
 import java.text.DecimalFormat
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 private val LOG by lazyLogger(SongTag::class)
 
@@ -270,7 +273,7 @@ class SongTag(
           appendFormattedSampleRate(header)
           append(COMMA_SPACE)
 
-          append(getTrackDuration(TimeUnit.SECONDS))
+          append(getTrackDuration().inWholeSeconds)
           append(" sec, ")
 
           append(audioFile.file.length() / 1000)
@@ -297,8 +300,8 @@ class SongTag(
   val nowPlaying: String
     get() = referenceAlbumArtist
 
-  val duration: Long
-    get() = getTrackDuration(TimeUnit.MILLISECONDS)
+  val duration: Duration
+    get() = getTrackDuration()
 
   var trackNumber: Int
     get() = getFirstAsInt(FieldKey.TRACK, FallbackSplit.First)
@@ -442,8 +445,8 @@ class SongTag(
     }
   }
 
-  fun getTrackDuration(asUnit: TimeUnit): Long {
-    return header.getDuration(asUnit, true)
+  fun getTrackDuration(): Duration {
+    return header.getDuration(TimeUnit.MILLISECONDS, true).toDuration(DurationUnit.MILLISECONDS)
   }
 
   private fun deleteField(key: FieldKey): Boolean {

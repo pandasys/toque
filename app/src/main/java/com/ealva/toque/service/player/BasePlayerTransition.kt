@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,36 +16,26 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.audio.PlayerTransition.Type
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 
-@Suppress("NOTHING_TO_INLINE")
-inline operator fun Volume.div(rhs: Millis): Volume = Volume(value / rhs().toInt())
-
-/**
- * Concrete transitions subclass this and only need implement [doExecute] and anything
- * supporting that.
- */
-abstract class BasePlayerTransition(override val type: Type) : PlayerTransition {
-  private var complete: Boolean = false
+abstract class BasePlayerTransition(
+  override val type: PlayerTransition.Type,
+  dispatcher: CoroutineDispatcher = Dispatchers.Default,
+) : PlayerTransition {
+  protected val scope = CoroutineScope(Job() + dispatcher)
   private var player: TransitionPlayer = NullTransitionPlayer
+  private var complete = false
 
-  final override var isCancelled: Boolean = false
-
-  override val isFinished: Boolean
-    get() = isCancelled || complete
-
-  private var isExecuting = false
-  override val isActive: Boolean
-    get() = isExecuting && !isFinished
-
-  override val isPaused: Boolean
-    get() = player.isPaused
-
-  override val isPlaying: Boolean
-    get() = player.isPlaying
+  override val isFinished: Boolean get() = isCancelled || complete
+  override val isActive: Boolean get() = !isFinished
+  override val isPlaying: Boolean get() = player.isPlaying
+  override val isPaused: Boolean get() = player.isPaused
+  override var isCancelled: Boolean = false
 
   override fun accept(nextTransition: PlayerTransition): Boolean =
     type.canTransitionTo(nextTransition.type)
@@ -54,35 +44,32 @@ abstract class BasePlayerTransition(override val type: Type) : PlayerTransition 
     player = transitionPlayer
   }
 
-  final override suspend fun execute() {
+  override fun execute() {
     if (!isFinished) {
-      isExecuting = true
       doExecute(player)
-      // setting isExecuting to false is likely redundant as all transitions should mark complete or
-      // canceled before doExecute ends. But isActive depends on this so we'll set it
-      isExecuting = false
     }
   }
 
-  /** Subclasses must override this to perform the actual transition */
-  protected abstract suspend fun doExecute(player: TransitionPlayer)
+  protected abstract fun doExecute(player: TransitionPlayer)
 
   override fun setCancelled() {
-    isCancelled = true
+    if (!isFinished) {
+      isCancelled = true
+      scope.cancel()
+      cancelTransition(player)
+    }
   }
 
-  fun setComplete() {
+  protected open fun cancelTransition(player: TransitionPlayer) = Unit
+
+  protected fun setComplete() {
     complete = true
-  }
-
-  fun shouldContinueTransition(player: TransitionPlayer): Boolean {
-    return !isFinished && player.shouldContinue()
   }
 }
 
 /**
  * Does nothing (obviously)
  */
-object NoOpPlayerTransition : BasePlayerTransition(Type.NoOp) {
-  override suspend fun doExecute(player: TransitionPlayer) = setComplete()
+object NoOpPlayerTransition : BasePlayerTransition(PlayerTransition.Type.NoOp) {
+  override fun doExecute(player: TransitionPlayer) = setComplete()
 }

@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import com.ealva.toque.ui.theme.toqueTypography
 
@@ -39,6 +40,7 @@ import com.ealva.toque.ui.theme.toqueTypography
 fun QuerySearch(
   modifier: Modifier = Modifier,
   query: String,
+  capitalization: KeyboardCapitalization,
   label: @Composable (() -> Unit)? = null,
   isError: Boolean = false,
   onDoneActionClick: () -> Unit = {},
@@ -76,7 +78,11 @@ fun QuerySearch(
       onDoneActionClick()
 //      focusManager.moveFocus(FocusDirection.Next)
     }),
-    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done, keyboardType = KeyboardType.Text)
+    keyboardOptions = KeyboardOptions(
+      capitalization = capitalization,
+      imeAction = ImeAction.Done,
+      keyboardType = KeyboardType.Text
+    )
   )
 //
 //  LaunchedEffect(Unit) {

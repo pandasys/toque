@@ -111,6 +111,7 @@ import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import kotlin.time.DurationUnit
 
 private object NowPlayingScreenIds {
   const val ID_SLIDER_SPACE = 1
@@ -370,7 +371,7 @@ private fun PlayerControls(
       Spacer(modifier = Modifier.layoutId(ID_SLIDER_SPACE))
       PositionSlider(
         state.position,
-        0F..state.duration.toFloat(),
+        0F..state.duration.toDouble(DurationUnit.MILLISECONDS).toFloat(),
         seekTo,
         modifier = Modifier
           .layoutId(ID_POSITION_SLIDER)

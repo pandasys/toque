@@ -14,110 +14,75 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE")
-
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.SuspendingThrottle
-import com.ealva.toque.common.Volume
+import com.ealva.toque.flow.CountDownFlow
 import com.ealva.toque.service.audio.PlayerTransition.Type
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
-private const val VOLUME_HACK_DELAY = 10L
-private const val PERMITS_PER_SECOND = 10.0 // 100 millis per permit
-
-private val ADJUST_FROM_END = Millis(200)
-private val MIN_FADE_LENGTH = Millis(100)
-private val MIN_VOLUME_STEP = Volume.ONE
+private val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
+private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
 
 /**
- * A play transition that fades in volume
+ * PlayerTransition that fades in from start volume to max volume over [requestedDuration]. We will
+ * use a [CountDownFlow] over the fade length which will emit approximately every [MIN_FADE_LENGTH].
+ * An emission contains the remaining duration of the fade and we will calculate the desired volume
+ * from that remaining time.
+ *
+ * We calculate a factor which when multiplied by the remaining duration of fade, and subtracted
+ * from max volume, gives the desired volume. The [requestedDuration] may be adjusted down if the
+ * start volume is not 0. If the user changes media rapidly, or rapidly presses play/pause, a fade
+ * out may not have reached min volume, so fading in can be shortened - no reason to set the same
+ * volume repeatedly.
  */
 class FadeInTransition(
-  /** Requested length of fade in millis may be adjusted depending on remaining duration */
-  private val requestedFadeLength: Millis,
-  /** The player's current volume is used as starting volume unless this is true */
-  private val forceStartVolumeZero: Boolean = false,
-  /** The throttle only need be changed for test */
-  private val throttle: SuspendingThrottle = SuspendingThrottle(PERMITS_PER_SECOND),
-  /** The dispatcher only need be changed for test */
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
-) : BasePlayerTransition(Type.Play) {
+  /** Requested fade duration, may be adjusted depending on remaining duration */
+  private val requestedDuration: Duration,
+  dispatcher: CoroutineDispatcher = Dispatchers.Default
+) : BasePlayerTransition(Type.Play, dispatcher) {
 
   override val isPlaying: Boolean = true
   override val isPaused: Boolean = false
 
-  override suspend fun doExecute(player: TransitionPlayer) {
-    val cancelVolume = player.volumeRange.endInclusive + Volume.ONE
+  override fun doExecute(player: TransitionPlayer) {
+    val startVolume = player.playerVolume
+    val maxVolume = player.volumeRange.endInclusive
+    val minFadeStartVolumeAdjustment = (requestedDuration * (maxVolume - startVolume).value / 100.0)
+    val duration: Duration = requestedDuration
+      .coerceAtMost(player.remainingTime - ADJUST_FROM_END)
+      .coerceAtMost(minFadeStartVolumeAdjustment)
 
-    supervisorScope {
-      launch(dispatcher) {
-        player.notifyPlaying()
-        val startVolume: Volume = player.getStartVolume()
-        val endVolume: Volume = player.volumeRange.endInclusive
-        if (shouldContinueTransition(player)) {
-          player.playerVolume = startVolume
-          if (!player.isPlaying) {
-            player.play()
-            // VLC HACK START
-            // YES delay - Vlc not setting volume to zero properly - causing audio squawk at song
-            // start and this nasty hack seems to fix it on my device. Who knows about other
-            // devices?? This is necessary, and works most of the time, to properly set the volume.
-            // Also, unsure if this is dependent on OpenSl ES vs Audio Track
-            player.playerVolume = startVolume
-            delay(VOLUME_HACK_DELAY)
-          }
-          player.playerVolume = startVolume
-          // VLC HACK END
+    if (duration > MIN_FADE_LENGTH) {
+      val countDownFlow = CountDownFlow(duration, MIN_FADE_LENGTH)
+      val multiplier = (maxVolume - startVolume).value.toDouble() / duration.inWholeMilliseconds
 
-          val remaining: Millis =
-            requestedFadeLength.coerceAtMost(player.remainingTime - ADJUST_FROM_END)
-
-          if (remaining > MIN_FADE_LENGTH) {
-            val stepLength: Millis = remaining / MIN_FADE_LENGTH
-            val volumeChange =
-              ((endVolume - startVolume) / stepLength).coerceAtLeast(MIN_VOLUME_STEP)
-
-            var currentVolume = startVolume
-            while (currentVolume <= endVolume) {
-              currentVolume = (currentVolume + volumeChange).coerceAtMost(endVolume)
-              player.playerVolume = currentVolume
-              if (shouldContinueTransition(player)) {
-                if (currentVolume >= endVolume) {
-                  currentVolume = cancelVolume
-                  setComplete()
-                } else {
-                  // If using default throttle, sleep until at least 100 millis have passed
-                  throttle.acquire()
-                }
-              } else {
-                currentVolume = cancelVolume
-                setCancelled()
-              }
-            }
-          } else {
-            player.playerVolume = endVolume
-            setComplete()
-          }
-        }
-      }
+      countDownFlow
+        .onStart { startAndNotify(player) }
+        .onEach { remaining -> player.playerVolume = maxVolume - remaining.asVolume(multiplier) }
+        .onCompletion { cause -> if (cause == null) setComplete() }
+        .launchIn(scope)
+    } else {
+      player.playerVolume = player.volumeRange.endInclusive
+      setComplete()
     }
   }
 
-  private fun TransitionPlayer.getStartVolume(): Volume {
-    return if (forceStartVolumeZero) Volume.NONE else playerVolume
+  private fun startAndNotify(player: TransitionPlayer) {
+    if (!player.isPlaying) player.play()
+    player.notifyPlaying()
   }
 
   override fun toString(): String = buildString {
     append("FadeInTransition(requestedFadeLength=")
-    append(requestedFadeLength)
-    append(" forceStartVolumeZero=")
-    append(forceStartVolumeZero)
+    append(requestedDuration)
     append(')')
   }
 }

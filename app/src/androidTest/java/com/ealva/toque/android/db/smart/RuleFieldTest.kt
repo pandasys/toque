@@ -46,8 +46,9 @@ import org.junit.runner.RunWith
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
-import java.util.concurrent.TimeUnit.MILLISECONDS
-import java.util.concurrent.TimeUnit.SECONDS
+import kotlin.time.DurationUnit
+import kotlin.time.ExperimentalTime
+import kotlin.time.toDuration
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -324,6 +325,7 @@ class RuleFieldTest {
   fun testLastSkippedBadMatcher() {
     RuleField.LastSkipped.makeWhereClause(TextMatcher.Is, MatcherData.EMPTY)
   }
+  @ExperimentalTime
   @Test
   fun testDuration() {
     val field = RuleField.Duration
@@ -332,8 +334,8 @@ class RuleFieldTest {
     }
     expectSuggestionProviderNotCalled(field)
     val matcher = DurationMatcher.Is
-    val first: Long = 777888
-    val asMillis = SECONDS.toMillis(MILLISECONDS.toSeconds(first))
+    val first: Long = 777000
+    val asMillis = 777.toDuration(DurationUnit.SECONDS).inWholeMilliseconds
     val low = asMillis - 500
     val high = asMillis + 499
     val data = MatcherData("", first, 0)

@@ -27,42 +27,56 @@ import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.notBetween
 import com.ealva.welite.db.table.Column
 import kotlinx.parcelize.Parcelize
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeUnit.MILLISECONDS
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
+/**
+ * The user will specify duration in seconds, but will be stored in milliseconds. So,
+ * [MatcherData.first] and [MatcherData.second] are [DurationUnit.MILLISECONDS] but effectively
+ * rounded to seconds. Because the user deals with seconds but the media length is milliseconds, we
+ * need to account for conversion of milliseconds to seconds. For example, [Is] (equals) must use
+ * [between] because 500 milliseconds rounds up to a second boundary and 499 rounds down to a second
+ * boundary.
+ */
 @Suppress("unused")
 @Parcelize
 enum class DurationMatcher(
   override val id: Int,
   @StringRes private val stringRes: Int
-) : Matcher<Long> {
+) : Matcher<Duration> {
   Is(1, R.string.is_) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
-      val seconds = TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first))
-      return column.between(seconds - 500, seconds + 499)
+    override fun makeClause(column: Column<Duration>, first: Long, second: Long): Op<Boolean> {
+      val millis = first.toDuration(DurationUnit.MILLISECONDS)
+      return column.between(millis - 500.milliseconds, millis + 499.milliseconds)
     }
   },
   IsNot(2, R.string.is_not) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> {
-      val seconds = TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first))
-      return column.notBetween(seconds - 500, seconds + 499)
+    override fun makeClause(column: Column<Duration>, first: Long, second: Long): Op<Boolean> {
+      val millis = first.toDuration(DurationUnit.MILLISECONDS)
+      return column.notBetween(millis - 500.milliseconds, millis + 499.milliseconds)
     }
   },
   IsGreaterThan(3, R.string.is_greater_than) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column greater TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first)) + 499
-
+    override fun makeClause(column: Column<Duration>, first: Long, second: Long): Op<Boolean> {
+      val millis = first.toDuration(DurationUnit.MILLISECONDS)
+      return column greater (millis + 499.milliseconds)
+    }
   },
   IsLessThan(4, R.string.is_less_than) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column less TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first)) - 500
+    override fun makeClause(column: Column<Duration>, first: Long, second: Long): Op<Boolean> {
+      val seconds = first.toDuration(DurationUnit.MILLISECONDS)
+      return column less (seconds - 500.milliseconds)
+    }
   },
   IsInTheRange(5, R.string.is_in_the_range) {
-    override fun makeClause(column: Column<Long>, first: Long, second: Long): Op<Boolean> =
-      column.between(
-        TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(first)) - 500,
-        TimeUnit.SECONDS.toMillis(MILLISECONDS.toSeconds(second)) + 499
+    override fun makeClause(column: Column<Duration>, first: Long, second: Long): Op<Boolean> {
+      return column.between(
+        first.toDuration(DurationUnit.MILLISECONDS) - 500.milliseconds,
+        second.toDuration(DurationUnit.MILLISECONDS) + 499.milliseconds
       )
+    }
 
     override fun willAccept(data: MatcherData): Boolean =
       data.first >= 0 && data.second > 0 && data.second > data.first
@@ -77,11 +91,11 @@ enum class DurationMatcher(
     }
   };
 
-  override fun makeWhereClause(column: Column<Long>, data: MatcherData): Op<Boolean> =
+  override fun makeWhereClause(column: Column<Duration>, data: MatcherData): Op<Boolean> =
     makeClause(column, data.first, data.second)
 
   protected abstract fun makeClause(
-    column: Column<Long>,
+    column: Column<Duration>,
     first: Long,
     second: Long
   ): Op<Boolean>

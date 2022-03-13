@@ -28,11 +28,11 @@ import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoResult
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.art.SelectAlbumArtScreen
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.back
@@ -167,7 +167,9 @@ abstract class BaseAlbumsViewModel(
     backstack.back()
   }
 
-  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedItems
+    .inSelectionModeThenTurnOff()
+    .cancelFlingOnBack(albumFlow)
 
   protected open val stateKey: String
     get() = javaClass.name

@@ -66,6 +66,7 @@ import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.GenresViewModel.GenreInfo
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
@@ -426,7 +427,9 @@ private class GenresViewModelImpl(
 
   override fun itemLongClicked(genreId: GenreId) = selectedItems.toggleSelection(genreId)
 
-  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedItems
+    .inSelectionModeThenTurnOff()
+    .cancelFlingOnBack(genreFlow)
 
   override fun toBundle(): StateBundle = StateBundle().apply {
     putParcelable(KEY_MODEL_STATE, GenresViewModelState(selectedItems.value))

@@ -28,6 +28,7 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.MediaId
+import kotlin.time.Duration
 
 @Immutable
 data class FullAudioInfo(
@@ -41,7 +42,7 @@ data class FullAudioInfo(
   val totalTracks: Int,
   val disc: Int,
   val totalDiscs: Int,
-  val duration: Millis,
+  val duration: Duration,
   val year: Int,
   val composer: ComposerName,
   val rating: StarRating,

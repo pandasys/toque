@@ -19,11 +19,11 @@ package com.ealva.toque.db
 import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
+import kotlin.time.Duration
 
 data class AudioQueueItemData(
   val id: MediaId,
@@ -36,7 +36,7 @@ data class AudioQueueItemData(
   val albumId: AlbumId,
   val artists: Set<ArtistName>,
   val rating: Rating,
-  val duration: Millis,
+  val duration: Duration,
   val trackNumber: Int,
   val localAlbumArt: Uri,
   val albumArt: Uri

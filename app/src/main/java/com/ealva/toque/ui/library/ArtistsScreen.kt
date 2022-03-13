@@ -78,6 +78,7 @@ import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
+import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
@@ -554,7 +555,9 @@ private class ArtistsViewModelImpl(
 
   override fun itemLongClicked(artistId: ArtistId) = selectedItems.toggleSelection(artistId)
 
-  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedItems
+    .inSelectionModeThenTurnOff()
+    .cancelFlingOnBack(artistFlow)
 }
 
 @Parcelize

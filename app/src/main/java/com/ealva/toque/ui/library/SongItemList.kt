@@ -33,7 +33,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.MediaId
@@ -44,6 +43,8 @@ import com.ealva.toque.ui.common.makeScreenConfig
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 @ExperimentalFoundationApi
 @OptIn(ExperimentalMaterialApi::class)
@@ -57,6 +58,8 @@ fun SongItemList(
 ) {
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
+
+  listState.isScrollInProgress
 
   LibraryScrollBar(
     listState = listState,
@@ -100,7 +103,7 @@ fun SongItemListPreview() {
     SongsViewModel.SongInfo(
       id = MediaId(1),
       title = Title("A Song title"),
-      duration = Millis(178000),
+      duration = 178000.toDuration(DurationUnit.MILLISECONDS),
       rating = Rating.RATING_4,
       album = AlbumTitle("Album Title 1"),
       artist = ArtistName("Artist Name 1"),
@@ -109,7 +112,7 @@ fun SongItemListPreview() {
     SongsViewModel.SongInfo(
       id = MediaId(2),
       title = Title("Happy Little Ditty"),
-      duration = Millis(500),
+      duration = 500.toDuration(DurationUnit.MILLISECONDS),
       rating = Rating.RATING_4_5,
       album = AlbumTitle("Rock Thrash"),
       artist = ArtistName("Princess"),
@@ -118,7 +121,7 @@ fun SongItemListPreview() {
     SongsViewModel.SongInfo(
       id = MediaId(3),
       title = Title("Instead Here"),
-      duration = Millis(1178000),
+      duration = 1178000.toDuration(DurationUnit.MILLISECONDS),
       rating = Rating.RATING_5,
       album = AlbumTitle("Metal Country Soulish"),
       artist = ArtistName("Harvey Wilder"),

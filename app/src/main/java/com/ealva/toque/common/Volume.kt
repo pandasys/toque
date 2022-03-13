@@ -50,3 +50,6 @@ value class Volume(val value: Int) : Comparable<Volume> {
 }
 
 fun abs(volume: Volume): Volume = Volume(kotlin.math.abs(volume.value))
+
+inline val Int.asVolume: Volume get() = Volume(this).coerceIn(Volume.RANGE)
+inline val Double.asVolume: Volume get() = toInt().asVolume

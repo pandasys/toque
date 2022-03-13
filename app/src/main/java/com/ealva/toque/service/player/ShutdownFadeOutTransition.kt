@@ -16,21 +16,18 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.SuspendingThrottle
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlin.time.Duration
 
 /**
  * A fade out transition that does a shutdown on completion
  */
 class ShutdownFadeOutTransition(
-  fadeLength: Millis,
-  /** The throttle only need be changed for test */
-  throttle: SuspendingThrottle? = null,
+  fadeLength: Duration,
   /** The dispatcher only need be changed for test */
   dispatcher: CoroutineDispatcher = Dispatchers.Default
-) : FadeOutTransition(fadeLength, throttle, dispatcher) {
+) : FadeOutTransition(fadeLength, dispatcher) {
   /**
    * Going to a shutdown state during a fade out, which means this is being used to
    * cross-fade, so we won't notify paused since we are already fading in another player. We
@@ -45,5 +42,5 @@ class ShutdownFadeOutTransition(
 
   override fun cancelTransition(player: TransitionPlayer) = player.shutdownPlayer()
 
-  override fun toString(): String = "ShutdownFadeOutTransition($requestedFadeLength)"
+  override fun toString(): String = "ShutdownFadeOutTransition($requestedDuration)"
 }

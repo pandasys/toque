@@ -16,22 +16,19 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.SuspendingThrottle
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlin.time.Duration
 
 /**
  * Fade the volume down over short duration to a pause
  */
 class PauseFadeOutTransition(
-  fadeLength: Millis,
-  /** The throttle only need be changed for test */
-  throttle: SuspendingThrottle? = null,
+  fadeLength: Duration,
   /** The dispatcher only need be changed for test */
   dispatcher: CoroutineDispatcher = Dispatchers.Default
-) : FadeOutTransition(fadeLength, throttle, dispatcher) {
-  override fun cancelTransition(player: TransitionPlayer) = setCancelled()
+) : FadeOutTransition(fadeLength, dispatcher) {
+  override fun cancelTransition(player: TransitionPlayer) = Unit
 
   override fun finishTransition(player: TransitionPlayer) {
     player.pause()
@@ -39,5 +36,5 @@ class PauseFadeOutTransition(
     setComplete()
   }
 
-  override fun toString(): String = "PauseFadeOutTransition($requestedFadeLength)"
+  override fun toString(): String = "PauseFadeOutTransition($requestedDuration)"
 }

@@ -18,9 +18,9 @@ package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.brainz.data.Mbid
 import com.ealva.ealvabrainz.brainz.data.isObsolete
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.persist.PersistentId
+import kotlin.time.Duration
 
 inline fun String.updateOrNull(block: () -> String): String? =
   block().let { newValue -> if (newValue.isNotEmpty() && this != newValue) newValue else null }
@@ -40,7 +40,7 @@ inline fun Int.updateOrNull(block: () -> Int): Int? =
 inline fun StarRating.updateOrNull(block: () -> StarRating): StarRating? =
   block().let { newValue -> if (this != newValue) newValue else null }
 
-inline fun Millis.updateOrNull(block: () -> Millis): Millis? =
+inline fun Duration.updateOrNull(block: () -> Duration): Duration? =
   block().let { newValue -> if (this != newValue) newValue else null }
 
 inline fun anyNotNull(block: () -> Array<Any?>): Boolean = block().any { it != null }

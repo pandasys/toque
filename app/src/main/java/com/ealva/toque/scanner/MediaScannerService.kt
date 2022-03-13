@@ -72,6 +72,9 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 private val LOG by lazyLogger(MediaScannerService::class)
 private const val SUFFIX = ".MediaScannerJobIntentService"
@@ -201,9 +204,12 @@ class MediaScannerService : LifecycleService() {
     if (rescan.cleanDb) deleteAllMediaFromDb()
     val createUpdateTime = Millis.currentUtcEpochMillis()
     val minimumDuration = if (BuildConfig.DEBUG) {
-      Millis(30000)
+      30_000.toDuration(DurationUnit.MILLISECONDS)
     } else {
-      if (prefs.ignoreSmallFiles()) prefs.ignoreThreshold() else Millis(0)
+      if (prefs.ignoreSmallFiles())
+        prefs.ignoreThreshold().value.toDuration(DurationUnit.MILLISECONDS)
+      else
+        Duration.ZERO
     }
     scanAllAudioAfter(
       if (rescan.forceUpdate) Date(0) else prefs.lastScanTime().toDate(),
@@ -223,7 +229,7 @@ class MediaScannerService : LifecycleService() {
   private suspend fun scanAllAudioAfter(
     modifiedAfter: Date,
     parser: MediaMetadataParser,
-    minimumDuration: Millis,
+    minimumDuration: Duration,
     createUpdateTime: Millis,
     onCompletion: suspend () -> Unit
   ) {
@@ -241,7 +247,7 @@ class MediaScannerService : LifecycleService() {
   private suspend fun persistAudio(
     audioInfo: AudioInfo,
     parser: MediaMetadataParser,
-    minimumDuration: Millis,
+    minimumDuration: Duration,
     createUpdateTime: Millis
   ): Boolean = try {
     audioMediaDao.upsertAudio(audioInfo, parser, minimumDuration, createUpdateTime)

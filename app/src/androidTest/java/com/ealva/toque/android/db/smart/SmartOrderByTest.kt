@@ -135,4 +135,18 @@ class SmartOrderByTest {
       .toBe(OrderBy(MediaTable.lastPlayedTime, Order.ASC))
     expect(SmartOrderBy.LeastRecentlyPlayed.makeJoinTemplate()).toBeNull()
   }
+
+  @Test
+  fun testMostOftenSkipped() {
+    expect(SmartOrderBy.MostOftenSkipped.getOrderBy())
+      .toBe(OrderBy(MediaTable.skippedCount, Order.DESC))
+    expect(SmartOrderBy.MostOftenSkipped.makeJoinTemplate()).toBeNull()
+  }
+
+  @Test
+  fun testMostRecentlySkipped() {
+    expect(SmartOrderBy.MostRecentlySkipped.getOrderBy())
+      .toBe(OrderBy(MediaTable.lastSkippedTime, Order.DESC))
+    expect(SmartOrderBy.MostRecentlySkipped.makeJoinTemplate()).toBeNull()
+  }
 }

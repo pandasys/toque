@@ -23,7 +23,7 @@ import com.ealva.toque.service.audio.PlayerTransition.Type
  * Immediately shutdown a player
  */
 class ShutdownImmediateTransition : BasePlayerTransition(Type.Shutdown) {
-  override suspend fun doExecute(player: TransitionPlayer) {
+  override fun doExecute(player: TransitionPlayer) {
     player.playerVolume = Volume.NONE
     player.shutdownPlayer()
     setComplete()

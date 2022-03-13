@@ -21,7 +21,7 @@ package com.ealva.toque.service.queue
  * goes 0 to 100 or vice versa. There are times when the app will decide on an [NoFade]
  * transition, whereas most times it will [AllowFade] transitions.
  */
-enum class ForceTransition(val noFade: Boolean) {
+enum class MayFade(val noFade: Boolean) {
   NoFade(true),
   AllowFade(false)
 }

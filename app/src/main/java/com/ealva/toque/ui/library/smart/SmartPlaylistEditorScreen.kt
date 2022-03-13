@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.text.isDigitsOnly
@@ -249,6 +250,7 @@ private fun NameField(
     singleLine = true,
     onValueChange = { nameChanged(it) },
     isError = !nameValidity.isValid,
+    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
     label = if (nameValidity.isValid) {
       { Text(text = stringResource(id = R.string.Name)) }
     } else {
@@ -489,6 +491,7 @@ fun EditTextRule(
     modifier = Modifier.fillMaxWidth(),
     query = rule.data.text,
     suggestions = editorRule.suggestions,
+    capitalization = editorRule.capitalization,
     isError = validity.isNotValid,
     onTextChanged = { text -> ruleDataChanged(editorRule, rule.data.copy(text = text)) },
     onSelected = { text ->

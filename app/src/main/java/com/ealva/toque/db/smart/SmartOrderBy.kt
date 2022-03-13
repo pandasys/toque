@@ -78,6 +78,12 @@ enum class SmartOrderBy(override val id: Int, private val stringRes: Int) : HasC
   LeastRecentlyPlayed(14, R.string.LeastRecentlyPlayed) {
     override fun getOrderBy(): OrderBy = OrderBy(MediaTable.lastPlayedTime, Order.ASC)
   },
+  MostOftenSkipped(15, R.string.MostOftenSkipped) {
+    override fun getOrderBy(): OrderBy = OrderBy(MediaTable.skippedCount, Order.DESC)
+  },
+  MostRecentlySkipped(16, R.string.MostRecentlySkipped) {
+    override fun getOrderBy(): OrderBy = OrderBy(MediaTable.lastSkippedTime, Order.DESC)
+  },
   None(ID_NONE, R.string.None) {
     override fun getOrderBy(): OrderBy = OrderBy.NONE
   };

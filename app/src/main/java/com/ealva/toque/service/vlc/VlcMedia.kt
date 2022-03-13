@@ -21,6 +21,19 @@ import com.ealva.toque.service.media.MetadataField
 import com.ealva.toque.service.media.ParsedStatus
 import org.videolan.libvlc.interfaces.IMedia
 
+interface VlcMedia : IMedia {
+
+  companion object {
+    operator fun invoke(media: IMedia): VlcMedia = VlcMediaImpl(media)
+  }
+}
+
+private class VlcMediaImpl(private val media: IMedia) : IMedia by media, VlcMedia, AutoCloseable {
+  override fun close() {
+    release()
+  }
+}
+
 private fun Int.toMetadataField(): MetadataField = when (this) {
   IMedia.Meta.Title -> MetadataField.Title
   IMedia.Meta.Artist -> MetadataField.Artist

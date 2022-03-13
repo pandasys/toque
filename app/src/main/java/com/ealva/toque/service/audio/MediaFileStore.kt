@@ -22,12 +22,10 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.isLocalScheme
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.tag.SongTag
 import com.github.michaelbull.result.Result
@@ -41,6 +39,7 @@ import okio.source
 import java.io.File
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
 
 /**
  * This interface is passed to [PlayableAudioItem]s to allow them to update themselves
@@ -53,7 +52,7 @@ interface MediaFileStore {
   fun incrementSkippedCountAsync(id: MediaId)
 
   /** Updates the [duration] for media with [id] without blocking the caller */
-  fun updateDurationAsync(id: MediaId, duration: Millis)
+  fun updateDurationAsync(id: MediaId, duration: Duration)
 
   /**
    * Sets and returns [newRating] if successful else a DoaMessage. The [id] is used to locate the
@@ -106,18 +105,12 @@ private class MediaFileStoreImpl(
 ) : MediaFileStore {
   private val resolver = ctx.contentResolver
 
-  override fun incrementPlayedCountAsync(id: MediaId) {
-    audioMediaDao.incrementPlayedCount(id)
-  }
+  override fun incrementPlayedCountAsync(id: MediaId) = audioMediaDao.incrementPlayedCount(id)
 
-  override fun incrementSkippedCountAsync(id: MediaId) {
-    LOG._e { it("incrementSkippedCountAsync %s", id) }
-    audioMediaDao.incrementSkippedCount(id)
-  }
+  override fun incrementSkippedCountAsync(id: MediaId) = audioMediaDao.incrementSkippedCount(id)
 
-  override fun updateDurationAsync(id: MediaId, duration: Millis) {
+  override fun updateDurationAsync(id: MediaId, duration: Duration) =
     audioMediaDao.updateDuration(id, duration)
-  }
 
   override suspend fun setRating(
     id: MediaId,

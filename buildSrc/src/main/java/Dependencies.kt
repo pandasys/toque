@@ -21,7 +21,7 @@ object SdkVersion {
 }
 
 object PluginsVersion {
-  const val AGP = "7.1.1"
+  const val AGP = "7.1.2"
   const val DETEKT = "1.19.0"
   const val DOKKA = "1.6.10"
   const val KOTLIN = "1.6.10"
@@ -193,6 +193,8 @@ object Libs {
       const val CORE = "org.jetbrains.kotlinx:kotlinx-serialization-core:$VERSION"
       const val JSON = "org.jetbrains.kotlinx:kotlinx-serialization-json:$VERSION"
     }
+
+    const val DATETIME = "org.jetbrains.kotlinx:kotlinx-datetime:0.3.2"
   }
 
   object LibVLC {
@@ -236,6 +238,7 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.5.1-0"
+    const val CORE = "com.ealva:welite-core:0.5.2-SNAPSHOT"
+    const val KTIME = "com.ealva:welite-ktime:0.5.2-SNAPSHOT"
   }
 }

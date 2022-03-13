@@ -20,11 +20,11 @@ import com.ealva.ealvabrainz.brainz.data.ArtistMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseGroupMbid
 import com.ealva.ealvabrainz.brainz.data.ReleaseMbid
 import com.ealva.ealvabrainz.brainz.data.TrackMbid
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.StarRating
+import kotlin.time.Duration
 
 interface MediaFileTagInfo : AutoCloseable {
-  val duration: Millis
+  val duration: Duration
   val title: String
   val titleSort: String
 

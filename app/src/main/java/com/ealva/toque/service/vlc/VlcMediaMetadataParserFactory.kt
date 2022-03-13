@@ -25,7 +25,6 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.file.fileExtension
 import com.ealva.toque.file.isFileScheme
@@ -44,6 +43,9 @@ import ealvatag.audio.SupportedFileFormat
 import org.videolan.libvlc.interfaces.IMedia
 import java.io.File
 import kotlin.math.min
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 private val LOG by lazyLogger(MediaMetadataParser::class)
 
@@ -80,8 +82,8 @@ private class FileTagInfo private constructor(
   private val tag: SongTag,
   private val artistParser: ArtistParser
 ) : MediaFileTagInfo {
-  override val duration: Millis
-    get() = Millis(tag.duration)
+  override val duration: Duration
+    get() = tag.duration
   override val title: String
     get() = tag.title
   override val titleSort: String
@@ -204,8 +206,8 @@ private class VlcTagInfo private constructor(
   private fun meta(id: Int): String? = media.getMeta(id)
   private val _artists = artistParser.parseAll(listOf(meta(IMedia.Meta.Artist).orUnknown()))
   private val _artistsSort = _artists.map { it.toArtistSort() }
-  override val duration: Millis
-    get() = Millis(media.duration)
+  override val duration: Duration
+    get() = media.duration.toDuration(DurationUnit.MILLISECONDS)
   override val title: String
     get() = meta(IMedia.Meta.Title).orUnknown()
   override val titleSort: String
@@ -374,7 +376,7 @@ fun String.toReleaseMbid() = ReleaseMbid(this)
 fun String.toReleaseGroupMbid() = ReleaseGroupMbid(this)
 fun String.toTrackMbid() = TrackMbid(this)
 
-class VlcEmbeddedArtwork : EmbeddedArtwork{
+class VlcEmbeddedArtwork : EmbeddedArtwork {
   override val exists: Boolean
     get() = false
   override val isUrl: Boolean

@@ -145,6 +145,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(AudioMediaDao::class)
 
@@ -175,7 +176,7 @@ interface AudioMediaDao {
   suspend fun upsertAudio(
     audioInfo: AudioInfo,
     metadataParser: MediaMetadataParser,
-    minimumDuration: Millis,
+    minimumDuration: Duration,
     createUpdateTime: Millis
   )
 
@@ -259,7 +260,7 @@ interface AudioMediaDao {
 
   fun incrementPlayedCount(id: MediaId)
   fun incrementSkippedCount(id: MediaId)
-  fun updateDuration(id: MediaId, newDuration: Millis)
+  fun updateDuration(id: MediaId, newDuration: Duration)
 
   suspend fun setRating(id: MediaId, newRating: Rating): DaoResult<Rating>
   suspend fun getMediaTitle(mediaId: MediaId): DaoResult<Title>
@@ -415,7 +416,7 @@ private class AudioMediaDaoImpl(
   override suspend fun upsertAudio(
     audioInfo: AudioInfo,
     metadataParser: MediaMetadataParser,
-    minimumDuration: Millis,
+    minimumDuration: Duration,
     createUpdateTime: Millis
   ) = metadataParser.parseMetadata(audioInfo.uriToParse(), artistParserFactory.make()).use { tag ->
     val appPrefs = appPrefsSingleton.instance()
@@ -429,7 +430,7 @@ private class AudioMediaDaoImpl(
   private fun Transaction.doUpsertAudio(
     audioInfo: AudioInfo,
     fileTagInfo: MediaFileTagInfo,
-    minimumDuration: Millis,
+    minimumDuration: Duration,
     createUpdateTime: Millis,
     appPrefs: AppPrefs,
     upsertResults: AudioUpsertResults
@@ -792,7 +793,7 @@ private class AudioMediaDaoImpl(
         AlbumId(cursor[AlbumTable.id]),
         setOf(cursor[songArtistTableName].asArtistName),
         cursor[MediaTable.rating].toRating(),
-        Millis(cursor[MediaTable.duration]),
+        cursor[MediaTable.duration],
         cursor[MediaTable.trackNumber],
         cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
         cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
@@ -884,7 +885,7 @@ private class AudioMediaDaoImpl(
             AlbumId(cursor[AlbumTable.id]),
             setOf(anArtist.asArtistName),
             cursor[MediaTable.rating].toRating(),
-            Millis(cursor[MediaTable.duration]),
+            cursor[MediaTable.duration],
             cursor[MediaTable.trackNumber],
             cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
             cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
@@ -910,7 +911,7 @@ private class AudioMediaDaoImpl(
               AlbumId(cursor[AudioViewQueueData.albumId]),
               setOf(cursor[AudioViewQueueData.songArtistName].asArtistName),
               cursor[AudioViewQueueData.rating].toRating(),
-              Millis(cursor[AudioViewQueueData.duration]),
+              cursor[AudioViewQueueData.duration],
               cursor[AudioViewQueueData.trackNumber],
               cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
               cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
@@ -949,12 +950,12 @@ private class AudioMediaDaoImpl(
     }
   }
 
-  override fun updateDuration(id: MediaId, newDuration: Millis) {
+  override fun updateDuration(id: MediaId, newDuration: Duration) {
     scope.launch {
       val rowsUpdated = db.transaction {
         MediaTable
           .updateColumns {
-            it[duration] = newDuration()
+            it[duration] = newDuration
             it[updatedTime] = Millis.currentUtcEpochMillis().value
           }
           .where { MediaTable.id eq id.value }
@@ -1219,7 +1220,7 @@ private class AudioMediaDaoImpl(
             cursor[MediaTable.totalTracks],
             cursor[MediaTable.discNumber],
             cursor[MediaTable.totalDiscs],
-            Millis(cursor[MediaTable.duration]),
+            cursor[MediaTable.duration],
             cursor[MediaTable.year],
             cursor[ComposerTable.composer].asComposerName,
             cursor[MediaTable.rating].toRating().toStarRating(),
@@ -1332,7 +1333,7 @@ private class AudioMediaDaoImpl(
       it[genre] = fileTagInfo.genre
       it[year] = fileTagInfo.year
       if (appPrefs.readTagRating()) it[rating] = fileTagInfo.rating.toRating().value
-      it[duration] = fileTagInfo.duration()
+      it[duration] = fileTagInfo.duration
       it[trackNumber] = fileTagInfo.trackNumber
       it[totalTracks] = fileTagInfo.totalTracks
       it[discNumber] = fileTagInfo.discNumber
@@ -1402,7 +1403,7 @@ private class AudioMediaDaoImpl(
           updateGenre?.let { update -> it[genre] = update }
           updateYear?.let { update -> it[year] = update }
           updateRating?.let { update -> it[rating] = update.toRating().value }
-          updateDuration?.let { update -> it[duration] = update() }
+          updateDuration?.let { update -> it[duration] = update }
           updateTrackNumber?.let { update -> it[trackNumber] = update }
           updateTotalTracks?.let { update -> it[totalTracks] = update }
           updateDiscNumber?.let { update -> it[discNumber] = update }
@@ -1432,7 +1433,7 @@ private class AudioMediaDaoImpl(
         cursor[genre],
         cursor[year],
         Rating(cursor[rating]).toStarRating(),
-        Millis(cursor[duration]),
+        cursor[duration],
         cursor[trackNumber],
         cursor[totalTracks],
         cursor[discNumber],
@@ -1442,13 +1443,13 @@ private class AudioMediaDaoImpl(
       )
     }.singleOrNull()
 
-  private fun logIgnoring(audioInfo: AudioInfo, duration: Millis, minimumDuration: Millis) {
+  private fun logIgnoring(audioInfo: AudioInfo, duration: Duration, minimumDuration: Duration) {
     LOG.i {
       it(
-        "Ignoring %s duration:%d < threshold:%d",
+        "Ignoring %s duration:%s < threshold:%s",
         audioInfo.title,
-        duration(),
-        minimumDuration()
+        duration,
+        minimumDuration
       )
     }
   }
@@ -1489,7 +1490,7 @@ private class AudioForUpdate(
   val genre: String,
   val year: Int,
   val rating: StarRating,
-  val duration: Millis,
+  val duration: Duration,
   val trackNumber: Int,
   val totalTracks: Int,
   val discNumber: Int,
@@ -1607,7 +1608,7 @@ private fun Op<Boolean>.restrictTo(artistId: ArtistId?): Op<Boolean> =
 private fun AudioDescription(cursor: Cursor): AudioDescription = AudioDescription(
   cursor[MediaTable.id].asMediaId,
   cursor[MediaTable.title].asTitle,
-  Millis(cursor[MediaTable.duration]),
+  cursor[MediaTable.duration],
   Rating(cursor[MediaTable.rating]),
   AlbumTitle(cursor[AlbumTable.albumTitle]),
   ArtistName(cursor[ArtistTable.artistName]),

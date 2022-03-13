@@ -16,79 +16,65 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.SuspendingThrottle
 import com.ealva.toque.common.Volume
-import com.ealva.toque.common.abs
+import com.ealva.toque.common.asVolume
+import com.ealva.toque.flow.CountDownFlow
 import com.ealva.toque.service.audio.PlayerTransition.Type
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
-private const val PERMITS_PER_SECOND = 10.0
-
-private val ADJUST_FROM_END = Millis(200)
-private val MIN_FADE_LENGTH = Millis(100)
-private val MIN_VOLUME_STEP = Volume.ONE
+private val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
+private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
 
 /**
- * Base FadeOut transition
+ * PlayerTransition that fades out from start volume to min volume over [requestedDuration]. We will
+ * use a [CountDownFlow] over the fade length which will emit approximately every [MIN_FADE_LENGTH].
+ * An emission contains the remaining duration of the fade and we will calculate the desired volume
+ * from that remaining time.
+ *
+ * We calculate a factor which when multiplied by the remaining duration of fade gives the desired
+ * volume. The [requestedDuration] may be adjusted down if the start volume is not max. If the
+ * user changes media rapidly, or rapidly presses play/pause, a fade in may not have reached max
+ * volume, so fading out can be shortened - no reason to set the same volume repeatedly.
  */
 abstract class FadeOutTransition(
-  /** Requested length of fade in millis may be adjusted depending on remaining duration */
-  protected val requestedFadeLength: Millis,
-  /** The throttle only need be set for test */
-  suspendingThrottle: SuspendingThrottle? = null,
-  /** The dispatcher only need be changed for test */
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
-) : BasePlayerTransition(Type.Pause) {
-
-  private val throttle = suspendingThrottle ?: SuspendingThrottle(PERMITS_PER_SECOND)
+  protected val requestedDuration: Duration,
+  dispatcher: CoroutineDispatcher
+) : BasePlayerTransition(Type.Pause, dispatcher) {
 
   override val isPlaying: Boolean = false
   override val isPaused: Boolean = true
 
-  override suspend fun doExecute(player: TransitionPlayer) {
-    val length: Millis = requestedFadeLength.coerceAtMost(player.remainingTime - ADJUST_FROM_END)
+  override fun doExecute(player: TransitionPlayer) {
+    val startVolume = player.playerVolume
+    val maxVolume = player.volumeRange.endInclusive.coerceAtMost(startVolume)
+    val minFadeStartVolumeAdjustment = requestedDuration * (startVolume.value / 100.0)
+    val duration: Duration = requestedDuration
+      .coerceAtMost(player.remainingTime - ADJUST_FROM_END)
+      .coerceAtMost(minFadeStartVolumeAdjustment)
 
-    if (length > MIN_FADE_LENGTH) {
-      supervisorScope {
-        launch(dispatcher) {
-          val cancelVolume = player.volumeRange.start - 1
-          maybeNotifyPaused(player)
-          val steps: Millis = length / MIN_FADE_LENGTH
-          val startVolume = player.playerVolume
-          val endVolume = player.volumeRange.start
-          val volumeChange = (abs((endVolume - startVolume)) / steps).coerceAtLeast(MIN_VOLUME_STEP)
-          var newVolume = startVolume
+    if (duration > MIN_FADE_LENGTH) {
+      val countDownFlow = CountDownFlow(duration, MIN_FADE_LENGTH)
+      val multiplier = maxVolume.value.toDouble() / duration.inWholeMilliseconds
 
-          while (newVolume > cancelVolume) {
-            newVolume = (newVolume - volumeChange).coerceAtLeast(Volume.NONE)
-            player.playerVolume = newVolume
-            if (shouldContinueTransition(player)) {
-              if (newVolume <= Volume.NONE) {
-                finishTransition(player)
-                newVolume = cancelVolume
-              } else {
-                throttle.acquire()
-              }
-            } else {
-              if (isCancelled) {
-                cancelTransition(player)
-              }
-              newVolume = cancelVolume
-            }
-          }
-          if (!isFinished) finishTransition(player)
-        }
-      }
+      countDownFlow
+        .onStart { maybeNotifyPaused(player) }
+        .onEach { remaining -> player.playerVolume = remaining.asVolume(multiplier) }
+        .onCompletion { cause -> if (cause == null) finishTransition(player) }
+        .launchIn(scope)
     } else {
       finishTransition(player)
     }
   }
 
   protected open fun maybeNotifyPaused(player: TransitionPlayer) = player.notifyPaused()
-  protected abstract fun cancelTransition(player: TransitionPlayer)
   protected abstract fun finishTransition(player: TransitionPlayer)
 }
+
+fun Duration.asVolume(multiplier: Double): Volume = (inWholeMilliseconds * multiplier).asVolume

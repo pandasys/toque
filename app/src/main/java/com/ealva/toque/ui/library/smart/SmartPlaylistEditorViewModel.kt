@@ -19,6 +19,7 @@ package com.ealva.toque.ui.library.smart
 import android.os.Parcelable
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -40,7 +41,6 @@ import com.ealva.toque.db.smart.Rule
 import com.ealva.toque.db.smart.RuleField
 import com.ealva.toque.db.smart.SmartOrderBy
 import com.ealva.toque.db.smart.SmartPlaylist
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.AllowableNavigation
 import com.ealva.toque.persist.PlaylistId
@@ -611,8 +611,8 @@ private class SmartPlaylistEditorViewModelImpl(
 
   private fun nameIsReserved(name: String): Boolean = name.trim().let { value ->
     name.startsWith("sqlite_", ignoreCase = true) ||
-    allViewNames.any { it.value.equals(value, ignoreCase = true) } ||
-    allPlaylistNames.any { it.value.equals(value, ignoreCase = true) }
+      allViewNames.any { schemaName -> schemaName.value.equals(value, ignoreCase = true) } ||
+      allPlaylistNames.any { playlistName -> playlistName.value.equals(value, ignoreCase = true) }
   }
 
   private fun makeDefaultRule(): EditorRule {
@@ -622,7 +622,8 @@ private class SmartPlaylistEditorViewModelImpl(
       rule = rule,
       nameValidity = data.text.isValidName,
       suggestions = emptyList(),
-      editing = false
+      editing = false,
+      capitalization = KeyboardCapitalization.Words
     )
   }
 

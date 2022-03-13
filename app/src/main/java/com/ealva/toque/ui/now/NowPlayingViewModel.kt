@@ -77,6 +77,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.annotation.concurrent.Immutable
+import kotlin.time.Duration
 
 interface NowPlayingViewModel {
   @Immutable
@@ -86,7 +87,7 @@ interface NowPlayingViewModel {
     val albumTitle: AlbumTitle,
     val albumArtist: ArtistName,
     val artist: ArtistName,
-    val duration: Millis,
+    val duration: Duration,
     val trackNumber: Int,
     val localAlbumArt: Uri,
     val albumArt: Uri,
@@ -105,7 +106,7 @@ interface NowPlayingViewModel {
           albumTitle = AlbumTitle(""),
           albumArtist = ArtistName(""),
           artist = ArtistName(""),
-          duration = Millis(0),
+          duration = Duration.ZERO,
           trackNumber = 0,
           localAlbumArt = Uri.EMPTY,
           albumArt = Uri.EMPTY,
@@ -122,7 +123,7 @@ interface NowPlayingViewModel {
     val queue: List<QueueItem>,
     val queueIndex: Int,
     val position: Millis,
-    val duration: Millis,
+    val duration: Duration,
     val playingState: PlayState,
     val repeatMode: RepeatMode,
     val shuffleMode: ShuffleMode,
@@ -136,16 +137,16 @@ interface NowPlayingViewModel {
       get() = if (queueIndex in queue.indices) queue[queueIndex] else NullQueueItem
 
     fun getDurationDisplay(): String =
-      (if (showTimeRemaining) position - duration else duration).asDurationString
+      (if (showTimeRemaining) position.toDuration() - duration else duration).asDurationString
 
-    fun getPositionDisplay(): String = position.asDurationString
+    fun getPositionDisplay(): String = position.toDuration().asDurationString
 
     companion object {
       val NONE = NowPlayingState(
         queue = emptyList(),
         queueIndex = -1,
-        position = Millis(0),
-        duration = Millis(0),
+        position = Millis.ZERO,
+        duration = Duration.ZERO,
         playingState = PlayState.Stopped,
         repeatMode = RepeatMode.None,
         shuffleMode = ShuffleMode.None,

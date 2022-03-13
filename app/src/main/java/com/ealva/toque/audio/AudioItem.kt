@@ -19,12 +19,12 @@ package com.ealva.toque.audio
 import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
+import kotlin.time.Duration
 
 interface AudioItem : HasId {
   override val id: MediaId
@@ -32,13 +32,14 @@ interface AudioItem : HasId {
   val albumTitle: AlbumTitle
   val albumArtist: ArtistName
   val artist: ArtistName
-  val duration: Millis
+  val duration: Duration
   val trackNumber: Int
   val localAlbumArt: Uri
   val albumArt: Uri
   val rating: Rating
   val location: Uri
   val fileUri: Uri
+
   /** True if this item is valid, ie. [id] is valid */
   val isValid: Boolean
   val albumId: AlbumId

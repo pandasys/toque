@@ -25,7 +25,7 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.notify.ServiceNotification
 import com.ealva.toque.service.queue.ClearQueue
-import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.MayFade
 import com.ealva.toque.service.queue.NullStreamVolume
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.StreamVolume
@@ -63,8 +63,8 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override suspend fun activate(resume: Boolean, playNow: PlayNow) = Unit
   override fun deactivate() = Unit
-  override fun play(forceTransition: ForceTransition) = Unit
-  override fun pause(forceTransition: ForceTransition) = Unit
+  override fun play(mayFade: MayFade) = Unit
+  override fun pause(mayFade: MayFade) = Unit
   override fun stop() = Unit
   override fun togglePlayPause() = Unit
   override fun next() = Unit

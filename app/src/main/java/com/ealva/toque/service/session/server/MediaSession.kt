@@ -640,7 +640,7 @@ suspend fun Metadata.toCompat(
     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, albumArtist.value)
     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumTitle.value)
     .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title.value)
-    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration.value)
+    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration.inWholeMilliseconds)
     .putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, trackNumber.toLong())
     .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, location.toString())
     .apply {
@@ -655,9 +655,7 @@ suspend fun Metadata.toCompat(
       if (artwork !== Uri.EMPTY) {
         putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, artwork.toString())
       }
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-        putRating(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())
-      }
+      putRating(MediaMetadataCompat.METADATA_KEY_RATING, rating.toStarRating().toCompat())
     }
     .build()
 }
@@ -678,7 +676,7 @@ private fun AudioItem.toDescriptionCompat() = MediaDescriptionCompat.Builder()
   .setMediaUri(location)
   .setExtras(
     Bundle().apply {
-      putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration())
+      putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration.inWholeMilliseconds)
       putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, trackNumber.toLong())
       if (albumArt !== Uri.EMPTY)
         putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, albumArt.toString())

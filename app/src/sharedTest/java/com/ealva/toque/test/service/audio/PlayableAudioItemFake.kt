@@ -32,11 +32,14 @@ import com.ealva.toque.service.audio.NullPlayableAudioItem
 import com.ealva.toque.service.audio.PlayableAudioItem
 import com.ealva.toque.service.audio.PlayableItemEvent
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.MayFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 class PlayableAudioItemFake(
   override val eventFlow: Flow<PlayableItemEvent> = emptyFlow(),
@@ -44,7 +47,7 @@ class PlayableAudioItemFake(
   override val instanceId: InstanceId = InstanceId(1),
   override var title: Title = Title.UNKNOWN,
   override var trackNumber: Int = 1,
-  override var duration: Millis = Millis(100),
+  override var duration: Duration = 100.toDuration(DurationUnit.MILLISECONDS),
   override val albumTitle: AlbumTitle = AlbumTitle.UNKNOWN,
   override val albumArtist: ArtistName = ArtistName.UNKNOWN,
   override val rating: Rating = Rating.RATING_NONE,
@@ -61,9 +64,9 @@ class PlayableAudioItemFake(
   override lateinit var albumArt: Uri
   override lateinit var localAlbumArt: Uri
   override val metadata: Metadata = Metadata.NullMetadata
-  override fun play(forceTransition: ForceTransition) = Unit
+  override fun play(mayFade: MayFade) = Unit
   override fun stop() = Unit
-  override fun pause(forceTransition: ForceTransition) = Unit
+  override fun pause(mayFade: MayFade) = Unit
   override fun togglePlayPause() = Unit
   override fun seekTo(position: Millis) = Unit
   override fun shutdown() = Unit

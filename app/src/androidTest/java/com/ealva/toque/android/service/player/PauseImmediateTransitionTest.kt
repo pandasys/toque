@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,29 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.player
+package com.ealva.toque.android.service.player
 
-import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
+import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.service.player.FadeInTransition
+import com.ealva.toque.service.player.PauseFadeOutTransition
+import com.ealva.toque.service.player.PauseImmediateTransition
+import com.ealva.toque.service.player.PlayImmediateTransition
+import com.ealva.toque.service.player.ShutdownFadeOutTransition
+import com.ealva.toque.service.player.ShutdownImmediateTransition
 import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class PlayImmediateTransitionTest {
+class PauseImmediateTransitionTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
@@ -39,7 +46,7 @@ class PlayImmediateTransitionTest {
   @Before
   fun init() {
     player = TransitionPlayerStub()
-    transition = PlayImmediateTransition()
+    transition = PauseImmediateTransition()
     transition.setPlayer(player)
   }
 
@@ -61,22 +68,23 @@ class PlayImmediateTransitionTest {
 
   @Test
   fun accept() {
-    expect(transition.accept(PlayImmediateTransition())).toBe(false)
-    expect(transition.accept(FadeInTransition(Millis(0), false))).toBe(false)
-    expect(transition.accept(ShutdownFadeOutTransition(Millis(0)))).toBe(true)
+    expect(transition.accept(PlayImmediateTransition())).toBe(true)
+    expect(transition.accept(FadeInTransition(Duration.ZERO))).toBe(true)
+    expect(transition.accept(ShutdownFadeOutTransition(Duration.ZERO))).toBe(false)
     expect(transition.accept(ShutdownImmediateTransition())).toBe(true)
-    expect(transition.accept(PauseImmediateTransition())).toBe(true)
-    expect(transition.accept(PauseFadeOutTransition(Millis(0)))).toBe(true)
+    expect(transition.accept(PauseImmediateTransition())).toBe(false)
+    expect(transition.accept(PauseFadeOutTransition(Duration.ZERO))).toBe(false)
   }
 
   @Test
   fun execute() = runTest {
-    transition.setPlayer(player)
     transition.execute()
-    expect(player._playCalled).toBe(1)
+    advanceUntilIdle()
+
+    expect(player._pauseCalled).toBe(1)
+    expect(player._notifyPausedCalled).toBe(1)
     expect(player._volumeSetCalled).toBe(1)
-    expect(player._volume).toBe(Volume.MAX)
-    expect(player._notifyPlayingCalled).toBe(1)
+    expect(player._volume).toBe(Volume.NONE)
     expect(transition.isCancelled).toBe(false)
     expect(transition.isFinished).toBe(true)
   }

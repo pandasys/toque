@@ -34,8 +34,8 @@ interface PlayableMediaQueue<T : Any> {
   suspend fun activate(resume: Boolean, playNow: PlayNow)
   fun deactivate()
 
-  fun play(forceTransition: ForceTransition)
-  fun pause(forceTransition: ForceTransition)
+  fun play(mayFade: MayFade)
+  fun pause(mayFade: MayFade)
   fun stop()
   fun togglePlayPause()
   fun next()
@@ -58,8 +58,8 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
 
   override fun deactivate() = Unit
   override val isActive = MutableStateFlow(false)
-  override fun play(forceTransition: ForceTransition) = Unit
-  override fun pause(forceTransition: ForceTransition) = Unit
+  override fun play(mayFade: MayFade) = Unit
+  override fun pause(mayFade: MayFade) = Unit
   override fun stop() = Unit
   override fun togglePlayPause() = Unit
   override fun next() = Unit

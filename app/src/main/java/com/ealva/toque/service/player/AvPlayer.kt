@@ -21,9 +21,10 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.MayFade
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlin.time.Duration
 
 interface AvPlayer {
   fun interface FocusRequest {
@@ -35,7 +36,7 @@ interface AvPlayer {
   val isSeekable: Boolean
   val isPausable: Boolean
   val isValid: Boolean
-  val duration: Millis
+  val duration: Duration
   val time: Millis
   val isPlaying: Boolean
   val isPaused: Boolean
@@ -53,8 +54,8 @@ interface AvPlayer {
   val isAudioPlayer: Boolean
 
   fun playStartPaused()
-  fun play(forceTransition: ForceTransition)
-  fun pause(forceTransition: ForceTransition)
+  fun play(mayFade: MayFade)
+  fun pause(mayFade: MayFade)
   fun seek(position: Millis)
   fun stop()
   fun shutdown()
@@ -152,8 +153,8 @@ object NullAvPlayer : AvPlayer {
   override val isSeekable: Boolean = false
   override val isPausable: Boolean = false
   override val isValid: Boolean = false
-  override val duration: Millis = Millis(0)
-  override val time: Millis = Millis(0)
+  override val duration: Duration = Duration.ZERO
+  override val time: Millis = Millis.ZERO
   override val isPlaying: Boolean = false
   override val isPaused: Boolean = false
   override val isShutdown: Boolean = false
@@ -165,8 +166,8 @@ object NullAvPlayer : AvPlayer {
   override val isVideoPlayer: Boolean = false
   override val isAudioPlayer: Boolean = true
   override fun playStartPaused() = Unit
-  override fun play(forceTransition: ForceTransition) = Unit
-  override fun pause(forceTransition: ForceTransition) = Unit
+  override fun play(mayFade: MayFade) = Unit
+  override fun pause(mayFade: MayFade) = Unit
   override fun seek(position: Millis) = Unit
   override fun stop() = Unit
   override fun shutdown() = Unit

@@ -42,6 +42,7 @@ import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.alsoIf
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.common.debug
 import com.ealva.toque.common.debugCheck
 import com.ealva.toque.common.debugRequire
@@ -78,9 +79,9 @@ import com.ealva.toque.service.player.NoOpMediaTransition
 import com.ealva.toque.service.player.NoOpPlayerTransition
 import com.ealva.toque.service.player.PlayerTransitionPair
 import com.ealva.toque.service.queue.ClearQueue
-import com.ealva.toque.service.queue.ForceTransition
-import com.ealva.toque.service.queue.ForceTransition.AllowFade
-import com.ealva.toque.service.queue.ForceTransition.NoFade
+import com.ealva.toque.service.queue.MayFade
+import com.ealva.toque.service.queue.MayFade.AllowFade
+import com.ealva.toque.service.queue.MayFade.NoFade
 import com.ealva.toque.service.queue.MusicStreamVolume
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
@@ -128,6 +129,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import kotlin.time.Duration
 
 typealias QueueList = List<PlayableAudioItem>
 
@@ -135,7 +137,7 @@ data class LocalAudioQueueState(
   val queue: List<AudioItem>,
   val queueIndex: Int,
   val position: Millis,
-  val duration: Millis,
+  val duration: Duration,
   val playingState: PlayState,
   val repeatMode: RepeatMode,
   val shuffleMode: ShuffleMode,
@@ -162,8 +164,8 @@ data class LocalAudioQueueState(
     val NONE = LocalAudioQueueState(
       queue = emptyList(),
       queueIndex = -1,
-      position = Millis(0),
-      duration = Millis(0),
+      position = Millis.ZERO,
+      duration = Duration.ZERO,
       playingState = PlayState.Stopped,
       repeatMode = RepeatMode.None,
       shuffleMode = ShuffleMode.None,
@@ -329,8 +331,8 @@ private class LocalAudioQueueImpl(
   private fun makeInitialState(): LocalAudioQueueState = LocalAudioQueueState(
     emptyList(),
     -1,
-    Millis(0),
-    Millis(0),
+    Millis.ZERO,
+    Duration.ZERO,
     PlayState.None,
     prefs.repeatMode(),
     prefs.shuffleMode(),
@@ -380,20 +382,14 @@ private class LocalAudioQueueImpl(
 
   override val manualTransition: PlayerTransitionPair
     get() = if (appPrefs.manualChangeFade()) {
-      CrossFadeTransition(
-        appPrefs.manualChangeFadeLength(),
-        libVlcPrefs.audioOutputModule().forceStartVolumeZero
-      )
+      CrossFadeTransition(appPrefs.manualChangeFadeLength().toDuration())
     } else {
       DirectTransition()
     }
 
   override val autoAdvanceTransition: PlayerTransitionPair
     get() = if (appPrefs.autoAdvanceFade()) {
-      CrossFadeTransition(
-        appPrefs.autoAdvanceFadeLength(),
-        libVlcPrefs.audioOutputModule().forceStartVolumeZero
-      )
+      CrossFadeTransition(appPrefs.autoAdvanceFadeLength().toDuration())
     } else {
       DirectTransition()
     }
@@ -640,7 +636,7 @@ private class LocalAudioQueueImpl(
     Title.EMPTY
   }
 
-  override fun play(forceTransition: ForceTransition) = currentItem.play(forceTransition)
+  override fun play(mayFade: MayFade) = currentItem.play(mayFade)
 
   private fun playIfTelephoneIdle(delay: Millis) {
     if (telecomManager.isIdle(true)) scope.launch {
@@ -649,7 +645,7 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  override fun pause(forceTransition: ForceTransition) = currentItem.pause(forceTransition)
+  override fun pause(mayFade: MayFade) = currentItem.pause(mayFade)
   override fun stop() = currentItem.stop()
   override fun togglePlayPause() = currentItem.togglePlayPause()
 
@@ -720,7 +716,7 @@ private class LocalAudioQueueImpl(
   override fun fastForward() {
     val current = currentItem
     val position = current.position
-    val end = current.duration - Millis.FIVE_SECONDS
+    val end = current.duration.asMillis() - Millis.FIVE_SECONDS
     if (position < end) current.seekTo((position + Millis.TEN_SECONDS).coerceAtMost(end))
   }
 
@@ -1111,8 +1107,8 @@ private class LocalAudioQueueImpl(
             val nextList = getNextPendingCategory()
             if (nextList.isNotEmpty) {
               val shouldShuffle = currentListType != nextList.categoryType &&
-              currentListName != nextList.categoryId &&
-              endOfQueueAction.shouldShuffle
+                currentListName != nextList.categoryId &&
+                endOfQueueAction.shouldShuffle
               playNext(
                 if (shouldShuffle) nextList.shuffled() else nextList,
                 ClearQueue(true),
@@ -1384,7 +1380,7 @@ private class LocalAudioQueueImpl(
   private fun handleFocusReaction(reaction: FocusReaction) {
     when (reaction) {
       FocusReaction.Play -> play(AllowFade)
-      FocusReaction.Pause -> pause(AllowFade)
+      FocusReaction.Pause -> pause(NoFade)
       FocusReaction.StopForeground -> stop()
       FocusReaction.Duck -> duck()
       FocusReaction.EndDuck -> endDuck()

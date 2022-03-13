@@ -103,6 +103,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import java.text.DateFormat
 import java.util.Locale
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(AudioMediaInfoScreen::class)
 
@@ -114,7 +115,7 @@ data class AudioMediaInfoScreen(
   private val albumTitle: AlbumTitle,
   private val albumArtist: ArtistName,
   private val rating: Rating,
-  private val duration: Millis,
+  private val duration: Duration,
 ) : BaseLibraryItemsScreen(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
     serviceBinder.add(
@@ -177,7 +178,7 @@ interface MediaInfoViewModel {
     val totalTracks: Int = 0,
     val disc: Int = 0,
     val totalDiscs: Int = 0,
-    val duration: Millis = Millis(0L),
+    val duration: Duration = Duration.ZERO,
     val year: Int = 0,
     val genre: GenreName = GenreName(""),
     val composer: ComposerName = ComposerName(""),
@@ -211,7 +212,7 @@ interface MediaInfoViewModel {
       albumTitle: AlbumTitle,
       albumArtist: ArtistName,
       rating: Rating,
-      duration: Millis,
+      duration: Duration,
       mainViewModel: MainViewModel,
       audioMediaDao: AudioMediaDao,
       mediaDataParserFactory: MediaMetadataParserFactory,
@@ -241,7 +242,7 @@ private class MediaInfoViewModelImpl(
   albumTitle: AlbumTitle,
   albumArtist: ArtistName,
   rating: Rating,
-  duration: Millis,
+  duration: Duration,
   private val mainViewModel: MainViewModel,
   private val audioMediaDao: AudioMediaDao,
   mediaDataParserFactory: MediaMetadataParserFactory,
@@ -263,6 +264,7 @@ private class MediaInfoViewModelImpl(
       duration = duration
     )
   )
+
   override fun goBack() {
     backstack.back()
   }

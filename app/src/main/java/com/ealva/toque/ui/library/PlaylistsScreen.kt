@@ -75,6 +75,7 @@ import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
+import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
@@ -512,7 +513,9 @@ private class PlaylistsViewModelImpl(
       )
     )
 
-  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedItems
+    .inSelectionModeThenTurnOff()
+    .cancelFlingOnBack(playlistsFlow)
 
   override fun toBundle(): StateBundle = StateBundle().apply {
     putParcelable(KEY_MODEL_STATE, PlaylistsViewModelState(selectedItems.value))

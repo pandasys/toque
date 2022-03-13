@@ -147,6 +147,7 @@ dependencies {
 
   implementation(Libs.Kotlin.Serialization.CORE)
   implementation(Libs.Kotlin.Serialization.JSON)
+  implementation(Libs.Kotlin.DATETIME)
 
   implementation(Libs.Android.MATERIAL)
 
@@ -164,6 +165,7 @@ dependencies {
   implementation(Libs.EAlvaBrainz.BRAINZ)
   implementation(Libs.EAlvaBrainz.BRAINZ_SERVICE)
   implementation(Libs.WeLite.CORE)
+  implementation(Libs.WeLite.KTIME)
 
   implementation(Libs.Coil.COIL)
   implementation(Libs.Coil.COIL_COMPOSE)

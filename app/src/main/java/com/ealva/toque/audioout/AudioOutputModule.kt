@@ -26,21 +26,18 @@ enum class AudioOutputModule(
   override val id: Int,
   private val module: String,
   private val hardwareOutput: HWDecoderUtil.AudioOutput,
-  val forceStartVolumeZero: Boolean,
   @StringRes override val titleRes: Int
 ) : HasConstId, HasTitle {
   OpenSlEs(
     1,
     "opensles_android",
     HWDecoderUtil.AudioOutput.OPENSLES,
-    false,
     R.string.OpenSL
   ),
   AudioTrack(
     2,
     "android_audiotrack",
     HWDecoderUtil.AudioOutput.AUDIOTRACK,
-    true,
     R.string.AudioTrack
   );
 

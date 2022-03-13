@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,28 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.player
+package com.ealva.toque.android.service.player
 
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.NullSuspendingThrottle
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
+import com.ealva.toque.service.player.FadeInTransition
+import com.ealva.toque.service.player.PauseFadeOutTransition
+import com.ealva.toque.service.player.PauseImmediateTransition
+import com.ealva.toque.service.player.PlayImmediateTransition
+import com.ealva.toque.service.player.ShutdownFadeOutTransition
+import com.ealva.toque.service.player.ShutdownImmediateTransition
 import com.ealva.toque.test.service.player.TransitionPlayerStub
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShutdownFadeoutTransitionTest {
@@ -38,11 +46,10 @@ class ShutdownFadeoutTransitionTest {
   private lateinit var transition: PlayerTransition
 
   @Before
-  fun init() {
+  fun setup() {
     player = TransitionPlayerStub()
     transition = ShutdownFadeOutTransition(
-      Millis(2000),
-      NullSuspendingThrottle,
+      2000.toDuration(DurationUnit.MILLISECONDS),
       coroutineRule.testDispatcher
     )
     transition.setPlayer(player)
@@ -65,21 +72,17 @@ class ShutdownFadeoutTransitionTest {
     expect(transition.accept(PlayImmediateTransition())).toBe(true)
     expect(
       transition.accept(
-        FadeInTransition(
-          Millis(0), false
-        )
+        FadeInTransition(Duration.ZERO)
       )
     ).toBe(true)
     expect(
       transition.accept(
-        ShutdownFadeOutTransition(
-          Millis(0)
-        )
+        ShutdownFadeOutTransition(Duration.ZERO)
       )
     ).toBe(false)
     expect(transition.accept(ShutdownImmediateTransition())).toBe(true)
     expect(transition.accept(PauseImmediateTransition())).toBe(false)
-    expect(transition.accept(PauseFadeOutTransition(Millis(0)))).toBe(false)
+    expect(transition.accept(PauseFadeOutTransition(Duration.ZERO))).toBe(false)
   }
 
   @Test
@@ -87,18 +90,17 @@ class ShutdownFadeoutTransitionTest {
     // given
     player._volume = Volume.MAX
     player._isPlaying = true
-    player._remainingTime = Millis(2000)
-    player._shouldContinue = true
+    player._remainingTime = 2000.toDuration(DurationUnit.MILLISECONDS)
 
     // when
     transition.execute()
+    advanceUntilIdle()
 
     // then
     expect(player._shutdownCalled).toBe(1)
     expect(player._pauseCalled).toBe(0)
     expect(player._notifyPausedCalled).toBe(0)
     expect(player._volumeGetCalled).toBe(1)
-    expect(player._shouldContinueCalled).toBeGreaterThan(0)
     expect(player._remainingTimeCalled).toBe(1)
     expect(player._volumeSetCalled).toBeGreaterThan(19)
     expect(player._volume).toBe(Volume.NONE)
@@ -110,6 +112,13 @@ class ShutdownFadeoutTransitionTest {
   fun cancel() = runTest {
     transition.setCancelled()
     transition.execute()
+    advanceUntilIdle()
+
+    // only shutdownPlayer() should be called, so verify that and then set to 0 so
+    // verifyZeroInteractions() can be used
+    expect(player._shutdownCalled).toBe(1)
+    player._shutdownCalled = 0
+
     player.verifyZeroInteractions()
     expect(transition.isCancelled).toBe(true)
     expect(transition.isFinished).toBe(true)

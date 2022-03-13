@@ -16,8 +16,8 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
 import com.ealva.toque.service.audio.PlayerTransition
+import kotlin.time.Duration
 
 /**
  * Contains [PlayerTransition]s to be used when moving from media that is playing and should stop to
@@ -36,11 +36,10 @@ interface PlayerTransitionPair {
 }
 
 data class CrossFadeTransition(
-  private val fadeLength: Millis,
-  private val forceFadeInVolumeStartZero: Boolean,
+  private val fadeLength: Duration,
   override val exitTransition: PlayerTransition = ShutdownFadeOutTransition(fadeLength),
   override val enterTransition: PlayerTransition =
-    FadeInTransition(fadeLength, forceFadeInVolumeStartZero)
+    FadeInTransition(fadeLength)
 ) : PlayerTransitionPair
 
 data class DirectTransition(

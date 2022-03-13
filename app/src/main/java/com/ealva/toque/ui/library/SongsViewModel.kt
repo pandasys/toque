@@ -34,7 +34,6 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.fetch
@@ -47,6 +46,7 @@ import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.ealva.toque.ui.main.Notification
@@ -75,6 +75,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import javax.annotation.concurrent.Immutable
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(BaseSongsViewModel::class)
 
@@ -83,7 +84,7 @@ interface SongsViewModel : ActionsViewModel {
   interface SongInfo : Parcelable {
     val id: MediaId
     val title: Title
-    val duration: Millis
+    val duration: Duration
     val rating: Rating
     val album: AlbumTitle
     val artist: ArtistName
@@ -93,7 +94,7 @@ interface SongsViewModel : ActionsViewModel {
       operator fun invoke(
         id: MediaId,
         title: Title,
-        duration: Millis,
+        duration: Duration,
         rating: Rating,
         album: AlbumTitle,
         artist: ArtistName,
@@ -105,7 +106,7 @@ interface SongsViewModel : ActionsViewModel {
       data class SongInfoData(
         override val id: MediaId,
         override val title: Title,
-        override val duration: Millis,
+        override val duration: Duration,
         override val rating: Rating,
         override val album: AlbumTitle,
         override val artist: ArtistName,
@@ -279,7 +280,9 @@ abstract class BaseSongsViewModel(
     backstack.back()
   }
 
-  override fun onBackEvent(): Boolean = selectedItems.inSelectionModeThenTurnOff()
+  override fun onBackEvent(): Boolean = selectedItems
+    .inSelectionModeThenTurnOff()
+    .cancelFlingOnBack(songsFlow)
 
   /**
    * Defaults to the [javaClass] name of the implementation of this class and is used to save and

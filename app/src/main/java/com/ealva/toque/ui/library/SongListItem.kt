@@ -38,7 +38,6 @@ import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.R
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
@@ -48,6 +47,7 @@ import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.theme.toqueColors
 import com.gowtham.ratingbar.RatingBar
 import com.gowtham.ratingbar.RatingBarStyle
+import kotlin.time.Duration
 
 @ExperimentalFoundationApi
 @OptIn(ExperimentalMaterialApi::class)
@@ -56,7 +56,7 @@ fun SongListItem(
   songTitle: Title,
   albumTitle: AlbumTitle,
   artistName: ArtistName,
-  songDuration: Millis,
+  songDuration: Duration,
   rating: Rating,
   highlightBackground: Boolean,
   icon: @Composable () -> Unit,
@@ -133,7 +133,7 @@ fun SongListItemIcon(artwork: Uri) {
 }
 
 @Composable
-private fun ArtistAndDuration(artistName: ArtistName, songDuration: Millis, textColor: Color) {
+private fun ArtistAndDuration(artistName: ArtistName, songDuration: Duration, textColor: Color) {
   ConstraintLayout(modifier = Modifier.fillMaxWidth()) {
     val (artist, duration) = createRefs()
     Text(

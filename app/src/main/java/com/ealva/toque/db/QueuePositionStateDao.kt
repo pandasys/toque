@@ -56,9 +56,7 @@ value class QueueId(val value: Int) : Parcelable
 data class QueuePositionState(
   val mediaId: MediaId,
   val queueIndex: Int,
-  val playbackPosition: Millis,
-  val timePlayed: Millis = Millis(0),
-  val countingFrom: Millis = Millis(0)
+  val playbackPosition: Millis
 ) {
   companion object {
     val INACTIVE_QUEUE_STATE = QueuePositionState(MediaId.INVALID, -1, Millis(0))
@@ -157,8 +155,6 @@ private class QueuePositionStateDaoImpl(
           it[BIND_MEDIA_ID] = state.mediaId.value
           it[BIND_QUEUE_INDEX] = state.queueIndex
           it[BIND_POSITION] = state.playbackPosition()
-          it[BIND_TIME_PLAYED] = state.timePlayed()
-          it[BIND_COUNT_FROM] = state.countingFrom()
         }
         if (updateResult < 1) {
           LOG.w { it("MediaServiceStateTable queueId:$queueId not initialized, inserting row") }
@@ -167,8 +163,6 @@ private class QueuePositionStateDaoImpl(
             it[mediaId] = state.mediaId.value
             it[queueIndex] = state.queueIndex
             it[playbackPosition] = state.playbackPosition()
-            it[timePlayed] = state.timePlayed()
-            it[countingFrom] = state.countingFrom()
           }
           if (insertResult < 1) {
             LOG.e { it("Update and insert fail, service state not persisted") }
@@ -182,15 +176,13 @@ private class QueuePositionStateDaoImpl(
     runSuspendCatching {
       db.transaction {
         QueueStateTable
-          .selects { listOf(mediaId, queueIndex, playbackPosition, timePlayed, countingFrom) }
+          .selects { listOf(mediaId, queueIndex, playbackPosition) }
           .where { id eq this@QueuePositionStateDaoImpl.queueId.value }
           .sequence { cursor ->
             QueuePositionState(
-              MediaId(cursor[mediaId]),
-              cursor[queueIndex],
-              Millis(cursor[playbackPosition]),
-              Millis(cursor[timePlayed]),
-              Millis(cursor[countingFrom])
+              mediaId = MediaId(cursor[mediaId]),
+              queueIndex = cursor[queueIndex],
+              playbackPosition = Millis(cursor[playbackPosition])
             )
           }
           .singleOrNull()
@@ -218,12 +210,8 @@ private val BIND_QUEUE_ID = bindInt()
 private val BIND_MEDIA_ID = bindLong()
 private val BIND_QUEUE_INDEX = bindInt()
 private val BIND_POSITION = bindLong()
-private val BIND_TIME_PLAYED = bindLong()
-private val BIND_COUNT_FROM = bindLong()
 private val UPDATE: UpdateStatement<QueueStateTable> = QueueStateTable.updateColumns {
   it[mediaId] = BIND_MEDIA_ID
   it[queueIndex] = BIND_QUEUE_INDEX
   it[playbackPosition] = BIND_POSITION
-  it[timePlayed] = BIND_TIME_PLAYED
-  it[countingFrom] = BIND_COUNT_FROM
 }.where { id eq BIND_QUEUE_ID }

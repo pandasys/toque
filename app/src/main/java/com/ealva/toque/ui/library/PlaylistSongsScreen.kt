@@ -28,7 +28,6 @@ import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
-import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
@@ -53,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import kotlin.time.Duration
 
 @Immutable
 @Parcelize
@@ -119,7 +119,7 @@ interface PlaylistSongsViewModel : SongsViewModel {
         position: Int,
         id: MediaId,
         title: Title,
-        duration: Millis,
+        duration: Duration,
         rating: Rating,
         album: AlbumTitle,
         artist: ArtistName,
@@ -141,7 +141,7 @@ interface PlaylistSongsViewModel : SongsViewModel {
         override val position: Int,
         override val id: MediaId,
         override val title: Title,
-        override val duration: Millis,
+        override val duration: Duration,
         override val rating: Rating,
         override val album: AlbumTitle,
         override val artist: ArtistName,

@@ -16,9 +16,10 @@
 
 package com.ealva.toque.service.player
 
-import com.ealva.toque.common.Millis
+import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
+import kotlin.time.Duration
 
 /**
  * TransitionPlayer is the interface PlayerTransition implementations see. The TransitionPlayer
@@ -31,6 +32,8 @@ import com.ealva.toque.common.VolumeRange
  * considered playing or paused.
  */
 interface TransitionPlayer {
+  val mediaTitle: Title
+
   val isPlaying: Boolean
 
   val isPaused: Boolean
@@ -43,7 +46,7 @@ interface TransitionPlayer {
 
   var allowVolumeChange: Boolean
 
-  val remainingTime: Millis
+  val remainingTime: Duration
 
   fun notifyPaused()
 
@@ -55,10 +58,12 @@ interface TransitionPlayer {
 
   fun shutdownPlayer()
 
-  fun shouldContinue(): Boolean
+//  fun shouldContinue(): Boolean
 }
 
 object NullTransitionPlayer : TransitionPlayer {
+  override val mediaTitle: Title = Title.UNKNOWN
+
   override val isPlaying: Boolean
     get() = false
 
@@ -81,9 +86,8 @@ object NullTransitionPlayer : TransitionPlayer {
 
   override fun notifyPaused() = Unit
   override fun notifyPlaying() = Unit
-  override val remainingTime: Millis = Millis(0)
+  override val remainingTime: Duration = Duration.ZERO
   override fun pause() = Unit
   override fun play() = Unit
   override fun shutdownPlayer() = Unit
-  override fun shouldContinue() = false
 }

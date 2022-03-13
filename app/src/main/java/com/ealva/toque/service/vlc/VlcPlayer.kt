@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.vlc
 
+import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
@@ -26,13 +27,13 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.audio.SharedPlayerState
 import com.ealva.toque.service.player.AvPlayer
-import com.ealva.toque.service.player.AvPlayer.Companion.OFFSET_CONSIDERED_END
 import com.ealva.toque.service.player.AvPlayerEvent
 import com.ealva.toque.service.player.FadeInTransition
 import com.ealva.toque.service.player.NoOpPlayerTransition
@@ -41,7 +42,7 @@ import com.ealva.toque.service.player.PauseImmediateTransition
 import com.ealva.toque.service.player.PlayImmediateTransition
 import com.ealva.toque.service.player.TransitionPlayer
 import com.ealva.toque.service.player.WakeLock
-import com.ealva.toque.service.queue.ForceTransition
+import com.ealva.toque.service.queue.MayFade
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -56,10 +57,19 @@ import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 private val LOG by lazyLogger(VlcPlayer::class)
 
+/**
+ * Only 2 VlcPlayers may be active at any given time. This allows for fade in/out functionality.
+ * This is handled internally - when a VlcPlayer is created it adds itself to a fifo queue of size
+ * 2.
+ */
 interface VlcPlayer : AvPlayer {
+  fun getVlcMedia(): VlcMedia
 
   companion object {
     operator fun invoke(
@@ -67,7 +77,7 @@ interface VlcPlayer : AvPlayer {
       albumId: AlbumId,
       media: IMedia,
       title: Title,
-      duration: Millis,
+      duration: Duration,
       sharedPlayerState: SharedPlayerState,
       onPreparedTransition: PlayerTransition,
       prefs: AppPrefs,
@@ -89,9 +99,7 @@ interface VlcPlayer : AvPlayer {
         requestFocus,
         wakeLock,
         dispatcher
-      ).apply {
-        VlcPlayerImpl.addToQueue(this)
-      }
+      )
     }
   }
 }
@@ -112,8 +120,8 @@ private class VlcPlayerImpl(
   private val albumId: AlbumId,
   vlcMedia: IMedia,
   @Suppress("unused") private val title: Title,
-  private val sharedPlayerState: SharedPlayerState,
-  override var duration: Millis,
+  private val playerState: SharedPlayerState,
+  override var duration: Duration,
   onPreparedTransition: PlayerTransition,
   private val appPrefs: AppPrefs,
   private val requestFocus: AvPlayer.FocusRequest,
@@ -128,35 +136,40 @@ private class VlcPlayerImpl(
   private var unmutedVolume = Volume.NONE
   private var firstStart: Boolean = true
   private var allowPositionUpdate = true
-  private val mediaPlayer: MediaPlayer = vlcMedia.makePlayer()
+  private val mediaPlayer: MediaPlayer
 
   init {
-    setAudioOutput(sharedPlayerState.outputModule.value)
+    addToQueue(this)
+    mediaPlayer = vlcMedia.makePlayer()
 
-    sharedPlayerState.currentPreset
+    setAudioOutput(playerState.outputModule.value)
+
+    playerState.currentPreset
       .onEach { preset -> if (!isShutdown) preset.asVlcPreset().applyToPlayer(mediaPlayer) }
       .launchIn(scope)
 
     // We should have a currentPreset emission for the "current" outputRoute, so drop the first.
     // While the lookup for a preferred preset occurs on another thread, no reason to churn for
     // something that won't be emitted.
-    sharedPlayerState.outputRoute
+    playerState.outputRoute
       .drop(1)
-      .onEach { sharedPlayerState.setPreferred(id, albumId) }
+      .onEach { playerState.setPreferred(id, albumId) }
       .launchIn(scope)
 
     // We should have a currentPreset emission for the "current" eqMode, so drop the first.
     // While the lookup for a preferred preset occurs on another thread, no reason to churn for
     // something that won't be emitted.
-    sharedPlayerState.eqMode
+    playerState.eqMode
       .drop(1)
-      .onEach { sharedPlayerState.setPreferred(id, albumId) }
+      .onEach { playerState.setPreferred(id, albumId) }
       .launchIn(scope)
 
-    sharedPlayerState.playbackRate
+    playerState.playbackRate
       .onEach { mediaPlayer.rate = it.value }
       .launchIn(scope)
   }
+
+  override fun getVlcMedia(): VlcMedia = VlcMedia(requireNotNull(mediaPlayer.media))
 
   override val eventFlow = MutableSharedFlow<AvPlayerEvent>(extraBufferCapacity = 10)
 
@@ -174,7 +187,7 @@ private class VlcPlayerImpl(
     get() = prepared && !isShutdown
 
   override val time: Millis
-    get() = Millis(mediaPlayer.time)
+    get() = mediaPlayer.time.asMillis()
 
   override val isPlaying: Boolean
     get() = if (prepared) transition.isPlaying else onPrepared.isPlaying
@@ -184,11 +197,12 @@ private class VlcPlayerImpl(
 
   override var isShutdown = false
 
-  override fun toString(): String = """VlcPlayer[isActive=${scope.isActive},
-    |id=${id.value},
-    |isValid=$isValid
-    |mediaPlayer.isReleased=${mediaPlayer.isReleased}
-    |]""".trimMargin()
+  override fun toString(): String = """VlcPlayer[
+    |   isActive=${scope.isActive},
+    |   id=${id.value},
+    |   isValid=$isValid
+    |   mediaPlayer.isReleased=${mediaPlayer.isReleased}
+    |   ]""".trimMargin()
 
   private var realVolume = Volume.NONE
   override var volume: Volume
@@ -196,10 +210,12 @@ private class VlcPlayerImpl(
     set(value) {
       realVolume = value.coerceIn(AvPlayer.DEFAULT_VOLUME_RANGE)
       muted = false
-      unmutedVolume = realVolume // MediaPlayer get volume not working
-      if (isValid) mediaPlayer.setMappedVolume(
-        if (sharedPlayerState.ducked) realVolume.coerceAtMost(appPrefs.duckVolume()) else realVolume
-      )
+      unmutedVolume = realVolume
+      if (isValid) {
+        mediaPlayer.setMappedVolume(
+          if (playerState.ducked) realVolume.coerceAtMost(appPrefs.duckVolume()) else realVolume
+        )
+      }
     }
 
   private var muted = false
@@ -237,24 +253,24 @@ private class VlcPlayerImpl(
 
   private val pauseTransition: PlayerTransition
     get() = if (appPrefs.playPauseFade()) {
-      PauseFadeOutTransition(appPrefs.playPauseFadeLength())
+      PauseFadeOutTransition(appPrefs.playPauseFadeLength().toDuration())
     } else PauseImmediateTransition()
 
   private val playTransition: PlayerTransition
     get() = if (appPrefs.playPauseFade()) {
-      FadeInTransition(appPrefs.playPauseFadeLength())
+      FadeInTransition(appPrefs.playPauseFadeLength().toDuration())
     } else PlayImmediateTransition()
 
   override fun playStartPaused() = mediaPlayer.play()
 
-  override fun play(forceTransition: ForceTransition) {
+  override fun play(mayFade: MayFade) {
     if (isValid && requestFocus.requestFocus()) {
-      startTransition(getPlayTransition(forceTransition), false)
+      startTransition(getPlayTransition(mayFade), false)
     }
   }
 
-  override fun pause(forceTransition: ForceTransition) {
-    if (isValid) startTransition(getPauseTransition(forceTransition), false)
+  override fun pause(mayFade: MayFade) {
+    if (isValid) startTransition(getPauseTransition(mayFade), false)
   }
 
   override fun seek(position: Millis) {
@@ -269,7 +285,7 @@ private class VlcPlayerImpl(
       mediaPlayer.time = position.value
       val theDuration = duration
       scope.launch {
-        emit(AvPlayerEvent.PositionUpdate(position, theDuration, false))
+        emit(AvPlayerEvent.PositionUpdate(position, theDuration.asMillis(), false))
       }
       allowPositionUpdate = true
     }
@@ -279,22 +295,35 @@ private class VlcPlayerImpl(
     if (isValid) mediaPlayer.stop()
   }
 
+  /**
+   * [shutdownOnPrepared] is always set to true to avoid any possible timing issues introduced by a
+   * VlcPlayer client. If separate threads are involved, it would be possible for [prepared] to be
+   * set immediately after we checked and found it false, which would cause [secondStageShutdown] to
+   * be missed.
+   */
   override fun shutdown() {
     if (!isShutdown) {
       isShutdown = true
       transition.setCancelled()
       seekable = false
-      if (prepared) secondStageShutdown() else shutdownOnPrepared = true
+      shutdownOnPrepared = true
+      if (prepared) secondStageShutdown()
     }
   }
 
+  /**
+   * This function must be idempotent, so no side effects from calling more than once
+   */
   private fun secondStageShutdown() {
-    scope.cancel()
-    removeFromQueue(this)
-    if (!mediaPlayer.isReleased) {
-      mediaPlayer.release()
+    try {
+      scope.cancel() // should never throw based on our use, but need to ensure other code executes
+    } catch (e: Throwable) {
+      LOG.e(e) { it("Canceling scope threw an exception! Internal defect, must investigate") }
+    } finally {
+      removeFromQueue(this)
+      if (!mediaPlayer.isReleased) mediaPlayer.release()
+      wakeLock.release()
     }
-    wakeLock.release()
   }
 
   override fun duck() {
@@ -311,11 +340,11 @@ private class VlcPlayerImpl(
     startTransition(transition, false)
   }
 
-  private fun getPauseTransition(forceTransition: ForceTransition) =
-    if (forceTransition.noFade) PauseImmediateTransition() else pauseTransition
+  private fun getPauseTransition(mayFade: MayFade) =
+    if (mayFade.noFade) PauseImmediateTransition() else pauseTransition
 
-  private fun getPlayTransition(forceTransition: ForceTransition) =
-    if (forceTransition.noFade) PlayImmediateTransition() else playTransition
+  private fun getPlayTransition(mayFade: MayFade) =
+    if (mayFade.noFade) PlayImmediateTransition() else playTransition
 
   private fun setAudioOutput(module: AudioOutputModule) {
     mediaPlayer.setAudioOutput(module.toString())
@@ -355,7 +384,13 @@ private class VlcPlayerImpl(
           }
           MediaPlayer.Event.TimeChanged -> {
             if (allowPositionUpdate) {
-              emit(AvPlayerEvent.PositionUpdate(Millis(event.timeChanged), duration, true))
+              emit(
+                AvPlayerEvent.PositionUpdate(
+                  Millis(event.timeChanged),
+                  duration.asMillis(),
+                  true
+                )
+              )
             }
           }
           MediaPlayer.Event.PositionChanged -> event.positionChanged
@@ -364,14 +399,19 @@ private class VlcPlayerImpl(
             pausable = event.pausable
             val reportedLength = mediaPlayer.length
             if (reportedLength > 0) {
-              duration = Millis(reportedLength)
+              duration = reportedLength.toDuration(DurationUnit.MILLISECONDS)
             }
           }
           MediaPlayer.Event.LengthChanged -> {}
         }
       }
     } else {
-      if (!prepared && shutdownOnPrepared && event.isBuffering && event.ampleBufferedForPrepare()) {
+      /* It's possible to receive a request to shutdown before even being prepared if transitions
+      are happening very quickly. isShutdown will be set to true to prevent any other activity,
+      but if shutdownOnPrepared = true and ensure secondStageShutdown is called to stop any player
+      activity and free resources. secondStageShutdown must be idempotent
+       */
+      if (!prepared && shutdownOnPrepared) {
         secondStageShutdown()
       }
     }
@@ -391,13 +431,16 @@ private class VlcPlayerImpl(
       newTransition.setPlayer(transitionPlayer)
       transition = newTransition
       scope.launch {
-        if (notifyPrepared) emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration))
+        if (notifyPrepared) {
+          emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration.asMillis()))
+        }
         newTransition.execute()
       }
     }
   }
 
   private inner class TheTransitionPlayer : TransitionPlayer {
+    override val mediaTitle: Title get() = title
     override val isPaused: Boolean get() = isValid && !mediaPlayer.isPlaying
     override val isPlaying: Boolean get() = isValid && mediaPlayer.isPlaying
     override val playerIsShutdown: Boolean get() = isShutdown
@@ -416,8 +459,8 @@ private class VlcPlayerImpl(
         _allowVolumeChange = value
       }
 
-    override val remainingTime: Millis
-      get() = if (isValid) duration - mediaPlayer.time else Millis(0)
+    override val remainingTime: Duration
+      get() = if (isValid) duration - time.toDuration() else Duration.ZERO
 
     override fun notifyPaused() {
       scope.launch { emit(AvPlayerEvent.Paused(time)) }
@@ -439,8 +482,10 @@ private class VlcPlayerImpl(
 
     override fun shutdownPlayer() = shutdown()
 
-    override fun shouldContinue(): Boolean =
-      !playerIsShutdown && duration > 0 && duration - mediaPlayer.time > OFFSET_CONSIDERED_END
+//    override fun shouldContinue(): Boolean =
+//      !playerIsShutdown &&
+//        duration > Duration.ZERO &&
+//        duration.asMillis() - mediaPlayer.time > OFFSET_CONSIDERED_END
   }
 
   /**
@@ -459,18 +504,24 @@ private class VlcPlayerImpl(
     private val fifoPlayerQueue = ArrayDeque<VlcPlayer>(3)
     private val queueLock = ReentrantLock(true)
 
-    fun addToQueue(player: VlcPlayer) = queueLock.withLock {
+    private fun addToQueue(player: VlcPlayer) = queueLock.withLock {
       while (fifoPlayerQueue.size > 1) {
         fifoPlayerQueue.removeLast().shutdown()
       }
       fifoPlayerQueue.addFirst(player)
     }
 
+    /**
+     * Function is idempotent. Once the player is removed from the queue, subsequent calls
+     * are ignored.
+     */
     private fun removeFromQueue(player: VlcPlayer) = queueLock.withLock {
-      fifoPlayerQueue.remove(player)
-      while (fifoPlayerQueue.size > 1) {
-        fifoPlayerQueue.removeLast().shutdown()
-        LOG.w { it("removeFromQueue queue size > 1") }
+      // if player not in queue don't do anything else
+      if (fifoPlayerQueue.remove(player)) {
+        while (fifoPlayerQueue.size > 1) {
+          fifoPlayerQueue.removeLast().shutdown()
+          LOG.w { it("removeFromQueue queue size > 1") }
+        }
       }
     }
   }

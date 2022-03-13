@@ -19,15 +19,16 @@
 package com.ealva.toque.common
 
 import android.os.Parcelable
-import ealvatag.utils.TimeUnits
 import kotlinx.parcelize.Parcelize
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.util.*
-import java.util.concurrent.TimeUnit
+import java.util.Date
+import kotlin.math.absoluteValue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 typealias MillisRange = ClosedRange<Millis>
 
@@ -57,9 +58,9 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
   inline operator fun compareTo(rhs: Long): Int = value.compareTo(rhs)
   inline operator fun compareTo(rhs: Int): Int = value.compareTo(rhs)
 
-  fun asPercentageOf(total: Millis): Double = value.toDouble() / total.value
-
   inline fun toDate(): Date = Date(value)
+
+  fun toDuration(): Duration = value.milliseconds
 
   companion object {
     operator fun invoke(value: Int): Millis = Millis(value.toLong())
@@ -67,53 +68,48 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
 
     inline fun currentUtcEpochMillis(): Millis = Millis(System.currentTimeMillis())
 
+    val ZERO = Millis(0)
     val ONE_SECOND = Millis(1000)
     val TWO_SECONDS = Millis(2000)
     val THREE_SECONDS = Millis(3000)
     val FIVE_SECONDS = Millis(5000)
     val TEN_SECONDS = Millis(10000)
     val ONE_MINUTE = Millis(60000)
-    val FOUR_MINUTES = Millis(240000)
   }
 }
 
+fun Duration.asMillis(): Millis = Millis(inWholeMilliseconds)
+
 fun Long.asMillis(): Millis = Millis(this)
 
+private inline fun <T> Duration.toAbsComponents(
+  action: (hours: Long, minutes: Int, seconds: Int) -> T
+): T = toComponents { hours, minutes, seconds, _ ->
+  action(hours.absoluteValue, minutes.absoluteValue, seconds.absoluteValue)
+}
+
 private val BUILDER = StringBuilder(16)
-val Millis.asDurationString: String
-  get() = BUILDER.run {
+val Duration.asDurationString: String
+  get() = toAbsComponents { hours, minutes, seconds ->
     debug { require(isUiThread) }   // don't share BUILDER across threads
-    val negative = value < 0
-    var totalSeconds =
-      TimeUnits.convert(kotlin.math.abs(value), TimeUnit.MILLISECONDS, TimeUnit.SECONDS, true)
+    BUILDER.run {
+      setLength(0)
 
-    val seconds = totalSeconds % 60
-    totalSeconds /= 60
-    val minutes = totalSeconds % 60
-    totalSeconds /= 60
-    val hours = totalSeconds
+      if (isNegative()) append("-")
 
-    setLength(0)
-    if (negative) {
-      append("-")
-    }
-    if (totalSeconds > 0) {
-      append(hours)
+      if (hours > 0) {
+        append(hours)
+        append(":")
+        if (minutes < 10) append("0")
+        append(minutes)
+      } else append(minutes)
+
       append(":")
-      if (minutes < 10) {
-        append("0")
-      }
-      append(minutes)
-    } else {
-      append(minutes)
-    }
 
-    append(":")
-    if (seconds < 10) {
-      append("0")
-    }
-    append(seconds)
-  }.toString()
+      if (seconds < 10) append("0")
+      append(seconds)
+    }.toString()
+  }
 
 private val dateTimeMillisFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.A")
 val Millis.asDateTimeWithMillis: String

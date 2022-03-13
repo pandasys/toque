@@ -25,6 +25,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.persist.MediaId
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -38,6 +39,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 @Serializable
 data class Metadata(
@@ -51,8 +55,8 @@ data class Metadata(
   val albumArtist: ArtistName,
   @Serializable(with = ArtistNameAsStringSerializer::class)
   val artistName: ArtistName,
-  @Serializable(with = MillisAsLongSerializer::class)
-  val duration: Millis,
+  @Serializable(with = DurationAsLongSerializer::class)
+  val duration: Duration,
   val trackNumber: Int,
   @Serializable(with = UriAsStringSerializer::class)
   val localAlbumArt: Uri,
@@ -70,7 +74,7 @@ data class Metadata(
    * Indices is the Closed range of position values. Playback position occur outside this range
    */
   @Transient
-  val playbackRange: ClosedRange<Millis> = Millis(0)..duration
+  val playbackRange: ClosedRange<Millis> = Millis(0)..duration.inWholeMilliseconds.asMillis()
 
   @OptIn(ExperimentalSerializationApi::class)
   fun toJsonString(): String {
@@ -89,7 +93,7 @@ data class Metadata(
       AlbumTitle(""),
       ArtistName(""),
       ArtistName(""),
-      Millis(0),
+      Duration.ZERO,
       -1,
       Uri.EMPTY,
       Uri.EMPTY,
@@ -108,12 +112,23 @@ object MediaIdAsLongSerializer : KSerializer<MediaId> {
   override fun deserialize(decoder: Decoder): MediaId = MediaId(decoder.decodeLong())
 }
 
-object MillisAsLongSerializer : KSerializer<Millis> {
-  override val descriptor: SerialDescriptor =
-    PrimitiveSerialDescriptor("Millis", PrimitiveKind.LONG)
+//object MillisAsLongSerializer : KSerializer<Millis> {
+//  override val descriptor: SerialDescriptor =
+//    PrimitiveSerialDescriptor("Millis", PrimitiveKind.LONG)
+//
+//  override fun serialize(encoder: Encoder, value: Millis) = encoder.encodeLong(value())
+//  override fun deserialize(decoder: Decoder): Millis = Millis(decoder.decodeLong())
+//}
 
-  override fun serialize(encoder: Encoder, value: Millis) = encoder.encodeLong(value())
-  override fun deserialize(decoder: Decoder): Millis = Millis(decoder.decodeLong())
+object DurationAsLongSerializer : KSerializer<Duration> {
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("Duration", PrimitiveKind.LONG)
+
+  override fun serialize(encoder: Encoder, value: Duration) =
+    encoder.encodeLong(value.inWholeMilliseconds)
+
+  override fun deserialize(decoder: Decoder): Duration =
+    decoder.decodeLong().toDuration(DurationUnit.MILLISECONDS)
 }
 
 object UriAsStringSerializer : KSerializer<Uri> {
