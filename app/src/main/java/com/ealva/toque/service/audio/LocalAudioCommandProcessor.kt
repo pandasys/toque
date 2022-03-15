@@ -76,7 +76,11 @@ class LocalAudioCommandProcessor(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + LOGGING_HANDLER)
 
   /** Replay a small number in case we get an initial burst at startup before completely active */
-  private val commandFlow = MutableSharedFlow<LocalAudioCommand>(replay = 4)
+  private val commandFlow = MutableSharedFlow<LocalAudioCommand>(
+    replay = 4,
+//    extraBufferCapacity = 4
+  )
+
   private val audioMediaDao: AudioMediaDao by inject()
   //private val uiModeManager: UiModeManager by inject()
 

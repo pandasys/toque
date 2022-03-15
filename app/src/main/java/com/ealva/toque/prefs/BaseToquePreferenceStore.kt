@@ -18,7 +18,6 @@
 
 package com.ealva.toque.prefs
 
-import com.ealva.ealvalog.lazyLogger
 import com.ealva.prefstore.store.BasePreferenceStore
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.Storage
@@ -29,16 +28,30 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.persist.reify
-
-val B_LOG by lazyLogger(BasePreferenceStore::class)
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 typealias MillisStorePref = PreferenceStore.Preference<Long, Millis>
 typealias VolumeStorePref = PreferenceStore.Preference<Int, Volume>
 typealias AmpStorePref = PreferenceStore.Preference<Float, Amp>
+typealias DurationPref = PreferenceStore.Preference<Long, Duration>
+typealias EnumPref<T> = PreferenceStore.Preference<Int, T>
 
 open class BaseToquePreferenceStore<T : PreferenceStore<T>>(
   storage: Storage
 ) : BasePreferenceStore<T>(storage) {
+  protected fun durationPref(
+    default: Duration,
+    customName: String? = null,
+    sanitize: ((Duration) -> Duration)? = null
+  ): DurationPref = asTypePref(
+    default = default,
+    maker = { millis -> millis.milliseconds },
+    serialize = { duration -> duration.inWholeMilliseconds },
+    customName = customName,
+    sanitize = sanitize
+  )
+
   protected fun millisPref(
     default: Millis,
     customName: String? = null,
@@ -67,7 +80,7 @@ open class BaseToquePreferenceStore<T : PreferenceStore<T>>(
   protected inline fun <reified T> enumPref(
     default: T,
     customName: String? = null
-  ): StorePref<Int, T> where T : Enum<T>, T : HasConstId {
+  ): EnumPref<T> where T : Enum<T>, T : HasConstId {
     return asTypePref(default, { default::class.reify(it, default) }, { it.id }, customName)
   }
 }

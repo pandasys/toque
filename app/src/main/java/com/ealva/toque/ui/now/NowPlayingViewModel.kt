@@ -33,7 +33,6 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
@@ -232,6 +231,7 @@ private class NowPlayingViewModelImpl(
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
 
   private val currentItem: QueueItem get() = nowPlayingState.value.currentItem
+  private val currentIndex: Int get() = nowPlayingState.value.queueIndex
 
   private suspend fun appPrefs(): AppPrefs = appPrefsSingleton.instance()
 
@@ -313,7 +313,11 @@ private class NowPlayingViewModelImpl(
 
   override fun seekTo(position: Millis) = audioQueue.seekTo(position)
 
-  override fun goToQueueIndexMaybePlay(index: Int) = audioQueue.goToIndexMaybePlay(index)
+  override fun goToQueueIndexMaybePlay(index: Int) {
+    if (index != currentIndex) {
+      audioQueue.goToIndexMaybePlay(index)
+    }
+  }
 
   override fun scheduleSleepTimer(duration: Millis) {
     TODO("Not yet implemented")
@@ -368,7 +372,6 @@ private class NowPlayingViewModelImpl(
   }
 
   private fun goToArtist(audioItem: QueueItem) {
-    LOG._e { it("goToArtist") }
     localAudioQueueModel.clearPrompt()
     scope.launch {
       audioMediaDao
@@ -388,7 +391,6 @@ private class NowPlayingViewModelImpl(
   }
 
   private fun goToAlbumArtist(audioItem: QueueItem) {
-    LOG._e { it("goToAlbumArtist") }
     localAudioQueueModel.clearPrompt()
     scope.launch {
       audioMediaDao

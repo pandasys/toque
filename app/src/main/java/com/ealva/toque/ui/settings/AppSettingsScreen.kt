@@ -20,7 +20,6 @@ import android.os.Parcelable
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -59,8 +58,6 @@ import com.ealva.toque.art.ArtworkDownloader.CompressionQuality
 import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.AmpRange
-import com.ealva.toque.common.Millis
-import com.ealva.toque.common.MillisRange
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.common.fetch
@@ -69,7 +66,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MAX_IMAGE_SEARCH_RANGE
-import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_DURATION_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.QUALITY_RANGE
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -108,6 +105,8 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG by lazyLogger(AppSettingsScreen::class)
 
@@ -253,16 +252,16 @@ data class AppSettingsScreen(
       singleLineTitle = true,
     ),
     SliderSettingItem(
-      preference = prefs.autoAdvanceFadeLength,
+      preference = prefs.autoAdvanceFadeDuration,
       title = fetch(R.string.AutoAdvanceCrossFadeLength),
       enabled = prefs.autoAdvanceFade(),
       singleLineTitle = true,
       summary = fetch(R.string.TotalCrossFadeDuration),
       steps = 0,
       valueRepresentation = { floatValue -> "${floatValue.roundToCentiseconds()} ms" },
-      valueRange = MEDIA_FADE_RANGE.toFloatRange(),
-      floatToType = { value -> Millis(value.roundToCentiseconds()) },
-      typeToFloat = millisToFloat
+      valueRange = MEDIA_FADE_DURATION_RANGE.toFloatRange(),
+      floatToType = { value -> value.roundToCentiseconds().milliseconds },
+      typeToFloat = durationToFloat
     ),
     SwitchSettingItem(
       preference = prefs.manualChangeFade,
@@ -279,9 +278,9 @@ data class AppSettingsScreen(
       summary = fetch(R.string.TotalCrossFadeDuration),
       steps = 0,
       valueRepresentation = { floatValue -> "${floatValue.roundToCentiseconds()} ms" },
-      valueRange = MEDIA_FADE_RANGE.toFloatRange(),
-      floatToType = { value -> Millis(value.roundToCentiseconds()) },
-      typeToFloat = millisToFloat
+      valueRange = MEDIA_FADE_DURATION_RANGE.toFloatRange(),
+      floatToType = { value -> value.roundToCentiseconds().milliseconds },
+      typeToFloat = durationToFloat
     ),
     SwitchSettingItem(
       preference = prefs.playPauseFade,
@@ -291,7 +290,7 @@ data class AppSettingsScreen(
       singleLineTitle = true,
     ),
     SliderSettingItem(
-      preference = prefs.playPauseFadeLength,
+      preference = prefs.playPauseFadeDuration,
       title = fetch(R.string.PlayPauseFadeLength),
       enabled = prefs.playPauseFade(),
       singleLineTitle = true,
@@ -299,8 +298,8 @@ data class AppSettingsScreen(
       steps = 0,
       valueRepresentation = { floatValue -> "${floatValue.roundToCentiseconds()} ms" },
       valueRange = PLAY_PAUSE_FADE_RANGE.toFloatRange(),
-      floatToType = { value -> Millis(value.roundToCentiseconds()) },
-      typeToFloat = millisToFloat
+      floatToType = { value -> value.roundToCentiseconds().milliseconds },
+      typeToFloat = durationToFloat
     ),
   )
 
@@ -469,8 +468,8 @@ data class AppSettingsScreen(
       steps = 0,
       valueRepresentation = { floatValue -> floatValue.toSeconds().toString() },
       valueRange = IGNORE_FILES_RANGE.toFloatRange(),
-      floatToType = { value -> Millis(value.toSeconds()) },
-      typeToFloat = millisToFloat
+      floatToType = { value -> value.roundToCentiseconds().milliseconds },
+      typeToFloat = durationToFloat
     ),
     //CallbackSettingItem(
     //  title = "Media File Tag",
@@ -679,12 +678,12 @@ private fun TitleAndSubtitle(title: String, subtitle: String) {
 }
 
 private fun Float.toSeconds(): Long = div(1000).roundToLong()
-private val millisToFloat: (Millis) -> Float = { it.value.toFloat() }
+private val durationToFloat: (Duration) -> Float = { it.inWholeMilliseconds.toFloat() }
 private fun Float.roundToCentiseconds(): Long = (this / 100).roundToLong() * 100
 
-@JvmName("millisToFloatRange")
-private fun MillisRange.toFloatRange(): ClosedFloatingPointRange<Float> =
-  start.value.toFloat()..endInclusive.value.toFloat()
+@JvmName("durationToFloatRange")
+private fun ClosedRange<Duration>.toFloatRange(): ClosedFloatingPointRange<Float> =
+  durationToFloat(start)..durationToFloat(endInclusive)
 
 private val volumeToFloat: (Volume) -> Float = { it.value.toFloat() }
 private fun Float.toVolume() =

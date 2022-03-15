@@ -26,7 +26,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Date
-import kotlin.math.absoluteValue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -81,35 +80,6 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
 fun Duration.asMillis(): Millis = Millis(inWholeMilliseconds)
 
 fun Long.asMillis(): Millis = Millis(this)
-
-private inline fun <T> Duration.toAbsComponents(
-  action: (hours: Long, minutes: Int, seconds: Int) -> T
-): T = toComponents { hours, minutes, seconds, _ ->
-  action(hours.absoluteValue, minutes.absoluteValue, seconds.absoluteValue)
-}
-
-private val BUILDER = StringBuilder(16)
-val Duration.asDurationString: String
-  get() = toAbsComponents { hours, minutes, seconds ->
-    debug { require(isUiThread) }   // don't share BUILDER across threads
-    BUILDER.run {
-      setLength(0)
-
-      if (isNegative()) append("-")
-
-      if (hours > 0) {
-        append(hours)
-        append(":")
-        if (minutes < 10) append("0")
-        append(minutes)
-      } else append(minutes)
-
-      append(":")
-
-      if (seconds < 10) append("0")
-      append(seconds)
-    }.toString()
-  }
 
 private val dateTimeMillisFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.A")
 val Millis.asDateTimeWithMillis: String

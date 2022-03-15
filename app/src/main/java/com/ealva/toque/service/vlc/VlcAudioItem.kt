@@ -118,6 +118,10 @@ class VlcAudioItem private constructor(
     wakeLockFactory.makeWakeLock(WAKE_LOCK_TIMEOUT, "$LOCK_TAG_PREFIX:${title()}")
   override val eventFlow = MutableSharedFlow<PlayableItemEvent>(extraBufferCapacity = 10)
 
+  private suspend fun emit(event: PlayableItemEvent) {
+    eventFlow.emit(event)
+  }
+
   override val isValid: Boolean
     get() = id.isValid
 
@@ -306,21 +310,18 @@ class VlcAudioItem private constructor(
   }
 
   private suspend fun onPrepared(event: AvPlayerEvent.Prepared) {
-    // Can get a 0 before we start actual playback, but we set this during prepareSeekMaybePlay
-//    if (position != Millis(0)) position = event.position
     isPreparing = false
-    if (event.duration > 0 && duration != event.duration.toDuration()) {
-      metadata = metadata.copy(duration = event.duration.toDuration())
+    if (event.duration > Duration.ZERO && duration != event.duration) {
+      metadata = metadata.copy(duration = event.duration)
       mediaFileStore.updateDurationAsync(id, duration)
     }
-    eventFlow.emit(PlayableItemEvent.Prepared(this, position, event.duration))
-    if (startOnPrepared) play(AllowFade)
+    emit(PlayableItemEvent.Prepared(this, position, event.duration))
   }
 
   private suspend fun onStart(event: AvPlayerEvent.Start) {
     isPreparing = false
     startMarkPlayedCountDown()
-    eventFlow.emit(PlayableItemEvent.Start(this, event.firstStart, position))
+    emit(PlayableItemEvent.Start(this, event.firstStart, position))
   }
 
   private fun startMarkPlayedCountDown() {
@@ -348,21 +349,21 @@ class VlcAudioItem private constructor(
    */
   private suspend fun onPositionUpdate(event: AvPlayerEvent.PositionUpdate) {
     position = event.position
-    eventFlow.emit(PlayableItemEvent.PositionUpdate(this, event.position, event.duration))
+    emit(PlayableItemEvent.PositionUpdate(this, event.position, event.duration))
   }
 
   private suspend fun onPaused(event: AvPlayerEvent.Paused) {
     cancelMarkPlayedCountDown()
     isPreparing = false
     position = event.position
-    eventFlow.emit(PlayableItemEvent.Paused(this, event.position))
+    emit(PlayableItemEvent.Paused(this, event.position))
   }
 
   private suspend fun onStopped() {
     cancelMarkPlayedCountDown()
     isPreparing = false
     isStopped = true
-    eventFlow.emit(PlayableItemEvent.Stopped(this))
+    emit(PlayableItemEvent.Stopped(this))
   }
 
   private suspend fun onPlaybackComplete() {
@@ -370,13 +371,13 @@ class VlcAudioItem private constructor(
     isPreparing = false
     isShutdown = true
     avPlayer = NullAvPlayer
-    eventFlow.emit(PlayableItemEvent.PlaybackComplete(this))
+    emit(PlayableItemEvent.PlaybackComplete(this))
   }
 
   private suspend fun onError() {
     cancelMarkPlayedCountDown()
     isPreparing = false
-    eventFlow.emit(PlayableItemEvent.Error(this))
+    emit(PlayableItemEvent.Error(this))
   }
 
   override fun cloneItem(): PlayableAudioItem = VlcAudioItem(

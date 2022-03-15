@@ -99,6 +99,7 @@ import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
+import com.google.accompanist.pager.PagerState
 import com.google.accompanist.pager.rememberPagerState
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.gowtham.ratingbar.RatingBar
@@ -456,7 +457,7 @@ private fun MediaArtPager(
   goToIndex: (Int) -> Unit,
   modifier: Modifier
 ) {
-  val pagerState = rememberPagerState(initialPage = queueIndex.coerceAtLeast(0))
+  val pagerState: PagerState = rememberPagerState(initialPage = queueIndex.coerceAtLeast(0))
 
   if (queueIndex >= 0) {
     LaunchedEffect(key1 = queueIndex) {
@@ -465,6 +466,7 @@ private fun MediaArtPager(
   }
 
   LaunchedEffect(pagerState) {
+    // ViewModel will determine if we are already at index and do nothing
     snapshotFlow { pagerState.currentPage }.collect { index -> goToIndex(index) }
   }
   HorizontalPager(

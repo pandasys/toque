@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.annotation.concurrent.Immutable
 
 private val LOG by lazyLogger(LocalAudioMiniPlayerViewModel::class)
@@ -87,6 +86,7 @@ private class LocalAudioMiniPlayerViewModelImpl(
   private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
 
   override val miniPlayerState = MutableStateFlow(MiniPlayerState.NONE)
+  private val currentIndex = miniPlayerState.value.queueIndex
 
   override fun onServiceActive() {
     scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -168,10 +168,12 @@ private class LocalAudioMiniPlayerViewModelImpl(
   }
 
   override fun togglePlayPause() {
-    scope.launch { audioQueue.togglePlayPause() }
+    audioQueue.togglePlayPause()
   }
 
   override fun goToQueueIndexMaybePlay(index: Int) {
-    scope.launch { audioQueue.goToIndexMaybePlay(index) }
+    if (index != currentIndex) {
+      audioQueue.goToIndexMaybePlay(index)
+    }
   }
 }

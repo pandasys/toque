@@ -42,6 +42,8 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -118,8 +120,8 @@ class AppPreferencesTest {
   fun testIgnoreThreshold() = runTest {
     prefsSingleton {
       expect(ignoreThreshold()).toBe(ignoreThreshold.default)
-      ignoreThreshold.set(Millis(5000))
-      expect(ignoreThreshold()).toBe(Millis(5000))
+      ignoreThreshold.set(5.seconds)
+      expect(ignoreThreshold()).toBe(5.seconds)
 
       clear()
       expectAllAreDefault()
@@ -155,15 +157,15 @@ class AppPreferencesTest {
   @Test
   fun testPlayPauseFade() = runTest {
     prefsSingleton {
-      expect(playPauseFadeLength()).toBe(playPauseFadeLength.default)
-      playPauseFadeLength.set(Millis(1000))
-      expect(playPauseFadeLength()).toBe(Millis(1000))
-      playPauseFadeLength.set(Millis(2000))
-      expect(playPauseFadeLength()).toBe(Millis(2000))
-      playPauseFadeLength.set(Millis(100))
-      expect(playPauseFadeLength()).toBe(PLAY_PAUSE_FADE_RANGE.start)
-      playPauseFadeLength.set(Millis(5000))
-      expect(playPauseFadeLength()).toBe(PLAY_PAUSE_FADE_RANGE.endInclusive)
+      expect(playPauseFadeDuration()).toBe(playPauseFadeDuration.default)
+      playPauseFadeDuration.set(1.seconds)
+      expect(playPauseFadeDuration()).toBe(1.seconds)
+      playPauseFadeDuration.set(2.seconds)
+      expect(playPauseFadeDuration()).toBe(2.seconds)
+      playPauseFadeDuration.set(100.milliseconds)
+      expect(playPauseFadeDuration()).toBe(PLAY_PAUSE_FADE_RANGE.start)
+      playPauseFadeDuration.set(5.seconds)
+      expect(playPauseFadeDuration()).toBe(PLAY_PAUSE_FADE_RANGE.endInclusive)
 
       clear()
       expectAllAreDefault()
@@ -247,21 +249,26 @@ class AppPreferencesTest {
   @Test
   fun testResetAllToDefault() = runTest {
     prefsSingleton {
+      // clear all and ensure default
       clear()
       expectAllAreDefault()
+
+      // set non-default values for all and ensure not default
       firstRun(!firstRun.default)
       allowDuplicates(!allowDuplicates.default)
       goToNowPlaying(!goToNowPlaying.default)
       ignoreSmallFiles(!ignoreSmallFiles.default)
-      ignoreThreshold(ignoreThreshold.default + 1000L)
+      ignoreThreshold(ignoreThreshold.default + 1.seconds)
       playPauseFade(!playPauseFade.default)
-      playPauseFadeLength(playPauseFadeLength.default + 500L)
+      playPauseFadeDuration(playPauseFadeDuration.default + 500.milliseconds)
       duckAction(DuckAction.Pause)
       duckVolume(duckVolume.default + 1)
       playUpNextAction(PlayUpNextAction.ClearUpNext)
       endOfQueueAction(EndOfQueueAction.Stop)
       selectMediaAction(SelectMediaAction.AddToUpNext)
       expectAllAreNotDefault()
+
+      // clear all and ensure default
       clear()
       expectAllAreDefault()
     }
@@ -275,7 +282,7 @@ class AppPreferencesTest {
     expect(ignoreSmallFiles()).toBe(ignoreSmallFiles.default)
     expect(ignoreThreshold()).toBe(ignoreThreshold.default)
     expect(playPauseFade()).toBe(playPauseFade.default)
-    expect(playPauseFadeLength()).toBe(playPauseFadeLength.default)
+    expect(playPauseFadeDuration()).toBe(playPauseFadeDuration.default)
     expect(duckAction()).toBe(duckAction.default)
     expect(duckVolume()).toBe(duckVolume.default)
     expect(playUpNextAction()).toBe(playUpNextAction.default)
@@ -289,7 +296,7 @@ class AppPreferencesTest {
     expect(ignoreSmallFiles()).toNotBe(ignoreSmallFiles.default)
     expect(ignoreThreshold()).toNotBe(ignoreThreshold.default)
     expect(playPauseFade()).toNotBe(playPauseFade.default)
-    expect(playPauseFadeLength()).toNotBe(playPauseFadeLength.default)
+    expect(playPauseFadeDuration()).toNotBe(playPauseFadeDuration.default)
     expect(duckAction()).toNotBe(duckAction.default)
     expect(duckVolume()).toNotBe(duckVolume.default)
     expect(playUpNextAction()).toNotBe(playUpNextAction.default)

@@ -382,14 +382,14 @@ private class LocalAudioQueueImpl(
 
   override val manualTransition: PlayerTransitionPair
     get() = if (appPrefs.manualChangeFade()) {
-      CrossFadeTransition(appPrefs.manualChangeFadeLength().toDuration())
+      CrossFadeTransition(appPrefs.manualChangeFadeLength())
     } else {
       DirectTransition()
     }
 
   override val autoAdvanceTransition: PlayerTransitionPair
     get() = if (appPrefs.autoAdvanceFade()) {
-      CrossFadeTransition(appPrefs.autoAdvanceFadeLength().toDuration())
+      CrossFadeTransition(appPrefs.autoAdvanceFadeDuration())
     } else {
       DirectTransition()
     }
@@ -675,7 +675,7 @@ private class LocalAudioQueueImpl(
         if (newIndex < 0) {
           // start of queue
         } else {
-          scope.launch { doGoToIndex(newIndex, PlayNow(playState.isPlaying), Manual) }
+          doGoToIndex(newIndex, PlayNow(playState.isPlaying), Manual)
         }
       }
     }
@@ -727,7 +727,7 @@ private class LocalAudioQueueImpl(
 
   override fun goToIndexMaybePlay(index: Int) {
     if (index != currentItemIndex && index in queue.indices) {
-      scope.launch { doGoToIndex(index, PlayNow(currentItem.isPlaying), Manual) }
+      doGoToIndex(index, PlayNow(currentItem.isPlaying), Manual)
     }
   }
 
@@ -1413,12 +1413,13 @@ private class LocalAudioQueueImpl(
   } || nextSong(PlayNow(true), TransitionType.AutoAdvance)
 
   private fun PlayableItemEvent.PositionUpdate.shouldAutoAdvance() =
-    audioItem.supportsFade && position.shouldAutoAdvanceFrom(duration)
+    audioItem.supportsFade && shouldAutoAdvanceFromPosition(position, duration)
 
-  private fun Millis.shouldAutoAdvanceFrom(
-    duration: Millis
-  ) = appPrefs.autoAdvanceFade() && appPrefs.autoAdvanceFadeLength().let { fadeLength ->
-    duration > fadeLength && duration - this < fadeLength + OFFSET_CONSIDERED_END
+  private fun shouldAutoAdvanceFromPosition(
+    position: Millis,
+    duration: Duration
+  ) = appPrefs.autoAdvanceFade() && appPrefs.autoAdvanceFadeDuration().let { fadeLength ->
+    duration > fadeLength && duration - position.toDuration() < fadeLength + OFFSET_CONSIDERED_END
   }
 
   private fun establishNewQueues(

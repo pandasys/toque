@@ -28,19 +28,19 @@ import com.ealva.toque.common.AllowDuplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_ALLOW_DUPLICATES
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_AUTO_ADVANCE_DURATION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_AUTO_ADVANCE_FADE
-import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_AUTO_ADVANCE_FADE_LENGTH
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_DUCK_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_DUCK_VOLUME
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_END_OF_QUEUE_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_GO_TO_NOW_PLAYING
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_IGNORE_SMALL_FILES
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_IGNORE_THRESHOLD
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_DURATION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_FADE
-import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MANUAL_ADVANCE_FADE_LENGTH
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_MARK_PLAYED_PERCENTAGE
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE
-import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE_LENGTH
+import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_PAUSE_FADE_DURATION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_PLAY_UP_NEXT_ACTION
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_QUALITY
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_SELECT_MEDIA_ACTION
@@ -49,10 +49,14 @@ import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.IGNORE_FILES_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MARK_PLAYED_PERCENTAGE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MAX_IMAGE_SEARCH_RANGE
-import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_RANGE
+import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_DURATION_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.QUALITY_RANGE
 import org.koin.core.qualifier.named
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 typealias AppPrefsSingleton = PreferenceStoreSingleton<AppPrefs>
 
@@ -61,20 +65,20 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val allowDuplicates: BoolPref
   val goToNowPlaying: BoolPref
   val ignoreSmallFiles: BoolPref
-  val ignoreThreshold: MillisStorePref
+  val ignoreThreshold: DurationPref
   val lastScanTime: MillisStorePref
   val playPauseFade: BoolPref
-  val playPauseFadeLength: MillisStorePref
+  val playPauseFadeDuration: DurationPref
   val autoAdvanceFade: BoolPref
-  val autoAdvanceFadeLength: MillisStorePref
+  val autoAdvanceFadeDuration: DurationPref
   val manualChangeFade: BoolPref
-  val manualChangeFadeLength: MillisStorePref
-  val duckAction: StorePref<Int, DuckAction>
+  val manualChangeFadeLength: DurationPref
+  val duckAction: EnumPref<DuckAction>
   val duckVolume: VolumeStorePref
-  val playUpNextAction: StorePref<Int, PlayUpNextAction>
-  val endOfQueueAction: StorePref<Int, EndOfQueueAction>
-  val selectMediaAction: StorePref<Int, SelectMediaAction>
-  val themeChoice: StorePref<Int, ThemeChoice>
+  val playUpNextAction: EnumPref<PlayUpNextAction>
+  val endOfQueueAction: EnumPref<EndOfQueueAction>
+  val selectMediaAction: EnumPref<SelectMediaAction>
+  val themeChoice: EnumPref<ThemeChoice>
 
   /**
    * This represents a percentage of media which needs to be played before it is marked as played.
@@ -90,7 +94,6 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val playOnWiredConnection: BoolPref
   val readTagRating: BoolPref
   val readTagSortFields: BoolPref
-
   val autoFetchArtLocation: BoolPref
   val downloadArt: BoolPref
   val downloadHighResArt: BoolPref
@@ -100,20 +103,19 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
 
   companion object {
     val QUALIFIER = named("AppPrefs")
-
     val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
     const val DEFAULT_GO_TO_NOW_PLAYING = true
     const val DEFAULT_IGNORE_SMALL_FILES = false
-    val IGNORE_FILES_RANGE: ClosedRange<Millis> = Millis.FIVE_SECONDS..Millis.ONE_MINUTE
-    val DEFAULT_IGNORE_THRESHOLD = Millis(20000).coerceIn(IGNORE_FILES_RANGE)
-    const val DEFAULT_PLAY_PAUSE_FADE = true
-    val PLAY_PAUSE_FADE_RANGE: ClosedRange<Millis> = Millis(500)..Millis(2000)
-    val DEFAULT_PLAY_PAUSE_FADE_LENGTH = Millis.ONE_SECOND.coerceIn(PLAY_PAUSE_FADE_RANGE)
-    val MEDIA_FADE_RANGE: ClosedRange<Millis> = Millis.ONE_SECOND..Millis.TEN_SECONDS
+    val IGNORE_FILES_RANGE: ClosedRange<Duration> = 5.seconds..1.minutes
+    val DEFAULT_IGNORE_THRESHOLD = 20.seconds.coerceIn(IGNORE_FILES_RANGE)
+    const val DEFAULT_PLAY_PAUSE_FADE = false
+    val PLAY_PAUSE_FADE_RANGE = 500.milliseconds..2.seconds
+    val DEFAULT_PLAY_PAUSE_FADE_DURATION = 1.seconds.coerceIn(PLAY_PAUSE_FADE_RANGE)
+    val MEDIA_FADE_DURATION_RANGE: ClosedRange<Duration> = 1.seconds..10.seconds
     const val DEFAULT_AUTO_ADVANCE_FADE = false
-    val DEFAULT_AUTO_ADVANCE_FADE_LENGTH = Millis.THREE_SECONDS.coerceIn(MEDIA_FADE_RANGE)
-    const val DEFAULT_MANUAL_ADVANCE_FADE = true
-    val DEFAULT_MANUAL_ADVANCE_FADE_LENGTH = Millis.TWO_SECONDS.coerceIn(MEDIA_FADE_RANGE)
+    val DEFAULT_AUTO_ADVANCE_DURATION = 3.seconds
+    const val DEFAULT_MANUAL_ADVANCE_FADE = false
+    val DEFAULT_MANUAL_ADVANCE_DURATION = 2.seconds.coerceIn(MEDIA_FADE_DURATION_RANGE)
     val DEFAULT_PLAY_UP_NEXT_ACTION = PlayUpNextAction.Prompt
     val DEFAULT_END_OF_QUEUE_ACTION = EndOfQueueAction.PlayNextList
     val DEFAULT_SELECT_MEDIA_ACTION = SelectMediaAction.Play
@@ -121,12 +123,9 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
     val DEFAULT_DUCK_ACTION = DuckAction.Duck
     val DUCK_VOLUME_RANGE: ClosedRange<Volume> = Volume.NONE..Volume.MAX
     val DEFAULT_DUCK_VOLUME: Volume = DUCK_VOLUME_RANGE.endInclusive / 2
-
     val MARK_PLAYED_PERCENTAGE_RANGE = 0.0..1.0
     const val DEFAULT_MARK_PLAYED_PERCENTAGE: Double = 0.5
-
     val MAX_IMAGE_SEARCH_RANGE = 10..50
-
     val DEFAULT_QUALITY = CompressionQuality(80)
     val QUALITY_RANGE = 0..100
 
@@ -142,26 +141,24 @@ private class AppPrefsImpl(
   override val allowDuplicates by preference(DEFAULT_ALLOW_DUPLICATES.value)
   override val goToNowPlaying by preference(DEFAULT_GO_TO_NOW_PLAYING)
   override val ignoreSmallFiles by preference(DEFAULT_IGNORE_SMALL_FILES)
-  override val ignoreThreshold by millisPref(DEFAULT_IGNORE_THRESHOLD) { millis ->
-    millis.coerceIn(IGNORE_FILES_RANGE)
+  override val ignoreThreshold by durationPref(DEFAULT_IGNORE_THRESHOLD) { duration ->
+    duration.coerceIn(IGNORE_FILES_RANGE)
   }
   override val lastScanTime by millisPref(Millis(0))
   override val playPauseFade by preference(DEFAULT_PLAY_PAUSE_FADE)
-  override val playPauseFadeLength by millisPref(DEFAULT_PLAY_PAUSE_FADE_LENGTH) { millis ->
-    millis.coerceIn(PLAY_PAUSE_FADE_RANGE)
+  override val playPauseFadeDuration by durationPref(DEFAULT_PLAY_PAUSE_FADE_DURATION) { duration ->
+    duration.coerceIn(PLAY_PAUSE_FADE_RANGE)
   }
   override val autoAdvanceFade by preference(DEFAULT_AUTO_ADVANCE_FADE)
-  override val autoAdvanceFadeLength by millisPref(DEFAULT_AUTO_ADVANCE_FADE_LENGTH) { millis ->
-    millis.coerceIn(MEDIA_FADE_RANGE)
+  override val autoAdvanceFadeDuration by durationPref(DEFAULT_AUTO_ADVANCE_DURATION) { duration ->
+    duration.coerceIn(MEDIA_FADE_DURATION_RANGE)
   }
   override val manualChangeFade by preference(DEFAULT_MANUAL_ADVANCE_FADE)
-  override val manualChangeFadeLength by millisPref(DEFAULT_MANUAL_ADVANCE_FADE_LENGTH) { millis ->
-    millis.coerceIn(MEDIA_FADE_RANGE)
+  override val manualChangeFadeLength by durationPref(DEFAULT_MANUAL_ADVANCE_DURATION) { duration ->
+    duration.coerceIn(MEDIA_FADE_DURATION_RANGE)
   }
   override val duckAction by enumPref(DEFAULT_DUCK_ACTION)
-  override val duckVolume by volumePref(DEFAULT_DUCK_VOLUME) {
-    it.coerceIn(DUCK_VOLUME_RANGE)
-  }
+  override val duckVolume by volumePref(DEFAULT_DUCK_VOLUME) { it.coerceIn(DUCK_VOLUME_RANGE) }
   override val playUpNextAction by enumPref(DEFAULT_PLAY_UP_NEXT_ACTION)
   override val endOfQueueAction by enumPref(DEFAULT_END_OF_QUEUE_ACTION)
   override val selectMediaAction by enumPref(DEFAULT_SELECT_MEDIA_ACTION)
@@ -187,8 +184,8 @@ private class AppPrefsImpl(
   }
   override val downloadUnmeteredOnly: BoolPref by preference(true)
   override val compressionQuality: StorePref<Int, CompressionQuality> by
-    asTypePref(DEFAULT_QUALITY, { CompressionQuality(it) }, { it.value }) { quality ->
-      CompressionQuality(quality.value.coerceIn(QUALITY_RANGE))
-    }
+  asTypePref(DEFAULT_QUALITY, { CompressionQuality(it) }, { it.value }) { quality ->
+    CompressionQuality(quality.value.coerceIn(QUALITY_RANGE))
+  }
 
 }

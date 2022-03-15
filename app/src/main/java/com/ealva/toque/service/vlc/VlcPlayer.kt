@@ -16,7 +16,6 @@
 
 package com.ealva.toque.service.vlc
 
-import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.w
@@ -28,6 +27,7 @@ import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.common.asMillis
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
@@ -119,7 +119,7 @@ private class VlcPlayerImpl(
   private val id: MediaId,
   private val albumId: AlbumId,
   vlcMedia: IMedia,
-  @Suppress("unused") private val title: Title,
+  @Suppress("unused") private val title: Title, // for logging
   private val playerState: SharedPlayerState,
   override var duration: Duration,
   onPreparedTransition: PlayerTransition,
@@ -253,15 +253,17 @@ private class VlcPlayerImpl(
 
   private val pauseTransition: PlayerTransition
     get() = if (appPrefs.playPauseFade()) {
-      PauseFadeOutTransition(appPrefs.playPauseFadeLength().toDuration())
+      PauseFadeOutTransition(appPrefs.playPauseFadeDuration())
     } else PauseImmediateTransition()
 
   private val playTransition: PlayerTransition
     get() = if (appPrefs.playPauseFade()) {
-      FadeInTransition(appPrefs.playPauseFadeLength().toDuration())
+      FadeInTransition(appPrefs.playPauseFadeDuration())
     } else PlayImmediateTransition()
 
-  override fun playStartPaused() = mediaPlayer.play()
+  override fun playStartPaused() {
+    mediaPlayer.play()
+  }
 
   override fun play(mayFade: MayFade) {
     if (isValid && requestFocus.requestFocus()) {
@@ -283,10 +285,7 @@ private class VlcPlayerImpl(
       */
       allowPositionUpdate = false
       mediaPlayer.time = position.value
-      val theDuration = duration
-      scope.launch {
-        emit(AvPlayerEvent.PositionUpdate(position, theDuration.asMillis(), false))
-      }
+      emit(AvPlayerEvent.PositionUpdate(position, duration, false))
       allowPositionUpdate = true
     }
   }
@@ -315,15 +314,10 @@ private class VlcPlayerImpl(
    * This function must be idempotent, so no side effects from calling more than once
    */
   private fun secondStageShutdown() {
-    try {
-      scope.cancel() // should never throw based on our use, but need to ensure other code executes
-    } catch (e: Throwable) {
-      LOG.e(e) { it("Canceling scope threw an exception! Internal defect, must investigate") }
-    } finally {
-      removeFromQueue(this)
-      if (!mediaPlayer.isReleased) mediaPlayer.release()
-      wakeLock.release()
-    }
+    removeFromQueue(this)
+    if (!mediaPlayer.isReleased) mediaPlayer.release()
+    wakeLock.release()
+    scope.cancel()
   }
 
   override fun duck() {
@@ -350,60 +344,50 @@ private class VlcPlayerImpl(
     mediaPlayer.setAudioOutput(module.toString())
   }
 
-  private suspend fun emit(event: AvPlayerEvent) {
-    eventFlow.emit(event)
+  private fun emit(event: AvPlayerEvent) {
+    scope.launch { eventFlow.emit(event) }
   }
 
   private fun makeEventListener() = MediaPlayer.EventListener { event: MediaPlayer.Event ->
 //    LOG._e { it("%s %s", title(), event.asString) }
     if (!isShutdown) {
-      scope.launch {
-        when (event.type) {
-          MediaPlayer.Event.Opening -> mediaPlayer.setMappedVolume(realVolume)
-          MediaPlayer.Event.Buffering -> if (!prepared && event.ampleBufferedForPrepare()) {
-            prepared = true
-            startTransition(onPrepared, notifyPrepared = true)
-          }
-          MediaPlayer.Event.Playing -> if (prepared) wakeLock.acquire()
-          MediaPlayer.Event.Paused -> if (prepared) wakeLock.release()
-          MediaPlayer.Event.Stopped -> {
-            wakeLock.release()
-            seekable = false
-            emit(AvPlayerEvent.Stopped)
-          }
-          MediaPlayer.Event.EndReached -> {
-            // emit before shutdown or won't go due to scope cancellation
-            emit(AvPlayerEvent.PlaybackComplete)
-            shutdown()
-          }
-          MediaPlayer.Event.EncounteredError -> {
-            prepared = false
-            // emit before shutdown or won't go due to scope cancellation
-            emit(AvPlayerEvent.Error)
-            shutdown()
-          }
-          MediaPlayer.Event.TimeChanged -> {
-            if (allowPositionUpdate) {
-              emit(
-                AvPlayerEvent.PositionUpdate(
-                  Millis(event.timeChanged),
-                  duration.asMillis(),
-                  true
-                )
-              )
-            }
-          }
-          MediaPlayer.Event.PositionChanged -> event.positionChanged
-          MediaPlayer.Event.SeekableChanged -> seekable = event.seekable
-          MediaPlayer.Event.PausableChanged -> {
-            pausable = event.pausable
-            val reportedLength = mediaPlayer.length
-            if (reportedLength > 0) {
-              duration = reportedLength.toDuration(DurationUnit.MILLISECONDS)
-            }
-          }
-          MediaPlayer.Event.LengthChanged -> {}
+      when (event.type) {
+        MediaPlayer.Event.Opening -> mediaPlayer.setMappedVolume(realVolume)
+        MediaPlayer.Event.Buffering -> if (!prepared && event.ampleBufferedForPrepare()) {
+          prepared = true
+          startTransition(onPrepared, notifyPrepared = true)
         }
+        MediaPlayer.Event.Playing -> if (prepared) wakeLock.acquire()
+        MediaPlayer.Event.Paused -> if (prepared) wakeLock.release()
+        MediaPlayer.Event.Stopped -> {
+          wakeLock.release()
+          seekable = false
+          emit(AvPlayerEvent.Stopped)
+        }
+        MediaPlayer.Event.EndReached -> {
+          // emit before shutdown or won't go due to scope cancellation
+          emit(AvPlayerEvent.PlaybackComplete)
+          shutdown()
+        }
+        MediaPlayer.Event.EncounteredError -> {
+          prepared = false
+          // emit before shutdown or won't go due to scope cancellation
+          emit(AvPlayerEvent.Error)
+          shutdown()
+        }
+        MediaPlayer.Event.TimeChanged -> if (allowPositionUpdate) {
+          emit(AvPlayerEvent.PositionUpdate(Millis(event.timeChanged), duration, true))
+        }
+        MediaPlayer.Event.PositionChanged -> event.positionChanged
+        MediaPlayer.Event.SeekableChanged -> seekable = event.seekable
+        MediaPlayer.Event.PausableChanged -> {
+          pausable = event.pausable
+          val reportedLength = mediaPlayer.length
+          if (reportedLength > 0) {
+            duration = reportedLength.toDuration(DurationUnit.MILLISECONDS)
+          }
+        }
+        MediaPlayer.Event.LengthChanged -> {}
       }
     } else {
       /* It's possible to receive a request to shutdown before even being prepared if transitions
@@ -411,7 +395,7 @@ private class VlcPlayerImpl(
       but if shutdownOnPrepared = true and ensure secondStageShutdown is called to stop any player
       activity and free resources. secondStageShutdown must be idempotent
        */
-      if (!prepared && shutdownOnPrepared) {
+      if (shutdownOnPrepared) {
         secondStageShutdown()
       }
     }
@@ -426,16 +410,14 @@ private class VlcPlayerImpl(
   }
 
   private fun startTransition(newTransition: PlayerTransition, notifyPrepared: Boolean = false) {
-    if (isSeekable && transition.accept(newTransition)) {
+    if (!isShutdown && transition.accept(newTransition)) {
       transition.setCancelled()
       newTransition.setPlayer(transitionPlayer)
       transition = newTransition
-      scope.launch {
-        if (notifyPrepared) {
-          emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration.asMillis()))
-        }
-        newTransition.execute()
-      }
+      if (notifyPrepared) emit(AvPlayerEvent.Prepared(Millis(mediaPlayer.time), duration))
+      newTransition.execute()
+    } else {
+      LOG._e { it("%s illegal transition %s to %s", title, transition, newTransition) }
     }
   }
 
@@ -462,14 +444,12 @@ private class VlcPlayerImpl(
     override val remainingTime: Duration
       get() = if (isValid) duration - time.toDuration() else Duration.ZERO
 
-    override fun notifyPaused() {
-      scope.launch { emit(AvPlayerEvent.Paused(time)) }
-    }
+    override fun notifyPaused() = emit(AvPlayerEvent.Paused(time))
 
     override fun notifyPlaying() {
       val isFirstStart = firstStart
-      scope.launch { emit(AvPlayerEvent.Start(isFirstStart)) }
       firstStart = false
+      emit(AvPlayerEvent.Start(isFirstStart))
     }
 
     override fun pause() {

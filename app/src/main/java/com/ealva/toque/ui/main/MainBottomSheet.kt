@@ -53,6 +53,7 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.navigation.ComposeKey
@@ -68,6 +69,9 @@ import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
 import com.google.accompanist.pager.rememberPagerState
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
+
+@Suppress("unused")
+private val LOG by lazyLogger("MainBottomSheet")
 
 private const val ALPHA_ON = 1.0F
 private const val ALPHA_OFF = 0.3F

@@ -31,12 +31,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
-import com.ealva.toque.common.Millis
 import com.ealva.toque.db.smart.DurationMatcher
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.ui.common.ListItemPicker
 import com.ealva.toque.ui.theme.toqueColors
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.ZERO
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun DurationEditor(
@@ -62,14 +66,18 @@ private fun SingleDurationEditor(
     verticalAlignment = Alignment.CenterVertically
   ) {
     HoursMinutesSecondsEditor(
-      millis = Millis(data.first),
-      timeUpdated = { millis -> ruleDataChanged(editorRule, data.copy(first = millis.value)) }
+      data.first.milliseconds,
+      timeUpdated = { duration ->
+        ruleDataChanged(
+          editorRule,
+          data.copy(first = duration.coerceAtLeast(ZERO).inWholeMilliseconds))
+      }
     )
   }
 }
 
 @Composable
-fun DurationRangeEditor(
+private fun DurationRangeEditor(
   editorRule: EditorRule.DurationRule,
   ruleDataChanged: (EditorRule, MatcherData) -> Unit
 ) {
@@ -81,83 +89,73 @@ fun DurationRangeEditor(
     verticalAlignment = Alignment.CenterVertically
   ) {
     HoursMinutesSecondsEditor(
-      millis = Millis(data.first),
-      timeUpdated = { millis -> ruleDataChanged(editorRule, data.copy(first = millis.value)) }
+      data.first.milliseconds,
+      timeUpdated = { duration ->
+        val first = duration.coerceAtLeast(ZERO)
+        ruleDataChanged(
+          editorRule,
+          data.copy(
+            first = first.inWholeMilliseconds,
+            second = data.second.milliseconds.coerceAtLeast(first + 1.seconds).inWholeMilliseconds
+          )
+        )
+      }
     )
     Text(
       modifier = Modifier.padding(horizontal = 4.dp),
       text = stringResource(id = R.string.to)
     )
     HoursMinutesSecondsEditor(
-      millis = Millis(data.second),
-      timeUpdated = { millis -> ruleDataChanged(editorRule, data.copy(second = millis.value)) }
+      data.second.milliseconds,
+      timeUpdated = { duration ->
+        val first = data.first.milliseconds
+          .coerceAtMost(duration - 1.seconds)
+          .coerceAtLeast(ZERO)
+        ruleDataChanged(
+          editorRule,
+          data.copy(
+            first = first.inWholeMilliseconds,
+            second = duration.coerceAtLeast(first + 1.seconds).inWholeMilliseconds
+          )
+        )
+      }
     )
   }
 }
 
 @Composable
-private fun HoursMinutesSecondsEditor(millis: Millis, timeUpdated: (Millis) -> Unit) {
-  val seconds = millis.seconds
-  val minutes = millis.minutes
-  val hours = millis.hours
-
-  LabeledNumberPicker(
-    value = hours.value,
-    label = stringResource(R.string.h_hours),
-    range = 0..99,
-    onValueChange = { newHours -> timeUpdated(timeChanged(Hours(newHours), minutes, seconds)) }
-  )
-  LabeledNumberPicker(
-    value = minutes.value,
-    valueText = ::secondsOrMinutesLabel,
-    label = stringResource(R.string.m_minutes),
-    range = -1..60,
-    onValueChange = { newMinutes -> timeUpdated(timeChanged(hours, Minutes(newMinutes), seconds)) }
-  )
-  LabeledNumberPicker(
-    value = seconds.value,
-    valueText = ::secondsOrMinutesLabel,
-    label = stringResource(R.string.s_seconds),
-    range = -1..60,
-    onValueChange = { newSeconds -> timeUpdated(timeChanged(hours, minutes, Seconds(newSeconds))) }
-  )
+private fun HoursMinutesSecondsEditor(duration: Duration, timeUpdated: (Duration) -> Unit) {
+  duration.components { hours, minutes, seconds ->
+    LabeledNumberPicker(
+      value = hours.value.toInt(),
+      label = stringResource(R.string.h_hours),
+      range = 0..99,
+      onValueChange = { newHours -> timeUpdated(toDuration(Hours(newHours), minutes, seconds)) }
+    )
+    LabeledNumberPicker(
+      value = minutes.value,
+      valueText = ::secondsOrMinutesLabel,
+      label = stringResource(R.string.m_minutes),
+      range = -1..60,
+      onValueChange = { newMinutes -> timeUpdated(toDuration(hours, Minutes(newMinutes), seconds)) }
+    )
+    LabeledNumberPicker(
+      value = seconds.value,
+      valueText = ::secondsOrMinutesLabel,
+      label = stringResource(R.string.s_seconds),
+      range = -1..60,
+      onValueChange = { newSeconds -> timeUpdated(toDuration(hours, minutes, Seconds(newSeconds))) }
+    )
+  }
 }
 
-fun secondsOrMinutesLabel(value: Int): String = when (value) {
+private fun secondsOrMinutesLabel(value: Int): String = when (value) {
   -1, 60 -> ""
   else -> value.toString()
 }
 
-private val HOURS_RANGE = Hours(0)..Hours(99)
-
-private fun timeChanged(newHours: Hours, newMinutes: Minutes, newSeconds: Seconds): Millis {
-  var hours = newHours
-  var minutes = newMinutes
-  var seconds = newSeconds
-  when {
-    seconds < Seconds.WITHIN_MINUTE -> {
-      seconds = Seconds.WITHIN_MINUTE.endInclusive
-      minutes -= 1
-    }
-    seconds > Seconds.WITHIN_MINUTE -> {
-      seconds = Seconds.WITHIN_MINUTE.start
-      minutes += 1
-    }
-  }
-  when {
-    minutes < Minutes.WITHIN_HOUR -> {
-      minutes = Minutes.WITHIN_HOUR.endInclusive
-      hours -= 1
-    }
-    minutes > Minutes.WITHIN_HOUR -> {
-      minutes = Minutes.WITHIN_HOUR.start
-      hours += 1
-    }
-  }
-
-  hours = hours.coerceIn(HOURS_RANGE)
-  return toMillis(hours, minutes, seconds)
-}
+private fun toDuration(hours: Hours, minutes: Minutes, seconds: Seconds): Duration =
+  hours.asDuration + minutes.asDuration + seconds.asDuration
 
 @Composable
 private fun LabeledNumberPicker(
@@ -186,64 +184,29 @@ private fun LabeledNumberPicker(
   }
 }
 
-private fun toMillis(hours: Hours, minutes: Minutes, seconds: Seconds): Millis =
-  hours.asMillis + minutes.asMillis + seconds.asMillis
-
-private val Millis.hours: Hours get() = Hours((value / (1000 * 60 * 60) % 24).toInt())
-private val Millis.minutes: Minutes get() = Minutes((value / (1000 * 60) % 60).toInt())
-private val Millis.seconds: Seconds get() = Seconds((value / 1000).toInt() % 60)
-
-
 @JvmInline
-value class Hours(val value: Int) : Comparable<Hours> {
-  val asMillis: Millis get() = Millis(TimeUnit.HOURS.toMillis(value.toLong()))
-
-  operator fun minus(rhs: Int): Hours = Hours(value - rhs)
-  operator fun plus(rhs: Int): Hours = Hours(value + rhs)
-
-  override fun compareTo(other: Hours): Int = value.compareTo(other.value)
-}
-
-@JvmInline
-value class Minutes(val value: Int) : Comparable<Minutes> {
-  val asMillis: Millis get() = Millis(TimeUnit.MINUTES.toMillis(value.toLong()))
-
-  operator fun minus(rhs: Int): Minutes = Minutes(value - rhs)
-  operator fun plus(rhs: Int): Minutes = Minutes(value + rhs)
-
-  override fun compareTo(other: Minutes): Int = value.compareTo(other.value)
-
-  operator fun compareTo(range: ClosedRange<Minutes>): Int {
-    return when {
-      this < range.start -> -1
-      this > range.endInclusive -> 1
-      else -> 0
-    }
-  }
+value class Hours(val value: Long) {
+  inline val asDuration: Duration get() = value.hours
 
   companion object {
-    val WITHIN_HOUR: ClosedRange<Minutes> = Minutes(0)..Minutes(59)
+    operator fun invoke(intValue: Int): Hours = Hours(intValue.toLong())
   }
 }
 
 @JvmInline
-value class Seconds(val value: Int) : Comparable<Seconds> {
-  val asMillis: Millis get() = Millis(TimeUnit.SECONDS.toMillis(value.toLong()))
+private value class Minutes(val value: Int) {
+  inline val asDuration: Duration get() = value.minutes
+}
 
-  operator fun minus(rhs: Int): Seconds = Seconds(value - rhs)
-  operator fun plus(rhs: Int): Seconds = Seconds(value + rhs)
+@JvmInline
+value class Seconds(val value: Int) {
+  inline val asDuration: Duration get() = value.seconds
+}
 
-  override fun compareTo(other: Seconds): Int = value.compareTo(other.value)
-
-  operator fun compareTo(range: ClosedRange<Seconds>): Int {
-    return when {
-      this < range.start -> -1
-      this > range.endInclusive -> 1
-      else -> 0
-    }
-  }
-
-  companion object {
-    val WITHIN_MINUTE = Seconds(0)..Seconds(59)
+private inline fun <T> Duration.components(
+  action: (hours: Hours, minutes: Minutes, seconds: Seconds) -> T
+): T {
+  return toComponents { hours, minutes, seconds, _ ->
+    action(Hours(hours), Minutes(minutes), Seconds(seconds))
   }
 }

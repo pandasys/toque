@@ -139,13 +139,13 @@ sealed interface PlayableItemEvent {
   data class Prepared(
     val audioItem: PlayableAudioItem,
     val position: Millis,
-    val duration: Millis
+    val duration: Duration
   ) : PlayableItemEvent
 
   data class PositionUpdate(
     val audioItem: PlayableAudioItem,
     val position: Millis,
-    val duration: Millis
+    val duration: Duration
   ) : PlayableItemEvent
 
   data class Start(

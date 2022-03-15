@@ -25,6 +25,7 @@ import com.ealva.toque.service.queue.MayFade
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 interface AvPlayer {
   fun interface FocusRequest {
@@ -76,7 +77,7 @@ interface AvPlayer {
     // considered the end of the media. For example, seeking to Media.duration during playback will
     // cause an immediate jump to the next media, which will frustrate the user trying to seek
     // within the bounds of 0..Media.duration.
-    const val OFFSET_CONSIDERED_END = 600L
+    val OFFSET_CONSIDERED_END = 600.milliseconds
 
     val DEFAULT_VOLUME_RANGE = Volume.NONE..Volume.MAX
   }
@@ -89,9 +90,9 @@ sealed interface AvPlayerEvent {
   /**
    * The player has been prepared, which currently means it has progressed far enough through
    * opening and buffering that it is considered "playable". [position] is within 0..[duration]. The
-   * starting playback position is not always Millis(0).
+   * starting playback position is not always [Millis.ZERO].
    */
-  data class Prepared(val position: Millis, val duration: Millis) : AvPlayerEvent
+  data class Prepared(val position: Millis, val duration: Duration) : AvPlayerEvent
 
   /**
    * The position within the media has changed. [position] is within 0..[duration]. If [isPlaying]
@@ -99,7 +100,7 @@ sealed interface AvPlayerEvent {
    */
   data class PositionUpdate(
     val position: Millis,
-    val duration: Millis,
+    val duration: Duration,
     val isPlaying: Boolean
   ) : AvPlayerEvent
 

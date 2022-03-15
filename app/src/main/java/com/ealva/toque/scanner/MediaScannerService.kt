@@ -206,10 +206,7 @@ class MediaScannerService : LifecycleService() {
     val minimumDuration = if (BuildConfig.DEBUG) {
       30_000.toDuration(DurationUnit.MILLISECONDS)
     } else {
-      if (prefs.ignoreSmallFiles())
-        prefs.ignoreThreshold().value.toDuration(DurationUnit.MILLISECONDS)
-      else
-        Duration.ZERO
+      if (prefs.ignoreSmallFiles()) prefs.ignoreThreshold() else Duration.ZERO
     }
     scanAllAudioAfter(
       if (rescan.forceUpdate) Date(0) else prefs.lastScanTime().toDate(),

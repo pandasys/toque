@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.player
 
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.flow.CountDownFlow
 import com.ealva.toque.service.audio.PlayerTransition.Type
 import kotlinx.coroutines.CoroutineDispatcher
@@ -27,6 +28,9 @@ import kotlinx.coroutines.flow.onStart
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
+
+@Suppress("unused")
+private val LOG by lazyLogger(FadeInTransition::class)
 
 private val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
 private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)

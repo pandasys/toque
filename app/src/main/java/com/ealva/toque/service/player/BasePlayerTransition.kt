@@ -16,12 +16,18 @@
 
 package com.ealva.toque.service.player
 
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
 import com.ealva.toque.service.audio.PlayerTransition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+
+@Suppress("unused")
+private val LOG by lazyLogger(BasePlayerTransition::class)
 
 abstract class BasePlayerTransition(
   override val type: PlayerTransition.Type,
@@ -54,8 +60,8 @@ abstract class BasePlayerTransition(
 
   override fun setCancelled() {
     if (!isFinished) {
-      isCancelled = true
       scope.cancel()
+      isCancelled = true
       cancelTransition(player)
     }
   }

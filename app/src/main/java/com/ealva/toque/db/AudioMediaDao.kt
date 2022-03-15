@@ -59,7 +59,6 @@ import com.ealva.toque.db.PlayListType.UserCreated
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.extension
 import com.ealva.toque.file.toUriOrEmpty
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.AlbumIdList
 import com.ealva.toque.persist.ArtistId
@@ -611,7 +610,6 @@ private class AudioMediaDaoImpl(
     filter: Filter,
     limit: Limit
   ): Result<List<AudioDescription>, Throwable> = runSuspendCatching {
-    LOG._e { it("getAlbumArtistAudio") }
     db.query {
       MediaTable
         .join(ArtistTable, INNER, MediaTable.albumArtistId, ArtistTable.id)
