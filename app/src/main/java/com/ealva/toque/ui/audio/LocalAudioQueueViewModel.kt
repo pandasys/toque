@@ -21,7 +21,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.PlaylistName
-import com.ealva.toque.common.ShuffleMedia
+import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.fetchPlural
 import com.ealva.toque.common.isValidAndUnique
@@ -29,7 +29,6 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
 import com.ealva.toque.db.PlaylistIdNameType
-import com.ealva.toque.log._e
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
@@ -127,7 +126,6 @@ class LocalAudioQueueViewModelImpl(
   override var queueSize: Int = 0
 
   override fun onServiceRegistered() {
-    LOG._e { it("onServiceRegistered") }
     scope = CoroutineScope(SupervisorJob() + dispatcher)
     scope.launch {
       val appPrefs = appPrefsSingleton.instance()
@@ -144,7 +142,6 @@ class LocalAudioQueueViewModelImpl(
   }
 
   override fun onServiceUnregistered() {
-    LOG._e { it("onServiceUnregistered") }
     scope.cancel()
   }
 
@@ -153,17 +150,17 @@ class LocalAudioQueueViewModelImpl(
   }
 
   override suspend fun play(mediaList: CategoryMediaList): PromptResult =
-    playOrPrompt(mediaList, ShuffleMedia(false))
+    playOrPrompt(mediaList, ShuffleMode.None)
 
   override suspend fun shuffle(mediaList: CategoryMediaList): PromptResult =
-    playOrPrompt(mediaList, ShuffleMedia(true))
+    playOrPrompt(mediaList, ShuffleMode.Media)
 
   private suspend fun playOrPrompt(
     mediaList: CategoryMediaList,
-    shuffle: ShuffleMedia
+    shuffleMode: ShuffleMode
   ): PromptResult {
     val result = CompletableDeferred<PromptResult>()
-    val idList: CategoryMediaList = if (shuffle.value) mediaList.shuffled() else mediaList
+    val idList: CategoryMediaList = mediaList.maybeShuffle(shuffleMode)
 
     fun onDismiss() {
       clearPrompt()

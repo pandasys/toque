@@ -431,6 +431,8 @@ potential-bugs:
     active: true
   HasPlatformType:
     active: false
+  IgnoredReturnValue:
+    active: true
   ImplicitDefaultLocale:
     active: false
   InvalidRange:

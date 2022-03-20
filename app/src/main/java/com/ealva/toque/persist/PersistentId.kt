@@ -28,6 +28,8 @@ import it.unimi.dsi.fastutil.longs.LongList
 import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.RawValue
+import java.util.Random
+import javax.annotation.CheckReturnValue
 
 /**
  * Interface for persistent IDs, used to define [value] property, the constant [ID_INVALID], and
@@ -92,6 +94,12 @@ value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parc
 
   inline operator fun get(index: Int): MediaId = value.getLong(index).asMediaId
 
+  /**
+   * If size is > 1 returns a shuffled list, else returns this
+   */
+  @CheckReturnValue
+  fun shuffle(): MediaIdList = if (size > 1) MediaIdList(LongLists.shuffle(value, random)) else this
+
   override fun iterator(): Iterator<MediaId> = idIterator(value, ::MediaId)
 
   override fun toString(): String = buildString {
@@ -100,6 +108,8 @@ value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parc
   }
 
   companion object {
+    private val random: Random = Random()
+
     inline operator fun invoke(capacity: Int = 16): MediaIdList =
       MediaIdList(LongArrayList(capacity))
 

@@ -19,7 +19,7 @@ package com.ealva.toque.service.vlc
 import com.ealva.toque.common.Volume
 import org.videolan.libvlc.MediaPlayer
 
-const val BUFFERING_PERCENT_TRIGGER_PREPARED = 90.0
+const val BUFFERING_PERCENT_TRIGGER_PREPARED = 10.0
 @Suppress("NOTHING_TO_INLINE")
 inline fun MediaPlayer.Event.ampleBufferedForPrepare(): Boolean =
   buffering > BUFFERING_PERCENT_TRIGGER_PREPARED

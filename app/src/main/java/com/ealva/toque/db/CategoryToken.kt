@@ -20,6 +20,9 @@ import android.os.Parcelable
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.db.smart.SmartPlaylist
+import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.AlbumIdList
 import com.ealva.toque.persist.ArtistId
@@ -32,6 +35,7 @@ import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
+import com.ealva.toque.prefs.EndOfQueueAction
 import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
@@ -59,6 +63,12 @@ sealed interface CategoryToken : Parcelable {
   suspend fun getRandom(audioMediaDao: AudioMediaDao): CategoryToken
 
   suspend fun getAllMedia(audioMediaDao: AudioMediaDao): MediaIdList
+
+  suspend fun getNextCategory(
+    endOfQueueAction: EndOfQueueAction,
+    shuffleMode: ShuffleMode,
+    audioMediaDao: AudioMediaDao
+  ): CategoryMediaList = endOfQueueAction.getNextCategory(this, shuffleMode, audioMediaDao)
 
   interface BaseCategoryToken : CategoryToken {
     override suspend fun getRandom(audioMediaDao: AudioMediaDao): CategoryToken =
@@ -396,6 +406,32 @@ sealed interface CategoryToken : Parcelable {
       )
       .onFailure { cause -> LOG.e(cause) { it("Error getting media for %s", persistentId) } }
       .getOrElse { MediaIdList.EMPTY_LIST }
+
+    /**
+     * Try to create a [SmartPlaylist] from [persistentId] as [SmartPlaylist]s may override the end
+     * of queue action. If it is a [SmartPlaylist], delegate to the [SmartPlaylist.endOfListAction].
+     * Otherwise, use the [endOfQueueAction] in determining the action to take
+     */
+    override suspend fun getNextCategory(
+      endOfQueueAction: EndOfQueueAction,
+      shuffleMode: ShuffleMode,
+      audioMediaDao: AudioMediaDao
+    ): CategoryMediaList =
+      audioMediaDao.playlistDao.getSmartPlaylist(persistentId)
+        .onFailure { cause -> LOG._i(cause) { it("Not smart playlist %s", this) } }
+        .map { playlist -> playlist.handleEndOfList(audioMediaDao, endOfQueueAction, shuffleMode) }
+        .getOrElse { endOfQueueAction.getNextCategory(this, shuffleMode, audioMediaDao) }
+        .maybeShuffle(shuffleMode)
+
+    private suspend fun SmartPlaylist.handleEndOfList(
+      audioMediaDao: AudioMediaDao,
+      endOfQueueAction: EndOfQueueAction,
+      shuffleMode: ShuffleMode
+    ) = endOfListAction.makeCategoryMediaList(
+      categoryToken = this@Playlist,
+      getAllMedia = { getAllMedia(audioMediaDao) },
+      endOfQueue = { endOfQueueAction.getNextCategory(this@Playlist, shuffleMode, audioMediaDao) }
+    )
   }
 
   /**

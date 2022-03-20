@@ -365,6 +365,7 @@ private val QUERY_AUDIO_FOR_UPDATE = MediaTable.selects {
     albumId,
     albumArtistId,
     artistId,
+    genre,
     year,
     rating,
     duration,

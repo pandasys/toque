@@ -26,7 +26,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StartPaused
-import com.ealva.toque.common.debug
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.flow.CountDownFlow
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
@@ -102,11 +102,13 @@ class VlcAudioItem private constructor(
   private val dispatcher: CoroutineDispatcher
 ) : PlayableAudioItem {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private var seekRange = metadata.seekRange
 
   private var countDownJob: Job? = null
-  private var remainingToMarkPlayed =
+  private var remainingToMarkPlayed: Duration =
     (metadata.duration * appPrefs.markPlayedPercentage())
       .coerceAtMost(4.toDuration(DurationUnit.MINUTES))
+
   private var hasBeenMarkedPlayed = false
 
   private var avPlayer: AvPlayer = NullAvPlayer
@@ -120,6 +122,18 @@ class VlcAudioItem private constructor(
 
   private suspend fun emit(event: PlayableItemEvent) {
     eventFlow.emit(event)
+  }
+
+  private fun endOfSeekRangeDuration(): Duration = if (appPrefs.autoAdvanceFade()) {
+    appPrefs.autoAdvanceFadeDuration()
+  } else 1.seconds
+
+  private val Metadata.seekRange: ClosedRange<Millis>
+    get() = playbackRange.start..playbackRange.endInclusive - endOfSeekRangeDuration().asMillis()
+
+  private fun updateMetadata(newMetadata: Metadata) {
+    metadata = newMetadata
+    seekRange = newMetadata.seekRange
   }
 
   override val isValid: Boolean
@@ -166,22 +180,11 @@ class VlcAudioItem private constructor(
   }
 
   override fun seekTo(position: Millis) {
-    if (position in metadata.playbackRange) {
-      if (shouldBeReset())
-        scope.launch { reset(PlayNow(false)) }
-      else
-        avPlayer.seek(position)
-    } else {
-      val id = metadata.id()
-      val title = metadata.title()
-      val pos = position()
-      val range = metadata.playbackRange
-      LOG.e { it("%d:%s attempt to seek to %d which is outside %s", id, title, pos, range) }
-      debug {
-        throw IllegalArgumentException("$id:$title attempt to seek to $pos which is outside $range")
-      }
-      avPlayer.seek(position.coerceIn(metadata.playbackRange)) // fix position
-    }
+    position.coerceIn(seekRange)
+    if (shouldBeReset())
+      scope.launch { reset(PlayNow(false)) }
+    else
+      avPlayer.seek(position)
   }
 
   /**
@@ -209,7 +212,7 @@ class VlcAudioItem private constructor(
     localAlbumArt: Uri
   ) {
     if (this.albumId == albumId) {
-      metadata = metadata.copy(albumArt = albumArt, localAlbumArt = localAlbumArt)
+      updateMetadata(metadata.copy(albumArt = albumArt, localAlbumArt = localAlbumArt))
     }
   }
 
@@ -312,7 +315,7 @@ class VlcAudioItem private constructor(
   private suspend fun onPrepared(event: AvPlayerEvent.Prepared) {
     isPreparing = false
     if (event.duration > Duration.ZERO && duration != event.duration) {
-      metadata = metadata.copy(duration = event.duration)
+      updateMetadata(metadata.copy(duration = event.duration))
       mediaFileStore.updateDurationAsync(id, duration)
     }
     emit(PlayableItemEvent.Prepared(this, position, event.duration))
@@ -367,11 +370,11 @@ class VlcAudioItem private constructor(
   }
 
   private suspend fun onPlaybackComplete() {
+    emit(PlayableItemEvent.PlaybackComplete(this))
     cancelMarkPlayedCountDown()
     isPreparing = false
     isShutdown = true
     avPlayer = NullAvPlayer
-    emit(PlayableItemEvent.PlaybackComplete(this))
   }
 
   private suspend fun onError() {
@@ -415,7 +418,7 @@ class VlcAudioItem private constructor(
       ) {
         if (wasPlaying) play(NoFade)
       }.onFailure { cause -> LOG.e(cause) { it("Error setting rating") } }
-        .onSuccess { rating -> metadata = metadata.copy(rating = rating) }
+        .onSuccess { rating -> updateMetadata(metadata.copy(rating = rating)) }
     }
   }
 

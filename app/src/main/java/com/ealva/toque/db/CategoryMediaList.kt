@@ -17,13 +17,12 @@
 package com.ealva.toque.db
 
 import android.os.Parcelable
+import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
-import com.ealva.toque.persist.PersistentId
 import it.unimi.dsi.fastutil.longs.LongList
-import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
-import java.util.Random
+import javax.annotation.CheckReturnValue
 
 /**
  * A list of media associated with a particular Category. If the list contains media from multiple
@@ -39,13 +38,8 @@ import java.util.Random
  */
 @Parcelize
 data class CategoryMediaList(val idList: MediaIdList, val token: CategoryToken) : Parcelable {
-  inline val categoryType: SongListType get() = token.songListType
-  inline val categoryId: PersistentId get() = token.persistentId
-
   companion object {
     val EMPTY_ALL_LIST = CategoryMediaList(MediaIdList.EMPTY_LIST, CategoryToken.All)
-
-    private val random = Random()
 
     operator fun invoke(
       mediaId: MediaId,
@@ -54,13 +48,17 @@ data class CategoryMediaList(val idList: MediaIdList, val token: CategoryToken) 
   }
 
   /**
-   * @return If [idList] size is > 1 returns a copy of this list shuffled, else returns this
+   * If size is 1 or 0 returns self, otherwise returns a copy of this with [idList] shuffled.
    */
-  fun shuffled(): CategoryMediaList = if (size > 1) {
-    copy(idList = MediaIdList(LongLists.shuffle(list, random)))
-  } else {
-    this
-  }
+  @CheckReturnValue
+  fun shuffled(): CategoryMediaList = if (size < 2) this else copy(idList = idList.shuffle())
+
+  /**
+   * Returns a shuffled version of this depending on [shuffleMode]
+   */
+  @CheckReturnValue
+  fun maybeShuffle(shuffleMode: ShuffleMode): CategoryMediaList =
+    if (shuffleMode.shuffleMedia.value) shuffled() else this
 
   inline val list: LongList get() = idList.value
   inline val size: Int get() = idList.size

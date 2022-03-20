@@ -157,6 +157,8 @@ interface PlaylistDao {
 
   suspend fun smartPlaylistsReferringTo(playlistId: PlaylistId): PlaylistIdList
 
+  suspend fun getDescription(persistentId: PlaylistId): PlaylistDescription
+
   companion object {
     operator fun invoke(
       db: Database,
@@ -452,6 +454,10 @@ private class PlaylistDaoImpl(
 
   override suspend fun smartPlaylistsReferringTo(playlistId: PlaylistId) = smartPlaylistDao
     .playlistsReferringTo(playlistId).mapBoth(success = { it }, failure = { PlaylistIdList() })
+
+  override suspend fun getDescription(persistentId: PlaylistId): PlaylistDescription {
+    TODO("Not yet implemented")
+  }
 
   private fun playlistDeleteUndo(playlistData: PlaylistData) {
     emitEvent(PlaylistCreated(playlistData.id))

@@ -18,15 +18,49 @@ package com.ealva.toque.prefs
 
 import androidx.annotation.StringRes
 import com.ealva.toque.R
+import com.ealva.toque.common.ShuffleMode
+import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.HasConstId
 
 enum class EndOfQueueAction(
   override val id: Int,
-  val shouldGoToNextCategory: Boolean,
-  val shouldShuffle: Boolean,
   @StringRes val titleRes: Int
 ) : HasConstId {
-  PlayNextList(1, true, false,R.string.PlayNextCategory),
-  ShuffleNextList(2, true, true, R.string.ShuffleNextCategory),
-  Stop(3, false, false, R.string.Stop);
+  PlayNextList(1, R.string.PlayNextCategory) {
+    override suspend fun getNextCategory(
+      categoryToken: CategoryToken,
+      shuffleMode: ShuffleMode,
+      audioMediaDao: AudioMediaDao
+    ) = doGetNextCategory(audioMediaDao, categoryToken, shuffleMode)
+  },
+  ShuffleNextList(2, R.string.ShuffleNextCategory) {
+    override suspend fun getNextCategory(
+      categoryToken: CategoryToken,
+      shuffleMode: ShuffleMode,
+      audioMediaDao: AudioMediaDao
+    ) = doGetNextCategory(audioMediaDao, categoryToken, shuffleMode.ensureShuffleMedia())
+  },
+  Stop(3, R.string.Stop) {
+    override suspend fun getNextCategory(
+      categoryToken: CategoryToken,
+      shuffleMode: ShuffleMode,
+      audioMediaDao: AudioMediaDao
+    ): CategoryMediaList = CategoryMediaList.EMPTY_ALL_LIST
+  };
+
+  abstract suspend fun getNextCategory(
+    categoryToken: CategoryToken,
+    shuffleMode: ShuffleMode,
+    audioMediaDao: AudioMediaDao
+  ): CategoryMediaList
+
+  protected suspend fun doGetNextCategory(
+    audioMediaDao: AudioMediaDao,
+    categoryToken: CategoryToken,
+    shuffleMode: ShuffleMode
+  ) = audioMediaDao
+    .getNextCategory(categoryToken, shuffleMode.shuffleLists)
+    .maybeShuffle(shuffleMode)
 }

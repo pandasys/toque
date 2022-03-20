@@ -66,6 +66,7 @@ import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
@@ -114,6 +115,9 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import kotlin.time.DurationUnit
 
+@Suppress("unused")
+private val LOG by lazyLogger("NowPlayingScreen")
+
 private object NowPlayingScreenIds {
   const val ID_SLIDER_SPACE = 1
   const val ID_BUTTON_ROW = 2
@@ -147,7 +151,6 @@ data class NowPlayingScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<NowPlayingViewModel>()
-
     val nowPlayingState = viewModel.nowPlayingState.collectAsState()
     NowPlaying(
       state = nowPlayingState.value,
@@ -158,6 +161,7 @@ data class NowPlayingScreen(
       nextList = { viewModel.nextList() },
       prevList = { viewModel.previousList() },
       seekTo = { position -> viewModel.seekTo(position) },
+      userSeekingComplete = { viewModel.userSeekingComplete() },
       toggleShowRemaining = { viewModel.toggleShowTimeRemaining() },
       toggleEqMode = { viewModel.toggleEqMode() },
       nextRepeatMode = { viewModel.nextRepeatMode() },
@@ -179,6 +183,7 @@ private fun NowPlaying(
   nextList: () -> Unit,
   prevList: () -> Unit,
   seekTo: (Millis) -> Unit,
+  userSeekingComplete: () -> Unit,
   toggleShowRemaining: () -> Unit,
   toggleEqMode: () -> Unit,
   nextRepeatMode: () -> Unit,
@@ -253,6 +258,7 @@ private fun NowPlaying(
         nextList = nextList,
         prevList = prevList,
         seekTo = seekTo,
+        userSeekingComplete = userSeekingComplete,
         toggleShowRemaining = toggleShowRemaining,
         toggleEqMode = toggleEqMode,
         nextRepeatMode = nextRepeatMode,
@@ -326,6 +332,7 @@ private fun PlayerControls(
   nextList: () -> Unit,
   prevList: () -> Unit,
   seekTo: (Millis) -> Unit,
+  userSeekingComplete: () -> Unit,
   toggleShowRemaining: () -> Unit,
   toggleEqMode: () -> Unit,
   nextRepeatMode: () -> Unit,
@@ -374,6 +381,7 @@ private fun PlayerControls(
         state.position,
         0F..state.duration.toDouble(DurationUnit.MILLISECONDS).toFloat(),
         seekTo,
+        userSeekingComplete,
         modifier = Modifier
           .layoutId(ID_POSITION_SLIDER)
           .padding(horizontal = 16.dp)
@@ -504,12 +512,14 @@ private fun PositionSlider(
   position: Millis,
   range: ClosedFloatingPointRange<Float>,
   seekTo: (Millis) -> Unit,
+  userSeekingComplete: () -> Unit,
   modifier: Modifier
 ) {
   Slider(
     value = position.toFloat(),
     valueRange = range,
     onValueChange = { value -> seekTo(Millis(value)) },
+    onValueChangeFinished = userSeekingComplete,
     modifier = modifier
   )
 }

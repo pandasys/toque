@@ -31,6 +31,7 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.debugRequire
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._i
@@ -168,7 +169,18 @@ interface NowPlayingViewModel {
   fun togglePlayPause()
   fun nextRepeatMode()
   fun toggleEqMode()
+
+  /**
+   * Called when the user is seeking using a scrubber (typically slider). This puts the
+   * audio into a "user seeking" mode. [userSeekingComplete] must be called when the user
+   * is finished seeking
+   */
   fun seekTo(position: Millis)
+
+  /**
+   * Called when the user is finished seeking within media
+   */
+  fun userSeekingComplete()
   fun goToQueueIndexMaybePlay(index: Int)
 
   /**
@@ -279,9 +291,10 @@ private class NowPlayingViewModelImpl(
     audioQueue = NullLocalAudioQueue
   }
 
-  private fun handleServiceState(queueState: LocalAudioQueueState) = nowPlayingState.update {
-    it.copy(
-      queue = queueState.queue.toNowPlayingList(),
+  private fun handleServiceState(queueState: LocalAudioQueueState) = nowPlayingState.update { cur ->
+    val queue = queueState.maybeNewQueue(cur)
+    cur.copy(
+      queue = queue,
       queueIndex = queueState.queueIndex,
       position = queueState.position,
       duration = queueState.duration,
@@ -312,6 +325,9 @@ private class NowPlayingViewModelImpl(
   override fun toggleEqMode() = audioQueue.toggleEqMode()
 
   override fun seekTo(position: Millis) = audioQueue.seekTo(position)
+//    nowPlayingState.update { state -> state.copy(position = position) }
+
+  override fun userSeekingComplete() = audioQueue.seekTo(nowPlayingState.value.position)
 
   override fun goToQueueIndexMaybePlay(index: Int) {
     if (index != currentIndex) {
@@ -430,6 +446,38 @@ private class NowPlayingViewModelImpl(
         )
     }
   }
+}
+
+private fun LocalAudioQueueState.maybeNewQueue(state: NowPlayingState) =
+  if (state.queue.differsFrom(queue, queueIndex)) queue.toNowPlayingList() else state.queue
+
+private fun List<QueueItem>.differsFrom(queue: List<AudioItem>, queueIndex: Int): Boolean = when {
+  size != queue.size -> true
+  else -> !sameAs(queue, queueIndex)
+}
+
+/**
+ * Only checking 3 items at most - the current index, the previous, and the next (accounting for
+ * queue boundaries). These are the only items we are concerned with in NowPlaying
+ */
+private fun List<QueueItem>.sameAs(queue: List<AudioItem>, queueIndex: Int): Boolean {
+  debugRequire(size == queue.size) { "Queue sizes don't match" }
+  val fromIndex = (queueIndex - 1).coerceAtLeast(0)
+  val toIndex = (fromIndex + 2).coerceAtMost(size)
+  return subList(fromIndex, toIndex).zip(queue.subList(fromIndex, toIndex))
+    .all { (queueItem, audioItem) -> queueItem.sameAs { audioItem } }
+}
+
+private inline fun QueueItem.sameAs(audioItem: () -> AudioItem): Boolean = audioItem().let { item ->
+  id == item.id &&
+    title == item.title &&
+    albumTitle == item.albumTitle &&
+    albumArtist == item.albumArtist &&
+    artist == item.artist &&
+    duration == item.duration &&
+    rating == item.rating &&
+    localAlbumArt == item.localAlbumArt &&
+    albumArt == item.albumArt
 }
 
 private fun List<AudioItem>.toNowPlayingList(): List<QueueItem> = map { it.toQueueItem }

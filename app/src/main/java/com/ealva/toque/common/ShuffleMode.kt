@@ -23,6 +23,7 @@ import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.res.HasTitle
 import kotlinx.parcelize.Parcelize
+import javax.annotation.CheckReturnValue
 
 /**
  * Describes the state of "shuffle"
@@ -41,11 +42,13 @@ enum class ShuffleMode(
   Lists(3, false, true, R.string.ShuffleCategories),
   MediaAndLists(4, true, true, R.string.ShuffleMediaAndCategories);
 
-  fun shuffleMedia(): ShuffleMedia = ShuffleMedia(media)
-
-  fun shuffleLists(): ShuffleLists = ShuffleLists(lists)
+  val shuffleMedia: ShuffleMedia get() = ShuffleMedia(media)
+  val shuffleLists: ShuffleLists get() = ShuffleLists(lists)
 
   fun isOn(): Boolean = this !== None
+
+  @CheckReturnValue
+  fun ensureShuffleMedia(): ShuffleMode = if (!media) getNext() else this
 
   /**
    * This function is useful when the user presses a "shuffle" button and the value needs to be

@@ -18,12 +18,39 @@ package com.ealva.toque.db.smart
 
 import com.ealva.toque.R
 import com.ealva.toque.common.fetch
+import com.ealva.toque.db.CategoryMediaList
+import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.HasConstId
+import com.ealva.toque.persist.MediaIdList
 
 enum class EndOfSmartPlaylistAction(override val id: Int, private val stringRes: Int) : HasConstId {
-  Replay(1, R.string.Replay),
-  Reshuffle(2, R.string.Reshuffle),
-  EndOfQueueAction(3, R.string.EndOfQueueAction);
+  Replay(1, R.string.Replay) {
+    override suspend fun makeCategoryMediaList(
+      categoryToken: CategoryToken,
+      getAllMedia: suspend () -> MediaIdList,
+      endOfQueue: suspend () -> CategoryMediaList
+    ) = CategoryMediaList(getAllMedia(), categoryToken)
+  },
+  Reshuffle(2, R.string.Reshuffle) {
+    override suspend fun makeCategoryMediaList(
+      categoryToken: CategoryToken,
+      getAllMedia: suspend () -> MediaIdList,
+      endOfQueue: suspend () -> CategoryMediaList
+    ) = CategoryMediaList(getAllMedia(), categoryToken).shuffled()
+  },
+  EndOfQueueAction(3, R.string.EndOfQueueAction) {
+    override suspend fun makeCategoryMediaList(
+      categoryToken: CategoryToken,
+      getAllMedia: suspend () -> MediaIdList,
+      endOfQueue: suspend () -> CategoryMediaList
+    ) = endOfQueue()
+  };
+
+  abstract suspend fun makeCategoryMediaList(
+    categoryToken: CategoryToken,
+    getAllMedia: suspend () -> MediaIdList,
+    endOfQueue: suspend () -> CategoryMediaList
+  ): CategoryMediaList
 
   override fun toString(): String = fetch(stringRes)
 
