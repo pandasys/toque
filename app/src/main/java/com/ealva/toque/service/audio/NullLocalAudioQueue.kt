@@ -28,6 +28,7 @@ import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.MayFade
 import com.ealva.toque.service.queue.NullStreamVolume
 import com.ealva.toque.service.queue.PlayNow
+import com.ealva.toque.service.queue.ScreenAction
 import com.ealva.toque.service.queue.StreamVolume
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Result
@@ -76,4 +77,5 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override fun rewind() = Unit
   override fun goToIndexMaybePlay(index: Int) = Unit
   override val streamVolume: StreamVolume = NullStreamVolume
+  override fun handleScreenAction(action: ScreenAction, keyguardLocked: Boolean) = Unit
 }

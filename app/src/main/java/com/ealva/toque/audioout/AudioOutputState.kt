@@ -22,7 +22,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.os.Build
 import androidx.lifecycle.LifecycleOwner
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -71,12 +70,16 @@ interface AudioOutputState {
   enum class Event {
     /** primordial */
     None,
+
     /** A bluetooth headset or speaker device connected */
     BluetoothConnected,
+
     /** A bluetooth headset or speaker device disconnected */
     BluetoothDisconnected,
+
     /** A wired headset or speaker was connected */
     HeadsetConnected,
+
     /** A wired headset or speaker was disconnected */
     HeadsetDisconnected
   }
@@ -118,26 +121,15 @@ interface AudioOutputState {
   }
 }
 
-@Suppress("DEPRECATION")
 val AudioManager.bluetoothIsOn: Boolean
-  get() {
-    return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-      isBluetoothA2dpOn
-    } else {
-      getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
-    }
-  }
+  get() = getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+    .any { audioDeviceInfo -> audioDeviceInfo.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
 
-@Suppress("DEPRECATION")
 val AudioManager.wiredHeadsetConnected: Boolean
-  get() {
-    return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) isWiredHeadsetOn
-    else getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
-      when (it.type) {
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET -> true
-        else -> false
-      }
+  get() = getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { audioDeviceInfo ->
+    when (audioDeviceInfo.type) {
+      AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET -> true
+      else -> false
     }
   }
 
@@ -164,7 +156,10 @@ private class AudioOutputStateImpl(audioManager: AudioManager) : AudioOutputStat
     if (!isInitialStickyBroadcast) {
       when (intent.action) {
         BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED -> {
-          when (intent.getIntExtra(BluetoothA2dp.EXTRA_STATE, BluetoothA2dp.STATE_DISCONNECTED)) {
+          when (intent.getIntExtra(
+            BluetoothA2dp.EXTRA_STATE,
+            BluetoothA2dp.STATE_DISCONNECTED
+          )) {
             BluetoothA2dp.STATE_CONNECTED -> {
               _bluetoothConnected = true
               emitEvent(BluetoothConnected)

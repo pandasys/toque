@@ -138,6 +138,10 @@ private class LocalAudioQueueViewModelStub : LocalAudioQueueViewModel {
     MutableStateFlow(PlayUpNextAction.Prompt)
   override val queueSize: Int = 0
 
+  var _isPlaying: Boolean = false
+  override val isPlaying: Boolean
+    get() = _isPlaying
+
   override fun emitNotification(notification: Notification) {}
 
   var _playReturn: PromptResult = PromptResult.Executed

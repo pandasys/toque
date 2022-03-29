@@ -52,7 +52,7 @@ sealed interface CategoryToken : Parcelable {
   val persistentId: PersistentId
   val songListType: SongListType
 
-  suspend fun write(writer: suspend (SongListType, Long) -> Unit) {
+  fun write(writer: (SongListType, Long) -> Unit) {
     writer(songListType, persistentId.value)
   }
 

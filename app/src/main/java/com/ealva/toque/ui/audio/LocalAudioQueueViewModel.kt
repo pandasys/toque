@@ -34,6 +34,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.service.audio.LocalAudioQueue
+import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.audio.TransitionType.Manual
 import com.ealva.toque.service.queue.ClearQueue
@@ -53,6 +54,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +70,7 @@ interface LocalAudioQueueViewModel {
   val localAudioQueue: StateFlow<LocalAudioQueue>
   val playUpNextAction: StateFlow<PlayUpNextAction>
   val queueSize: Int
+  val isPlaying: Boolean
 
   fun emitNotification(notification: Notification)
 
@@ -118,12 +121,17 @@ class LocalAudioQueueViewModelImpl(
   private val dispatcher: CoroutineDispatcher
 ) : LocalAudioQueueViewModel, ScopedServices.Registered {
   private lateinit var scope: CoroutineScope
-
+  private var queueStateJob: Job? = null
+  private var queueNotificationJob: Job? = null
   private val prefsHolder = MutableStateFlow(PrefsHolder())
+  private var lastState: LocalAudioQueueState = LocalAudioQueueState.NONE
 
   override val localAudioQueue = MutableStateFlow<LocalAudioQueue>(NullLocalAudioQueue)
   override val playUpNextAction = MutableStateFlow(PlayUpNextAction.Prompt)
-  override var queueSize: Int = 0
+  override val queueSize: Int
+    get() = lastState.queue.size
+  override val isPlaying: Boolean
+    get() = lastState.playingState.isPlaying
 
   override fun onServiceRegistered() {
     scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -357,23 +365,29 @@ class LocalAudioQueueViewModelImpl(
     }
   }
 
-  private fun handleQueueChange(queue: PlayableMediaQueue<*>) = when (queue) {
-    is NullLocalAudioQueue -> queueInactive()
-    is LocalAudioQueue -> queueActive(queue)
-    else -> queueInactive()
+  private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
+    return when (queue) {
+      is NullLocalAudioQueue -> queueInactive()
+      is LocalAudioQueue -> queueActive(queue)
+      else -> queueInactive()
+    }
   }
 
   private fun queueInactive() {
     localAudioQueue.value = NullLocalAudioQueue
+    queueStateJob?.cancel()
+    lastState = LocalAudioQueueState.NONE
+    queueNotificationJob?.cancel()
   }
 
   private fun queueActive(queue: LocalAudioQueue) {
     localAudioQueue.value = queue
-    queue.queueState
-      .onEach { queueSize = it.queue.size }
+
+    queueStateJob = queue.queueState
+      .onEach { audioQueueState -> lastState = audioQueueState }
       .launchIn(scope)
 
-    queue.notification
+    queueNotificationJob = queue.notification
       .onEach { serviceNotification -> mainViewModel.notify(serviceNotification) }
       .launchIn(scope)
   }

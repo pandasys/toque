@@ -60,7 +60,7 @@ class ArtworkSearchService : JobIntentService() {
       notificationManager.createNotificationChannel(
         NotificationChannel(
           SCANNER_CHANNEL_ID,
-          getString(R.string.ScanningMedia),
+          getString(R.string.MediaScannerChannelName),
           NotificationManager.IMPORTANCE_LOW
         )
       )

@@ -17,14 +17,15 @@
 package com.ealva.toque.ui.main
 
 import android.Manifest.permission.READ_EXTERNAL_STORAGE
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -33,10 +34,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
-import com.ealva.toque.prefs.ThemeChoice
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
@@ -52,37 +53,34 @@ import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.ProvideWindowInsets
 import com.zhuinden.simplestack.AsyncStateChanger
 import com.zhuinden.simplestack.Backstack
-import com.zhuinden.simplestack.GlobalServices
 import com.zhuinden.simplestack.History
-import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.navigator.Navigator
 import com.zhuinden.simplestackcomposeintegration.core.BackstackProvider
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
-import com.zhuinden.simplestackextensions.services.DefaultServiceProvider
-import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import com.zhuinden.statebundle.StateBundle
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
+
+@Suppress("unused")
+private val LOG by lazyLogger(MainActivity::class)
 
 private val topOfStackFlow = MutableStateFlow<ComposeKey>(SplashScreen())
 
 private val KEY_BACKSTACK = "${MainActivity::class.java.name}_BACK_STACK"
 
 interface MainBridge {
+  val haveReadExternalPermission: Boolean
+  val activityContext: Context
+
   fun startAppSettingsActivity()
   fun exit()
+  val canDrawOverlays: Boolean
+  fun requestOverlayPermission()
 }
 
 class MainActivity : ComponentActivity(), MainBridge {
@@ -90,6 +88,10 @@ class MainActivity : ComponentActivity(), MainBridge {
   private val composeStateChanger = makeAppComposeStateChanger()
   private lateinit var backstack: Backstack
   private val appPrefsSingleton: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
+
+  private val overlayLauncher = registerForActivityResult(StartActivityForResult()) {
+    scope.launch { appPrefsSingleton.instance().showLockScreenPlayer.set(canDrawOverlays) }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -156,6 +158,13 @@ class MainActivity : ComponentActivity(), MainBridge {
     super.onSaveInstanceState(outState)
   }
 
+  override val haveReadExternalPermission: Boolean
+    get() = checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+
+
+  override val activityContext: Context
+    get() = this
+
   override fun startAppSettingsActivity() {
     startActivity(
       Intent(
@@ -167,6 +176,17 @@ class MainActivity : ComponentActivity(), MainBridge {
 
   override fun exit() {
     finishAfterTransition()
+  }
+
+  override val canDrawOverlays: Boolean
+    get() = Settings.canDrawOverlays(this)
+
+  override fun requestOverlayPermission() {
+    overlayLauncher.launch(
+      Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+        intent.data = Uri.fromParts("package", packageName, null)
+      }
+    )
   }
 
   override fun onBackPressed() {
@@ -186,48 +206,3 @@ private fun makeAppComposeStateChanger() = ComposeStateChanger(
     }
   )
 )
-
-interface ThemeViewModel {
-  val themeChoice: StateFlow<ThemeChoice>
-
-  companion object {
-    operator fun invoke(appPrefsSingleton: AppPrefsSingleton): ThemeViewModel =
-      ThemeViewModelImpl(appPrefsSingleton)
-  }
-}
-
-private class ThemeViewModelImpl(
-  private val appPrefsSingleton: AppPrefsSingleton,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : ThemeViewModel, ScopedServices.Activated {
-  private lateinit var scope: CoroutineScope
-
-  override val themeChoice = MutableStateFlow(ThemeChoice.System)
-
-  override fun onServiceActive() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
-    scope.launch {
-      appPrefsSingleton.instance()
-        .themeChoice
-        .asFlow()
-        .onEach { themeChoice.value = it }
-        .launchIn(scope)
-    }
-  }
-
-  override fun onServiceInactive() {
-    scope.cancel()
-  }
-}
-
-class ToqueGlobalServicesFactory(
-  private val mainBridge: MainBridge,
-  private val appPrefsSingleton: AppPrefsSingleton,
-) : GlobalServices.Factory {
-  override fun create(backstack: Backstack): GlobalServices = GlobalServices.builder().apply {
-    val mainViewModel = MainViewModel(mainBridge, backstack)
-    add(mainViewModel)
-    add(LocalAudioMiniPlayerViewModel(mainViewModel))
-    add(ThemeViewModel(appPrefsSingleton))
-  }.build()
-}

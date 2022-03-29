@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.service.controller
+package com.ealva.toque.service
 
-import com.ealva.toque.service.queue.NullPlayableMediaQueue
-import com.ealva.toque.service.queue.QueueType
-import kotlinx.coroutines.flow.MutableStateFlow
+import android.app.PendingIntent
+import android.content.Context
 
-object NullMediaController : ToqueMediaController {
-  override val currentQueueFlow = MutableStateFlow(NullPlayableMediaQueue)
-  override suspend fun setCurrentQueue(type: QueueType, resume: Boolean) = Unit
+fun interface ActionToPendingIntent {
+  fun makeIntent(ctx: Context, action: MediaPlayerService.Action): PendingIntent
 }

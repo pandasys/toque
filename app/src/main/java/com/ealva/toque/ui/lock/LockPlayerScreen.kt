@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.now
+package com.ealva.toque.ui.lock
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.now.NowPlaying
+import com.ealva.toque.ui.now.NowPlayingViewModel
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ServiceBinder
@@ -33,11 +35,11 @@ import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
-private const val NOW_PLAYING_SCREEN_MODEL_SERVICE_TAG = "LockScreenViewModel"
+private const val LOCK_SCREEN_MODEL_SERVICE_TAG = "LockScreenViewModel"
 
 @Immutable
 @Parcelize
-data class NowPlayingScreen(
+data class LockPlayerScreen(
   private val noArg: String = ""
 ) : ComposeKey(), ScopeKey.Child, KoinComponent {
   override fun getParentScopes(): List<String> = listOf(
@@ -48,7 +50,7 @@ data class NowPlayingScreen(
     with(serviceBinder) {
       add(
         NowPlayingViewModel(backstack, get(), lookup(), get(AppPrefs.QUALIFIER)),
-        NOW_PLAYING_SCREEN_MODEL_SERVICE_TAG
+        LOCK_SCREEN_MODEL_SERVICE_TAG
       )
     }
   }
@@ -56,7 +58,7 @@ data class NowPlayingScreen(
   @OptIn(ExperimentalPagerApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-    val viewModel = rememberService<NowPlayingViewModel>(NOW_PLAYING_SCREEN_MODEL_SERVICE_TAG)
+    val viewModel = rememberService<NowPlayingViewModel>(LOCK_SCREEN_MODEL_SERVICE_TAG)
 
     val nowPlayingState = viewModel.nowPlayingState.collectAsState()
 
@@ -70,12 +72,13 @@ data class NowPlayingScreen(
       prevList = { viewModel.previousList() },
       seekTo = { position -> viewModel.seekTo(position) },
       userSeekingComplete = { viewModel.userSeekingComplete() },
-      toggleShowRemaining = { viewModel.toggleShowTimeRemaining() },
-      toggleEqMode = { viewModel.toggleEqMode() },
-      nextRepeatMode = { viewModel.nextRepeatMode() },
-      nextShuffleMode = { viewModel.nextShuffleMode() },
-      showItemDialog = { viewModel.showCurrentItemDialog() },
-      modifier = modifier
+      toggleShowRemaining = {},
+      toggleEqMode = {},
+      nextRepeatMode = {},
+      nextShuffleMode = {},
+      showItemDialog = {},
+      modifier = modifier,
+      isLockScreen = true
     )
   }
 }

@@ -52,19 +52,34 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.app.Toque
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.main.RequestPermissionActivity.Companion.PermissionData
 import com.ealva.toque.ui.theme.ToqueTheme
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionRequired
 import com.google.accompanist.permissions.rememberPermissionState
+import com.zhuinden.simplestack.AsyncStateChanger
+import com.zhuinden.simplestack.Backstack
+import com.zhuinden.simplestack.GlobalServices
+import com.zhuinden.simplestack.History
+import com.zhuinden.simplestack.navigator.Navigator
+import com.zhuinden.simplestackcomposeintegration.core.BackstackProvider
+import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
+import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
+import com.zhuinden.simplestackextensions.servicesktx.add
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.parcelize.Parcelize
+import org.koin.android.ext.android.inject
 
 private val LOG by lazyLogger(RequestPermissionActivity::class)
 
 class RequestPermissionActivity : ComponentActivity() {
   private lateinit var scope: CoroutineScope
+  private lateinit var backstack: Backstack
+  private val composeStateChanger = ComposeStateChanger()
+  private val appPrefsSingleton: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
 
   @OptIn(ExperimentalPermissionsApi::class)
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,47 +94,55 @@ class RequestPermissionActivity : ComponentActivity() {
       finish()
     }
 
+    backstack = Navigator.configure()
+      .setGlobalServices(GlobalServicesFactory(appPrefsSingleton))
+      .setScopedServices(ServiceProvider())
+      .setStateChanger(AsyncStateChanger(composeStateChanger))
+      .install(this, androidContentFrame, History.of(SplashScreen()))
+
     setContent {
-      val themeViewModel = rememberService<ThemeViewModel>()
-      val themeChoice by themeViewModel.themeChoice.collectAsState()
+      BackstackProvider(backstack) {
+        val themeViewModel = rememberService<ThemeViewModel>()
+        val themeChoice by themeViewModel.themeChoice.collectAsState()
 
-      ToqueTheme(themeChoice) {
-        var userExit by rememberSaveable { mutableStateOf(false) }
-        val readPhoneState = rememberPermissionState(data.permissionString)
+        ToqueTheme(themeChoice) {
+          var userExit by rememberSaveable { mutableStateOf(false) }
+          val permissionState = rememberPermissionState(data.permissionString)
 
-        if (userExit) finishAfterTransition() else {
-          Column(
-            modifier = Modifier
-              .fillMaxSize()
-          ) {
-            TopAppBar(title = {
-              Text(text = stringResource(id = data.windowTitle))
-            })
-            PermissionRequired(
-              permissionState = readPhoneState,
-              permissionNotGrantedContent = {
-                Rationale(
-                  data = data,
-                  userExit = { userExit = true },
-                  onRequestPermission = { readPhoneState.launchPermissionRequest() }
-                )
-              },
-              permissionNotAvailableContent = {
-                PermissionDenied(
-                  data = data,
-                  userExit = { userExit = true },
-                  navigateToSettingsScreen = {
-                    startActivity(
-                      Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.fromParts("package", packageName, null)
-                      )
-                    )
-                  }
-                )
-              }
+          if (userExit) finishAfterTransition() else {
+            Column(
+              modifier = Modifier
+                .fillMaxSize()
             ) {
-              finishAfterTransition()
+              TopAppBar(title = {
+                Text(text = stringResource(id = data.windowTitle))
+              })
+              PermissionRequired(
+                permissionState = permissionState,
+                permissionNotGrantedContent = {
+                  Rationale(
+                    data = data,
+                    userExit = { userExit = true },
+                    onRequestPermission = { permissionState.launchPermissionRequest() }
+                  )
+                },
+                permissionNotAvailableContent = {
+                  PermissionDenied(
+                    data = data,
+                    userExit = { userExit = true },
+                    navigateToSettingsScreen = {
+                      startActivity(
+                        Intent(
+                          Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                          Uri.fromParts("package", packageName, null)
+                        )
+                      )
+                    }
+                  )
+                }
+              ) {
+                finishAfterTransition()
+              }
             }
           }
         }
@@ -223,4 +246,12 @@ private fun PermissionDenied(
       }
     }
   }
+}
+
+private class GlobalServicesFactory(
+  private val appPrefsSingleton: AppPrefsSingleton,
+) : GlobalServices.Factory {
+  override fun create(backstack: Backstack): GlobalServices = GlobalServices.builder().apply {
+    add(ThemeViewModel(appPrefsSingleton))
+  }.build()
 }

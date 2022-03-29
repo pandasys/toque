@@ -59,7 +59,6 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
-import com.ealva.toque.common.asMillis
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.InstanceId
@@ -464,9 +463,8 @@ private class QueueViewModelImpl(
     scope.launch { localAudioQueue.removeFromQueue(item.position, item) }
   }
 
-  override fun goToQueueItemMaybePlay(item: QueueAudioItem) {
+  override fun goToQueueItemMaybePlay(item: QueueAudioItem) =
     localAudioQueue.goToIndexMaybePlay(item.position)
-  }
 
   override fun itemClicked(item: QueueAudioItem) =
     selectedFlow.ifInSelectionModeToggleElse(item.instanceId) { goToQueueItemMaybePlay(item) }

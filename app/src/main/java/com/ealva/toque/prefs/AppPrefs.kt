@@ -79,7 +79,8 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
   val endOfQueueAction: EnumPref<EndOfQueueAction>
   val selectMediaAction: EnumPref<SelectMediaAction>
   val themeChoice: EnumPref<ThemeChoice>
-
+  val keepScreenOn: BoolPref
+  val showLockScreenPlayer: BoolPref
   /**
    * This represents a percentage of media which needs to be played before it is marked as played.
    * The range of this value is 0.0..1.0. eg. 0.5 is 50% and 1.0 is 100%
@@ -163,6 +164,8 @@ private class AppPrefsImpl(
   override val endOfQueueAction by enumPref(DEFAULT_END_OF_QUEUE_ACTION)
   override val selectMediaAction by enumPref(DEFAULT_SELECT_MEDIA_ACTION)
   override val themeChoice by enumPref(DEFAULT_THEME_CHOICE)
+  override val keepScreenOn: BoolPref by preference(false)
+  override val showLockScreenPlayer: BoolPref by preference(false)
   override val markPlayedPercentage by preference(DEFAULT_MARK_PLAYED_PERCENTAGE) { percentage ->
     percentage.coerceIn(MARK_PLAYED_PERCENTAGE_RANGE)
   }

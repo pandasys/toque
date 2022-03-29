@@ -16,7 +16,10 @@
 
 package com.ealva.toque.service.queue
 
+import android.content.Intent
 import com.ealva.toque.common.Millis
+import com.ealva.toque.common.RepeatMode
+import com.ealva.toque.common.ShuffleMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -26,6 +29,7 @@ interface PlayableMediaQueue<T : Any> {
    */
   val queueType: QueueType
   val isActive: StateFlow<Boolean>
+  val streamVolume: StreamVolume
 
   /**
    * Activate the queue, reestablishing index and position if [resume] is true, start playing if
@@ -46,18 +50,40 @@ interface PlayableMediaQueue<T : Any> {
   fun fastForward()
   fun rewind()
   fun goToIndexMaybePlay(index: Int)
-  val streamVolume: StreamVolume
+
+  /** Go to the next logical [RepeatMode]  */
+  fun nextRepeatMode()
+
+  /** Go to the next logical [ShuffleMode] */
+  fun nextShuffleMode()
+
+  fun handleScreenAction(action: ScreenAction, keyguardLocked: Boolean)
+}
+
+enum class ScreenAction(val intentAction: String) {
+  On(Intent.ACTION_SCREEN_ON),
+  Off(Intent.ACTION_SCREEN_OFF);
+
+  companion object {
+    fun screenAction(intent: Intent?): ScreenAction? = when (intent?.action) {
+      On.intentAction -> On
+      Off.intentAction -> Off
+      else -> null
+    }
+  }
 }
 
 object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
   override val queueType: QueueType = QueueType.NullQueue
+  override val isActive = MutableStateFlow(false)
+  override val streamVolume: StreamVolume = NullStreamVolume
+
   override suspend fun activate(
     resume: Boolean,
     playNow: PlayNow
   ) = Unit
 
   override fun deactivate() = Unit
-  override val isActive = MutableStateFlow(false)
   override fun play(mayFade: MayFade) = Unit
   override fun pause(mayFade: MayFade) = Unit
   override fun stop() = Unit
@@ -66,9 +92,11 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
   override fun previous() = Unit
   override fun nextList() = Unit
   override fun previousList() = Unit
-  override val streamVolume: StreamVolume = NullStreamVolume
   override fun fastForward() = Unit
   override fun rewind() = Unit
   override fun seekTo(position: Millis) = Unit
   override fun goToIndexMaybePlay(index: Int) = Unit
+  override fun handleScreenAction(action: ScreenAction, keyguardLocked: Boolean) = Unit
+  override fun nextRepeatMode() = Unit
+  override fun nextShuffleMode() = Unit
 }

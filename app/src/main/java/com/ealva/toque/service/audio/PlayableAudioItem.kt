@@ -38,6 +38,9 @@ import kotlin.time.Duration
 interface PlayableAudioItem : AudioItem {
   val eventFlow: Flow<PlayableItemEvent>
 
+  /** True if this item is valid, ie. [id] is valid */
+  val isValid: Boolean
+
   val metadata: Metadata
 
   val position: Millis

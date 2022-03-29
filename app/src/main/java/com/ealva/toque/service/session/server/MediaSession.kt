@@ -73,12 +73,17 @@ import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.asCompat
+import com.ealva.toque.common.compatToRepeatMode
+import com.ealva.toque.common.compatToShuffleMode
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.common.windowOf15
 import com.ealva.toque.db.AudioMediaDao
+import com.ealva.toque.log._e
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.session.common.Metadata
+import com.ealva.toque.service.session.common.Metadata.Companion.NullMetadata
+import com.ealva.toque.service.session.common.PlaybackActions
 import com.ealva.toque.service.session.common.PlaybackState
 import com.ealva.toque.service.session.common.PlaybackState.Companion.NullPlaybackState
 import com.ealva.toque.service.session.common.toCompat
@@ -92,6 +97,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
@@ -99,7 +105,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.*
 import kotlin.math.roundToInt
 import androidx.core.app.NotificationCompat.Builder as NotificationBuilder
 
@@ -118,6 +123,8 @@ interface MediaSessionControl {
    */
   val eventFlow: Flow<SessionControlEvent>
 
+  var sessionActivity: PendingIntent?
+
   /**
    * We want replay at startup so we don't lose anything during initial activation, but subsequently
    * switching to different queue should not replay anything meant for the previous queue
@@ -133,6 +140,8 @@ interface MediaSessionControl {
   fun onMediaButton(handler: MediaButtonHandler?)
 
   fun handleMediaButtonIntent(intent: Intent): KeyEvent?
+
+  fun makeMediaButtonPendingIntent(action: PlaybackActions.Action): PendingIntent
 }
 
 /**
@@ -144,23 +153,26 @@ interface MediaSessionState {
    * controller may not be discoverable.
    */
   var isActive: Boolean
-
-//  val isPlaying: Boolean
-
   var contentType: AudioFocusManager.ContentType
+
+  val playbackStateFlow: StateFlow<PlaybackState>
+  fun setPlaybackState(state: PlaybackState)
+
+  val metadataFlow: StateFlow<Metadata>
+  fun setMetadata(metadata: Metadata)
+
+  val shuffleModeFlow: StateFlow<ShuffleMode>
+  fun setShuffleMode(mode: ShuffleMode)
+
+  val repeatModeFlow: StateFlow<RepeatMode>
+  fun setRepeatMode(mode: RepeatMode)
+
+  fun getIconBitmap(): Bitmap?
 
   interface NotificationListener {
     fun onPosted(notificationId: Int, notification: Notification)
     fun stopForeground()
   }
-
-  /** Update the current playback state clients can display */
-  suspend fun setState(state: PlaybackState)
-
-  /**
-   * Updates the current metadata clients can display.
-   */
-  fun setMetadata(metadata: Metadata)
 
   /**
    * Send [queue] info to clients for display. Because we may need to limit the actual amount of
@@ -175,12 +187,6 @@ interface MediaSessionState {
 
   /** Sets the title of the play queue, eg. "Now Playing" */
   fun setQueueTitle(title: String)
-
-  /** Send shuffle mode info to clients */
-  fun setShuffle(shuffleMode: ShuffleMode)
-
-  /** Send repeat mode info to clients */
-  fun setRepeat(repeatMode: RepeatMode)
 }
 
 private const val NOW_PLAYING_NOTIFICATION_ID = 1010
@@ -221,8 +227,8 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
    */
   fun release()
 
-  /** Set an intent for launching UI for this session */
-  fun setSessionActivity(pi: PendingIntent)
+//  /** Set an intent for launching UI for this session */
+//  fun setSessionActivity(pi: PendingIntent)
 
   companion object {
     fun make(
@@ -231,7 +237,8 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
       notificationListener: MediaSessionState.NotificationListener,
       lifecycleOwner: LifecycleOwner,
       active: Boolean,
-      dispatcher: CoroutineDispatcher = Dispatchers.Main
+      dispatcher: CoroutineDispatcher = Dispatchers.Main,
+      ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     ): MediaSession {
       return MediaSessionImpl(
         context,
@@ -247,7 +254,8 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
         },
         notificationListener,
         NOW_PLAYING_CHANNEL_ID,
-        dispatcher
+        dispatcher,
+        ioDispatcher
       ).apply {
         lifecycleOwner.lifecycle.addObserver(this)
       }
@@ -290,22 +298,23 @@ private class MediaSessionImpl(
   private val notificationManager: NotificationManager,
   private val notificationListener: MediaSessionState.NotificationListener,
   private val channelId: String,
-  dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher,
+  private val ioDispatcher: CoroutineDispatcher
 ) : MediaSession, DefaultLifecycleObserver {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private var allowNotifications = false
   private val maxBitmapSize = METADATA_BITMAP_SIZE_DP.toPx()
 
-  /** Primary (only?) purpose of [lastMetadata] is for fast recent media query at startup */
-  private var lastMetadata: Metadata = Metadata.NullMetadata
-
   /** [msgHandler] for async notification update and bitmap retrieval */
   private var msgHandler = makeHandler()
   private var isNotificationStarted = false
 
-//  private var lastState: PlaybackState = NullPlaybackState
-
-  private val playbackStateFlow = MutableStateFlow(NullPlaybackState)
+  override val playbackStateFlow = MutableStateFlow(NullPlaybackState)
+  override val metadataFlow = MutableStateFlow(NullMetadata)
+  override val shuffleModeFlow =
+    MutableStateFlow(session.controller.shuffleMode.compatToShuffleMode())
+  override val repeatModeFlow =
+    MutableStateFlow(session.controller.repeatMode.compatToRepeatMode())
 
   /** Replay a small number in case we get an initial burst at startup before completely active */
   override val eventFlow: MutableSharedFlow<SessionControlEvent> = MutableSharedFlow(replay = 4)
@@ -321,8 +330,6 @@ private class MediaSessionImpl(
     set(value) {
       session.isActive = value
     }
-//  override val isPlaying: Boolean
-//    get() = lastState.playState.isPlaying
 
   override var contentType: AudioFocusManager.ContentType
     get() = sessionCallback.contentType
@@ -330,14 +337,23 @@ private class MediaSessionImpl(
       sessionCallback.contentType = value
     }
 
+  override fun getIconBitmap(): Bitmap? =
+    session.controller?.metadata?.description?.iconBitmap
+
   init {
+    LOG._e { it("session.setCallback") }
     session.setCallback(sessionCallback)
     playbackStateFlow
       .onStart { LOG.i { it("PlaybackStateFlow started") } }
-      .onEach { state -> if (state !== NullPlaybackState) handleState(state) }
+      .onEach { state -> handlePlaybackState(state) }
       .catch { cause -> LOG.e(cause) { it("Error processing PlaybackStateFlow") } }
       .onCompletion { cause -> LOG.i(cause) { it("PlaybackStateFlow completed") } }
       .launchIn(scope)
+
+    metadataFlow
+      .onEach { metadata -> handleMetadata(metadata) }
+      .launchIn(scope)
+
     isActive = true
   }
 
@@ -353,19 +369,26 @@ private class MediaSessionImpl(
   override fun handleMediaButtonIntent(intent: Intent): KeyEvent? =
     MediaButtonReceiver.handleIntent(session, intent)
 
-  override fun setSessionActivity(pi: PendingIntent) = session.setSessionActivity(pi)
+  override fun makeMediaButtonPendingIntent(action: PlaybackActions.Action): PendingIntent {
+    return buildMediaButtonPendingIntent(ctx, action.value)
+  }
+
+  override var sessionActivity: PendingIntent?
+    get() = session.controller.sessionActivity
+    set(value) {
+      session.setSessionActivity(value)
+    }
 
   @OptIn(ExperimentalCoroutinesApi::class)
   override fun resetSessionEventReplayCache() {
     eventFlow.resetReplayCache()
   }
 
-  override suspend fun setState(state: PlaybackState) {
-    playbackStateFlow.emit(state)
+  override fun setPlaybackState(state: PlaybackState) {
+    playbackStateFlow.value = state
   }
 
-  private fun handleState(state: PlaybackState) {
-//    lastState = state
+  private fun handlePlaybackState(state: PlaybackState) {
     if (state !== NullPlaybackState) {
       if (state.playState.isPlaying) {
         allowNotifications = true
@@ -377,10 +400,15 @@ private class MediaSessionImpl(
   }
 
   override fun setMetadata(metadata: Metadata) {
-    lastMetadata = metadata
-    scope.launch(Dispatchers.IO) {
-      sessionPrefsSingleton.instance().lastMetadata.set(metadata) // save for getRecentMedia
+    scope.launch(ioDispatcher) {
       session.setMetadata(metadata.toCompat(::resolveUriAsBitmap))
+      metadataFlow.value = metadata
+    }
+  }
+
+  private fun handleMetadata(metadata: Metadata) {
+    scope.launch(ioDispatcher) {
+      sessionPrefsSingleton.instance().lastMetadata.set(metadata) // save for getRecentMedia
       postStartOrUpdateNotification()
     }
   }
@@ -409,19 +437,23 @@ private class MediaSessionImpl(
     session.setQueueTitle(title)
   }
 
-  override fun setShuffle(shuffleMode: ShuffleMode) {
-    session.setShuffleMode(shuffleMode.asCompat)
+  override fun setShuffleMode(mode: ShuffleMode) {
+    session.setShuffleMode(mode.asCompat)
+    shuffleModeFlow.value = mode
   }
 
-  override fun setRepeat(repeatMode: RepeatMode) {
-    session.setRepeatMode(repeatMode.asCompat)
+  override fun setRepeatMode(mode: RepeatMode) {
+    session.setRepeatMode(mode.asCompat)
+    repeatModeFlow.value = mode
   }
 
   override suspend fun getRecentMedia(): MediaDescriptionCompat? {
-    if (lastMetadata === Metadata.NullMetadata) {
-      lastMetadata = sessionPrefsSingleton.instance().lastMetadata()
+    var metadata = metadataFlow.value
+    if (metadata === NullMetadata) {
+      metadata = sessionPrefsSingleton.instance().lastMetadata()
+      metadataFlow.value = metadata
     }
-    return if (lastMetadata === Metadata.NullMetadata) null else lastMetadata.toCompat().description
+    return if (metadata === NullMetadata) null else metadata.toCompat().description
   }
 
   override var browser: MediaSessionBrowser = MediaSessionBrowser(this, audioMediaDao, scope)
@@ -438,19 +470,18 @@ private class MediaSessionImpl(
     ctx.resources.displayMetrics
   ).roundToInt()
 
-  private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
-    try {
-      val request = ImageRequest.Builder(ctx)
-        .data(if (uri !== Uri.EMPTY) uri else R.drawable.ic_big_album)
-        .error(R.drawable.ic_big_album)
-        .allowHardware(false)
-        .size(maxBitmapSize, maxBitmapSize)
-        .build()
-      (ctx.imageLoader.execute(request).drawable as BitmapDrawable).bitmap
-    } catch (e: Exception) {
-      null
-    }
+  private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = withContext(ioDispatcher) {
+    loadBitmap(uri)?.bitmap
   }
+
+  private suspend fun loadBitmap(uri: Uri) = ctx.imageLoader.execute(
+    ImageRequest.Builder(ctx)
+      .data(if (uri !== Uri.EMPTY) uri else R.drawable.ic_big_album)
+      .error(R.drawable.ic_big_album)
+      .allowHardware(false)
+      .size(maxBitmapSize, maxBitmapSize)
+      .build()
+  ).drawable as? BitmapDrawable
 
   private fun NotificationBuilder.addAction(
     action: NotificationCompat.Action,
@@ -464,7 +495,7 @@ private class MediaSessionImpl(
   }
 
   private fun makePreviousAction() = NotificationCompat.Action(
-    R.drawable.ic_skip_previous,
+    R.drawable.ic_previous,
     fetch(R.string.Previous),
     buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
   )
@@ -486,7 +517,7 @@ private class MediaSessionImpl(
   }
 
   private fun makeNextAction() = NotificationCompat.Action(
-    R.drawable.ic_skip_next,
+    R.drawable.ic_next,
     fetch(R.string.Next),
     buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_SKIP_TO_NEXT)
   )
@@ -631,10 +662,8 @@ fun Context.isCarMode(): Boolean {
 
 suspend fun Metadata.toCompat(
   getBitmap: suspend (Uri) -> Bitmap? = { null }
-): MediaMetadataCompat {
-  if (this === Metadata.NullMetadata) return MediaMetadataCompat.Builder().build()
-
-  return MediaMetadataCompat.Builder()
+): MediaMetadataCompat = if (this === NullMetadata) MediaMetadataCompat.Builder().build() else {
+  MediaMetadataCompat.Builder()
     .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, id.toCompatMediaId())
     .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistName.value)
     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, albumArtist.value)
@@ -645,11 +674,11 @@ suspend fun Metadata.toCompat(
     .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, location.toString())
     .apply {
       /*
-        Preferred order of artwork URI is:
-          METADATA_KEY_DISPLAY_ICON_URI,
-          METADATA_KEY_ART_URI,
-          METADATA_KEY_ALBUM_ART_URI
-       */
+      Preferred order of artwork URI is:
+        METADATA_KEY_DISPLAY_ICON_URI,
+        METADATA_KEY_ART_URI,
+        METADATA_KEY_ALBUM_ART_URI
+     */
       val artwork = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
       putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, getBitmap(artwork))
       if (artwork !== Uri.EMPTY) {
@@ -703,5 +732,5 @@ private class MediaSessionPrefs(
     sanitize
   )
 
-  val lastMetadata: StorePref<String, Metadata> by metadataPref(Metadata.NullMetadata)
+  val lastMetadata: StorePref<String, Metadata> by metadataPref(NullMetadata)
 }

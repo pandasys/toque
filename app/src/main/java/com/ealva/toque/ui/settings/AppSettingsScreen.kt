@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +52,7 @@ import com.ealva.comppref.pref.SwitchSettingItem
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.prefstore.store.BoolPref
 import com.ealva.prefstore.store.PreferenceStore
 import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.toque.R
@@ -61,6 +63,7 @@ import com.ealva.toque.common.AmpRange
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
 import com.ealva.toque.common.fetch
+import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefs.Companion.DUCK_VOLUME_RANGE
@@ -77,6 +80,7 @@ import com.ealva.toque.prefs.ThemeChoice
 import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
+import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.settings.SettingScreenKeys.AdvancedSettings
@@ -154,9 +158,9 @@ data class AppSettingsScreen(
   @OptIn(ExperimentalPagerApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
+    val mainModel = rememberService<MainViewModel>()
     val appPrefsSingleton = rememberService<AppPrefsSingleton>(APP_PREFS_TAG)
     val libVlcPrefsSingleton = rememberService<LibVlcPrefsSingleton>(LIB_VLC_PREFS_TAG)
-
     val backstack = LocalBackstack.current
     val goBack: () -> Unit = { backstack.back() }
     if (key == AdvancedSettings) {
@@ -172,20 +176,21 @@ data class AppSettingsScreen(
         title = stringResource(id = key.title),
         subtitle = if (key.subtitle > 0) stringResource(id = key.subtitle) else null,
         prefsSingleton = appPrefsSingleton,
-        makeSettings = { prefs -> makeItems(key, backstack, prefs) },
+        makeSettings = { prefs -> makeItems(mainModel, key, backstack, prefs) },
         back = goBack
       )
     }
   }
 
   private fun makeItems(
+    mainViewModel: MainViewModel,
     key: SettingScreenKey,
     backstack: Backstack,
     prefs: AppPrefs
   ): List<SettingItem> =
     when (key) {
       PrimarySettings -> makePrimaryItems(backstack)
-      LookAndFeel -> makeLookAndFeelItems(prefs, backstack)
+      LookAndFeel -> makeLookAndFeelItems(mainViewModel, prefs, backstack)
       ListsLookAndFeel -> makeListsLookAndFeelItems(prefs)
       NowPlayingLookAndFeel -> makeNowPlayingItems()
       LibrarySettings -> makeLibraryItems(backstack, prefs)
@@ -199,7 +204,7 @@ data class AppSettingsScreen(
         LOG.e { it("Unrecognized Setting Screen key %s", key) }
         emptyList()
       }
-    }
+    }.also { LOG._e { it("made items for %s", key) } }
 
   private fun makeItems(key: SettingScreenKey, prefs: LibVlcPrefs): List<SettingItem> =
     when (key) {
@@ -350,9 +355,35 @@ data class AppSettingsScreen(
   )
 
   private fun makeLookAndFeelItems(
+    mainViewModel: MainViewModel,
     prefs: AppPrefs,
     backstack: Backstack
   ): List<SettingItem> = listOf(
+    ListSettingItem(
+      preference = prefs.themeChoice,
+      title = fetch(R.string.Theme),
+      singleLineTitle = true,
+      enabled = true,
+      dialogItems = mapOf(
+        ThemeChoice.Dark.titleValuePair,
+        ThemeChoice.Light.titleValuePair,
+        ThemeChoice.System.titleValuePair
+      )
+    ),
+    SwitchSettingItem(
+      preference = prefs.keepScreenOn,
+      title = fetch(R.string.KeepScreenOn),
+      summary = fetch(R.string.ScreenWillNotSleep),
+      offSummary = fetch(R.string.ScreenWillNotStayOn),
+      singleLineTitle = true,
+    ),
+    SwitchSettingItem(
+      preference = ShowLockScreenPref(mainViewModel, prefs.showLockScreenPlayer),
+      title = fetch(R.string.ShowLockScreenPlayer),
+      summary = fetch(R.string.ShowPlayerOverLockScreen),
+      offSummary = fetch(R.string.DoNowShowPlayerOverLockScreen),
+      singleLineTitle = true,
+    ),
     CallbackSettingItem(
       title = fetch(R.string.Lists),
       summary = fetch(R.string.ListItemActionsOptions),
@@ -364,17 +395,6 @@ data class AppSettingsScreen(
       summary = fetch(R.string.NowPlayingScreenOptions),
       iconDrawable = R.drawable.ic_presentation_play,
       onClick = { backstack.goToScreen(AppSettingsScreen(NowPlayingLookAndFeel)) }
-    ),
-    ListSettingItem(
-      preference = prefs.themeChoice,
-      title = fetch(R.string.Theme),
-      singleLineTitle = true,
-      enabled = true,
-      dialogItems = mapOf(
-        ThemeChoice.Dark.titleValuePair,
-        ThemeChoice.Light.titleValuePair,
-        ThemeChoice.System.titleValuePair
-      )
     ),
   )
 
@@ -726,3 +746,17 @@ val AudioOutputModule.titleViewPair: Pair<String, AudioOutputModule>
 
 val ThemeChoice.titleValuePair: Pair<String, ThemeChoice>
   get() = Pair(fetch(titleRes), this)
+
+class ShowLockScreenPref(
+  private val mainViewModel: MainViewModel,
+  private val realPref: BoolPref
+) : PreferenceStore.Preference<Boolean, Boolean> by realPref {
+  override suspend fun set(value: Boolean) {
+    if (mainViewModel.canDrawOverlays) {
+      realPref.set(value)
+    } else {
+      realPref.set(false)
+      if (value) mainViewModel.requestOverlayPermission()
+    }
+  }
+}

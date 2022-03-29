@@ -78,7 +78,7 @@ class LocalAudioCommandProcessor(
   /** Replay a small number in case we get an initial burst at startup before completely active */
   private val commandFlow = MutableSharedFlow<LocalAudioCommand>(
     replay = 4,
-//    extraBufferCapacity = 4
+    extraBufferCapacity = 4
   )
 
   private val audioMediaDao: AudioMediaDao by inject()
@@ -197,7 +197,7 @@ class LocalAudioCommandProcessor(
   )
 
   private suspend fun handleSessionEvent(event: SessionControlEvent) {
-    //LOG._e { it("handleSessionEvent %s", event) }
+    LOG._e { it("handleSessionEvent %s", event) }
     when (event) {
       is SessionControlEvent.AddItemAt -> addItemAt(event.item, event.pos, event.addToEnd)
       is SessionControlEvent.CustomAction -> customAction(event.action, event.extras)

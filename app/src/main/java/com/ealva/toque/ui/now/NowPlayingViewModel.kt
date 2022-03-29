@@ -67,6 +67,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -92,8 +93,7 @@ interface NowPlayingViewModel {
     val localAlbumArt: Uri,
     val albumArt: Uri,
     val rating: Rating,
-    val albumId: AlbumId,
-    val isValid: Boolean
+    val albumId: AlbumId
   ) {
     val artwork: Uri
       get() = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
@@ -112,7 +112,6 @@ interface NowPlayingViewModel {
           albumArt = Uri.EMPTY,
           rating = Rating.RATING_NONE,
           albumId = AlbumId.INVALID,
-          isValid = false
         )
       }
     }
@@ -234,7 +233,7 @@ private class NowPlayingViewModelImpl(
   private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefsSingleton: AppPrefsSingleton
-) : NowPlayingViewModel, ScopedServices.Activated {
+) : NowPlayingViewModel, ScopedServices.Registered {
   private lateinit var scope: CoroutineScope
   private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
@@ -247,7 +246,7 @@ private class NowPlayingViewModelImpl(
 
   private suspend fun appPrefs(): AppPrefs = appPrefsSingleton.instance()
 
-  override fun onServiceActive() {
+  override fun onServiceRegistered() {
     scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     scope.launch {
       appPrefs().showTimeRemaining
@@ -262,10 +261,11 @@ private class NowPlayingViewModelImpl(
       .launchIn(scope)
   }
 
-  override fun onServiceInactive() {
-    currentQueueJob?.cancel()
-    currentQueueJob = null
-    handleQueueChange(NullLocalAudioQueue)
+  override fun onServiceUnregistered() {
+//    currentQueueJob?.cancel()
+//    currentQueueJob = null
+//    handleQueueChange(NullLocalAudioQueue)
+    scope.cancel()
   }
 
   private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
@@ -291,20 +291,19 @@ private class NowPlayingViewModelImpl(
     audioQueue = NullLocalAudioQueue
   }
 
-  private fun handleServiceState(queueState: LocalAudioQueueState) = nowPlayingState.update { cur ->
-    val queue = queueState.maybeNewQueue(cur)
-    cur.copy(
-      queue = queue,
-      queueIndex = queueState.queueIndex,
-      position = queueState.position,
-      duration = queueState.duration,
-      playingState = queueState.playingState,
-      repeatMode = queueState.repeatMode,
-      shuffleMode = queueState.shuffleMode,
-      eqMode = queueState.eqMode,
-      currentPreset = queueState.currentPreset,
-      extraMediaInfo = queueState.extraMediaInfo,
-      playbackRate = queueState.playbackRate
+  private fun handleServiceState(newState: LocalAudioQueueState) = nowPlayingState.update { state ->
+    state.copy(
+      queue = newState.maybeNewQueue(state),
+      queueIndex = newState.queueIndex,
+      position = newState.position,
+      duration = newState.duration,
+      playingState = newState.playingState,
+      repeatMode = newState.repeatMode,
+      shuffleMode = newState.shuffleMode,
+      eqMode = newState.eqMode,
+      currentPreset = newState.currentPreset,
+      extraMediaInfo = newState.extraMediaInfo,
+      playbackRate = newState.playbackRate
     )
   }
 
@@ -428,28 +427,27 @@ private class NowPlayingViewModelImpl(
 
   override fun showCurrentItemDialog() {
     currentItem.let { item ->
-      if (item.isValid)
-        localAudioQueueModel.showPrompt(
-          DialogPrompt(
-            prompt = {
-              CurrentItemDialog(
-                audioItem = item,
-                onDismiss = { localAudioQueueModel.clearPrompt() },
-                showMediaInfo = ::displayMediaInfo,
-                selectAlbumArt = ::selectAlbumArt,
-                goToAlbum = ::goToAlbum,
-                goToArtist = ::goToArtist,
-                goToAlbumArtist = ::goToAlbumArtist
-              )
-            }
-          )
+      localAudioQueueModel.showPrompt(
+        DialogPrompt(
+          prompt = {
+            CurrentItemDialog(
+              audioItem = item,
+              onDismiss = { localAudioQueueModel.clearPrompt() },
+              showMediaInfo = ::displayMediaInfo,
+              selectAlbumArt = ::selectAlbumArt,
+              goToAlbum = ::goToAlbum,
+              goToArtist = ::goToArtist,
+              goToAlbumArtist = ::goToAlbumArtist
+            )
+          }
         )
+      )
     }
   }
 }
 
 private fun LocalAudioQueueState.maybeNewQueue(state: NowPlayingState) =
-  if (state.queue.differsFrom(queue, queueIndex)) queue.toNowPlayingList() else state.queue
+  if (state.queue.differsFrom(queue, queueIndex)) queue.asNowPlayingList else state.queue
 
 private fun List<QueueItem>.differsFrom(queue: List<AudioItem>, queueIndex: Int): Boolean = when {
   size != queue.size -> true
@@ -464,25 +462,25 @@ private fun List<QueueItem>.sameAs(queue: List<AudioItem>, queueIndex: Int): Boo
   debugRequire(size == queue.size) { "Queue sizes don't match" }
   val fromIndex = (queueIndex - 1).coerceAtLeast(0)
   val toIndex = (fromIndex + 2).coerceAtMost(size)
-  return subList(fromIndex, toIndex).zip(queue.subList(fromIndex, toIndex))
-    .all { (queueItem, audioItem) -> queueItem.sameAs { audioItem } }
+  return subList(fromIndex, toIndex)
+    .zip(queue.subList(fromIndex, toIndex))
+    .all { (queueItem, audioItem) -> queueItem.sameAs(audioItem) }
 }
 
-private inline fun QueueItem.sameAs(audioItem: () -> AudioItem): Boolean = audioItem().let { item ->
-  id == item.id &&
-    title == item.title &&
-    albumTitle == item.albumTitle &&
-    albumArtist == item.albumArtist &&
-    artist == item.artist &&
-    duration == item.duration &&
-    rating == item.rating &&
-    localAlbumArt == item.localAlbumArt &&
-    albumArt == item.albumArt
-}
+private fun QueueItem.sameAs(audioItem: AudioItem): Boolean = id == audioItem.id &&
+  title == audioItem.title &&
+  albumTitle == audioItem.albumTitle &&
+  albumArtist == audioItem.albumArtist &&
+  artist == audioItem.artist &&
+  duration == audioItem.duration &&
+  rating == audioItem.rating &&
+  localAlbumArt == audioItem.localAlbumArt &&
+  albumArt == audioItem.albumArt
 
-private fun List<AudioItem>.toNowPlayingList(): List<QueueItem> = map { it.toQueueItem }
+private val List<AudioItem>.asNowPlayingList: List<QueueItem>
+  get() = map { audioItem -> audioItem.asQueueItem }
 
-private inline val AudioItem.toQueueItem: QueueItem
+private inline val AudioItem.asQueueItem: QueueItem
   get() = QueueItem(
     id,
     title,
@@ -494,7 +492,6 @@ private inline val AudioItem.toQueueItem: QueueItem
     localAlbumArt,
     albumArt,
     rating,
-    albumId,
-    isValid
+    albumId
   )
 

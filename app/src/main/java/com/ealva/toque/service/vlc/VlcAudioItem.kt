@@ -152,14 +152,9 @@ class VlcAudioItem private constructor(
   override val duration: Duration
     get() = metadata.duration
 
-  private fun shouldBeReset(): Boolean = isStopped || avPlayer == NullAvPlayer
+  private val shouldBeReset: Boolean get() = isStopped || avPlayer == NullAvPlayer
 
-  override fun play(mayFade: MayFade) {
-    if (shouldBeReset())
-      scope.launch { reset(PlayNow(true)) }
-    else
-      avPlayer.play(mayFade)
-  }
+  override fun play(mayFade: MayFade) = resetOrDo(PlayNow(true)) { avPlayer.play(mayFade) }
 
   override fun stop() {
     if (!isStopped) avPlayer.stop()
@@ -176,15 +171,15 @@ class VlcAudioItem private constructor(
    * Note: use [shouldBeReset] instead of just [isStopped]
    */
   override fun togglePlayPause() {
-    if (shouldBeReset() || avPlayer.isPaused) play(AllowFade) else pause(AllowFade)
+    if (shouldBeReset || avPlayer.isPaused) play(AllowFade) else pause(AllowFade)
   }
 
-  override fun seekTo(position: Millis) {
-    position.coerceIn(seekRange)
-    if (shouldBeReset())
-      scope.launch { reset(PlayNow(false)) }
-    else
-      avPlayer.seek(position)
+  override fun seekTo(position: Millis) = resetOrDo(PlayNow(false)) {
+    avPlayer.seek(position.coerceIn(seekRange))
+  }
+
+  private inline fun resetOrDo(playAfterReset: PlayNow, block: () -> Unit) {
+    if (shouldBeReset) scope.launch { reset(playAfterReset) } else block()
   }
 
   /**
@@ -427,11 +422,15 @@ class VlcAudioItem private constructor(
 
   override val instanceId = InstanceId(nextId.getAndIncrement())
 
-  override fun toString(): String = """VlcAudioItem[isActive=${scope.isActive},
-    |isShutdown=${isShutdown},
+  override fun toString(): String = """VlcAudioItem(
+    |id=${metadata.id},
     |title=${metadata.title},
+    |albumArt=${metadata.albumArt},
+    |localAlbumArt=${metadata.localAlbumArt},
+    |isActive=${scope.isActive},
+    |isShutdown=${isShutdown},
     |avPlayer=${avPlayer}
-    |]""".trimMargin()
+    |)""".trimMargin()
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true

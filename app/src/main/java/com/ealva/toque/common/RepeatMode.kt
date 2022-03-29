@@ -18,6 +18,7 @@ package com.ealva.toque.common
 
 import android.os.Parcelable
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -58,3 +59,11 @@ val RepeatMode.asCompat
     RepeatMode.All -> PlaybackStateCompat.REPEAT_MODE_ALL
     RepeatMode.One -> PlaybackStateCompat.REPEAT_MODE_ONE
   }
+
+val RepeatMode.drawable: Int
+  @DrawableRes get() = when (this) {
+    RepeatMode.None -> R.drawable.ic_repeat_off
+    RepeatMode.All -> R.drawable.ic_repeat
+    RepeatMode.One -> R.drawable.ic_repeat_once
+  }
+

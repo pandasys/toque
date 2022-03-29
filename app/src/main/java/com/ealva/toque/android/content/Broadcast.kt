@@ -105,3 +105,8 @@ fun BroadcastReceiver.goAsync(
     }
   }
 }
+
+fun intentFilterOf(action: String, vararg actions: String) = IntentFilter().apply {
+  addAction(action)
+  actions.forEach { action -> addAction(action) }
+}

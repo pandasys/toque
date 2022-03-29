@@ -38,4 +38,31 @@
     <style name="Theme.Toque.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
 
     <style name="Theme.Toque.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+  <style name="TqText" parent="TextAppearance.AppCompat"/>
+
+  <style name="TqText.Widget">
+    <item name="android:textColor">@color/white</item>
+    <item name="android:textSize">14sp</item>
+  </style>
+
+  <style name="TqText.Widget.Title">
+    <item name="android:textStyle">normal</item>
+    <item name="android:textSize">16sp</item>
+<!--    <item name="android:letterSpacing">0.15</item>-->
+  </style>
+
+  <style name="TqText.Widget.Artist">
+    <item name="android:textColor">#BCFFFFFF</item>
+    <item name="android:textStyle">normal</item>
+    <item name="android:textSize">14sp</item>
+<!--    <item name="android:letterSpacing">0.25</item>-->
+  </style>
+
+  <style name="TqText.Widget.Album">
+    <item name="android:textStyle">normal</item>
+    <item name="android:textSize">10sp</item>
+<!--    <item name="android:letterSpacing">0.5</item>-->
+  </style>
+
 </resources>

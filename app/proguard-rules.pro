@@ -20,11 +20,13 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--printconfiguration /home/eric/tmp/full-r8-config.txt
--printusage /home/eric/tmp/usage.txt
--printseeds /home/eric/tmp/seeds.txt
+#-printconfiguration /home/eric/tmp/full-r8-config.txt
+#-printusage /home/eric/tmp/usage.txt
+#-printseeds /home/eric/tmp/seeds.txt
 
 # Toque Rules START
+-dontwarn com.google.errorprone.annotations.Immutable
+
 -keep class com.ealva.toque.** { *; }
 
 # Do not optimize/shrink LibVLC, because of native code

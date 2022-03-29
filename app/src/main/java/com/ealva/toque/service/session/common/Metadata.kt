@@ -69,6 +69,8 @@ data class Metadata(
   @Serializable(with = UriAsStringSerializer::class)
   val fileUri: Uri
 ) {
+  val artwork: Uri
+    get() = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
 
   /**
    * Indices is the Closed range of position values. Playback position occur outside this range

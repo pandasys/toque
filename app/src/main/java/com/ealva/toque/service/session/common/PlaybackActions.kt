@@ -19,6 +19,7 @@
 package com.ealva.toque.service.session.common
 
 import android.support.v4.media.session.PlaybackStateCompat
+import android.support.v4.media.session.PlaybackStateCompat.MediaKeyAction
 import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap
 
@@ -33,7 +34,7 @@ private val DEFAULT_ACTION_FLAGS = PlaybackActions.Action.Stop.value or
 data class PlaybackActions(private val actionFlags: Long) {
 
   @Suppress("unused")
-  enum class Action(val value: Long) {
+  enum class Action(@MediaKeyAction val value: Long) {
     Stop(PlaybackStateCompat.ACTION_STOP),
     Pause(PlaybackStateCompat.ACTION_PAUSE),
     Play(PlaybackStateCompat.ACTION_PLAY),

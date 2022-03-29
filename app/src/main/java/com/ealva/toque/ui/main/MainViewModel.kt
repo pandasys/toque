@@ -16,11 +16,11 @@
 
 package com.ealva.toque.ui.main
 
+import android.app.KeyguardManager
 import androidx.compose.material.SnackbarDuration
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.app.Toque
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.MediaPlayerServiceConnection
@@ -31,6 +31,7 @@ import com.ealva.toque.service.queue.NullPlayableMediaQueue
 import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.QueueType
 import com.ealva.toque.ui.common.DialogPrompt
+import com.ealva.toque.ui.lock.LockPlayerScreen
 import com.ealva.toque.ui.nav.setScreenHistory
 import com.ealva.toque.ui.now.NowPlayingScreen
 import com.zhuinden.simplestack.Backstack
@@ -53,6 +54,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 private val LOG by lazyLogger(MainViewModel::class)
 
@@ -79,6 +82,8 @@ interface MainViewModel : MainBridge {
 
   fun gainedReadExternalPermission()
 
+  fun bindIfHaveReadExternalPermission()
+
   companion object {
     operator fun invoke(
       mainBridge: MainBridge,
@@ -92,14 +97,26 @@ private class MainViewModelImpl(
   private val mainBridge: MainBridge,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
-) : MainViewModel, ScopedServices.Registered, MainBridge by mainBridge {
+) : MainViewModel, ScopedServices.Registered, KoinComponent, MainBridge by mainBridge {
   private lateinit var scope: CoroutineScope
   private lateinit var playerServiceConnection: MediaPlayerServiceConnection
+  private val keyguardManager: KeyguardManager by inject()
   private var mediaController: ToqueMediaController = NullMediaController
   override var currentQueue = MutableStateFlow<PlayableMediaQueue<*>>(NullPlayableMediaQueue)
   private var currentQueueJob: Job? = null
 
   override val notificationFlow = MutableSharedFlow<Notification>()
+
+  override fun onServiceRegistered() {
+    scope = CoroutineScope(SupervisorJob() + dispatcher)
+    playerServiceConnection = MediaPlayerServiceConnection(mainBridge.activityContext)
+  }
+
+  override fun onServiceUnregistered() {
+    playerServiceConnection.unbind()
+    scope.cancel()
+  }
+
   override fun notify(notification: Notification) {
     scope.launch { notificationFlow.emit(notification) }
   }
@@ -133,12 +150,16 @@ private class MainViewModelImpl(
       .launchIn(scope)
   }
 
+  override fun bindIfHaveReadExternalPermission() {
+    if (mainBridge.haveReadExternalPermission && playerServiceConnection.isNotBound)
+      gainedReadExternalPermission()
+  }
+
   private fun handleControllerChange(controller: ToqueMediaController) {
     if (mediaController !== controller) {
       mediaController = controller
       if (controller !== NullMediaController) {
-        currentQueueJob = controller.currentQueue
-          .onStart { LOG._i { it("start currentQueue flow") } }
+        currentQueueJob = controller.currentQueueFlow
           .onEach { queue -> handleQueueChange(queue) }
           .catch { cause -> LOG.e(cause) { it("currentQueue flow error") } }
           .onCompletion { LOG._i { it("currentQueue flow completed") } }
@@ -166,22 +187,14 @@ private class MainViewModelImpl(
   }
 
   private fun handleAudioQueue() {
-    if (backstack.root<ComposeKey>() !is NowPlayingScreen)
+    val root = backstack.root<ComposeKey>()
+    if (root !is LockPlayerScreen && root !is NowPlayingScreen && keyguardManager.isNotLocked) {
       backstack.setScreenHistory(History.of(NowPlayingScreen()), StateChange.REPLACE)
+    }
   }
 
   private fun handleNullQueue() {
     backstack.setScreenHistory(History.of(SplashScreen()), StateChange.REPLACE)
-  }
-
-  override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
-    playerServiceConnection = MediaPlayerServiceConnection(Toque.appContext)
-  }
-
-  override fun onServiceUnregistered() {
-    playerServiceConnection.unbind()
-    scope.cancel()
   }
 }
 
@@ -200,3 +213,5 @@ private fun ServiceNotification.Duration.asSnackbarDuration(): SnackbarDuration 
     ServiceNotification.Duration.WaitForReply -> SnackbarDuration.Indefinite
   }
 }
+
+private inline val KeyguardManager.isNotLocked: Boolean get() = !isKeyguardLocked

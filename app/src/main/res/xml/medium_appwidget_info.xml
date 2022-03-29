@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2016-2019. eAlva.com - All Rights Reserved
+  ~
+  ~ Unauthorized copying of this file, in whole or in part, via any medium, is strictly prohibited
+  ~ Proprietary and confidential
+  ~
+  -->
+
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:initialLayout="@layout/medium_widget"
+  android:description="@string/medium_widget_description"
+  android:minWidth="250dp"
+  android:minHeight="110dp"
+  android:resizeMode="horizontal|vertical"
+  android:updatePeriodMillis="86400000"
+  android:widgetCategory="keyguard|home_screen" />

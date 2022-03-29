@@ -1,0 +1,152 @@
+<!--
+  ~ Copyright (c) 2016-2019. eAlva.com - All Rights Reserved
+  ~
+  ~ Unauthorized copying of this file, in whole or in part, via any medium, is strictly prohibited
+  ~ Proprietary and confidential
+  ~
+  -->
+
+<resources>
+
+  <dimen name="widget_image_width">120dp</dimen>
+  <dimen name="widget_image_height">120dp</dimen>
+
+  <item name="alpha_dim" format="float" type="dimen">.25</item>
+  <item name="alpha_mid" format="float" type="dimen">.5</item>
+  <item name="alpha_opaque" format="float" type="dimen">1.0</item>
+  <item name="alpha_epsilon" format="float" type="dimen">0.01</item>
+  <item name="rating_bar_alpha_dim" format="float" type="dimen">.35</item>
+
+  <dimen name="ap_action_bar_with_subtitles_height">56dp</dimen>
+  <dimen name="ap_action_bar_no_subtitles_height">42dp</dimen>
+  <dimen name="ap_status_bar_height">25dp</dimen>
+  <dimen name="ap_status_plus_action_bar_height">81dp</dimen>
+  <dimen name="ap_busy_indicator_top_margin">140dp</dimen>
+
+  <dimen name="ap_action_bar_preset_spinner_width">140dp</dimen>
+  <dimen name="ap_action_bar_preset_spinner_height">40dp</dimen>
+
+  <dimen name="ap_action_bar_preset_spinner_padding_top">1dp</dimen>
+  <dimen name="ap_action_bar_preset_spinner_padding_bottom">4dp</dimen>
+  <dimen name="ap_action_bar_preset_spinner_layout_margin">12dp</dimen>
+
+  <dimen name="ap_up_next_toolbar_height">54dp</dimen>
+
+  <dimen name="now_playing_titles_end_margin">12dp</dimen>
+  <dimen name="now_playing_song_title_margin_top">6dp</dimen>
+  <dimen name="now_playing_song_album_margin_bottom">-4dp</dimen>
+
+  <dimen name="ap_album_fragment_image_size">348dp</dimen>
+  <!--anchor height is image height + status bar height-->
+  <dimen name="ap_album_fragment_anchor_height">373dp</dimen>
+  <dimen name="ap_album_lyrics_scroll_view_padding">8dp</dimen>
+  <!-- Default screen margins, per the Android Design guidelines. -->
+  <dimen name="activity_horizontal_margin">16dp</dimen>
+  <dimen name="activity_vertical_margin">16dp</dimen>
+
+  <dimen name="select_image_dialog_image_size">250dp</dimen>
+
+  <dimen name="fast_scroller_width">18dp</dimen>
+
+  <dimen name="ap_album_image_lyrics_text_size">15sp</dimen>
+  <dimen name="ap_album_image_lyrics_line_spacing">4dp</dimen>
+
+  <dimen name="ap_text_size_title">20sp</dimen>
+  <dimen name="ap_text_size_subhead">16sp</dimen>
+
+  <dimen name="ap_text_size_small_title">18sp</dimen>
+  <dimen name="ap_text_size_small_subtitle">16sp</dimen>
+  <dimen name="ap_text_size_small_secondary_subtitle">14sp</dimen>
+  <!--List sizes and padding-->
+  <dimen name="ap_1_line_tile_height">56dp</dimen>
+  <dimen name="ap_1_line_tile_height_dense">48dp</dimen>
+  <dimen name="ap_2_line_tile_height">72dp</dimen>
+  <dimen name="ap_2_line_tile_height_dense">60dp</dimen>
+  <dimen name="ap_3_line_tile_height">88dp</dimen>
+  <dimen name="ap_3_line_tile_height_dense">76dp</dimen>
+
+  <dimen name="ap_2_line_text_layout_height">36dp</dimen>
+  <dimen name="ap_2_line_text_layout_height_dense">30dp</dimen>
+
+  <dimen name="ap_list_title_text_size">16sp</dimen>
+  <dimen name="ap_list_secondary_text_size">14sp</dimen>
+  <dimen name="ap_list_text_size_dense">13sp</dimen>
+
+  <dimen name="ap_item_with_icon_text_left_padding">56dp</dimen>
+  <dimen name="ap_list_right_padding">16dp</dimen>
+  <dimen name="ap_list_right_margin">16dp</dimen>
+
+  <dimen name="ap_list_icon_size">40dp</dimen>
+  <dimen name="ap_list_drag_handle_size">48dp</dimen>
+  <dimen name="ap_list_icon_left_margin">8dp</dimen>
+  <dimen name="ap_list_icon_padding">4dp</dimen>
+  <dimen name="ap_list_icon_padding_dense">8dp</dimen>
+  <dimen name="ap_list_drag_handle_padding">12dp</dimen>
+
+  <dimen name="ap_list_right_icon_size">48dp</dimen>
+  <dimen name="ap_list_right_icon_padding_dense">14dp</dimen>
+  <dimen name="ap_list_right_icon_padding">13dp</dimen>
+  <dimen name="ap_2_item_list_text_top_bottom_padding">0dp</dimen>
+
+  <dimen name="ap_player_button_size">50dp</dimen>
+  <dimen name="ap_player_button_left_right_margin">16dp</dimen>
+  <dimen name="ap_player_button_bottom_margin">8dp</dimen>
+  <dimen name="ap_player_play_button_padding">2dp</dimen>
+  <dimen name="ap_player_shuffle_button_padding">12dp</dimen>
+  <dimen name="ap_player_prev_next_button_padding">16dp</dimen>
+
+  <dimen name="ap_mini_player_button_size">44dp</dimen>
+  <dimen name="ap_mini_player_button_left_right_margin">24dp</dimen>
+  <dimen name="ap_mini_player_button_bottom_margin">6dp</dimen>
+  <dimen name="ap_mini_player_play_button_padding">0dp</dimen>
+  <dimen name="ap_mini_player_shuffle_button_padding">6dp</dimen>
+  <dimen name="ap_mini_player_prev_next_button_padding">9dp</dimen>
+
+  <dimen name="ap_video_player_button_size">50dp</dimen>
+  <dimen name="ap_video_player_secondary_button_size">45dp</dimen>
+  <dimen name="ap_video_player_button_margin">8dp</dimen>
+  <dimen name="ap_video_player_secondary_button_padding">10dp</dimen>
+  <dimen name="video_sync_button_size">40dp</dimen>
+
+  <dimen name="ap_drawer_artist_image_size">82dp</dimen>
+  <dimen name="ap_drawer_artist_top_margin">14dp</dimen>
+
+  <dimen name="ap_now_playing_rating_bar_size">36dp</dimen>
+  <dimen name="ap_now_playing_rating_bar_padding">7dp</dimen>
+
+  <dimen name="ap_small_rating_bar_size">16dp</dimen>
+  <dimen name="ap_small_rating_bar_padding">1dp</dimen>
+  <dimen name="ap_medium_rating_bar_size">29dp</dimen>
+  <dimen name="ap_medium_rating_bar_padding">1dp</dimen>
+
+  <dimen name="ap_count_button_size">40dp</dimen>
+  <dimen name="ap_count_button_padding">8dp</dimen>
+  <dimen name="ap_count_button_corners">10dp</dimen>
+
+  <dimen name="ap_player_lyrics_eq_button_size">40dp</dimen>
+  <dimen name="ap_player_lyrics_eq_button_padding">8dp</dimen>
+  <dimen name="tag_editor_changed_icon_size">14dp</dimen>
+  <dimen name="ap_now_playing_song_info_layout_padding">10dp</dimen>
+  <dimen name="position_duration_width">58sp</dimen>
+  <dimen name="position_duration_height">30sp</dimen>
+
+  <dimen name="ap_radio_suggestion_text_size">18sp</dimen>
+  <dimen name="ap_radio_suggestion_icon_size">38dp</dimen>
+  <dimen name="ap_radio_suggestion_icon_padding">8dp</dimen>
+  <dimen name="ap_radio_suggestion_set_icon_padding">11dp</dimen>
+
+  <dimen name="material_drawer_account_header_title">16sp</dimen>
+
+  <!--<dimen name="material_drawer_account_header_height_compact">82dp</dimen>-->
+  <!--<dimen name="material_drawer_padding">2dp</dimen>-->
+  <!--<dimen name="material_drawer_account_header_bottom_margin_compact">4dp</dimen>-->
+  <!-- Per the design guidelines, navigation drawers should be between 240dp and 320dp:
+       https://developer.android.com/design/patterns/navigation-drawer.html -->
+  <dimen name="navigation_drawer_width">240dp</dimen>
+
+  <dimen name="library_fab_end_margin">26dp</dimen>
+  <dimen name="library_fab_bottom_margin">50dp</dimen>
+
+  <dimen name="ap_navbar_bottom_margin">48dp</dimen>
+
+</resources>

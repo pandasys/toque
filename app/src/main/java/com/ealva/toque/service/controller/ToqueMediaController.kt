@@ -21,9 +21,7 @@ import com.ealva.toque.service.queue.QueueType
 import kotlinx.coroutines.flow.StateFlow
 
 interface ToqueMediaController {
-  val currentQueue: StateFlow<PlayableMediaQueue<*>>
-
-  val mediaIsLoaded: Boolean
+  val currentQueueFlow: StateFlow<PlayableMediaQueue<*>>
 
   suspend fun setCurrentQueue(type: QueueType, resume: Boolean)
 }

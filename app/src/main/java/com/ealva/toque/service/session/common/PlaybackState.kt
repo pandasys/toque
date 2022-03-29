@@ -28,6 +28,8 @@ data class PlaybackState(
   val itemInstanceId: InstanceId,
   val actions: PlaybackActions
 ) {
+  inline val isPlaying: Boolean get() = playState.isPlaying
+
   companion object {
     val NullPlaybackState = PlaybackState(
       playState = PlayState.None,

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2016-2019. eAlva.com - All Rights Reserved
+  ~
+  ~ Unauthorized copying of this file, in whole or in part, via any medium, is strictly prohibited
+  ~ Proprietary and confidential
+  ~
+  -->
+
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools"
+  android:id="@+id/rootLayout"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="#88000000">
+
+  <ImageView
+    android:id="@+id/albumImage"
+    android:layout_width="@dimen/widget_image_width"
+    android:layout_height="@dimen/widget_image_height"
+    android:layout_alignParentStart="true"
+    android:layout_alignParentTop="true"
+    android:layout_marginStart="4dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginEnd="2dp"
+    android:layout_marginBottom="2dp"
+    android:scaleType="fitCenter"
+    tools:ignore="ContentDescription"
+    tools:src="@drawable/ic_big_album" />
+
+  <LinearLayout
+    android:id="@+id/playerControls"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_alignParentStart="true"
+    android:layout_alignParentEnd="true"
+    android:layout_alignParentBottom="true"
+    android:paddingBottom="2dp">
+
+    <ImageButton
+      android:id="@+id/repeatButton"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:layout_gravity="center"
+      android:layout_weight="1"
+      android:padding="2dp"
+      android:scaleType="fitCenter"
+      android:adjustViewBounds="false"
+      android:alpha="0.9"
+      android:background="@null"
+      android:src="@drawable/ic_repeat_square"
+      tools:ignore="ContentDescription" />
+
+    <ImageButton
+      android:id="@+id/prevButton"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:layout_gravity="center"
+      android:layout_weight="1"
+      android:padding="2dp"
+      android:scaleType="fitCenter"
+      android:adjustViewBounds="false"
+      android:alpha="0.9"
+      android:background="@null"
+      android:src="@drawable/ic_previous"
+      tools:ignore="ContentDescription" />
+
+    <ImageButton
+      android:id="@+id/playPauseButton"
+      android:layout_width="58dp"
+      android:layout_height="58dp"
+      android:layout_gravity="center"
+      android:layout_weight="1"
+      android:padding="0dp"
+      android:scaleType="fitCenter"
+      android:adjustViewBounds="false"
+      android:background="@null"
+      android:focusable="false"
+      android:src="@drawable/ic_play"
+      tools:ignore="ContentDescription" />
+
+    <ImageButton
+      android:id="@+id/nextButton"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:layout_gravity="center"
+      android:layout_weight="1"
+      android:padding="2dp"
+      android:scaleType="fitCenter"
+      android:adjustViewBounds="false"
+      android:alpha="0.9"
+      android:background="@null"
+      android:cropToPadding="false"
+      android:src="@drawable/ic_next"
+      tools:ignore="ContentDescription" />
+
+    <ImageButton
+      android:id="@+id/shuffleButton"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:layout_gravity="center"
+      android:layout_weight="1"
+      android:padding="2dp"
+      android:scaleType="fitCenter"
+      android:adjustViewBounds="false"
+      android:alpha="0.9"
+      android:background="@null"
+      android:src="@drawable/ic_shuffle_off"
+      tools:ignore="ContentDescription" />
+
+  </LinearLayout>
+
+  <RelativeLayout
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:layout_alignBottom="@+id/albumImage"
+    android:layout_alignParentTop="true"
+    android:layout_toEndOf="@+id/albumImage">
+
+    <TextView
+      android:id="@+id/albumName"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_alignParentTop="true"
+      android:layout_alignParentStart="true"
+      android:layout_marginTop="12dp"
+      android:layout_marginStart="4dp"
+      android:layout_marginEnd="4dp"
+      android:layout_marginBottom="4dp"
+      android:textAlignment="center"
+      android:ellipsize="end"
+      android:maxLines="2"
+      android:textAppearance="@style/TqText.Widget.Album"
+      tools:text="A Very Long Album Name To Test What It Would Look Like If It Wrapped" />
+
+    <TextView
+      android:id="@+id/songTitle"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_below="@+id/albumName"
+      android:layout_alignParentStart="true"
+      android:layout_marginStart="4dp"
+      android:layout_marginEnd="4dp"
+      android:layout_marginBottom="4dp"
+      android:textAlignment="center"
+      android:ellipsize="end"
+      android:maxLines="2"
+      android:textAppearance="@style/TqText.Widget.Title"
+      tools:text="A Very Long Song Title To Test What It Would Look Like" />
+
+    <TextView
+      android:id="@+id/artistName"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_below="@+id/songTitle"
+      android:layout_alignParentStart="true"
+      android:layout_alignParentEnd="true"
+      android:layout_marginStart="4dp"
+      android:layout_marginEnd="4dp"
+      android:layout_marginBottom="4dp"
+      android:textAlignment="center"
+      android:ellipsize="end"
+      android:maxLines="2"
+      android:textAppearance="@style/TqText.Widget.Artist"
+      tools:text="Artist Name That Is Really Long and Might Wrap " />
+
+  </RelativeLayout>
+
+</RelativeLayout>

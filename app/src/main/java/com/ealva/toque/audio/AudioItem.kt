@@ -40,7 +40,5 @@ interface AudioItem : HasId {
   val location: Uri
   val fileUri: Uri
 
-  /** True if this item is valid, ie. [id] is valid */
-  val isValid: Boolean
   val albumId: AlbumId
 }

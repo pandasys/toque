@@ -20,7 +20,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
 import android.os.IBinder
+import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.ealvalog.w
+import com.ealva.toque.log._i
 import com.ealva.toque.service.controller.NullMediaController
 import com.ealva.toque.service.controller.ToqueMediaController
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,7 +89,7 @@ private class MediaPlayerServiceConnectionImpl(
     val connection = makeServiceConnection(binderName)
     isBound = context.bindService(
       MediaPlayerService.makeStartIntent(
-        context.applicationContext,
+        context,
         MediaPlayerService.Action.None,
         null
       ),
@@ -103,12 +106,22 @@ private class MediaPlayerServiceConnectionImpl(
         name: ComponentName,
         service: IBinder
       ) {
+        LOG._i { it("onServiceConnected name:%s %s", name, binderName) }
         val binder = service as MediaPlayerService.MediaServiceBinder
         mediaController.value = binder.controller
       }
 
       override fun onServiceDisconnected(name: ComponentName) {
+        LOG._i { it("onServiceDisconnected name:%s %s", name, binderName) }
         mediaController.value = NullMediaController
+      }
+
+      override fun onBindingDied(name: ComponentName) {
+        LOG.w { it("onBindingDied name:%s %s", name, binderName) }
+      }
+
+      override fun onNullBinding(name: ComponentName) {
+        LOG.w { it("onNullBinding name:%s %s", name, binderName) }
       }
     }
   }

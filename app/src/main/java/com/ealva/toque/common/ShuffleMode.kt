@@ -18,6 +18,7 @@ package com.ealva.toque.common
 
 import android.os.Parcelable
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.persist.HasConstId
@@ -79,6 +80,14 @@ val ShuffleMode.asCompat
     ShuffleMode.Media -> PlaybackStateCompat.SHUFFLE_MODE_ALL
     ShuffleMode.Lists -> PlaybackStateCompat.SHUFFLE_MODE_GROUP
     ShuffleMode.MediaAndLists -> PlaybackStateCompat.SHUFFLE_MODE_GROUP
+  }
+
+val ShuffleMode.drawable: Int
+  @DrawableRes get() = when (this) {
+    ShuffleMode.None -> R.drawable.ic_shuffle_disabled
+    ShuffleMode.Media -> R.drawable.ic_shuffle_media
+    ShuffleMode.Lists -> R.drawable.ic_shuffle_lists
+    ShuffleMode.MediaAndLists -> R.drawable.ic_shuffle_both
   }
 
 @JvmInline

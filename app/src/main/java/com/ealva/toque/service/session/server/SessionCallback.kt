@@ -30,6 +30,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.compatToRepeatMode
 import com.ealva.toque.common.compatToShuffleMode
 import com.ealva.toque.common.toStarRating
+import com.ealva.toque.log._e
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.service.controller.SessionControlEvent
 import com.ealva.toque.service.session.server.AudioFocusManager.ContentType
@@ -48,6 +49,7 @@ internal class SessionCallback(
   private var inMediaButtonEvent = false
 
   fun emit(event: SessionControlEvent) {
+    LOG._e { it("SessionControlEvent:%s", event) }
     scope.launch { flow.emit(event) }
   }
 
@@ -101,8 +103,10 @@ internal class SessionCallback(
       ?: LOG.e { it("onPrepareFromUri null uri") }
   }
 
-  override fun onSkipToQueueItem(id: Long) =
+  override fun onSkipToQueueItem(id: Long) {
+    LOG._e { it("onSkipToQueueItem") }
     emit(SessionControlEvent.SkipToQueueItem(InstanceId(id)))
+  }
 
   override fun onPause() = emit(SessionControlEvent.Pause)
   override fun onSkipToNext() = emit(SessionControlEvent.SkipToNext)
