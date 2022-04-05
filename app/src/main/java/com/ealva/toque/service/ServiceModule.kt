@@ -20,6 +20,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.service.audio.PlayableAudioItemFactory
 import com.ealva.toque.service.player.WakeLockFactory
 import com.ealva.toque.service.vlc.LibVlcPrefs
+import com.ealva.toque.service.widget.WidgetUpdater
 import org.koin.dsl.module
 
 object ServiceModule {
@@ -44,5 +45,6 @@ object ServiceModule {
         libVlcPrefsSingleton = get(LibVlcPrefs.QUALIFIER),
       )
     }
+    single { WidgetUpdater(get()) }
   }
 }

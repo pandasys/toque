@@ -36,6 +36,7 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
@@ -81,7 +82,7 @@ private val LOG by lazyLogger(BaseSongsViewModel::class)
 
 interface SongsViewModel : ActionsViewModel {
   @Immutable
-  interface SongInfo : Parcelable {
+  interface SongInfo {
     val id: MediaId
     val title: Title
     val duration: Duration
@@ -102,7 +103,6 @@ interface SongsViewModel : ActionsViewModel {
       ): SongInfo = SongInfoData(id, title, duration, rating, album, artist, artwork)
 
       @Immutable
-      @Parcelize
       data class SongInfoData(
         override val id: MediaId,
         override val title: Title,
@@ -268,7 +268,7 @@ abstract class BaseSongsViewModel(
               info.album,
               info.artist,
               info.rating,
-              info.duration
+              info.duration.asMillis
             )
           )
         }

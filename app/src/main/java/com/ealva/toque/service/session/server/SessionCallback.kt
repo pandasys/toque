@@ -122,16 +122,14 @@ internal class SessionCallback(
     rating?.let { emit(SessionControlEvent.SetRating(it.starRating.toStarRating(), Bundle.EMPTY)) }
       ?: LOG.e { it("onSetRating null rating") }
 
-  override fun onSetRating(rating: RatingCompat?, extras: Bundle?) =
-    rating?.let {
-      emit(
-        SessionControlEvent.SetRating(
-          it.starRating.toStarRating(),
-          extras ?: Bundle.EMPTY
-        )
+  override fun onSetRating(rating: RatingCompat?, extras: Bundle?) = rating?.let {
+    emit(
+      SessionControlEvent.SetRating(
+        it.starRating.toStarRating(),
+        extras ?: Bundle.EMPTY
       )
-    }
-      ?: LOG.e { it("onSetRating with extras, null rating") }
+    )
+  } ?: LOG.e { it("onSetRating with extras, null rating") }
 
   override fun onSetCaptioningEnabled(enabled: Boolean) =
     emit(SessionControlEvent.EnableCaption(enabled))

@@ -20,6 +20,7 @@ plugins {
   kotlin("plugin.serialization")
   id("kotlin-parcelize")
   kotlin("kapt")
+//  id("com.google.devtools.ksp")
 }
 
 val localProperties = com.android.build.gradle.internal.cxx.configure.gradleLocalProperties(rootDir)
@@ -67,6 +68,9 @@ android {
   }
 
   sourceSets {
+//    getByName("release").java.srcDirs("build/generated/ksp/main/kotlin")
+//    getByName("debug").java.srcDirs("build/generated/ksp/debug/kotlin")
+
     val sharedTestDir = File("src/sharedTest/java")
     getByName("test").java.srcDirs(sharedTestDir)
     getByName("androidTest").java.srcDirs(sharedTestDir)
@@ -125,6 +129,8 @@ android {
 dependencies {
   coreLibraryDesugaring(Libs.DESUGAR)
   implementation(kotlin("stdlib-jdk8"))
+
+  implementation(Libs.AndroidX.GLANCE)
 
   implementation(Libs.NumberPicker.COMPOSE)
 
@@ -190,6 +196,8 @@ dependencies {
   implementation(Libs.Koin.ANDROID)
   implementation(Libs.Koin.ANDROID_EXT)
   implementation(Libs.Koin.COMPOSE)
+//  implementation(Libs.Koin.ANNOTATIONS)
+//  ksp(Libs.Koin.KSP)
 
   implementation(Libs.SimpleStack.EXT)
   implementation(Libs.SimpleStack.COMPOSE)

@@ -53,16 +53,35 @@
         <entry key="../../../../layout/compose-model-1645635546095.xml" value="0.1675925925925926" />
         <entry key="../../../../layout/compose-model-1645645969432.xml" value="0.1" />
         <entry key="../../../../layout/compose-model-1646882004421.xml" value="0.12964527027027026" />
+        <entry key="../../../../layout/compose-model-1649112231825.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_account_box.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_add.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_add_circle_outline.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_album.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_arrow_left.xml" value="0.10925925925925926" />
         <entry key="app/src/main/res/drawable/ic_arrow_left_top.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_auto_album.xml" value="0.1578125" />
         <entry key="app/src/main/res/drawable/ic_auto_artist.xml" value="0.1675925925925926" />
+        <entry key="app/src/main/res/drawable/ic_baseline_close_24.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_baseline_refresh_24.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_baseline_skip_next_24.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_check.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_launcher_background.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_list.xml" value="0.16944444444444445" />
         <entry key="app/src/main/res/drawable/ic_map.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_menu.xml" value="0.23425925925925925" />
+        <entry key="app/src/main/res/drawable/ic_next.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_next_list.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_outline_add_circle_outline_24.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_outline_close_24.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_play.xml" value="0.18055555555555555" />
+        <entry key="app/src/main/res/drawable/ic_play_pause_playing_button.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_playlist_add.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_prev_list.xml" value="0.232" />
+        <entry key="app/src/main/res/drawable/ic_refresh.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_repeat.xml" value="0.23425925925925925" />
+        <entry key="app/src/main/res/drawable/ic_repeat_off.xml" value="0.1" />
+        <entry key="app/src/main/res/drawable/ic_restore.xml" value="0.1" />
         <entry key="app/src/main/res/drawable/ic_shuffle.xml" value="0.23425925925925925" />
         <entry key="app/src/main/res/drawable/ic_shuffle_both.xml" value="0.1755" />
         <entry key="app/src/main/res/drawable/ic_shuffle_disabled.xml" value="0.23425925925925925" />
@@ -73,7 +92,11 @@
         <entry key="app/src/main/res/drawable/play_pause_playing_button.xml" value="0.1755" />
         <entry key="app/src/main/res/drawable/small_play_pause_paused_button.xml" value="0.17037037037037037" />
         <entry key="app/src/main/res/drawable/small_play_pause_playing_button.xml" value="0.17037037037037037" />
-        <entry key="app/src/main/res/layout/medium_widget.xml" value="0.1" />
+        <entry key="app/src/main/res/layout/a_widget.xml" value="0.2947916666666667" />
+        <entry key="app/src/main/res/layout/medium_widget.xml" value="0.41651705565529623" />
+        <entry key="app/src/main/res/layout/medium_widget_2.xml" value="0.33" />
+        <entry key="app/src/main/res/layout/widget_loading.xml" value="0.28072916666666664" />
+        <entry key="app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" value="0.1" />
       </map>
     </option>
   </component>

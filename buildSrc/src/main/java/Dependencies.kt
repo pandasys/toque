@@ -25,9 +25,9 @@ object PluginsVersion {
   const val DETEKT = "1.19.0"
   const val DOKKA = "1.6.10"
   const val KOTLIN = "1.6.10"
-  const val PUBLISH = "0.18.0"
+  const val PUBLISH = "0.19.0"
   const val SERIALIZATION = "1.6.10"
-  const val VERSIONS = "0.41.0"
+  const val VERSIONS = "0.42.0"
 }
 
 object Libs {
@@ -35,7 +35,7 @@ object Libs {
   const val DESUGAR = "com.android.tools:desugar_jdk_libs:1.1.5"
 
   object Accompanist {
-    private const val VERSION = "0.20.3"
+    private const val VERSION = "0.23.1"
     const val INSETS = "com.google.accompanist:accompanist-insets:$VERSION"
     const val UI_CONTROLLER = "com.google.accompanist:accompanist-systemuicontroller:$VERSION"
     const val PERMISSIONS = "com.google.accompanist:accompanist-permissions:$VERSION"
@@ -64,8 +64,8 @@ object Libs {
 
     object Compose {
       @Suppress("MemberVisibilityCanBePrivate")
-      const val COMPILER_VERSION = "1.1.0-rc02"
-      private const val VERSION = "1.1.0-rc01"
+      const val COMPILER_VERSION = "1.1.1"
+      private const val VERSION = "1.1.1"
 
       //const val FOUNDATION = "androidx.compose.foundation:foundation:$VERSION"
       const val UI = "androidx.compose.ui:ui:$VERSION"
@@ -79,9 +79,10 @@ object Libs {
     }
 
     const val EXIF = "androidx.exifinterface:exifinterface:1.3.3"
+    const val GLANCE = "androidx.glance:glance-appwidget:1.0.0-alpha03"
 
     object Lifecycle {
-      private const val VERSION = "2.4.0"
+      private const val VERSION = "2.4.1"
       const val RUNTIME_KTX = "androidx.lifecycle:lifecycle-runtime-ktx:$VERSION"
       const val COMMON_JAVA8 = "androidx.lifecycle:lifecycle-common-java8:$VERSION"
       const val SERVICE = "androidx.lifecycle:lifecycle-service:$VERSION"
@@ -153,7 +154,7 @@ object Libs {
   }
 
   object Gowtham {
-    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.2.1"
+    const val RATING_BAR = "com.github.a914-gowtham:compose-ratingbar:1.2.3"
   }
 
   object JUnit {
@@ -164,10 +165,13 @@ object Libs {
   object Koin {
     private const val VERSION = "3.1.5"
     private const val COMPOSE_VERSION = "3.1.5"
+//    private const val KOIN_KSP = "1.0.0-beta-1"
     const val CORE = "io.insert-koin:koin-core:$VERSION"
     const val ANDROID = "io.insert-koin:koin-android:$VERSION"
     const val COMPOSE = "io.insert-koin:koin-androidx-compose:$COMPOSE_VERSION"
     const val ANDROID_EXT = "io.insert-koin:koin-android-ext:3.0.2"
+//    const val ANNOTATIONS = "io.insert-koin:koin-annotations:$KOIN_KSP"
+//    const val KSP = "io.insert-koin:koin-ksp-compiler:$KOIN_KSP"
     const val EXT = "io.insert-koin:koin-core-ext:3.0.2"
     const val TEST = "io.insert-koin:koin-test:$VERSION"
   }
@@ -198,11 +202,11 @@ object Libs {
   }
 
   object LibVLC {
-    const val ALL = "org.videolan.android:libvlc-all:3.4.8"
+    const val ALL = "org.videolan.android:libvlc-all:3.4.9"
   }
 
   object NumberPicker {
-    const val COMPOSE = "com.chargemap.compose:numberpicker:0.0.11"
+    const val COMPOSE = "com.chargemap.compose:numberpicker:0.0.12"
   }
 
   object Phoenix {

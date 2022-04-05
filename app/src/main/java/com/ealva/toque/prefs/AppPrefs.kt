@@ -52,6 +52,7 @@ import com.ealva.toque.prefs.AppPrefs.Companion.MAX_IMAGE_SEARCH_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_DURATION_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.QUALITY_RANGE
+import org.koin.core.qualifier.StringQualifier
 import org.koin.core.qualifier.named
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds

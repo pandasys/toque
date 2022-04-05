@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
@@ -103,7 +104,7 @@ data class ArtistSongsScreen(
     ) {
       ScreenHeaderWithArtwork(artwork = artwork.value) {
         SongListHeaderInfo(
-          title = artistName.value,
+          title = stringResource(id = artistType.allSongsRes),
           subtitle = null,
           itemCount = songs.value.size,
           selectedItems = selected.value,

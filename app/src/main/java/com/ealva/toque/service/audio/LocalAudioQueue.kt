@@ -64,6 +64,7 @@ import com.ealva.toque.db.QueueDao
 import com.ealva.toque.db.QueuePositionState
 import com.ealva.toque.db.QueuePositionStateDao
 import com.ealva.toque.db.QueuePositionStateDaoFactory
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
@@ -321,12 +322,10 @@ private class LocalAudioQueueImpl(
   private var lastShuffle = prefs.shuffleMode()
 
   override val queueState = MutableStateFlow(makeInitialState())
-  override val notification = MutableSharedFlow<ServiceNotification>(
-    replay = 0,
-    extraBufferCapacity = 0
-  )
+  override val notification = MutableSharedFlow<ServiceNotification>()
 
   private val focusRequest = AvPlayer.FocusRequest {
+    LOG._e { it("FocusRequest playState:%s", playState) }
     audioFocusManager.requestFocus(AudioFocusManager.ContentType.Audio) { playState.isPlaying }
   }
 
@@ -495,6 +494,7 @@ private class LocalAudioQueueImpl(
     }
     if (any { audioItem -> audioItem.instanceId == currentItem.instanceId }) {
       updateMetadata()
+      updatePlaybackState(playState)
     }
   }
 
@@ -506,9 +506,7 @@ private class LocalAudioQueueImpl(
   }
 
   private fun handleNewEqMode(mode: EqMode) {
-    updateQueueState("handleNewEqMode") { state ->
-      state.copy(eqMode = mode)
-    }
+    updateQueueState("handleNewEqMode") { state -> state.copy(eqMode = mode) }
     notify(ServiceNotification(fetch(mode.titleRes)))
   }
 
@@ -628,20 +626,20 @@ private class LocalAudioQueueImpl(
     when {
       nextItem.isValid -> item.title
       queue.isNotEmpty() -> getNextListFirstMediaTitle()
-      else -> Title.EMPTY
+      else -> Title("")
     }
-  } else Title.EMPTY
+  } else Title("")
 
   private suspend fun getNextListFirstMediaTitle(): Title = try {
     val nextList = getNextCategory()
     if (nextList.isNotEmpty) {
       audioMediaDao.getMediaTitle(nextList.idList[0])
         .onFailure { cause -> LOG.e(cause) { it("Error getting media title") } }
-        .getOrElse { Title.EMPTY }
-    } else Title.EMPTY
+        .getOrElse { Title("") }
+    } else Title("")
   } catch (e: Exception) {
     LOG.e(e) { it("Error getting next list, first title") }
-    Title.EMPTY
+    Title("")
   }
 
   override fun play(mayFade: MayFade) = currentItem.play(mayFade)
@@ -724,7 +722,7 @@ private class LocalAudioQueueImpl(
   override fun fastForward() {
     val current = currentItem
     val position = current.position
-    val end = current.duration.asMillis() - Millis.FIVE_SECONDS
+    val end = current.duration.asMillis - Millis.FIVE_SECONDS
     if (position < end) current.seekTo((position + Millis.TEN_SECONDS).coerceAtMost(end))
   }
 
@@ -858,6 +856,7 @@ private class LocalAudioQueueImpl(
   }
 
   private fun notify(msg: ServiceNotification) {
+    LOG._e { it("notify") }
     scope.launch { notification.emit(msg) }
   }
 
@@ -1101,6 +1100,10 @@ private class LocalAudioQueueImpl(
     LockScreenActivity.maybeStart(Toque.appContext, appPrefs, currentItem.isPlaying)
   }
 
+  override fun ifActiveRefreshMediaState() {
+    if (isActive.value) updateMetadata()
+  }
+
   private fun queueContainsMedia(): Boolean = queue.isNotEmpty()
   private fun atEndOfQueue(): Boolean = currentItemIndex >= queue.size - 1
 
@@ -1250,6 +1253,7 @@ private class LocalAudioQueueImpl(
   }
 
   private suspend fun onPrepared(event: PlayableItemEvent.Prepared) {
+    LOG._e { it("onPrepared") }
     isActive.value = true
     val item = event.audioItem
     updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = event.position))

@@ -24,12 +24,9 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 @JvmInline
 value class Title(val value: String) : Parcelable {
-  inline operator fun invoke(): String = value
-
   companion object {
     val UNKNOWN: Title = Title("Unknown")
-    val EMPTY: Title = Title("")
   }
 }
 
-inline val String?.asTitle: Title get() = this?.let { Title(it.trim()) } ?: Title.EMPTY
+inline val String?.asTitle: Title get() = this?.let { Title(it.trim()) } ?: Title("")

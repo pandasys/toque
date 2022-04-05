@@ -46,7 +46,9 @@ import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.theme.toqueColors
 import com.gowtham.ratingbar.RatingBar
+import com.gowtham.ratingbar.RatingBarConfig
 import com.gowtham.ratingbar.RatingBarStyle
+import com.gowtham.ratingbar.StepSize
 import kotlin.time.Duration
 
 @ExperimentalFoundationApi
@@ -176,14 +178,17 @@ private fun AlbumAndRating(albumTitle: AlbumTitle, rating: Rating, textColor: Co
         width = Dimension.fillToConstraints
       }
     )
+    val rbColor = if (textColor.isUnspecified) LocalContentColor.current else textColor
     RatingBar(
       value = rating.toStarRating().value,
-      size = 8.dp,
-      padding = 2.dp,
-      isIndicator = true,
-      activeColor = if (textColor.isUnspecified) LocalContentColor.current else textColor,
-      inactiveColor = if (textColor.isUnspecified) LocalContentColor.current else textColor,
-      ratingBarStyle = RatingBarStyle.HighLighted,
+      config = RatingBarConfig()
+        .size(8.dp)
+        .padding(2.dp)
+        .isIndicator(true)
+        .activeColor(rbColor)
+        .inactiveColor(rbColor)
+        .stepSize(StepSize.HALF)
+        .style(RatingBarStyle.HighLighted),
       onValueChange = {},
       onRatingChanged = {},
       modifier = Modifier.constrainAs(ratingBar) {

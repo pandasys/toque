@@ -42,7 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.ealva.ealvabrainz.common.AlbumTitle
+import coil.size.OriginalSize
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.asArtistName
 import com.ealva.ealvalog.e
@@ -55,7 +55,6 @@ import com.ealva.toque.R
 import com.ealva.toque.app.Toque.Companion.appContext
 import com.ealva.toque.art.MusicInfoProvider
 import com.ealva.toque.db.ArtistDao
-import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.ui.art.SelectArtistArtViewModel.SelectState
@@ -307,6 +306,7 @@ private class SelectArtistArtViewModelImpl(
     return if (remoteImage.actualSize != null) remoteImage else {
       val request = ImageRequest.Builder(appContext)
         .data(remoteImage.location)
+        .size(OriginalSize)
         .allowHardware(false)
         .build()
       val drawable = appContext.imageLoader.execute(request).drawable as? BitmapDrawable

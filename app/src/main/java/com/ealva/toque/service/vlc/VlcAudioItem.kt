@@ -117,7 +117,7 @@ class VlcAudioItem private constructor(
   private var isPreparing = false
   private var startOnPrepared = false
   private val wakeLock: WakeLock =
-    wakeLockFactory.makeWakeLock(WAKE_LOCK_TIMEOUT, "$LOCK_TAG_PREFIX:${title()}")
+    wakeLockFactory.makeWakeLock(WAKE_LOCK_TIMEOUT, "$LOCK_TAG_PREFIX:${title.value}")
   override val eventFlow = MutableSharedFlow<PlayableItemEvent>(extraBufferCapacity = 10)
 
   private suspend fun emit(event: PlayableItemEvent) {
@@ -129,7 +129,7 @@ class VlcAudioItem private constructor(
   } else 1.seconds
 
   private val Metadata.seekRange: ClosedRange<Millis>
-    get() = playbackRange.start..playbackRange.endInclusive - endOfSeekRangeDuration().asMillis()
+    get() = playbackRange.start..playbackRange.endInclusive - endOfSeekRangeDuration().asMillis
 
   private fun updateMetadata(newMetadata: Metadata) {
     metadata = newMetadata

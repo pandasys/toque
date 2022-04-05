@@ -52,6 +52,27 @@ import kotlinx.parcelize.Parcelize
 
 private val LOG by lazyLogger(EditorRule::class)
 
+@Parcelize
+enum class Capitalization : Parcelable {
+  None {
+    override val keyboardCapitalization: KeyboardCapitalization
+      get() = KeyboardCapitalization.None
+  },
+  Characters {
+    override val keyboardCapitalization: KeyboardCapitalization
+      get() = KeyboardCapitalization.Characters
+  },
+  Words {
+    override val keyboardCapitalization: KeyboardCapitalization
+      get() = KeyboardCapitalization.Words
+  },
+  Sentences {
+    override val keyboardCapitalization: KeyboardCapitalization
+      get() = KeyboardCapitalization.Sentences
+  };
+  abstract val keyboardCapitalization: KeyboardCapitalization
+}
+
 @Immutable
 sealed interface EditorRule : Parcelable {
   val rule: Rule
@@ -66,7 +87,7 @@ sealed interface EditorRule : Parcelable {
     val editing: Boolean,
     val nameValidity: SmartPlaylistEditorViewModel.NameValidity,
     val suggestions: List<String>,
-    val capitalization: KeyboardCapitalization
+    val capitalization: Capitalization
   ) : EditorRule
 
   @Immutable
@@ -311,7 +332,7 @@ private suspend fun makeTextEditorRuleWithSuggestions(
     editing = showSuggestions,
     nameValidity = newName.isValidName,
     suggestions = suggestions,
-    capitalization = KeyboardCapitalization.Words
+    capitalization = Capitalization.Words
   )
 }
 
@@ -437,7 +458,7 @@ private fun makeCommentEditorRule(
     editing = false,
     nameValidity = SmartPlaylistEditorViewModel.NameValidity.IsValid,
     suggestions = emptyList(),
-    capitalization = KeyboardCapitalization.Sentences
+    capitalization = Capitalization.Sentences
   )
 
 private suspend fun makePlaylistEditorRule(

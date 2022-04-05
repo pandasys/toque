@@ -21,6 +21,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -46,6 +48,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,7 +103,9 @@ import com.google.accompanist.pager.PagerState
 import com.google.accompanist.pager.rememberPagerState
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.gowtham.ratingbar.RatingBar
+import com.gowtham.ratingbar.RatingBarConfig
 import com.gowtham.ratingbar.RatingBarStyle
+import com.gowtham.ratingbar.StepSize
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -419,6 +425,14 @@ private fun MediaArtPager(
 ) {
   val pagerState: PagerState = rememberPagerState(initialPage = queueIndex.coerceAtLeast(0))
 
+  HorizontalPager(
+    count = queue.size,
+    state = pagerState,
+    modifier = modifier
+  ) { page ->
+    ArtPagerCard(queue, page, size)
+  }
+
   if (queueIndex >= 0 && queueIndex in queue.indices) {
     LaunchedEffect(key1 = queueIndex) {
       pagerState.scrollToPage(queueIndex)
@@ -431,14 +445,6 @@ private fun MediaArtPager(
       .drop(1)
       .onEach { index -> goToIndex(index) }
       .launchIn(this)
-  }
-
-  HorizontalPager(
-    count = queue.size,
-    state = pagerState,
-    modifier = modifier
-  ) { page ->
-    ArtPagerCard(queue, page, size)
   }
 }
 
@@ -456,7 +462,7 @@ private fun ArtPagerCard(queue: List<QueueItem>, currentPage: Int, size: Int) {
             error(R.drawable.ic_big_album)
           }
         ),
-        contentDescription = "${item.title()} Album Cover Art",
+        contentDescription = "${item.title.value} Album Cover Art",
         modifier = Modifier.fillMaxSize()
       )
     }
@@ -527,12 +533,14 @@ private fun RatingBarRow(
       RatingBar(
         modifier = Modifier.wrapContentSize(),
         value = rating.toStarRating().value,
-        size = 22.dp,
-        padding = 2.dp,
-        isIndicator = true,
-        activeColor = LocalContentColor.current,
-        inactiveColor = LocalContentColor.current,
-        ratingBarStyle = RatingBarStyle.HighLighted,
+        config = RatingBarConfig()
+          .size(22.dp)
+          .padding(2.dp)
+          .isIndicator(true)
+          .activeColor(LocalContentColor.current)
+          .inactiveColor(LocalContentColor.current)
+          .stepSize(StepSize.HALF)
+          .style(RatingBarStyle.HighLighted),
         onValueChange = {},
         onRatingChanged = {},
       )
@@ -605,18 +613,10 @@ private fun ButtonRow(
         modifier = Modifier.size(44.dp),
       )
     }
-    IconButton(onClick = togglePlayPause, modifier = Modifier.size(50.dp)) {
-      Icon(
-        painter = painterResource(
-          id = if (playState.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-        ),
-        contentDescription = "Toggle play pause",
-        modifier = Modifier.size(50.dp)
-      )
-    }
+    PlayPauseButton(togglePlayPause, playState)
     IconButton(onClick = next, modifier = Modifier.size(50.dp)) {
       Icon(
-        painter = painterResource(id = R.drawable.ic_next),
+        painter = painterResource(id = R.drawable.ic_baseline_skip_next_24),
         contentDescription = "Play next",
         modifier = Modifier.size(44.dp)
       )
@@ -628,6 +628,37 @@ private fun ButtonRow(
         modifier = Modifier.size(38.dp)
       )
     }
+  }
+}
+
+@Composable
+private fun PlayPauseButton(
+  togglePlayPause: () -> Unit,
+  playState: PlayState
+) {
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val drawable = when {
+    playState.isPlaying -> when {
+      isPressed -> R.drawable.ic_baseline_pause_circle_filled_24
+      else -> R.drawable.ic_baseline_pause_circle_outline_24
+    }
+    else -> when {
+      isPressed -> R.drawable.ic_baseline_play_circle_filled_24
+      else -> R.drawable.ic_baseline_play_circle_outline_24
+    }
+  }
+
+  IconButton(
+    onClick = togglePlayPause,
+    modifier = Modifier.size(50.dp),
+    interactionSource = interactionSource
+  ) {
+    Icon(
+      painter = painterResource(id = drawable),
+      contentDescription = "Toggle play pause",
+      modifier = Modifier.size(50.dp)
+    )
   }
 }
 

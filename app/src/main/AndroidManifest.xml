@@ -99,11 +99,10 @@
       android:exported="false"
       android:label="Lock Screen Player"
       android:launchMode="singleTask"
-      android:theme="@style/Theme.Toque.NoActionBar"
       android:showOnLockScreen="true"
       android:showWhenLocked="true"
-      tools:targetApi="o_mr1"
-      />
+      android:theme="@style/Theme.Toque.NoActionBar"
+      tools:targetApi="o_mr1" />
 
     <service
       android:name=".scanner.MediaScannerService"
@@ -141,7 +140,9 @@
         tools:node="remove" />
     </provider>
 
-    <receiver android:name=".service.widget.PlayerAppWidgetProvider"
+    <receiver
+      android:name=".service.widget.MediumWidgetReceiver"
+      android:enabled="@bool/glance_appwidget_available"
       android:exported="false">
       <intent-filter>
         <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -149,8 +150,7 @@
 
       <meta-data
         android:name="android.appwidget.provider"
-        android:resource="@xml/medium_appwidget_info"
-        />
+        android:resource="@xml/medium_appwidget_info" />
     </receiver>
 
   </application>

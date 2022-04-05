@@ -35,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -434,7 +433,7 @@ data class AppSettingsScreen(
     CallbackSettingItem(
       title = fetch(R.string.MediaScanner),
       summary = fetch(R.string.LibraryScannerSettings),
-      iconDrawable = R.drawable.ic_refresh,
+      iconDrawable = R.drawable.ic_baseline_refresh_24,
       onClick = { backstack.goToScreen(AppSettingsScreen(MediaScannerSettings)) }
     ),
     ListSettingItem(

@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import coil.imageLoader
 import coil.request.ImageRequest
+import coil.size.OriginalSize
 import coil.size.Scale
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
@@ -423,10 +424,12 @@ private class SelectAlbumArtViewModelImpl(
     return if (remoteImage.actualSize != null) remoteImage else {
       val request = ImageRequest.Builder(appContext)
         .data(remoteImage.location)
+        .size(OriginalSize)
         .allowHardware(false)
         .build()
-      val drawable = appContext.imageLoader.execute(request).drawable as? BitmapDrawable
-      if (drawable != null) {
+      val drawable = appContext.imageLoader.execute(request).drawable
+      val bitmapDrawable = drawable as? BitmapDrawable
+      if (bitmapDrawable != null) {
         val bitmap = drawable.bitmap
         remoteImage.copy(actualSize = Size(bitmap.width, bitmap.height))
       } else remoteImage

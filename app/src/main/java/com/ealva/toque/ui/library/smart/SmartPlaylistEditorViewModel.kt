@@ -19,7 +19,6 @@ package com.ealva.toque.ui.library.smart
 import android.os.Parcelable
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -623,7 +622,7 @@ private class SmartPlaylistEditorViewModelImpl(
       nameValidity = data.text.isValidName,
       suggestions = emptyList(),
       editing = false,
-      capitalization = KeyboardCapitalization.Words
+      capitalization = Capitalization.Words
     )
   }
 

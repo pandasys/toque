@@ -76,7 +76,7 @@ data class Metadata(
    * Indices is the Closed range of position values. Playback position occur outside this range
    */
   @Transient
-  val playbackRange: ClosedRange<Millis> = Millis(0)..duration.inWholeMilliseconds.asMillis()
+  val playbackRange: ClosedRange<Millis> = Millis(0)..duration.inWholeMilliseconds.asMillis
 
   @OptIn(ExperimentalSerializationApi::class)
   fun toJsonString(): String {
@@ -91,7 +91,7 @@ data class Metadata(
 
     val NullMetadata = Metadata(
       MediaId.INVALID,
-      Title.EMPTY,
+      Title(""),
       AlbumTitle(""),
       ArtistName(""),
       ArtistName(""),
@@ -149,7 +149,7 @@ object TitleAsStringSerializer : KSerializer<Title> {
   override val descriptor: SerialDescriptor =
     PrimitiveSerialDescriptor("Title", PrimitiveKind.STRING)
 
-  override fun serialize(encoder: Encoder, value: Title) = encoder.encodeString(value())
+  override fun serialize(encoder: Encoder, value: Title) = encoder.encodeString(value.value)
   override fun deserialize(decoder: Decoder): Title = Title(decoder.decodeString())
 }
 

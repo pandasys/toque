@@ -31,6 +31,7 @@ import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
+import com.ealva.toque.android.util.coerceIn
 import com.ealva.toque.app.Toque
 import com.ealva.toque.art.ArtworkDownloader.CompressionQuality
 import com.ealva.toque.common.debug
@@ -79,7 +80,7 @@ interface ArtworkDownloader {
     destination: Uri,
     size: Size,
     quality: CompressionQuality,
-    maxSize: Size = Size(2048, 2048)
+    maxSize: Size
   )
 
   companion object {
@@ -198,7 +199,15 @@ private class ArtworkFileDownloader : ArtworkDownloader {
     if (size == ORIGINAL_SIZE) {
       originalSize = getImageSize(file)
     }
-    return originalSize.maybeScaleDown(maxSize)
+    return originalSize.coerceIn(maxSize.coerceAtLeast(300))
+  }
+
+  /**
+   * This doesn't maintain aspect ratio. It's only used if the original max size is abnormally
+   * low for some reason. Max artwork size should be bounded by screen size.
+   */
+  private fun Size.coerceAtLeast(minSize: Int): Size {
+    return Size(width.coerceAtLeast(minSize), height.coerceAtLeast(minSize))
   }
 
   private fun getScaledBitmap(
@@ -252,7 +261,7 @@ private class ArtworkFileDownloader : ArtworkDownloader {
 
     //inJustDecodeBounds set to false to load the actual bitmap
     options.inJustDecodeBounds = false
-    options.inTempStorage = ByteArray(16 * 1024)
+    options.inTempStorage = ByteArray(16 * 1024) // set to 16K as recommended
 
     //load the bitmap from its path
     val bmp = BitmapFactory.decodeFile(filePath, options)
@@ -329,43 +338,6 @@ private class ArtworkFileDownloader : ArtworkDownloader {
     }
 
     return inSampleSize
-  }
-}
-
-/** Returns true if both this.width < boundary.width and this.height < boundary.height*/
-fun Size.needsToBeScaledDown(boundary: Size): Boolean =
-  width > boundary.width || height > boundary.height
-
-/**
- * If [needsToBeScaledDown], returns a Size less than boundary while maintaining aspect ratio.
- * Otherwise returns self.
- */
-fun Size.maybeScaleDown(boundary: Size): Size {
-  return if (!needsToBeScaledDown(boundary)) this else {
-    val originalWidth = width
-    val originalHeight = height
-    val boundWidth = boundary.width
-    val boundHeight = boundary.height
-    var newWidth = originalWidth
-    var newHeight = originalHeight
-
-    // first check if we need to scale width
-    if (originalWidth > boundWidth) {
-      //scale width to fit
-      newWidth = boundWidth
-      //scale height to maintain aspect ratio
-      newHeight = newWidth * originalHeight / originalWidth
-    }
-
-    // then check if we need to scale even with the new height
-    if (newHeight > boundHeight) {
-      //scale height to fit
-      newHeight = boundHeight
-      //scale width to maintain aspect ratio
-      newWidth = newHeight * originalWidth / originalHeight
-    }
-
-    Size(newWidth, newHeight)
   }
 }
 

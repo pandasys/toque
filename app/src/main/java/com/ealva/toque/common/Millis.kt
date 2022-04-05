@@ -77,9 +77,9 @@ value class Millis(val value: Long) : Comparable<Millis>, Parcelable {
   }
 }
 
-fun Duration.asMillis(): Millis = Millis(inWholeMilliseconds)
+inline val Duration.asMillis: Millis get() = Millis(inWholeMilliseconds)
 
-fun Long.asMillis(): Millis = Millis(this)
+inline val Long.asMillis: Millis get() = Millis(this)
 
 private val dateTimeMillisFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.A")
 val Millis.asDateTimeWithMillis: String

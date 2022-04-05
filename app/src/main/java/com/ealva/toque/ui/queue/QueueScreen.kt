@@ -59,6 +59,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.InstanceId
@@ -497,7 +498,7 @@ private class QueueViewModelImpl(
               info.albumTitle,
               info.albumArtist,
               info.rating,
-              info.duration
+              info.duration.asMillis
             )
           )
         }

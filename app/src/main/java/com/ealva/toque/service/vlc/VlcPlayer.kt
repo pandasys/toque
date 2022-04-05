@@ -66,8 +66,11 @@ private val LOG by lazyLogger(VlcPlayer::class)
 
 /**
  * Only 2 VlcPlayers may be active at any given time. This allows for fade in/out functionality.
- * This is handled internally - when a VlcPlayer is created it adds itself to a fifo queue of size
- * 2.
+ * There is a queue of players, [VlcPlayerImpl.Companion.fifoPlayerQueue], that has max 2 players.
+ * During construction the player calls [VlcPlayerImpl.Companion.addToQueue] to add itself and
+ * during shutdown the player calls [VlcPlayerImpl.Companion.removeFromQueue]. These functions
+ * handle ensuring only 2 players active at a given time and any "excess" players are removed
+ * from the end of the queue and shutdown.
  */
 interface VlcPlayer : AvPlayer {
   fun getVlcMedia(): VlcMedia
@@ -188,7 +191,7 @@ private class VlcPlayerImpl(
     get() = prepared && !isShutdown
 
   override val time: Millis
-    get() = mediaPlayer.time.asMillis()
+    get() = mediaPlayer.time.asMillis
 
   override val isPlaying: Boolean
     get() = if (prepared) transition.isPlaying else onPrepared.isPlaying
@@ -262,7 +265,9 @@ private class VlcPlayerImpl(
       FadeInTransition(appPrefs.playPauseFadeDuration())
     } else PlayImmediateTransition()
 
-  override fun playStartPaused() = mediaPlayer.play()
+  override fun playStartPaused() {
+    mediaPlayer.play()
+  }
 
   override fun play(mayFade: MayFade) {
     if (isValid && requestFocus.requestFocus()) {
@@ -346,7 +351,6 @@ private class VlcPlayerImpl(
 
   private fun tryEmit(event: AvPlayerEvent) {
     if (!eventFlow.tryEmit(event)) {
-      LOG._e { it("tryEmit failed") }
       scope.launch { eventFlow.emit(event) }
     }
   }
@@ -361,7 +365,7 @@ private class VlcPlayerImpl(
       scope.launch {
         when (event.type) {
           MediaPlayer.Event.Opening -> mediaPlayer.setMappedVolume(realVolume)
-          MediaPlayer.Event.Buffering -> if (!prepared && event.ampleBufferedForPrepare()) {
+          MediaPlayer.Event.Buffering -> if (!prepared && event.ampleBufferedForPrepare) {
             prepared = true
             startTransition(onPrepared, notifyPrepared = true)
           }
@@ -430,6 +434,11 @@ private class VlcPlayerImpl(
     }
   }
 
+  /**
+   * This class should not typically call [VlcPlayer] methods as they may cause transitions which in
+   * turn call this player = blowing up the stack. [VlcPlayer.shutdown] being the exception as it
+   * will immediate cancel any transitions and shutdown the player.
+   */
   private inner class TheTransitionPlayer : TransitionPlayer {
     override val mediaTitle: Title get() = title
     override val isPaused: Boolean get() = isValid && !mediaPlayer.isPlaying
@@ -461,12 +470,19 @@ private class VlcPlayerImpl(
       tryEmit(AvPlayerEvent.Start(isFirstStart))
     }
 
+    /**
+     * Don't call [VlcPlayer.pause] from here. See [play] docs
+     */
     override fun pause() {
       if (isValid) mediaPlayer.pause()
     }
 
+    /**
+     * This is called by PlayerTransition implementations, so don't call [VlcPlayer.play] as it
+     * will start a Transition = indirect recursion/out of stack
+     */
     override fun play() {
-      if (isValid) mediaPlayer.play()
+      if (isValid && requestFocus.requestFocus()) mediaPlayer.play()
     }
 
     override fun shutdownPlayer() = shutdown()
@@ -541,3 +557,46 @@ private val MediaPlayer.Event.asString: String
       else -> "Event.UNKNOWN"
     }
   }
+
+private const val BUFFERING_PERCENT_TRIGGER_PREPARED = 50.0
+
+private inline val MediaPlayer.Event.ampleBufferedForPrepare: Boolean
+  get() = buffering > BUFFERING_PERCENT_TRIGGER_PREPARED
+
+/**
+ * Map the volume value used by the MediaPlayer to a value which better matches human hearing. As of
+ * now the user does not directly affect this volume. The user only affects the stream volume
+ * (Media volume presented to the user) and this volume is only affected via transitions.
+ */
+private fun MediaPlayer.setMappedVolume(linearVolume: Volume) {
+  volume = linearToLogVolumeMap[linearVolume().coerceIn(linearToLogVolumeMap.indices)]
+}
+
+/**
+ * Linear volume controls are poor because that's not how our hearing works. This map converts the
+ * linear volume scale the media player uses to a logarithmic scale our ears use.
+ * [Decibels](https://en.wikipedia.org/wiki/Decibel)
+ *
+ * To hear the problem change the [MediaPlayer.setMappedVolume] to directly use the linear volume
+ * without mapping, turn the device volume up (doesn't need to be very loud), and use transition
+ * fades: PauseFadeOutTransition, ShutdownFadeOutTransition, FadeInTransition, etc... On fade out
+ * you should hear the volume decrease much too quickly and be silent for too long. Fade in sounds
+ * very sudden too.
+ *
+ * Currently no reason to calculate this at runtime as there are only 101 distinct values, so this
+ * function was used to calculate these values:
+ * ```
+ * fun linearToLog(z: Int): Int {
+ *   val x = 0.0
+ *   val y = 100.00
+ *   val b = (if (x > 0) ln(y / x) else ln(y)) / (y - x)
+ *   val a = 100 / exp(b * 100)
+ *   return (a * exp(b * z)).roundToInt()
+ * }```
+ */
+private val linearToLogVolumeMap = intArrayOf(
+  0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4,
+  5, 5, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 10, 10, 10, 11, 11, 12, 13, 13, 14, 14, 15, 16,
+  17, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 32, 33, 35, 36, 38, 40, 42, 44, 46, 48,
+  50, 52, 55, 58, 60, 63, 66, 69, 72, 76, 79, 83, 87, 91, 95, 100
+)

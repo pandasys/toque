@@ -27,7 +27,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -46,17 +45,12 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.STATE_PAUSED
 import android.support.v4.media.session.PlaybackStateCompat.STATE_PLAYING
 import android.support.v4.media.session.PlaybackStateCompat.STATE_STOPPED
-import android.util.TypedValue
 import android.view.KeyEvent
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.media.session.MediaButtonReceiver
 import androidx.media.session.MediaButtonReceiver.buildMediaButtonPendingIntent
-import coil.imageLoader
-import coil.request.ImageRequest
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.i
 import com.ealva.ealvalog.invoke
@@ -81,6 +75,7 @@ import com.ealva.toque.common.windowOf15
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.log._e
 import com.ealva.toque.service.controller.SessionControlEvent
+import com.ealva.toque.service.image.loadAsBitmap
 import com.ealva.toque.service.session.common.Metadata
 import com.ealva.toque.service.session.common.Metadata.Companion.NullMetadata
 import com.ealva.toque.service.session.common.PlaybackActions
@@ -104,8 +99,6 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 import androidx.core.app.NotificationCompat.Builder as NotificationBuilder
 
 typealias MediaButtonHandler = (KeyEvent, Int, Intent, MediaSessionCompat.Callback) -> Boolean
@@ -286,7 +279,6 @@ interface MediaSession : MediaSessionControl, MediaSessionState, RecentMediaProv
   }
 }
 
-private val METADATA_BITMAP_SIZE_DP = 320.dp
 private const val MSG_START_OR_UPDATE_NOTIFICATION = 0
 
 private val Context.mediaSessionTag: String get() = "${getString(R.string.app_name)}MediaSession"
@@ -303,7 +295,6 @@ private class MediaSessionImpl(
 ) : MediaSession, DefaultLifecycleObserver {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private var allowNotifications = false
-  private val maxBitmapSize = METADATA_BITMAP_SIZE_DP.toPx()
 
   /** [msgHandler] for async notification update and bitmap retrieval */
   private var msgHandler = makeHandler()
@@ -464,24 +455,7 @@ private class MediaSessionImpl(
     scope.cancel()
   }
 
-  fun Dp.toPx() = TypedValue.applyDimension(
-    TypedValue.COMPLEX_UNIT_DIP,
-    value,
-    ctx.resources.displayMetrics
-  ).roundToInt()
-
-  private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = withContext(ioDispatcher) {
-    loadBitmap(uri)?.bitmap
-  }
-
-  private suspend fun loadBitmap(uri: Uri) = ctx.imageLoader.execute(
-    ImageRequest.Builder(ctx)
-      .data(if (uri !== Uri.EMPTY) uri else R.drawable.ic_big_album)
-      .error(R.drawable.ic_big_album)
-      .allowHardware(false)
-      .size(maxBitmapSize, maxBitmapSize)
-      .build()
-  ).drawable as? BitmapDrawable
+  private suspend fun resolveUriAsBitmap(uri: Uri): Bitmap? = uri.loadAsBitmap()
 
   private fun NotificationBuilder.addAction(
     action: NotificationCompat.Action,
@@ -503,13 +477,13 @@ private class MediaSessionImpl(
   private fun makePlayPauseAction(isPlaying: Boolean): NotificationCompat.Action {
     return if (isPlaying) {
       NotificationCompat.Action(
-        R.drawable.small_play_pause_playing_button,
+        R.drawable.ic_play_pause_playing_button,
         fetch(R.string.Play),
         buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_PAUSE)
       )
     } else {
       NotificationCompat.Action(
-        R.drawable.small_play_pause_paused_button,
+        R.drawable.ic_play_pause_paused_button,
         fetch(R.string.Pause),
         buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_PLAY)
       )
@@ -517,13 +491,13 @@ private class MediaSessionImpl(
   }
 
   private fun makeNextAction() = NotificationCompat.Action(
-    R.drawable.ic_next,
+    R.drawable.ic_baseline_skip_next_24,
     fetch(R.string.Next),
     buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_SKIP_TO_NEXT)
   )
 
   private fun makeCloseAction() = NotificationCompat.Action(
-    R.drawable.ic_cross,
+    R.drawable.ic_outline_close_24,
     fetch(R.string.Stop),
     buildMediaButtonPendingIntent(ctx, PlaybackStateCompat.ACTION_STOP)
   )
@@ -644,7 +618,7 @@ private class MediaSessionImpl(
   }
 
   private fun makeNewBuilder(intent: PendingIntent?) = NotificationBuilder(ctx, channelId).apply {
-    setSmallIcon(R.drawable.ic_notification)
+    setSmallIcon(R.drawable.ic_toque)
     setContentIntent(intent)
     setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
     setShowWhen(false)
@@ -698,7 +672,7 @@ private fun List<AudioItem>.toCompat(): List<MediaSessionCompat.QueueItem> =
 
 private fun AudioItem.toDescriptionCompat() = MediaDescriptionCompat.Builder()
   .setMediaId(id.toCompatMediaId())
-  .setTitle(title())
+  .setTitle(title.value)
   .setSubtitle(artist.value)
   .setDescription(albumTitle.value)
   .setIconUri(if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt)

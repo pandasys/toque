@@ -169,7 +169,7 @@ fun FAB(
       onClick = onClick,
       content = {
         Icon(
-          painter = painterResource(id = R.drawable.ic_add),
+          painter = painterResource(id = R.drawable.ic_baseline_add_24),
           contentDescription = null,
           tint = Color.White
         )
@@ -367,7 +367,7 @@ private fun TitleBar(
       }
       IconButton(onClick = addRow) {
         Icon(
-          painter = painterResource(id = R.drawable.ic_add_circle_outline),
+          painter = painterResource(id = R.drawable.ic_outline_add_circle_outline_24),
           contentDescription = "Add Rule",
           modifier = Modifier.size(26.dp),
           tint = LocalContentColor.current
@@ -491,7 +491,7 @@ fun EditTextRule(
     modifier = Modifier.fillMaxWidth(),
     query = rule.data.text,
     suggestions = editorRule.suggestions,
-    capitalization = editorRule.capitalization,
+    capitalization = editorRule.capitalization.keyboardCapitalization,
     isError = validity.isNotValid,
     onTextChanged = { text -> ruleDataChanged(editorRule, rule.data.copy(text = text)) },
     onSelected = { text ->

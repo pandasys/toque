@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.LocalTextStyle
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -92,7 +91,7 @@ fun <T : Comparable<T>> ListItemPicker(
       val index = range.indexOf(value)
       val offsetRange = remember(value, range) {
         -((range.count() - 1) - index) * halfNumbersColumnHeightPx to
-        index * halfNumbersColumnHeightPx
+          index * halfNumbersColumnHeightPx
       }
       updateBounds(offsetRange.first, offsetRange.second)
     }

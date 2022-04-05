@@ -136,7 +136,6 @@ interface PlaylistSongsViewModel : SongsViewModel {
       )
 
       @Immutable
-      @Parcelize
       data class PlaylistSongInfoData(
         override val position: Int,
         override val id: MediaId,

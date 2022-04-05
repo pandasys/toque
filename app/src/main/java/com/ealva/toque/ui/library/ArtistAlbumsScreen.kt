@@ -315,7 +315,7 @@ private class ArtistAlbumsViewModelImpl(
       artistType = artistType,
       artistName = artistName,
       artwork = artistArt.value,
-      backTo = fetch(artistType.allSongsRes)
+      backTo = artistName.value
     )
   )
 }

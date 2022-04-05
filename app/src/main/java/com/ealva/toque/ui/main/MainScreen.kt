@@ -47,7 +47,16 @@ import com.ealva.toque.ui.now.NowPlayingScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlin.math.roundToInt
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
+
+@Suppress("unused")
+private val LOG by lazyLogger("MainScreen")
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -58,6 +67,7 @@ fun MainScreen(
   goToLibrary: () -> Unit,
   goToQueue: () -> Unit,
   goToSearch: () -> Unit,
+  goToPresetEditor: () -> Unit,
   goToSettings: () -> Unit,
 ) {
   Surface(
@@ -119,6 +129,7 @@ fun MainScreen(
               goToLibrary = goToLibrary,
               goToQueue = goToQueue,
               goToSearch = goToSearch,
+              goToPresetEditor = goToPresetEditor,
               goToSettings = goToSettings,
               modifier = Modifier
                 .fillMaxWidth()
@@ -136,7 +147,9 @@ fun MainScreen(
 
         LaunchedEffect(Unit) {
           mainModel.notificationFlow
-            .collect { notification ->
+            .onStart { LOG._e { it("Start collecting notifications") }}
+            .onEach {  notification ->
+              LOG._e { it("handleNotification") }
               when (
                 snackbarHostState.showSnackbar(
                   message = notification.msg,
@@ -148,6 +161,7 @@ fun MainScreen(
                 SnackbarResult.Dismissed -> notification.action.expired()
               }
             }
+            .launchIn(this)
         }
       }
     }

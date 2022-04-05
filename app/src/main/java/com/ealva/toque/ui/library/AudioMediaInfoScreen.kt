@@ -82,7 +82,9 @@ import com.github.michaelbull.result.onSuccess
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.gowtham.ratingbar.RatingBar
+import com.gowtham.ratingbar.RatingBarConfig
 import com.gowtham.ratingbar.RatingBarStyle
+import com.gowtham.ratingbar.StepSize
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.simplestack.ServiceBinder
@@ -98,6 +100,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -115,8 +118,11 @@ data class AudioMediaInfoScreen(
   private val albumTitle: AlbumTitle,
   private val albumArtist: ArtistName,
   private val rating: Rating,
-  private val duration: Duration,
+  private val durationMillis: Millis,
 ) : BaseLibraryItemsScreen(), KoinComponent {
+  @IgnoredOnParcel
+  private val duration: Duration = durationMillis.toDuration()
+
   override fun bindServices(serviceBinder: ServiceBinder) {
     serviceBinder.add(
       MediaInfoViewModel(
@@ -495,12 +501,14 @@ private fun RatingRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color
         if (mediaInfo.rating.isValid) {
           RatingBar(
             value = mediaInfo.rating.value,
-            size = 18.dp,
-            padding = 2.dp,
-            isIndicator = true,
-            activeColor = LocalContentColor.current,
-            inactiveColor = LocalContentColor.current,
-            ratingBarStyle = RatingBarStyle.HighLighted,
+            config = RatingBarConfig()
+              .size(18.dp)
+              .padding(2.dp)
+              .isIndicator(true)
+              .activeColor(LocalContentColor.current)
+              .inactiveColor(LocalContentColor.current)
+              .stepSize(StepSize.HALF)
+              .style(RatingBarStyle.HighLighted),
             onValueChange = {},
             onRatingChanged = {},
           )
@@ -516,12 +524,14 @@ private fun RatingRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Color
         if (mediaInfo.tagRating.isValid) {
           RatingBar(
             value = mediaInfo.tagRating.value,
-            size = 18.dp,
-            padding = 2.dp,
-            isIndicator = true,
-            activeColor = LocalContentColor.current,
-            inactiveColor = LocalContentColor.current,
-            ratingBarStyle = RatingBarStyle.HighLighted,
+            config = RatingBarConfig()
+              .size(18.dp)
+              .padding(2.dp)
+              .isIndicator(true)
+              .activeColor(LocalContentColor.current)
+              .inactiveColor(LocalContentColor.current)
+              .stepSize(StepSize.HALF)
+              .style(RatingBarStyle.HighLighted),
             onValueChange = {},
             onRatingChanged = {},
           )

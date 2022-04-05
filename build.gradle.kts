@@ -25,6 +25,7 @@ plugins {
   id("com.github.ben-manes.versions") version PluginsVersion.VERSIONS
   id("org.jetbrains.dokka") version PluginsVersion.DOKKA
   id("com.vanniktech.maven.publish") version PluginsVersion.PUBLISH
+//  id("com.google.devtools.ksp") version PluginsVersion.KSP
 }
 
 allprojects {

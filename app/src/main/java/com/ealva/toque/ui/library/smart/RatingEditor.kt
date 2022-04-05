@@ -41,6 +41,7 @@ import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.db.smart.RatingMatcher
 import com.ealva.toque.ui.theme.toqueTypography
 import com.gowtham.ratingbar.RatingBar
+import com.gowtham.ratingbar.RatingBarConfig
 import com.gowtham.ratingbar.RatingBarStyle
 import com.gowtham.ratingbar.StepSize
 
@@ -68,13 +69,14 @@ private fun SingleRatingEditor(
     RatingBar(
       modifier = Modifier.wrapContentSize(),
       value = editorRule.firstStarRating.value,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = false,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
-      stepSize = StepSize.HALF,
-      ratingBarStyle = RatingBarStyle.HighLighted,
+      config = RatingBarConfig()
+        .size(22.dp)
+        .padding(2.dp)
+        .isIndicator(false)
+        .activeColor(LocalContentColor.current)
+        .inactiveColor(LocalContentColor.current)
+        .stepSize(StepSize.HALF)
+        .style(RatingBarStyle.HighLighted),
       onValueChange = {
         ruleDataChanged(
           editorRule,
@@ -144,13 +146,14 @@ private fun RatingRangeEditor(
     RatingBar(
       modifier = Modifier.wrapContentSize(),
       value = low,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = false,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
-      stepSize = StepSize.HALF,
-      ratingBarStyle = RatingBarStyle.HighLighted,
+      config = RatingBarConfig()
+        .size(22.dp)
+        .padding(2.dp)
+        .isIndicator(false)
+        .activeColor(LocalContentColor.current)
+        .inactiveColor(LocalContentColor.current)
+        .stepSize(StepSize.HALF)
+        .style(RatingBarStyle.HighLighted),
       onValueChange = { lowChanged(it) },
       onRatingChanged = { ratingChanged(editorRule) },
     )
@@ -162,13 +165,14 @@ private fun RatingRangeEditor(
     RatingBar(
       modifier = Modifier.wrapContentSize(),
       value = high,
-      size = 22.dp,
-      padding = 2.dp,
-      isIndicator = false,
-      activeColor = LocalContentColor.current,
-      inactiveColor = LocalContentColor.current,
-      stepSize = StepSize.HALF,
-      ratingBarStyle = RatingBarStyle.HighLighted,
+      config = RatingBarConfig()
+        .size(22.dp)
+        .padding(2.dp)
+        .isIndicator(false)
+        .activeColor(LocalContentColor.current)
+        .inactiveColor(LocalContentColor.current)
+        .stepSize(StepSize.HALF)
+        .style(RatingBarStyle.HighLighted),
       onValueChange = { highChanged(it) },
       onRatingChanged = { ratingChanged(editorRule) },
     )

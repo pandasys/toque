@@ -60,6 +60,7 @@ import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.BaseLibraryItemsScreen
+import com.ealva.toque.ui.library.EqPresetEditorScreen
 import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.BaseAppSettingsScreen
@@ -85,6 +86,7 @@ fun MainBottomSheet(
   goToLibrary: () -> Unit,
   goToQueue: () -> Unit,
   goToSearch: () -> Unit,
+  goToPresetEditor: () -> Unit,
   goToSettings: () -> Unit,
   modifier: Modifier
 ) {
@@ -111,6 +113,7 @@ fun MainBottomSheet(
           goToLibrary = goToLibrary,
           goToQueue = goToQueue,
           goToSearch = goToSearch,
+          goToPresetEditor = goToPresetEditor,
           goToSettings = goToSettings,
           modifier = Modifier
             .fillMaxWidth()
@@ -135,6 +138,7 @@ private fun MainBottomSheetButtonRow(
   goToLibrary: () -> Unit,
   goToQueue: () -> Unit,
   goToSearch: () -> Unit,
+  goToPresetEditor: () -> Unit,
   goToSettings: () -> Unit,
   modifier: Modifier
 ) {
@@ -142,6 +146,7 @@ private fun MainBottomSheetButtonRow(
   val onLibraryScreen = topOfStack is BaseLibraryItemsScreen
   val onQueueScreen = topOfStack is QueueScreen
   val onSearchScreen = topOfStack is SearchScreen
+  val onPresetScreen = topOfStack is EqPresetEditorScreen
 
   val imageSize = LocalScreenConfig.current.getBottomSheetButtonBarHeight() - 12.dp
 
@@ -186,6 +191,19 @@ private fun MainBottomSheetButtonRow(
         contentDescription = "Search",
         modifier = Modifier.size(imageSize),
         tint = LocalContentColor.current.copy(alpha = if (onSearchScreen) ALPHA_ON else ALPHA_OFF)
+      )
+    }
+    IconButton(
+      onClick = if (!onPresetScreen) goToPresetEditor else ::doNothing,
+      modifier = Modifier
+        .fillMaxHeight()
+        .weight(1.0F)
+    ) {
+      Icon(
+        painter = painterResource(id = R.drawable.ic_audio_equalizer),
+        contentDescription = "Preset Editor",
+        modifier = Modifier.size(imageSize),
+        tint = LocalContentColor.current.copy(alpha = if (onPresetScreen) ALPHA_ON else ALPHA_OFF)
       )
     }
     IconButton(
@@ -269,7 +287,7 @@ private fun CurrentItemPagerCard(
             placeholder(R.drawable.ic_big_album)
           }
         ),
-        contentDescription = "${item.title()} Album Cover Art",
+        contentDescription = "${item.title.value} Album Cover Art",
         modifier = Modifier
           .size(miniPlayerHeight - 2.dp)
           .padding(2.dp)

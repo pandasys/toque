@@ -75,7 +75,7 @@ class ArtworkSearchService : JobIntentService() {
       NotificationCompat.Builder(this, SCANNER_CHANNEL_ID)
         .setContentTitle(getString(R.string.app_name))
         .setContentText(getString(R.string.Searching_for_artwork))
-        .setSmallIcon(R.drawable.ic_refresh)
+        .setSmallIcon(R.drawable.ic_baseline_refresh_24)
         .setOngoing(true)
         .setProgress(0, 0, true)
 //        .setContentIntent(NowPlayingActivity.makeActivityPendingIntent(this))

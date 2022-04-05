@@ -21,6 +21,7 @@ import androidx.compose.material.SnackbarDuration
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.MediaPlayerServiceConnection
@@ -118,10 +119,12 @@ private class MainViewModelImpl(
   }
 
   override fun notify(notification: Notification) {
+    LOG._e { it("notify notification") }
     scope.launch { notificationFlow.emit(notification) }
   }
 
   override fun notify(serviceNotification: ServiceNotification) {
+    LOG._e { it("notify serviceNotification") }
     scope.launch {
       notificationFlow.emit(
         Notification(

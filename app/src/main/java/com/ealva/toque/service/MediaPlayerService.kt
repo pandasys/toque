@@ -25,7 +25,6 @@ import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.Service
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.ACTION_MEDIA_BUTTON
@@ -68,7 +67,8 @@ import com.ealva.toque.service.queue.ScreenAction
 import com.ealva.toque.service.session.server.BrowserResult
 import com.ealva.toque.service.session.server.MediaSession
 import com.ealva.toque.service.session.server.MediaSessionState
-import kotlinx.coroutines.Dispatchers
+import com.ealva.toque.service.widget.ActionToPendingIntent
+import com.ealva.toque.service.widget.WidgetUpdater
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -93,6 +93,8 @@ private val servicePrefsSingleton: PlayerServicePrefsSingleton = PlayerServicePr
 private const val UPDATING_NOTIFICATION_ID = 1010
 private const val UPDATING_CHANNEL_ID = "com.ealva.toque.UpdatingChannel"
 
+private val TEMP_NOTIFICATION_MAX_DURATION = 5.seconds
+
 class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, LifecycleOwner {
   // Because we inherit from MediaBrowserServiceCompat we need to maintain our own lifecycle
   private val dispatcher = ServiceLifecycleDispatcher(this)
@@ -107,17 +109,14 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   private lateinit var mediaSession: MediaSession
   private val audioOutputState: AudioOutputState by inject()
   private val keyguardManager: KeyguardManager by inject()
-  private lateinit var widgetUpdater: WidgetUpdater
+  private val widgetUpdater: WidgetUpdater by inject()
 
   /**
-   * Replay is 10 as we will emit an actions before collecting. Collection will start when a
+   * Replay is 10 as we will emit actions before collecting. Collection will start when a
    * queue has become active. Until then a user could be repeatedly clicking a widget button or
    * something similar
    */
-  private val incomingActions = MutableSharedFlow<ActionWithIntent>(
-    replay = 10,
-    extraBufferCapacity = 10
-  )
+  private val incomingActions = MutableSharedFlow<ActionWithIntent>(replay = 10)
   private var incomingActionsJob: Job? = null
   private var tempNotificationJob: Job? = null
 
@@ -141,6 +140,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       lifecycleOwner = this,
       active = true // will set active after setting the current queue for the first time
     )
+    widgetUpdater.setMediaSession(mediaSession, Companion)
     packageManager?.getLaunchIntentForPackage(packageName)?.let { sessionIntent ->
       mediaSession.sessionActivity =
         PendingIntent.getActivity(this, 0, sessionIntent, FLAG_IMMUTABLE)
@@ -150,7 +150,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       setCurrentQueue(servicePrefs().currentQueueType(), false)
       mediaSession.isActive = true
     }
-    widgetUpdater = WidgetUpdater(this, scope, mediaSession, Companion, Dispatchers.IO)
     listenToBroadcasts()
     artworkUpdateListener.start()
     listenToCurrentQueue()
@@ -188,6 +187,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
 
   private val binder = MediaServiceBinder()
   override fun onBind(intent: Intent): IBinder? {
+    LOG._e { it("onBind %s", intent.action ?: "null") }
     dispatcher.onServicePreSuperOnBind()
     return if (doNotHaveReadPermission()) {
       LOG.e { it("Don't have read external permission. Bind disallowed.") }
@@ -201,6 +201,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    LOG._e { it("onStartCommand %s", intent?.action ?: "null") }
     dispatcher.onServicePreSuperOnStart()
 
     val startIntent = intent.orNullObject()
@@ -214,6 +215,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   }
 
   private fun handleStartIntent(intent: Intent, action: String) {
+    LOG._e { it("handleStartIntent action:%s", action) }
     if (action.isNotEmpty()) {
       if (ACTION_MEDIA_BUTTON == action) {
         mediaSession.handleMediaButtonIntent(intent)?.let {
@@ -299,7 +301,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       startForeground(UPDATING_NOTIFICATION_ID, makeTempNotification())
       tempNotificationJob?.cancel()
       tempNotificationJob = scope.launch {
-        delay(5.seconds)
+        delay(TEMP_NOTIFICATION_MAX_DURATION)
         maybeRemoveTempForeground()
       }
     }
@@ -307,7 +309,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
 
   private fun makeTempNotification(): Notification {
     return NotificationBuilder(this, UPDATING_CHANNEL_ID).apply {
-      setSmallIcon(R.drawable.ic_notification)
+      setSmallIcon(R.drawable.ic_toque)
       setContentTitle(fetch(R.string.UpdatingQueue))
       setContentIntent(mediaSession.sessionActivity)
       setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -419,8 +421,9 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     currentQueue.nextShuffleMode()
   }
 
-  private fun updateWidgets(appWidgetIds: IntArray) {
-    widgetUpdater.updateWidgets(appWidgetIds)
+  private fun updateWidgets(@Suppress("UNUSED_PARAMETER") appWidgetIds: IntArray) {
+    LOG._e { it("updateWidgets") }
+    currentQueue.ifActiveRefreshMediaState()
   }
 
   companion object : ActionToPendingIntent {
@@ -452,27 +455,29 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     fun startForWidgetsUpdate(
       context: Context,
       appWidgetIds: IntArray,
-      componentName: ComponentName
+//      componentName: ComponentName
     ) = with(context) {
+      LOG._e { it("startForWidgetsUpdate") }
       ContextCompat.startForegroundService(
         this,
         makeStartIntent(this, Action.UpdateWidgets, null)
           .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
-          .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, componentName)
+//          .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, componentName)
       )
     }
 
     private fun makeStartPendingIntent(
       context: Context,
-      action: Action
+      action: Action,
+      id: Int
     ): PendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      PendingIntent.getForegroundService(context, 0, makeStartIntent(context, action, null), 0)
+      PendingIntent.getForegroundService(context, id, makeStartIntent(context, action, null), 0)
     } else {
-      PendingIntent.getService(context, 0, makeStartIntent(context, action, null), FLAG_IMMUTABLE)
+      PendingIntent.getService(context, id, makeStartIntent(context, action, null), FLAG_IMMUTABLE)
     }
 
-    override fun makeIntent(ctx: Context, action: Action): PendingIntent =
-      makeStartPendingIntent(ctx, action)
+    override fun makeIntent(ctx: Context, action: Action, requestId: Int): PendingIntent =
+      makeStartPendingIntent(ctx, action, requestId)
   }
 }
 

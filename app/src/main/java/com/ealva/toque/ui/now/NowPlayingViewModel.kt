@@ -31,6 +31,7 @@ import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.asMillis
 import com.ealva.toque.common.debugRequire
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
@@ -102,7 +103,7 @@ interface NowPlayingViewModel {
       val NullQueueItem by lazy {
         QueueItem(
           id = MediaId.INVALID,
-          title = Title.EMPTY,
+          title = Title(""),
           albumTitle = AlbumTitle(""),
           albumArtist = ArtistName(""),
           artist = ArtistName(""),
@@ -361,7 +362,7 @@ private class NowPlayingViewModelImpl(
         audioItem.albumTitle,
         audioItem.albumArtist,
         audioItem.rating,
-        audioItem.duration
+        audioItem.duration.asMillis
       )
     )
   }

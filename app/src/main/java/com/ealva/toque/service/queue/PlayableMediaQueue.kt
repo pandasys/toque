@@ -58,6 +58,11 @@ interface PlayableMediaQueue<T : Any> {
   fun nextShuffleMode()
 
   fun handleScreenAction(action: ScreenAction, keyguardLocked: Boolean)
+
+  /**
+   * If this Queue is active, refresh state in the MediaSession so clients are notified
+   */
+  fun ifActiveRefreshMediaState()
 }
 
 enum class ScreenAction(val intentAction: String) {
@@ -99,4 +104,5 @@ object NullPlayableMediaQueue : PlayableMediaQueue<NullQueueMediaItem> {
   override fun handleScreenAction(action: ScreenAction, keyguardLocked: Boolean) = Unit
   override fun nextRepeatMode() = Unit
   override fun nextShuffleMode() = Unit
+  override fun ifActiveRefreshMediaState() = Unit
 }

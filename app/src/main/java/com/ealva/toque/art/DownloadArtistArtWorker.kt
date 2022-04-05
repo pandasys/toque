@@ -18,6 +18,7 @@ package com.ealva.toque.art
 
 import android.content.Context
 import android.net.Uri
+import android.util.Size
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -38,18 +39,23 @@ import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asArtistId
 import com.ealva.toque.prefs.AppPrefsSingleton
+import kotlin.math.max
 
 private val LOG by lazyLogger(DownloadArtistArtWorker::class)
 
 private const val FOLDER_NAME = "album"
 
 class DownloadArtistArtWorker(
-  appContext: Context,
+  ctx: Context,
   workerParams: WorkerParameters,
   private val appPrefs: AppPrefsSingleton,
   private val artistDao: ArtistDao,
   private val artworkDownloader: ArtworkDownloader
-) : CoroutineWorker(appContext, workerParams) {
+) : CoroutineWorker(ctx, workerParams) {
+  private val maxSize = ctx.resources.displayMetrics.run {
+    val maxDimension = max(widthPixels, heightPixels)
+    Size(maxDimension, maxDimension)
+  }
 
   override suspend fun doWork(): Result {
     val artistId = inputData.artistId
@@ -64,6 +70,7 @@ class DownloadArtistArtWorker(
           dest,
           ORIGINAL_SIZE,
           quality,
+          maxSize
         )
         artistDao.setArtistArt(artistId, source, dest)
       }

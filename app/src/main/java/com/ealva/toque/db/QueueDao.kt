@@ -159,7 +159,7 @@ private class QueueDaoImpl(
     .select(updatedTime)
     .where { queueId eq queue.value }
     .sequence { cursor -> cursor[updatedTime] }
-    .singleOrNull()?.asMillis() ?: throw IllegalStateException("No update time found for $queue")
+    .singleOrNull()?.asMillis ?: throw IllegalStateException("No update time found for $queue")
 
   private fun Transaction.setQueueLastUpdateTime(queue: QueueId, updateTime: Millis) {
     QueueTable.updateColumns { it[updatedTime] = updateTime.value }

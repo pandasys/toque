@@ -78,4 +78,5 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override fun goToIndexMaybePlay(index: Int) = Unit
   override val streamVolume: StreamVolume = NullStreamVolume
   override fun handleScreenAction(action: ScreenAction, keyguardLocked: Boolean) = Unit
+  override fun ifActiveRefreshMediaState() = Unit
 }

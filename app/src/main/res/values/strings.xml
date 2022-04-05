@@ -329,4 +329,7 @@
   <string name="MediaScannerChannelName">Media Scanner</string>
   <string name="UpdateQueueChannelName">Update Queue</string>
   <string name="UpdatingQueue">Updating Queue</string>
+    <string name="Repeat">Repeat</string>
+    <string name="loading_widget">Loading widget…</string>
+    <string name="QueueIsEmpty">Queue Is Empty</string>
 </resources>
