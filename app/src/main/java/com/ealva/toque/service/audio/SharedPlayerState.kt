@@ -123,10 +123,6 @@ interface SharedPlayerState {
      * [eqMode] and [outputRoute] are used to determine preferred presets, see [setPreferred], but
      * are contained elsewhere, so are passed as params here. The are also used to indicate to
      * clients that the preferred preset may be different, so are also offered via this interface.
-     *
-     * [dispatcher] defaults to [Dispatchers.IO] instead of [Dispatchers.Default] thinking this may
-     * avoid a context switch ([factory] will do some DB IO to get a preference) and/or interfere
-     * with transitions which currently execute on [Dispatchers.Default]
      */
     operator fun invoke(
       scope: CoroutineScope,

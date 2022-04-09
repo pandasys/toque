@@ -90,6 +90,8 @@ val DP_LARGEST_BUTTON_SIZE = 38.dp
 val DP_MAX_IMAGE_SIZE = 120.dp
 val DP_MIN_IMAGE_SIZE = 60.dp
 
+private val backgroundColor = Color.Black.copy(alpha = 0.33F)
+
 class MediumWidget(private val state: WidgetState) : GlanceAppWidget() {
   override val sizeMode: SizeMode = SizeMode.Exact
 
@@ -107,7 +109,7 @@ class MediumWidget(private val state: WidgetState) : GlanceAppWidget() {
     Column(
       modifier = GlanceModifier
         .fillMaxWidth()
-        .background(Color.Black.copy(alpha = 0.33F))
+        .background(backgroundColor)
         .clickable(actionRunCallback<StartMain>())
     ) {
       Row(

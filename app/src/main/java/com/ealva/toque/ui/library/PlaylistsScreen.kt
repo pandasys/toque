@@ -40,8 +40,10 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -148,6 +150,7 @@ data class PlaylistsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<PlaylistsViewModel>()
+    val scrollConnection = remember { CategoryHeaderScrollConnection() }
     val playlists = viewModel.playlistsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
@@ -155,6 +158,7 @@ data class PlaylistsScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
@@ -162,8 +166,9 @@ data class PlaylistsScreen(
         menuItems = makeMenuItems(viewModel),
         itemCount = playlists.value.size,
         selectedItems = selected.value,
-        backTo = fetch(R.string.Library),
-        back = { viewModel.goBack() }
+        backTo = stringResource(R.string.Library),
+        back = { viewModel.goBack() },
+        scrollConnection = scrollConnection
       )
       AllPlaylists(
         list = playlists.value,
@@ -290,23 +295,12 @@ private fun PlaylistInfo.makePopupMenuItems(
   return when (type) {
     PlayListType.Rules -> {
       listOf(
-        PopupMenuItem(
-          title = fetch(R.string.Edit),
-          onClick = { editSmartPlaylist(this) }
-        ),
-        PopupMenuItem(
-          title = fetch(R.string.Delete),
-          onClick = { deletePlaylist(this) }
-        )
+        PopupMenuItem(title = fetch(R.string.Edit), onClick = { editSmartPlaylist(this) }),
+        PopupMenuItem(title = fetch(R.string.Delete), onClick = { deletePlaylist(this) })
       )
     }
     PlayListType.UserCreated -> {
-      listOf(
-        PopupMenuItem(
-          title = fetch(R.string.Delete),
-          onClick = { deletePlaylist(this) }
-        )
-      )
+      listOf(PopupMenuItem(title = fetch(R.string.Delete), onClick = { deletePlaylist(this) }))
     }
     else -> emptyList()
   }

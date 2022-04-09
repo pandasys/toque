@@ -40,7 +40,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
-import com.ealva.toque.ui.library.EqPresetEditorScreen
+import com.ealva.toque.ui.preset.EqPresetEditorScreen
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
 import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.nav.goToAboveRoot

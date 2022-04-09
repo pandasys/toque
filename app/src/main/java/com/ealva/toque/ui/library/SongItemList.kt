@@ -22,6 +22,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
@@ -56,7 +57,7 @@ fun SongItemList(
   itemLongClicked: (SongsViewModel.SongInfo) -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val listState = rememberLazyListState()
+  val listState: LazyListState = rememberLazyListState()
   val config = LocalScreenConfig.current
 
   listState.isScrollInProgress

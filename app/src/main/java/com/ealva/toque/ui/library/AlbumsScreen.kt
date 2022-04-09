@@ -24,7 +24,9 @@ import androidx.compose.material.ButtonColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
@@ -73,6 +75,7 @@ data class AlbumsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AllAlbumsViewModel>()
+    val scrollConnection = remember { CategoryHeaderScrollConnection() }
     val albums = viewModel.albumFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
@@ -80,6 +83,7 @@ data class AlbumsScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
@@ -88,6 +92,7 @@ data class AlbumsScreen(
         selectedItems = selected.value,
         backTo = fetch(R.string.Library),
         back = { viewModel.goBack() },
+        scrollConnection = scrollConnection,
         selectActions = {
           AlbumSelectActions(
             selectedCount = selected.value.selectedCount,

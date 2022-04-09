@@ -14,62 +14,39 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.library
+package com.ealva.toque.ui.preset
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.ealva.ealvalog.e
-import com.ealva.toque.navigation.ComposeKey
-import com.zhuinden.simplestack.ScopedServices
-import kotlinx.parcelize.Parcelize
-import javax.annotation.concurrent.Immutable
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.navigation.ComposeKey
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import kotlinx.parcelize.Parcelize
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
+import javax.annotation.concurrent.Immutable
 
 @Suppress("unused")
 private val LOG by lazyLogger(EqPresetEditorScreen::class)
 
 @Immutable
 @Parcelize
-data class EqPresetEditorScreen(private val noArg: String = "") : ComposeKey() {
+data class EqPresetEditorScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    serviceBinder.add(EqPresetEditorModel())
+    serviceBinder.add(EqPresetEditorModel(get()))
   }
 
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-//    val viewModel = rememberService<EqPresetEditorModel>()
+    val viewModel = rememberService<EqPresetEditorModel>()
     Column(modifier = Modifier.fillMaxSize()) {
       Text(text = "Search")
     }
   }
 }
 
-class EqPresetEditorModel : ScopedServices.Registered, ScopedServices.Activated {
-  init {
-    LOG.e { it("SearchModel") }
-  }
-
-  override fun onServiceRegistered() {
-    LOG.e { it("onServiceRegistered") }
-  }
-
-  override fun onServiceUnregistered() {
-    LOG.e { it("onServiceUnregistered") }
-  }
-
-  override fun onServiceActive() {
-    LOG.e { it("onServiceActive") }
-  }
-
-  override fun onServiceInactive() {
-    LOG.e { it("onServiceInactive") }
-  }
-
-}

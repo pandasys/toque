@@ -17,7 +17,6 @@
 package com.ealva.toque.ui.main
 
 import android.net.Uri
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -60,8 +59,8 @@ import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.BaseLibraryItemsScreen
-import com.ealva.toque.ui.library.EqPresetEditorScreen
 import com.ealva.toque.ui.library.SearchScreen
+import com.ealva.toque.ui.preset.EqPresetEditorScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.BaseAppSettingsScreen
 import com.ealva.toque.ui.theme.toqueColors
@@ -77,7 +76,6 @@ private val LOG by lazyLogger("MainBottomSheet")
 private const val ALPHA_ON = 1.0F
 private const val ALPHA_OFF = 0.3F
 
-@OptIn(ExperimentalCoilApi::class, ExperimentalAnimationApi::class)
 @Composable
 fun MainBottomSheet(
   topOfStack: ComposeKey,

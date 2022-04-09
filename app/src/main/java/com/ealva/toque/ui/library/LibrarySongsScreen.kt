@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
@@ -68,6 +70,7 @@ data class LibrarySongsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<LibrarySongsViewModel>()
+    val scrollConnection = remember { CategoryHeaderScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
@@ -75,6 +78,7 @@ data class LibrarySongsScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
@@ -82,6 +86,7 @@ data class LibrarySongsScreen(
         itemCount = songs.value.size,
         selectedItems = selected.value,
         backTo = fetch(R.string.Library),
+        scrollConnection = scrollConnection,
         back = { viewModel.goBack() }
       )
       SongItemList(

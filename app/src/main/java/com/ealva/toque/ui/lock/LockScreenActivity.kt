@@ -108,7 +108,15 @@ class LockScreenActivity : ComponentActivity(), MainBridge {
                 LocalWindowInsets.current
               )
             ) {
-              MainLockScreen(composeStateChanger = composeStateChanger)
+              MainLockScreen(
+                composeStateChanger = composeStateChanger,
+                unlock = {
+                  finish()
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    keyguardManager.requestDismissKeyguard(this, null)
+                  }
+                }
+              )
             }
           }
         }
@@ -171,7 +179,7 @@ class LockScreenActivity : ComponentActivity(), MainBridge {
     private fun start(context: Context) = context.startActivity(
       Intent(context, LockScreenActivity::class.java).apply {
         action = SWITCH_TO_AUDIO
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
       }
     )
   }

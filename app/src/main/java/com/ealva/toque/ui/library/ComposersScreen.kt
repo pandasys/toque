@@ -38,7 +38,9 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -125,6 +127,7 @@ data class ComposersScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<ComposersViewModel>()
+    val scrollConnection = remember { CategoryHeaderScrollConnection() }
     val composers = viewModel.composerFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
@@ -132,6 +135,7 @@ data class ComposersScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
@@ -139,7 +143,8 @@ data class ComposersScreen(
         itemCount = composers.value.size,
         selectedItems = selected.value,
         backTo = fetch(R.string.Library),
-        back = { viewModel.goBack() }
+        back = { viewModel.goBack() },
+        scrollConnection = scrollConnection
       )
       AllComposers(
         list = composers.value,
