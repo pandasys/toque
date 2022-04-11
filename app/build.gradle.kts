@@ -121,7 +121,8 @@ android {
     verbose = true
     freeCompilerArgs = listOf(
       "-Xopt-in=kotlin.RequiresOptIn",
-      "-Xskip-prerelease-check"
+      "-Xskip-prerelease-check",
+      "-Xbackend-threads=4"
     )
   }
 }

@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.ealva.toque.R
-import com.ealva.toque.ui.common.LocalScreenConfig
 
 
 private val MIN_IMAGE_HEIGHT_PORTRAIT = 240.dp
@@ -41,8 +40,6 @@ fun ScreenHeaderWithArtwork(
   artwork: Uri,
   content: @Composable () -> Unit,
 ) {
-  val screenConfig = LocalScreenConfig.current
-  val inPortrait = screenConfig.inPortrait
   Layout(
     modifier = modifier,
     content = {
@@ -62,16 +59,16 @@ fun ScreenHeaderWithArtwork(
     }
   ) { measurables, constraints ->
     val contentWidth = constraints.maxWidth
-    val minHeight = if (inPortrait) MIN_IMAGE_HEIGHT_PORTRAIT else MIN_IMAGE_HEIGHT_LANDSCAPE
+//    val minHeight = if (inPortrait) MIN_IMAGE_HEIGHT_PORTRAIT else MIN_IMAGE_HEIGHT_LANDSCAPE
     val contentPlaceable = measurables[1].measure(
       Constraints(
         minWidth = contentWidth,
         maxWidth = contentWidth,
-        minHeight = minHeight.roundToPx()
+//        minHeight = minHeight.roundToPx()
       )
     )
 
-    val imageHeight = contentPlaceable.height.coerceAtLeast(minHeight.roundToPx())
+    val imageHeight = contentPlaceable.height //.coerceAtLeast(minHeight.roundToPx())
     val imagePlaceable =
       measurables[0].measure(Constraints.fixed(constraints.maxWidth, imageHeight))
 

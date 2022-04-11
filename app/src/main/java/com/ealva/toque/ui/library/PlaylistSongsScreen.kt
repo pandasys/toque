@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
@@ -78,6 +80,7 @@ data class PlaylistSongsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<PlaylistSongsViewModel>()
+    val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
@@ -85,6 +88,7 @@ data class PlaylistSongsScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       ScreenHeaderWithArtwork(artwork = artwork) {
         SongListHeaderInfo(
@@ -95,6 +99,7 @@ data class PlaylistSongsScreen(
           viewModel = viewModel,
           buttonColors = ActionButtonDefaults.overArtworkColors(),
           backTo = backTo,
+          scrollConnection = scrollConnection,
           back = { viewModel.goBack() }
         )
       }

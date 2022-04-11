@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
@@ -30,10 +31,12 @@ import com.ealva.toque.ui.theme.toqueTypography
 @Composable
 fun CategoryTitleBar(
   categoryItem: LibraryCategories.CategoryItem,
-  menuItems: List<PopupMenuItem> = emptyList()
+  menuItems: List<PopupMenuItem> = emptyList(),
+  contentColor: Color,
+  alphaPercentage: Float
 ) {
   Row(verticalAlignment = Alignment.CenterVertically) {
-    CategoryTitle(categoryItem)
+    CategoryTitle(categoryItem, contentColor, alphaPercentage)
     if (menuItems.isNotEmpty())
       Spacer(modifier = Modifier.weight(1.0F, fill = true))
     PopupMenu(items = menuItems)
@@ -41,13 +44,19 @@ fun CategoryTitleBar(
 }
 
 @Composable
-private fun CategoryTitle(categoryItem: LibraryCategories.CategoryItem) {
+private fun CategoryTitle(
+  categoryItem: LibraryCategories.CategoryItem,
+  contentColor: Color,
+  alphaPercentage: Float
+) {
   LibraryCategory(
     item = categoryItem,
     boxSize = 48.dp,
     iconSize = 38.dp,
     textStyle = toqueTypography.h5,
     padding = PaddingValues(vertical = 8.dp),
-    textStartPadding = 10.dp
+    textStartPadding = 10.dp,
+    contentColor = contentColor,
+    alphaPercentage = alphaPercentage
   )
 }

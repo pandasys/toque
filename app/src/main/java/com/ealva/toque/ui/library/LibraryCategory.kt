@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
+import androidx.compose.material.LocalContentColor
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.ealva.toque.ui.common.timesAlpha
 import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
@@ -46,6 +48,8 @@ fun LibraryCategory(
   textStyle: TextStyle = toqueTypography.subtitle1,
   padding: PaddingValues = PaddingValues(vertical = 8.dp),
   textStartPadding: Dp = 4.dp,
+  contentColor: Color = LocalContentColor.current,
+  alphaPercentage: Float = 1F,
   onClick: () -> Unit = {}
 ) {
   Row(
@@ -58,19 +62,20 @@ fun LibraryCategory(
       modifier = Modifier
         .size(boxSize)
         .clip(RoundedCornerShape(50))
-        .background(item.color),
+        .background(item.color.timesAlpha(alphaPercentage)),
       contentAlignment = Alignment.Center
     ) {
       Icon(
         painter = painterResource(id = item.icon),
         contentDescription = stringResource(id = item.title),
         modifier = Modifier.size(iconSize),
-        tint = Color.White
+        tint = Color.White.timesAlpha(alphaPercentage)
       )
     }
     Text(
       text = stringResource(id = item.title),
       style = textStyle,
+      color = contentColor,
       modifier = Modifier
         .align(Alignment.CenterVertically)
         .padding(start = textStartPadding)

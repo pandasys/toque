@@ -36,7 +36,7 @@ import com.ealva.toque.ui.theme.toqueTypography
 fun BackToButton(
   modifier: Modifier = Modifier,
   backTo: String,
-  contentColor: Color = Color.White,
+  color: Color = Color.White,
   ovalColor: Color = toqueColors.shadedBackground,
   back: () -> Unit
 ) {
@@ -51,11 +51,11 @@ fun BackToButton(
         painter = painterResource(id = R.drawable.ic_navigate_before),
         contentDescription = "Back",
         modifier = Modifier.size(26.dp),
-        tint = contentColor
+        tint = color
       )
       Text(
         text = backTo,
-        color = contentColor,
+        color = color,
         style = toqueTypography.subtitle2
       )
     }

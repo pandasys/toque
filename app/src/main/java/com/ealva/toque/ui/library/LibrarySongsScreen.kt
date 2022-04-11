@@ -70,7 +70,7 @@ data class LibrarySongsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<LibrarySongsViewModel>()
-    val scrollConnection = remember { CategoryHeaderScrollConnection() }
+    val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 

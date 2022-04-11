@@ -75,7 +75,7 @@ data class AlbumsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AllAlbumsViewModel>()
-    val scrollConnection = remember { CategoryHeaderScrollConnection() }
+    val scrollConnection = remember { HeightResizeScrollConnection() }
     val albums = viewModel.albumFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 

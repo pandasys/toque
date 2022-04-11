@@ -18,7 +18,6 @@ package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -175,8 +174,6 @@ fun LibraryActionBar(
         )
         TextOvalBackground(
           text = "$selectedCount/$itemCount",
-          textAlign = TextAlign.End,
-//          textPadding = PaddingValues(top = 2.dp, bottom = 2.dp, end = 4.dp),
           maxLines = 1,
           style = toqueTypography.caption,
           color = contentColor,

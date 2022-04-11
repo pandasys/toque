@@ -23,12 +23,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ButtonColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.ui.common.BackToButton
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.TextOvalBackground
+import com.ealva.toque.ui.common.timesAlpha
+import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.statusBarsPadding
 
@@ -41,51 +46,94 @@ fun SongListHeaderInfo(
   viewModel: SongsViewModel,
   buttonColors: ButtonColors,
   backTo: String,
+  scrollConnection: HeightResizeScrollConnection,
   back: () -> Unit
 ) {
-  val inPortrait = LocalScreenConfig.current.inPortrait
-  Column(
+  val heightSubtrahend = scrollConnection.heightSubtrahend.collectAsState()
+  SongListHeaderInfo(
+    title = title,
+    subtitle = subtitle,
+    itemCount = itemCount,
+    selectedItems = selectedItems,
+    viewModel = viewModel,
+    buttonColors = buttonColors,
+    backTo = backTo,
+    heightSubtrahend = heightSubtrahend.value,
+    scrollConnection = scrollConnection,
+    back = back
+  )
+}
+
+@Composable
+private fun SongListHeaderInfo(
+  title: String,
+  subtitle: String?,
+  itemCount: Int,
+  selectedItems: SelectedItems<MediaId>,
+  viewModel: SongsViewModel,
+  buttonColors: ButtonColors,
+  backTo: String,
+  heightSubtrahend: Int,
+  scrollConnection: HeightResizeScrollConnection,
+  back: () -> Unit
+) {
+  val maxSubtrahend = scrollConnection.maxSubtrahend
+  val alphaPercentage =
+    if (maxSubtrahend < Int.MAX_VALUE) 1F - (heightSubtrahend.toFloat() / maxSubtrahend) else 1F
+  val screenConfig = LocalScreenConfig.current
+  Layout(
     modifier = Modifier
       .fillMaxWidth()
       .statusBarsPadding()
-      .padding(horizontal = 14.dp)
-  ) {
-    val contentColor = buttonColors.contentColor(enabled = true).value
-    val notInSelectionMode = !selectedItems.inSelectionMode
-    if (notInSelectionMode) {
-      Spacer(modifier = Modifier.height(2.dp))
-      BackToButton(
-        modifier = Modifier,
-        backTo = backTo,
-        back = back
-      )
-      Spacer(modifier = Modifier.height(if (inPortrait) 28.dp else 13.dp))
-    }
-    Spacer(
-      modifier = Modifier
-        .height(2.dp)
-        .weight(1F)
-    )
-    TextOvalBackground(
-      modifier = Modifier.padding(vertical = 2.dp),
-      text = title,
-      color = contentColor,
-      style = toqueTypography.headerPrimary
-    )
-    if (subtitle != null) {
+      .padding(horizontal = 14.dp),
+    content = {
+      val contentColor = buttonColors.contentColor(enabled = true).value.timesAlpha(alphaPercentage)
+      val ovalColor: Color = toqueColors.shadedBackground.timesAlpha(alphaPercentage)
+
+      val notInSelectionMode = !selectedItems.inSelectionMode
+      if (notInSelectionMode) {
+        Column {
+          Spacer(modifier = Modifier.height(2.dp))
+          BackToButton(
+            modifier = Modifier,
+            backTo = backTo,
+            color = contentColor,
+            ovalColor = ovalColor,
+            back = back
+          )
+        }
+      }
+
       TextOvalBackground(
-        modifier = Modifier.padding(bottom = 2.dp),
-        text = subtitle,
+        modifier = Modifier.padding(vertical = 2.dp),
+        text = title,
         color = contentColor,
-        style = toqueTypography.headerSecondary
+        ovalColor = ovalColor,
+        style = toqueTypography.headerPrimary
       )
-    }
-    SongsItemsActions(
-      modifier = Modifier.padding(bottom = 2.dp),
-      itemCount = itemCount,
-      selectedItems = selectedItems,
-      viewModel = viewModel,
-      buttonColors = buttonColors
+      if (subtitle != null) {
+        Spacer(modifier = Modifier.height(2.dp))
+        TextOvalBackground(
+          modifier = Modifier.padding(bottom = 2.dp),
+          text = subtitle,
+          color = contentColor,
+          ovalColor = ovalColor,
+          style = toqueTypography.headerSecondary
+        )
+      }
+      Spacer(modifier = Modifier.height(8.dp))
+      SongsItemsActions(
+        modifier = Modifier.padding(bottom = 2.dp),
+        itemCount = itemCount,
+        selectedItems = selectedItems,
+        viewModel = viewModel,
+        buttonColors = buttonColors
+      )
+    },
+    measurePolicy = BottomUpResizeHeightMeasurePolicy(
+      heightSubtrahend,
+      scrollConnection,
+      screenConfig.preferredArtworkHeaderHeightPx
     )
-  }
+  )
 }

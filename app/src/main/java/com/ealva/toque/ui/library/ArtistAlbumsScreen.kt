@@ -33,7 +33,11 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -43,7 +47,6 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
-import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.AudioMediaDao
@@ -57,8 +60,10 @@ import com.ealva.toque.ui.common.BackToButton
 import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.TextOvalBackground
+import com.ealva.toque.ui.common.timesAlpha
 import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.nav.goToScreen
+import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
@@ -116,6 +121,7 @@ data class ArtistAlbumsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<ArtistAlbumsViewModel>()
+    val scrollConnection = remember { HeightResizeScrollConnection() }
     val albums = viewModel.albumFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
     val art = viewModel.artistArt.collectAsState()
@@ -124,6 +130,7 @@ data class ArtistAlbumsScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       ScreenHeaderWithArtwork(artwork = art.value) {
         ArtistAlbumsHeaderInfo(
@@ -132,6 +139,7 @@ data class ArtistAlbumsScreen(
           selectedItems = selected.value,
           viewModel = viewModel,
           backTo = backTo,
+          scrollConnection = scrollConnection,
           back = { viewModel.goBack() }
         )
       }
@@ -158,45 +166,80 @@ private fun ArtistAlbumsHeaderInfo(
   selectedItems: SelectedItems<*>,
   viewModel: ActionsViewModel,
   backTo: String,
+  scrollConnection: HeightResizeScrollConnection,
   back: () -> Unit
 ) {
+  val heightSubtrahend = scrollConnection.heightSubtrahend.collectAsState()
+  ArtistAlbumsHeaderInfo(
+    artistName = artistName,
+    albumCount = albumCount,
+    selectedItems = selectedItems,
+    viewModel = viewModel,
+    backTo = backTo,
+    heightSubtrahend = heightSubtrahend.value,
+    scrollConnection = scrollConnection,
+    back = back
+  )
+}
+
+@Composable
+private fun ArtistAlbumsHeaderInfo(
+  artistName: ArtistName,
+  albumCount: Int,
+  selectedItems: SelectedItems<*>,
+  viewModel: ActionsViewModel,
+  backTo: String,
+  heightSubtrahend: Int,
+  scrollConnection: HeightResizeScrollConnection,
+  back: () -> Unit
+) {
+  val maxSubtrahend = scrollConnection.maxSubtrahend
+  val alphaPercentage =
+    if (maxSubtrahend < Int.MAX_VALUE) 1F - (heightSubtrahend.toFloat() / maxSubtrahend) else 1F
   val buttonColors = ActionButtonDefaults.overArtworkColors()
-  val inPortrait = LocalScreenConfig.current.inPortrait
-  Column(
+  val screenConfig = LocalScreenConfig.current
+  Layout(
     modifier = Modifier
       .fillMaxWidth()
       .statusBarsPadding()
-      .padding(horizontal = 14.dp)
-  ) {
-    val contentColor = buttonColors.contentColor(enabled = true).value
-    val notInSelectionMode = !selectedItems.inSelectionMode
-    if (notInSelectionMode) {
-      Spacer(modifier = Modifier.height(2.dp))
-      BackToButton(
-        modifier = Modifier,
-        backTo = backTo,
-        back = back
+      .padding(horizontal = 14.dp),
+    content = {
+      val contentColor = buttonColors.contentColor(enabled = true).value.timesAlpha(alphaPercentage)
+      val ovalColor: Color = toqueColors.shadedBackground.timesAlpha(alphaPercentage)
+
+      val notInSelectionMode = !selectedItems.inSelectionMode
+      if (notInSelectionMode) {
+        Column {
+          Spacer(modifier = Modifier.height(2.dp))
+          BackToButton(
+            modifier = Modifier,
+            backTo = backTo,
+            color = contentColor,
+            ovalColor = ovalColor,
+            back = back
+          )
+        }
+      }
+      TextOvalBackground(
+        modifier = Modifier.padding(vertical = 2.dp),
+        text = artistName.value,
+        color = contentColor,
+        ovalColor = ovalColor,
+        style = toqueTypography.headerPrimary
       )
-      Spacer(modifier = Modifier.height(if (inPortrait) 28.dp else 13.dp))
-    }
-    Spacer(
-      modifier = Modifier
-        .height(2.dp)
-        .weight(1F)
+      LibraryItemsActions(
+        itemCount = albumCount,
+        selectedItems = selectedItems,
+        viewModel = viewModel,
+        buttonColors = ActionButtonDefaults.overArtworkColors(),
+      )
+    },
+    measurePolicy = BottomUpResizeHeightMeasurePolicy(
+      heightSubtrahend,
+      scrollConnection,
+      screenConfig.preferredArtworkHeaderHeightPx
     )
-    TextOvalBackground(
-      modifier = Modifier.padding(vertical = 2.dp),
-      text = artistName.value,
-      color = contentColor,
-      style = toqueTypography.headerPrimary
-    )
-    LibraryItemsActions(
-      itemCount = albumCount,
-      selectedItems = selectedItems,
-      viewModel = viewModel,
-      buttonColors = ActionButtonDefaults.overArtworkColors(),
-    )
-  }
+  )
 }
 
 @OptIn(ExperimentalMaterialApi::class)

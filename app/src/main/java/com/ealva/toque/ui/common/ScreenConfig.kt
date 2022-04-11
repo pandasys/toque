@@ -29,6 +29,8 @@ import com.google.accompanist.insets.WindowInsets
 
 private val PORTRAIT_ACTION_BTN_HEIGHT = 28.dp
 private val LANDSCAPE_ACTION_BTN_HEIGHT = 26.dp
+private val HEADER_ARTWORK_HEIGHT_PORTRAIT = 210.dp
+private val HEADER_ARTWORK_HEIGHT_LANDSCAPE = 150.dp
 
 @Immutable
 data class ScreenConfig(
@@ -54,6 +56,12 @@ data class ScreenConfig(
 
   val actionBarButtonHeight: Dp
     get() = if (inPortrait) PORTRAIT_ACTION_BTN_HEIGHT else LANDSCAPE_ACTION_BTN_HEIGHT
+
+  private val preferredArtworkHeaderHeight: Dp
+    get() = if (inPortrait) HEADER_ARTWORK_HEIGHT_PORTRAIT else HEADER_ARTWORK_HEIGHT_LANDSCAPE
+
+  val preferredArtworkHeaderHeightPx: Int
+    get() = preferredArtworkHeaderHeight.roundToPx()
 
   fun getBottomSheetButtonBarHeight(): Dp = MainBottomSheetConfig.getButtonBarHeight(inPortrait)
 

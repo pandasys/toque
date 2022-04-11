@@ -127,7 +127,7 @@ data class GenresScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<GenresViewModel>()
-    val scrollConnection = remember { CategoryHeaderScrollConnection() }
+    val scrollConnection = remember { HeightResizeScrollConnection() }
     val genres = viewModel.genreFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 

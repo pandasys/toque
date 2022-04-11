@@ -25,19 +25,14 @@ import androidx.compose.material.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.ui.common.BackToButton
 import com.ealva.toque.ui.common.PopupMenuItem
+import com.ealva.toque.ui.common.timesAlpha
 import com.google.accompanist.insets.statusBarsPadding
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlin.math.roundToInt
 
 @Composable
 fun CategoryScreenHeader(
@@ -48,19 +43,19 @@ fun CategoryScreenHeader(
   selectedItems: SelectedItems<*>,
   backTo: String,
   back: () -> Unit,
-  scrollConnection: CategoryHeaderScrollConnection = CategoryHeaderScrollConnection(),
+  scrollConnection: HeightResizeScrollConnection = HeightResizeScrollConnection(),
   selectActions: (@Composable (Dp) -> Unit)? = null,
 ) {
   val heightSubtrahend = scrollConnection.heightSubtrahend.collectAsState()
   CategoryScreenHeader(
     viewModel = viewModel,
-    heightSubtrahend = heightSubtrahend.value,
     categoryItem = categoryItem,
     menuItems = menuItems,
     itemCount = itemCount,
     selectedItems = selectedItems,
     backTo = backTo,
     back = back,
+    heightSubtrahend = heightSubtrahend.value,
     scrollConnection = scrollConnection,
     selectActions = selectActions
   )
@@ -69,22 +64,27 @@ fun CategoryScreenHeader(
 @Composable
 private fun CategoryScreenHeader(
   viewModel: ActionsViewModel,
-  heightSubtrahend: Int,
   categoryItem: LibraryCategories.CategoryItem,
   menuItems: List<PopupMenuItem> = emptyList(),
   itemCount: Int,
   selectedItems: SelectedItems<*>,
   backTo: String,
   back: () -> Unit,
-  scrollConnection: CategoryHeaderScrollConnection,
-  selectActions: (@Composable (Dp) -> Unit)? = null,
+  heightSubtrahend: Int,
+  scrollConnection: HeightResizeScrollConnection,
+  selectActions: @Composable ((Dp) -> Unit)? = null,
 ) {
+  val maxSubtrahend = scrollConnection.maxSubtrahend
+  val alphaPercentage =
+    if (maxSubtrahend < Int.MAX_VALUE) 1F - (heightSubtrahend.toFloat()) / maxSubtrahend else 1F
+
   Layout(
     modifier = Modifier
       .fillMaxWidth()
       .statusBarsPadding()
       .padding(horizontal = 14.dp),
     content = {
+      val contentColor = LocalContentColor.current.timesAlpha(alphaPercentage)
       val notInSelectionMode = !selectedItems.inSelectionMode
       if (notInSelectionMode) {
         Column {
@@ -92,14 +92,14 @@ private fun CategoryScreenHeader(
           BackToButton(
             modifier = Modifier,
             backTo = backTo,
-            contentColor = LocalContentColor.current,
+            color = contentColor,
             ovalColor = Color.Transparent,
             back = back,
           )
           Spacer(modifier = Modifier.height(22.dp))
         }
       }
-      CategoryTitleBar(categoryItem, menuItems)
+      CategoryTitleBar(categoryItem, menuItems, contentColor, alphaPercentage)
       Spacer(modifier = Modifier.height(10.dp))
       LibraryItemsActions(
         itemCount = itemCount,
@@ -107,45 +107,7 @@ private fun CategoryScreenHeader(
         viewModel = viewModel,
         selectActions = selectActions
       )
-    }
-  ) { measurables, constraints ->
-   val placeables = measurables.map { measurable ->
-      measurable.measure(constraints)
-    }
-
-    val width = placeables.maxOf { placeable -> placeable.width }
-    val maxHeight = placeables.sumOf { placeable -> placeable.height }
-    val minHeight = placeables.last().height
-    if (heightSubtrahend == 0) scrollConnection.maxSubtrahend = maxHeight - minHeight
-    val height = (maxHeight - heightSubtrahend)
-      .coerceAtLeast(minHeight)
-
-    layout(width, height) {
-      var y = height
-      placeables.asReversed().forEach { placeable ->
-        y -= placeable.height
-        placeable.place(x = 0, y = y)
-      }
-    }
-  }
-}
-
-interface CategoryHeaderScrollConnection : NestedScrollConnection {
-  val heightSubtrahend: StateFlow<Int>
-  var maxSubtrahend: Int
-
-  companion object {
-    operator fun invoke(): CategoryHeaderScrollConnection = CategoryHeaderScrollConnectionImpl()
-  }
-}
-
-private class CategoryHeaderScrollConnectionImpl : CategoryHeaderScrollConnection {
-  override val heightSubtrahend = MutableStateFlow(0)
-  override var maxSubtrahend = Int.MAX_VALUE
-
-  override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-    heightSubtrahend.value = (heightSubtrahend.value - available.y.roundToInt())
-      .coerceIn(0..maxSubtrahend)
-    return Offset.Zero
-  }
+    },
+    measurePolicy = BottomUpResizeHeightMeasurePolicy(heightSubtrahend, scrollConnection)
+  )
 }

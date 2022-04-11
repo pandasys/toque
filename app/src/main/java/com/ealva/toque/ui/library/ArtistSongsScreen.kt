@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
@@ -93,6 +95,7 @@ data class ArtistSongsScreen(
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<ArtistSongsViewModel>()
+    val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
     val artwork = viewModel.artistArt.collectAsState()
@@ -101,6 +104,7 @@ data class ArtistSongsScreen(
       modifier = Modifier
         .fillMaxSize()
         .navigationBarsPadding(bottom = false)
+        .nestedScroll(scrollConnection)
     ) {
       ScreenHeaderWithArtwork(artwork = artwork.value) {
         SongListHeaderInfo(
@@ -111,6 +115,7 @@ data class ArtistSongsScreen(
           viewModel = viewModel,
           buttonColors = ActionButtonDefaults.overArtworkColors(),
           backTo = backTo,
+          scrollConnection = scrollConnection,
           back = { viewModel.goBack() }
         )
       }
