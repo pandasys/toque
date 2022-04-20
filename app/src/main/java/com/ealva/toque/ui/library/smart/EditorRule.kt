@@ -23,7 +23,6 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.common.asLong
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.ArtistDao
@@ -70,6 +69,7 @@ enum class Capitalization : Parcelable {
     override val keyboardCapitalization: KeyboardCapitalization
       get() = KeyboardCapitalization.Sentences
   };
+
   abstract val keyboardCapitalization: KeyboardCapitalization
 }
 

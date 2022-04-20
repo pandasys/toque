@@ -18,35 +18,25 @@ package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.brainz.data.Mbid
 import com.ealva.ealvabrainz.brainz.data.isObsolete
-import com.ealva.toque.common.StarRating
-import com.ealva.toque.persist.PersistentId
-import kotlin.time.Duration
 
-inline fun String.updateOrNull(block: () -> String): String? =
-  block().let { newValue -> if (newValue.isNotEmpty() && this != newValue) newValue else null }
-
-inline fun <T : Mbid> T.updateOrNull(block: () -> T?): T? =
-  block().let { newValue -> if (isObsolete(newValue)) newValue else null }
-
-inline fun <T : PersistentId> T.updateOrNull(block: () -> T): T? =
-  block().let { newValue -> if (value != newValue.value) newValue else null }
-
-// inline fun Long.updateOrNull(block: () -> Long): Long? =
-//  block().let { newValue -> if (this != newValue) newValue else null }
-
-inline fun Int.updateOrNull(block: () -> Int): Int? =
-  block().let { newValue -> if (newValue != this) newValue else null }
-
-inline fun StarRating.updateOrNull(block: () -> StarRating): StarRating? =
-  block().let { newValue -> if (this != newValue) newValue else null }
-
-inline fun Duration.updateOrNull(block: () -> Duration): Duration? =
-  block().let { newValue -> if (this != newValue) newValue else null }
-
-inline fun anyNotNull(block: () -> Array<Any?>): Boolean = block().any { it != null }
-
-/*
-public inline fun <T : Mbid> T.isObsolete(newValue: T?): Boolean {
-  return (newValue != null && newValue.isValid && (this.isInvalid || newValue != this))
-
+/**
+ * Return this if it [isNotBlank] blank and != to the [current], else null
  */
+fun String.takeIfSupersedes(current: String): String? = takeIf { it.isNotBlank() && it != current }
+
+/**
+ * Return this Mbid is valid and != to [oldValue], else null
+ */
+fun <T : Mbid> T.takeIfSupersedes(oldValue: T): T? =
+  takeIf { new -> oldValue.isObsolete(new) }
+
+/**
+ * Return this if > 0 and != [oldValue]
+ */
+fun Int.takeIfSupersedes(oldValue: Int): Int? = takeIf { it > 0 && it != oldValue }
+
+/**
+ * Returns true if any of the values are not null
+ */
+fun anyNotNull(vararg values: Any?): Boolean = values.any { it != null }
+

@@ -39,6 +39,8 @@ import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.asAlbumIdList
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.nav.goToScreen
@@ -69,7 +71,9 @@ data class AlbumsScreen(
 
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
-    with(serviceBinder) { add(AllAlbumsViewModel(key, get(), get(), backstack, lookup())) }
+    with(serviceBinder) {
+      add(AllAlbumsViewModel(key, get(), get(), get(AppPrefs.QUALIFIER), backstack, lookup()))
+    }
   }
 
   @Composable
@@ -115,9 +119,10 @@ private class AllAlbumsViewModel(
   private val key: ComposeKey,
   albumDao: AlbumDao,
   private val audioMediaDao: AudioMediaDao,
+  appPrefs: AppPrefsSingleton,
   backstack: Backstack,
   localAudioQueueModel: LocalAudioQueueViewModel
-) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel) {
+) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel, appPrefs) {
   private val categories = LibraryCategories()
 
   val categoryItem: LibraryCategories.CategoryItem

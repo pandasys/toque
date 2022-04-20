@@ -456,10 +456,10 @@ private fun ArtPagerCard(queue: List<QueueItem>, currentPage: Int, size: Int) {
     Box(modifier = Modifier.fillMaxSize()) {
       Image(
         painter = rememberImagePainter(
-          data = if (item.localAlbumArt !== Uri.EMPTY) item.localAlbumArt else item.albumArt,
+          data = if (item.artwork !== Uri.EMPTY) item.artwork else R.drawable.ic_big_album,
           builder = {
             size(size)
-            error(R.drawable.ic_big_album)
+            error(R.drawable.ic_album)
           }
         ),
         contentDescription = "${item.title.value} Album Cover Art",

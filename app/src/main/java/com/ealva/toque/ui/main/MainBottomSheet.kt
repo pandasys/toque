@@ -279,11 +279,8 @@ private fun CurrentItemPagerCard(
 
       Image(
         painter = rememberImagePainter(
-          data = if (item.localAlbumArt !== Uri.EMPTY) item.localAlbumArt else item.albumArt,
-          builder = {
-            error(R.drawable.ic_big_album)
-            placeholder(R.drawable.ic_big_album)
-          }
+          data = if (item.artwork !== Uri.EMPTY) item.artwork else R.drawable.ic_big_album,
+          builder = { error(R.drawable.ic_album) }
         ),
         contentDescription = "${item.title.value} Album Cover Art",
         modifier = Modifier

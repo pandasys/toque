@@ -40,6 +40,8 @@ import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PlaylistId
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
@@ -72,7 +74,16 @@ data class PlaylistSongsScreen(
 
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) {
-      add(PlaylistSongsViewModel(playlistId, playListType, get(), lookup(), backstack))
+      add(
+        PlaylistSongsViewModel(
+          playlistId = playlistId,
+          playListType = playListType,
+          audioMediaDao = get(),
+          localAudioQueueModel = lookup(),
+          appPrefs = get(AppPrefs.QUALIFIER),
+          backstack = backstack
+        )
+      )
     }
   }
 
@@ -160,6 +171,7 @@ interface PlaylistSongsViewModel : SongsViewModel {
       playListType: PlayListType,
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
+      appPrefs: AppPrefsSingleton,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): PlaylistSongsViewModel = PlaylistSongsViewModelImpl(
@@ -167,6 +179,7 @@ interface PlaylistSongsViewModel : SongsViewModel {
       playListType,
       audioMediaDao,
       localAudioQueueModel,
+      appPrefs,
       backstack,
       dispatcher
     )
@@ -178,9 +191,10 @@ private class PlaylistSongsViewModelImpl(
   private val playListType: PlayListType,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
+  appPrefs: AppPrefsSingleton,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher
-) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),
+) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, appPrefs, backstack, dispatcher),
   PlaylistSongsViewModel {
   override val categoryToken: CategoryToken
     get() = CategoryToken(playlistId)

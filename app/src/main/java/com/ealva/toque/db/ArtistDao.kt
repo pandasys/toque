@@ -55,6 +55,7 @@ import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.expr.or
+import com.ealva.welite.db.expr.sum
 import com.ealva.welite.db.statements.DeleteStatement
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
@@ -87,6 +88,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(ArtistDao::class)
 
@@ -96,7 +98,8 @@ data class ArtistDescription(
   override val remoteArtwork: Uri,
   override val localArtwork: Uri,
   val albumCount: Long,
-  val songCount: Long
+  val songCount: Long,
+  val duration: Duration
 ) : EntityArtwork
 
 data class ArtistIdName(val artistId: ArtistId, val artistName: ArtistName)
@@ -255,13 +258,11 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
     upsertResults: AudioUpsertResults
   ): ArtistId? = queryArtistUpdateInfo(newArtist)?.let { info ->
     // artist could match on query yet differ in case, so update if case changes
-    val updateArtist = info.artist.updateOrNull { newArtist }
-    val updateSort = info.artistSort.updateOrNull { newArtistSort }
-    val updateMbid = info.artistMbid.updateOrNull { newArtistMbid }
+    val updateArtist = newArtist.takeIfSupersedes(info.artist)
+    val updateSort = newArtistSort.takeIfSupersedes(info.artistSort)
+    val updateMbid = newArtistMbid?.takeIfSupersedes(info.artistMbid)
 
-    val updateNeeded = anyNotNull {
-      arrayOf(updateArtist, updateSort, updateMbid)
-    }
+    val updateNeeded = anyNotNull(updateArtist, updateSort, updateMbid)
 
     if (updateNeeded) {
       val updated = ArtistTable
@@ -325,6 +326,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           ArtistTable.artistArtUri,
           ArtistTable.artistLocalArtUri,
           songCountColumn,
+          durationColumn,
           albumArtistAlbumCountColumn
         )
       }
@@ -339,7 +341,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           cursor[ArtistTable.artistArtUri].toUriOrEmpty(),
           cursor[ArtistTable.artistLocalArtUri].toUriOrEmpty(),
           cursor[albumArtistAlbumCountColumn],
-          cursor[songCountColumn]
+          cursor[songCountColumn],
+          cursor[durationColumn]
         )
       }
       .toList()
@@ -364,6 +367,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           ArtistTable.artistArtUri,
           ArtistTable.artistLocalArtUri,
           songCountColumn,
+          durationColumn,
           songArtistAlbumCountColumn
         )
       }
@@ -378,7 +382,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           cursor[ArtistTable.artistArtUri].toUriOrEmpty(),
           cursor[ArtistTable.artistLocalArtUri].toUriOrEmpty(),
           cursor[songArtistAlbumCountColumn],
-          cursor[songCountColumn]
+          cursor[songCountColumn],
+          cursor[durationColumn]
         )
       }
       .toList()
@@ -574,6 +579,7 @@ private val songArtistAlbumCountColumn = AlbumTable.id.countDistinct()
 private val albumArtistAlbumCountColumn = ArtistAlbumTable.albumId.countDistinct()
 private val artistSortMax by lazy { ArtistTable.artistSort.max().alias("artist_sort_max_alias") }
 private val artistSortMin by lazy { ArtistTable.artistSort.min().alias("artist_sort_min_alias") }
+private val durationColumn = MediaTable.duration.sum()
 
 private val INSERT_STATEMENT = ArtistTable.insertValues {
   it[artistName].bindArg()

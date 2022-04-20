@@ -22,15 +22,18 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.persist.AlbumId
 import kotlinx.coroutines.flow.StateFlow
 import javax.annotation.concurrent.Immutable
+import kotlin.time.Duration
 
 interface AlbumsViewModel : ActionsViewModel {
   @Immutable
   data class AlbumInfo(
     val id: AlbumId,
     val title: AlbumTitle,
-    val artwork: Uri,
     val artist: ArtistName,
-    val songCount: Int
+    val year: Int,
+    val artwork: Uri,
+    val songCount: Int,
+    val duration: Duration
   )
 
   val albumFlow: StateFlow<List<AlbumInfo>>

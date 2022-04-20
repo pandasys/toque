@@ -46,12 +46,13 @@ import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asMediaIdList
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.cancelFlingOnBack
-import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.SongsViewModel.SongInfo
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
@@ -66,6 +67,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -132,12 +134,13 @@ interface SongsViewModel : ActionsViewModel {
 abstract class BaseSongsViewModel(
   private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,
+  private val appPrefs: AppPrefsSingleton,
   private val backstack: Backstack,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Main
+  dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : SongsViewModel, ScopedServices.Registered, ScopedServices.Activated, ScopedServices.HandlesBack,
   Bundleable {
 
-  protected lateinit var scope: CoroutineScope
+  protected val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private var requestJob: Job? = null
   private var daoEventsJob: Job? = null
   private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
@@ -165,7 +168,6 @@ abstract class BaseSongsViewModel(
   ): Result<List<AudioDescription>, Throwable>
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(Job() + dispatcher)
     filterFlow
       .onEach { requestAudio() }
       .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
@@ -218,7 +220,7 @@ abstract class BaseSongsViewModel(
 
   override fun mediaLongClicked(mediaId: MediaId) = selectedItems.toggleSelection(mediaId)
 
-  private fun makeMediaListResult(): Result<CategoryMediaList, Throwable> =
+  private fun getMediaList(): Result<CategoryMediaList, Throwable> =
     runSuspendCatching {
       CategoryMediaList(
         songsFlow
@@ -231,28 +233,31 @@ abstract class BaseSongsViewModel(
       )
     }
 
-  private fun offSelectMode() {
-    selectedItems.turnOffSelectionMode()
+  private fun selectModeOff() = selectedItems.turnOffSelectionMode()
+
+  private suspend fun selectModeOffMaybeGoHome() {
+    selectModeOff()
+    if (appPrefs.instance().goToNowPlaying()) backstack.goToRootScreen()
   }
 
   override fun play() {
-    scope.launch { localQueueOps.doOp(Op.Play, ::makeMediaListResult, ::offSelectMode) }
+    scope.launch { localQueueOps.play(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun shuffle() {
-    scope.launch { localQueueOps.doOp(Op.Shuffle, ::makeMediaListResult, ::offSelectMode) }
+    scope.launch { localQueueOps.shuffle(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun playNext() {
-    scope.launch { localQueueOps.doOp(Op.PlayNext, ::makeMediaListResult, ::offSelectMode) }
+    scope.launch { localQueueOps.playNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToUpNext() {
-    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::makeMediaListResult, ::offSelectMode) }
+    scope.launch { localQueueOps.addToUpNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToPlaylist() {
-    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::makeMediaListResult, ::offSelectMode) }
+    scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
   override fun displayMediaInfo() {

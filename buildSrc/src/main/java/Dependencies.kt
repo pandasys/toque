@@ -242,7 +242,7 @@ object Libs {
   }
 
   object WeLite {
-    const val CORE = "com.ealva:welite-core:0.5.2-SNAPSHOT"
-    const val KTIME = "com.ealva:welite-ktime:0.5.2-SNAPSHOT"
+    const val CORE = "com.ealva:welite-core:0.5.2-0"
+//    const val KTIME = "com.ealva:welite-ktime:0.5.2-0"
   }
 }

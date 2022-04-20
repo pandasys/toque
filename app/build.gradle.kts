@@ -122,6 +122,7 @@ android {
     freeCompilerArgs = listOf(
       "-Xopt-in=kotlin.RequiresOptIn",
       "-Xskip-prerelease-check",
+      "-Xcontext-receivers",
       "-Xbackend-threads=4"
     )
   }
@@ -172,7 +173,7 @@ dependencies {
   implementation(Libs.EAlvaBrainz.BRAINZ)
   implementation(Libs.EAlvaBrainz.BRAINZ_SERVICE)
   implementation(Libs.WeLite.CORE)
-  implementation(Libs.WeLite.KTIME)
+//  implementation(Libs.WeLite.KTIME)
 
   implementation(Libs.Coil.COIL)
   implementation(Libs.Coil.COIL_COMPOSE)

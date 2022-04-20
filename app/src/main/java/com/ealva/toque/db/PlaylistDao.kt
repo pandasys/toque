@@ -51,6 +51,7 @@ import com.ealva.welite.db.expr.inList
 import com.ealva.welite.db.expr.less
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
+import com.ealva.welite.db.expr.sum
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
 import com.ealva.welite.db.table.Column
@@ -66,12 +67,9 @@ import com.ealva.welite.db.table.orderByAsc
 import com.ealva.welite.db.table.orderByRandom
 import com.ealva.welite.db.table.ordersBy
 import com.ealva.welite.db.table.select
-import com.ealva.welite.db.table.selectCount
 import com.ealva.welite.db.table.selectWhere
 import com.ealva.welite.db.table.selects
 import com.ealva.welite.db.table.where
-import com.ealva.welite.db.view.View
-import com.ealva.welite.db.view.ViewColumn
 import com.ealva.welite.db.view.existingView
 import com.github.michaelbull.result.andThen
 import com.github.michaelbull.result.coroutines.runSuspendCatching
@@ -90,6 +88,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(PlaylistDao::class)
 
@@ -103,8 +102,15 @@ data class PlaylistDescription(
   val id: PlaylistId,
   val name: PlaylistName,
   val type: PlayListType,
-  val songCount: Long
-)
+  val songCount: Long,
+  val duration: Duration
+) {
+  companion object {
+    val NullPlaylistDescription = PlaylistDescription(
+      PlaylistId.INVALID, PlaylistName.UNKNOWN, PlayListType.Rules, 0, Duration.ZERO
+    )
+  }
+}
 
 data class PlaylistData(
   val id: PlaylistId,
@@ -309,20 +315,21 @@ private class PlaylistDaoImpl(
     }
   }.onSuccess { emitEvent(PlaylistUpdated(id)) }
 
-
+  private val playlistSongCountColumn = PlayListMediaTable.mediaId.count()
+  private val durationColumn = MediaTable.duration.sum()
   override suspend fun getAllPlaylists() = runSuspendCatching {
     db.query {
-      val songCountColumn = PlayListMediaTable.mediaId.count()
       mutableListOf<PlaylistDescription>().apply {
         PlayListTable
-          .join(
-            PlayListMediaTable,
-            JoinType.INNER,
-            PlayListTable.id,
-            PlayListMediaTable.playListId
-          )
+          .join(PlayListMediaTable, JoinType.INNER, PlayListTable.id, PlayListMediaTable.playListId)
+          .join(MediaTable, JoinType.INNER, PlayListMediaTable.mediaId, MediaTable.id)
           .selects {
-            listOf(PlayListTable.id, PlayListTable.playListName, songCountColumn)
+            listOf(
+              PlayListTable.id,
+              PlayListTable.playListName,
+              playlistSongCountColumn,
+              durationColumn
+            )
           }
           .where { PlayListTable.playListType eq PlayListType.UserCreated.id }
           .groupBy { PlayListTable.playListName }
@@ -331,18 +338,14 @@ private class PlaylistDaoImpl(
               PlaylistId(cursor[PlayListTable.id]),
               cursor[PlayListTable.playListName].asPlaylistName,
               PlayListType.UserCreated,
-              cursor[songCountColumn]
+              cursor[playlistSongCountColumn],
+              cursor[durationColumn]
             )
           }
           .forEach { add(it) }
 
         PlayListTable
-          .join(
-            SmartPlaylistTable,
-            JoinType.INNER,
-            PlayListTable.id,
-            SmartPlaylistTable.smartId
-          )
+          .join(SmartPlaylistTable, JoinType.INNER, PlayListTable.id, SmartPlaylistTable.smartId)
           .selects {
             listOf(PlayListTable.id, PlayListTable.playListName, SmartPlaylistTable.smartName)
           }
@@ -365,23 +368,22 @@ private class PlaylistDaoImpl(
   ): PlaylistDescription {
     val view = existingView(smart.viewName, forceQuoteName = true)
     val viewId = view.column(MediaTable.id, MediaTable.id.name)
+    val songCountColumn = MediaTable.id.count()
 
-    return PlaylistDescription(
-      id = smart.id,
-      name = smart.name,
-      type = PlayListType.Rules,
-      songCount = viewCount(view, viewId)
-    )
-  }
-
-  private fun Queryable.viewCount(view: View, viewId: ViewColumn<Long>): Long = try {
-    view
+    return view
       .join(MediaTable, JoinType.INNER, viewId, MediaTable.id)
-      .selectCount()
-      .longForQuery()
-  } catch (e: Exception) {
-    LOG.e(e) { it("Error getting SmartPlaylist view count") }
-    0L
+      .selects { listOf(songCountColumn, durationColumn) }
+      .all()
+      .sequence { cursor ->
+        PlaylistDescription(
+          id = smart.id,
+          name = smart.name,
+          type = PlayListType.Rules,
+          songCount = cursor[songCountColumn],
+          duration = cursor[durationColumn]
+        )
+      }
+      .singleOrNull() ?: PlaylistDescription.NullPlaylistDescription
   }
 
   override fun Queryable.getPlaylistName(

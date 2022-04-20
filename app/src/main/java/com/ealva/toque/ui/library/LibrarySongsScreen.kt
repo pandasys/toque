@@ -33,6 +33,8 @@ import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
@@ -63,7 +65,9 @@ data class LibrarySongsScreen(
 
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
-    with(serviceBinder) { add(LibrarySongsViewModel(key, get(), lookup(), backstack)) }
+    with(serviceBinder) {
+      add(LibrarySongsViewModel(key, get(), lookup(), get(AppPrefs.QUALIFIER), backstack))
+    }
   }
 
   @OptIn(ExperimentalFoundationApi::class)
@@ -103,11 +107,13 @@ private class LibrarySongsViewModel(
   private val key: ComposeKey,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
+  appPrefs: AppPrefsSingleton,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : BaseSongsViewModel(
   audioMediaDao,
   localAudioQueueModel,
+  appPrefs,
   backstack,
   dispatcher
 ) {

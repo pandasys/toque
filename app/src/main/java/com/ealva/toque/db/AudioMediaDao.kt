@@ -20,7 +20,6 @@ import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
 import androidx.core.net.toUri
 import com.ealva.ealvabrainz.brainz.data.TrackMbid
-import com.ealva.ealvabrainz.brainz.data.isValidMbid
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.asAlbumTitle
@@ -492,6 +491,7 @@ private class AudioMediaDaoImpl(
       fileTagInfo.albumSort,
       albumArt,
       fileTagInfo.albumArtist,
+      fileTagInfo.year,
       fileTagInfo.releaseMbid,
       fileTagInfo.releaseGroupMbid,
       createUpdateTime,
@@ -1354,42 +1354,39 @@ private class AudioMediaDaoImpl(
     appPrefs: AppPrefs,
     upsertResults: AudioUpsertResults
   ): MediaId? = queryAudioForUpdate(newInfo.location)?.let { info ->
-    val updateTitle = info.title.updateOrNull { fileTagInfo.title }
-    val updateTitleSort = info.titleSort.updateOrNull { fileTagInfo.titleSort }
-    val updateAlbumId = info.albumId.updateOrNull { newAlbumId }
-    val updateAlbumArtistId = info.albumArtistId.updateOrNull { newAlbumArtistId }
-    val updateArtistId = info.artistId.updateOrNull { newArtistId }
-    val updateGenre = info.genre.updateOrNull { fileTagInfo.genre }
-    val updateYear = info.year.updateOrNull { fileTagInfo.year }
-    val updateRating = if (appPrefs.readTagRating())
-      info.rating.updateOrNull { fileTagInfo.rating } else null
-    val updateDuration = info.duration.updateOrNull { fileTagInfo.duration }
-    val updateTrackNumber = info.trackNumber.updateOrNull { fileTagInfo.trackNumber }
-    val updateTotalTracks = info.totalTracks.updateOrNull { fileTagInfo.totalTracks }
-    val updateDiscNumber = info.discNumber.updateOrNull { fileTagInfo.discNumber }
-    val updateTotalDiscs = info.totalDiscs.updateOrNull { fileTagInfo.totalDiscs }
-    val updateComment = info.comment.updateOrNull { fileTagInfo.comment }
-    val updateTrackMbid = info.trackMbid?.updateOrNull { fileTagInfo.trackMbid }
+    val updateTitle = fileTagInfo.title.takeIfSupersedes(info.title)
+    val updateTitleSort = fileTagInfo.titleSort.takeIfSupersedes(info.titleSort)
+    val updateAlbumId = newAlbumId.takeIf { it != info.albumId }
+    val updateAlbumArtistId = newAlbumArtistId.takeIf { it != info.albumArtistId }
+    val updateArtistId = newArtistId.takeIf { it != info.artistId }
+    val updateGenre = fileTagInfo.genre.takeIfSupersedes(info.genre)
+    val updateYear = fileTagInfo.year.takeIfSupersedes(info.year)
+    val updateRating = fileTagInfo.rating.takeIf { appPrefs.readTagRating() && it != info.rating }
+    val updateDuration = fileTagInfo.duration.takeIf { it != info.duration }
+    val updateTrackNumber = fileTagInfo.trackNumber.takeIfSupersedes(info.trackNumber)
+    val updateTotalTracks = fileTagInfo.totalTracks.takeIfSupersedes(info.totalTracks)
+    val updateDiscNumber = fileTagInfo.discNumber.takeIfSupersedes(info.discNumber)
+    val updateTotalDiscs = fileTagInfo.totalDiscs.takeIfSupersedes(info.totalDiscs)
+    val updateComment = fileTagInfo.comment.takeIfSupersedes(info.comment)
+    val updateTrackMbid = fileTagInfo.trackMbid?.takeIfSupersedes(info.trackMbid)
 
-    val updateNeeded = anyNotNull {
-      arrayOf(
-        updateTitle,
-        updateTitleSort,
-        updateAlbumId,
-        updateAlbumArtistId,
-        updateArtistId,
-        updateGenre,
-        updateYear,
-        updateRating,
-        updateDuration,
-        updateTrackNumber,
-        updateTotalTracks,
-        updateDiscNumber,
-        updateTotalDiscs,
-        updateComment,
-        updateTrackMbid
-      )
-    }
+    val updateNeeded = anyNotNull(
+      updateTitle,
+      updateTitleSort,
+      updateAlbumId,
+      updateAlbumArtistId,
+      updateArtistId,
+      updateGenre,
+      updateYear,
+      updateRating,
+      updateDuration,
+      updateTrackNumber,
+      updateTotalTracks,
+      updateDiscNumber,
+      updateTotalDiscs,
+      updateComment,
+      updateTrackMbid
+    )
 
     if (updateNeeded) {
       val updated = MediaTable
@@ -1438,7 +1435,7 @@ private class AudioMediaDaoImpl(
         cursor[discNumber],
         cursor[totalDiscs],
         cursor[comment],
-        cursor[trackMbid].toTrackMbidOrNull()
+        TrackMbid(cursor[trackMbid])
       )
     }.singleOrNull()
 
@@ -1495,15 +1492,11 @@ private class AudioForUpdate(
   val discNumber: Int,
   val totalDiscs: Int,
   val comment: String,
-  val trackMbid: TrackMbid?
+  val trackMbid: TrackMbid
 )
 
 private fun AudioInfo.uriToParse(): Uri {
   return if (path.exists()) path.toUri() else location
-}
-
-fun String.toTrackMbidOrNull(): TrackMbid? {
-  return if (isValidMbid()) TrackMbid(this) else null
 }
 
 private val AudioViewQueueDataQuery: QueryBuilder<Join> = MediaTable

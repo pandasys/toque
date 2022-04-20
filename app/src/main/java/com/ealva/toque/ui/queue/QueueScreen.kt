@@ -28,7 +28,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.ContentAlpha
 import androidx.compose.material.DismissDirection
 import androidx.compose.material.DismissState
 import androidx.compose.material.DismissValue
@@ -241,7 +242,7 @@ private fun QueueContents(
         )
         .navigationBarsPadding(bottom = false)
     ) {
-      items(items = queue, key = { it.instanceId }) { queueItem ->
+      itemsIndexed(items = queue, key = { _, item -> item.instanceId }) { curIndex, queueItem ->
         val dismissState = rememberDismissState()
         if (dismissState.isDismissed(DismissDirection.EndToStart)) {
           onDelete(queueItem)
@@ -251,19 +252,14 @@ private fun QueueContents(
           }
         }
 
-        val currentId =
-          if (index in queue.indices) queue[index].instanceId else InstanceId.INVALID
-        val isCurrent = queueItem.item.instanceId == currentId
-        val isSelected = selectedItems.isSelected(queueItem.instanceId)
-
         DismissibleItem(
           dismissState = dismissState,
           modifier = Modifier.draggedItem(reorderState.offsetByKey(queueItem.instanceId))
         ) {
           QueueItem(
             audioItem = queueItem,
-            isCurrent = isCurrent,
-            isSelected = isSelected,
+            distanceFromCurrent = curIndex - index,
+            isSelected = selectedItems.isSelected(queueItem.instanceId),
             modifier = Modifier.combinedClickable(
               onLongClick = { onLongClick(queueItem) },
               onClick = { onClick(queueItem) }
@@ -320,7 +316,7 @@ fun DismissibleItem(
 @Composable
 private fun QueueItem(
   audioItem: QueueAudioItem,
-  isCurrent: Boolean,
+  distanceFromCurrent: Int,
   isSelected: Boolean,
   modifier: Modifier = Modifier,
   icon: @Composable () -> Unit,
@@ -335,7 +331,11 @@ private fun QueueItem(
       highlightBackground = isSelected,
       icon = icon,
       modifier = modifier,
-      textColor = if (isCurrent) Color.Green.copy(green = 0.7F) else Color.Unspecified
+      textColor = when {
+        distanceFromCurrent > 0 -> Color.Unspecified
+        distanceFromCurrent == 0 -> Color.Green.copy(green = 0.7F)
+        else -> LocalContentColor.current.copy(alpha = ContentAlpha.disabled)
+      }
     )
   }
 }

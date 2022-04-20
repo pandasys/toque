@@ -30,12 +30,13 @@ import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectAlbumArtScreen
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
-import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.getOrElse
@@ -44,9 +45,11 @@ import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.statebundle.StateBundle
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -61,10 +64,12 @@ private val LOG by lazyLogger(BaseAlbumsViewModel::class)
 abstract class BaseAlbumsViewModel(
   private val albumDao: AlbumDao,
   protected val backstack: Backstack,
-  private val localAudioQueueModel: LocalAudioQueueViewModel
+  private val localAudioQueueModel: LocalAudioQueueViewModel,
+  private val appPrefs: AppPrefsSingleton,
+  dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : AlbumsViewModel, ScopedServices.Registered, ScopedServices.Activated,
   ScopedServices.HandlesBack, Bundleable {
-  protected lateinit var scope: CoroutineScope
+  protected val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private var requestJob: Job? = null
   private var daoEventsJob: Job? = null
   private var wentInactive = false
@@ -76,7 +81,6 @@ abstract class BaseAlbumsViewModel(
   private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(Job() + Dispatchers.Main)
     filterFlow
       .onEach { requestAlbums() }
       .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
@@ -128,9 +132,11 @@ abstract class BaseAlbumsViewModel(
     get() = AlbumInfo(
       id = albumId,
       title = albumTitle,
-      artwork = preferredArt,
       artist = artistName,
-      songCount = songCount.toInt()
+      year = albumYear,
+      artwork = preferredArt,
+      songCount = songCount.toInt(),
+      duration = duration
     )
 
   protected abstract suspend fun doGetAlbums(
@@ -193,29 +199,34 @@ abstract class BaseAlbumsViewModel(
     albumList: List<AlbumInfo>
   ): Result<CategoryMediaList, Throwable>
 
-  private fun offSelectMode() = selectedItems.turnOffSelectionMode()
-
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedAlbums())
 
+  private fun selectModeOff() = selectedItems.turnOffSelectionMode()
+
+  private suspend fun selectModeOffMaybeGoHome() {
+    selectModeOff()
+    if (appPrefs.instance().goToNowPlaying()) backstack.goToRootScreen()
+  }
+
   override fun play() {
-    scope.launch { localQueueOps.doOp(Op.Play, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.play(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun shuffle() {
-    scope.launch { localQueueOps.doOp(Op.Shuffle, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.shuffle(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun playNext() {
-    scope.launch { localQueueOps.doOp(Op.PlayNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.playNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToUpNext() {
-    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToUpNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToPlaylist() {
-    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
   /** Get selected albums, or all if no selection */

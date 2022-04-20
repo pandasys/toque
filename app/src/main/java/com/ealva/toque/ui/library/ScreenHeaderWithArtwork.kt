@@ -17,6 +17,7 @@
 package com.ealva.toque.ui.library
 
 import android.net.Uri
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
@@ -26,30 +27,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.ealva.toque.R
-
-
-private val MIN_IMAGE_HEIGHT_PORTRAIT = 240.dp
-private val MIN_IMAGE_HEIGHT_LANDSCAPE = 150.dp
 
 @Composable
 fun ScreenHeaderWithArtwork(
   modifier: Modifier = Modifier,
   artwork: Uri,
+  @DrawableRes fallbackArt: Int = R.drawable.ic_big_album,
   content: @Composable () -> Unit,
 ) {
   Layout(
     modifier = modifier,
     content = {
       Image(
-        painter = rememberImagePainter(
-          data = artwork,
-          builder = {
-            error(R.drawable.ic_big_album)
-          }
-        ),
+        painter = rememberImagePainter(data = artwork, builder = { error(fallbackArt) }),
         alignment = Alignment.Center,
         contentScale = ContentScale.Crop,
         contentDescription = stringResource(R.string.Artwork),
@@ -59,16 +51,14 @@ fun ScreenHeaderWithArtwork(
     }
   ) { measurables, constraints ->
     val contentWidth = constraints.maxWidth
-//    val minHeight = if (inPortrait) MIN_IMAGE_HEIGHT_PORTRAIT else MIN_IMAGE_HEIGHT_LANDSCAPE
     val contentPlaceable = measurables[1].measure(
       Constraints(
         minWidth = contentWidth,
         maxWidth = contentWidth,
-//        minHeight = minHeight.roundToPx()
       )
     )
 
-    val imageHeight = contentPlaceable.height //.coerceAtLeast(minHeight.roundToPx())
+    val imageHeight = contentPlaceable.height
     val imagePlaceable =
       measurables[0].measure(Constraints.fixed(constraints.maxWidth, imageHeight))
 

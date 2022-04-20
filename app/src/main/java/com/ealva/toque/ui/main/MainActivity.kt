@@ -45,7 +45,7 @@ import com.ealva.toque.ui.library.LibraryCategoriesScreen
 import com.ealva.toque.ui.library.SearchScreen
 import com.ealva.toque.ui.nav.goToAboveRoot
 import com.ealva.toque.ui.nav.goToScreen
-import com.ealva.toque.ui.nav.jumpToRootScreen
+import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.AppSettingsScreen
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity(), MainBridge {
               MainScreen(
                 composeStateChanger = composeStateChanger,
                 topOfStack = topOfStackState,
-                goToNowPlaying = { backstack.jumpToRootScreen() },
+                goToNowPlaying = { backstack.goToRootScreen() },
                 goToLibrary = { backstack.goToAboveRoot(LibraryCategoriesScreen()) },
                 goToQueue = { backstack.goToAboveRoot(QueueScreen()) },
                 goToSearch = { backstack.goToAboveRoot(SearchScreen()) },

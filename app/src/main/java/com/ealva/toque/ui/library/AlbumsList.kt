@@ -35,8 +35,8 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,6 +55,8 @@ import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.LocalWindowInsets
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -114,26 +116,18 @@ private fun AlbumItem(
       ),
     icon = {
       Image(
-        painter = rememberImagePainter(
+        painter = if (albumInfo.artwork !== Uri.EMPTY) rememberImagePainter(
           data = albumInfo.artwork,
-          builder = { error(R.drawable.ic_big_album) }
-        ),
+          builder = { error(R.drawable.ic_album) }
+        ) else painterResource(id = R.drawable.ic_big_album),
         contentDescription = stringResource(R.string.Artwork),
         modifier = Modifier.size(56.dp)
       )
     },
     text = { ListItemText(text = albumInfo.title.value) },
-    secondaryText = { ArtistAndSongCount(albumInfo = albumInfo) },
-    overlineText = {
-      Text(
-        text = LocalContext.current.resources.getQuantityString(
-          R.plurals.SongCount,
-          albumInfo.songCount,
-          albumInfo.songCount,
-        ),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-      )
+    overlineText = { ArtistAndSongCount(albumInfo = albumInfo) },
+    secondaryText = {
+      CountDurationYear(albumInfo.songCount, albumInfo.duration, albumInfo.year)
     }
   )
 }
@@ -155,16 +149,20 @@ fun AlbumsListPreview() {
     AlbumInfo(
       AlbumId(1),
       AlbumTitle("Album Title 1"),
-      Uri.EMPTY,
       ArtistName("Artist Name 1"),
-      5
+      1970,
+      Uri.EMPTY,
+      5,
+      20.minutes
     ),
     AlbumInfo(
       AlbumId(1),
       AlbumTitle("Album Title 2"),
-      Uri.EMPTY,
       ArtistName("Artist Name 2"),
-      100
+      1980,
+      Uri.EMPTY,
+      100,
+      5.hours
     )
   )
   ProvideScreenConfig(

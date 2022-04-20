@@ -32,19 +32,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.ComposerName
@@ -63,6 +59,8 @@ import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.asComposerIdList
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.ListItemText
@@ -71,8 +69,8 @@ import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
 import com.ealva.toque.ui.library.LibraryCategories.CategoryItem
-import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
@@ -95,6 +93,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -106,6 +105,7 @@ import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(ComposersScreen::class)
 
@@ -121,7 +121,9 @@ data class ComposersScreen(
 
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
-    with(serviceBinder) { add(ComposersViewModel(key, get(), lookup(), backstack)) }
+    with(serviceBinder) {
+      add(ComposersViewModel(key, get(), lookup(), backstack, get(AppPrefs.QUALIFIER)))
+    }
   }
 
   @Composable
@@ -209,32 +211,18 @@ private fun ComposerItem(
         onLongClick = { itemLongClicked(composerInfo.id) }
       ),
     icon = {
-      if (composerInfo.artwork !== Uri.EMPTY) {
-        Image(
-          painter = rememberImagePainter(
-            data = composerInfo.artwork,
-            builder = { error(R.drawable.ic_person) }
-          ),
-          contentDescription = stringResource(R.string.ArtistArt),
-          modifier = Modifier.size(56.dp)
-        )
-      } else {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_person),
-          contentDescription = "Composer icon",
-          modifier = Modifier.size(40.dp)
-        )
-      }
+      Image(
+        painter = if (composerInfo.artwork !== Uri.EMPTY) rememberImagePainter(
+          data = composerInfo.artwork,
+          builder = { error(R.drawable.ic_person) }
+        ) else painterResource(id = R.drawable.ic_person),
+        contentDescription = stringResource(R.string.Artwork),
+        modifier = Modifier.size(56.dp)
+      )
     },
     text = { ListItemText(text = composerInfo.name.value) },
     secondaryText = {
-      Text(
-        text = LocalContext.current.resources.getQuantityString(
-          R.plurals.SongCount,
-          composerInfo.songCount,
-          composerInfo.songCount,
-        ), maxLines = 1, overflow = TextOverflow.Ellipsis
-      )
+      CountDurationYear(composerInfo.songCount, composerInfo.duration, year = 0)
     },
   )
 }
@@ -245,6 +233,7 @@ private interface ComposersViewModel : ActionsViewModel {
     val id: ComposerId,
     val name: ComposerName,
     val songCount: Int,
+    val duration: Duration,
     val artwork: Uri
   )
 
@@ -266,9 +255,17 @@ private interface ComposersViewModel : ActionsViewModel {
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
+      appPrefs: AppPrefsSingleton,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ComposersViewModel =
-      ComposersViewModelImpl(key, audioMediaDao, localAudioQueueModel, backstack, dispatcher)
+      ComposersViewModelImpl(
+        key,
+        audioMediaDao,
+        localAudioQueueModel,
+        backstack,
+        appPrefs,
+        dispatcher
+      )
   }
 }
 
@@ -277,10 +274,11 @@ private class ComposersViewModelImpl(
   private val audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
-  private val dispatcher: CoroutineDispatcher
+  private val appPrefs: AppPrefsSingleton,
+  dispatcher: CoroutineDispatcher
 ) : ComposersViewModel, ScopedServices.Registered, ScopedServices.Activated,
   ScopedServices.HandlesBack, Bundleable {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private var requestJob: Job? = null
   private var daoEventsJob: Job? = null
   private var wentInactive = false
@@ -302,8 +300,6 @@ private class ComposersViewModelImpl(
   private fun getGenreKeys() = composerFlow.value.mapTo(mutableSetOf()) { it.id }
   override fun clearSelection() = selectedItems.clearSelection()
 
-  private fun offSelectMode() = selectedItems.turnOffSelectionMode()
-
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedComposers())
 
@@ -319,24 +315,31 @@ private class ComposersViewModelImpl(
   private fun getSelectedComposers() = composerFlow.value
     .filterIfHasSelection(selectedItems.value) { it.id }
 
+  private fun selectModeOff() = selectedItems.turnOffSelectionMode()
+
+  private suspend fun selectModeOffMaybeGoHome() {
+    selectModeOff()
+    if (appPrefs.instance().goToNowPlaying()) backstack.goToRootScreen()
+  }
+
   override fun play() {
-    scope.launch { localQueueOps.doOp(Op.Play, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.play(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun shuffle() {
-    scope.launch { localQueueOps.doOp(Op.Shuffle, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.shuffle(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun playNext() {
-    scope.launch { localQueueOps.doOp(Op.PlayNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.playNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToUpNext() {
-    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToUpNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToPlaylist() {
-    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
   private fun goToComposersSongs(info: ComposerInfo) =
@@ -350,7 +353,6 @@ private class ComposersViewModelImpl(
     )
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(Job() + dispatcher)
     // may want onStart+drop(1) for chunking and onEach to not chunk
     filterFlow
       .onEach { requestComposers(processChunks = true) }
@@ -412,6 +414,7 @@ private class ComposersViewModelImpl(
     id = composerId,
     name = composerName,
     songCount = songCount.toInt(),
+    duration = duration,
     artwork = audioMediaDao.albumDao
       .getAlbumArtFor(composerId)
       .onFailure { cause ->

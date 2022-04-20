@@ -240,7 +240,7 @@ fun RemoteImageItem(item: RemoteImage, selected: (RemoteImage) -> Unit, minSize:
             data = item.location,
             builder = {
               scale(Scale.FIT)
-              error(R.drawable.ic_big_album)
+              error(R.drawable.ic_album)
             }
           ),
           contentDescription = stringResource(R.string.AlbumArt),

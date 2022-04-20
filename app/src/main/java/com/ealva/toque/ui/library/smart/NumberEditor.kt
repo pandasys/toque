@@ -30,7 +30,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
-import com.ealva.toque.common.asLong
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.db.smart.NumberMatcher
 import com.ealva.toque.ui.library.smart.EditorRule.NumberEditorRule

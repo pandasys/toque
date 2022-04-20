@@ -38,6 +38,8 @@ import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.getOrElse
@@ -85,6 +87,7 @@ data class ArtistSongsScreen(
           artwork = artwork,
           audioMediaDao = get(),
           localAudioQueueModel = lookup(),
+          appPrefs = get(AppPrefs.QUALIFIER),
           backstack = backstack
         )
       )
@@ -139,10 +142,18 @@ interface ArtistSongsViewModel : SongsViewModel {
       artwork: Uri,
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
+      appPrefs: AppPrefsSingleton,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ArtistSongsViewModel = ArtistSongsViewModelImpl(
-      artistId, artistType, artwork, audioMediaDao, localAudioQueueModel, backstack, dispatcher
+      artistId,
+      artistType,
+      artwork,
+      audioMediaDao,
+      localAudioQueueModel,
+      appPrefs,
+      backstack,
+      dispatcher
     )
   }
 }
@@ -153,9 +164,10 @@ private class ArtistSongsViewModelImpl(
   artwork: Uri,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
+  appPrefs: AppPrefsSingleton,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher
-) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),
+) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, appPrefs, backstack, dispatcher),
   ArtistSongsViewModel {
   private val artistDao: ArtistDao = audioMediaDao.artistDao
   private val albumDao: AlbumDao = audioMediaDao.albumDao

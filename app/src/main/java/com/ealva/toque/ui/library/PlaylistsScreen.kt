@@ -34,9 +34,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
@@ -44,10 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.e
@@ -79,12 +75,12 @@ import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorScreen
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
 import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
@@ -120,6 +116,7 @@ import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(PlaylistsScreen::class)
 
@@ -254,32 +251,18 @@ private fun PlaylistItem(
           onLongClick = { itemLongClicked(playlistInfo) }
         ),
       icon = {
-        if (playlistInfo.artwork !== Uri.EMPTY) {
-          Image(
-            painter = rememberImagePainter(
-              data = playlistInfo.artwork,
-              builder = { error(playlistInfo.type.icon) }
-            ),
-            contentDescription = stringResource(R.string.Artwork),
-            modifier = Modifier.size(56.dp)
-          )
-        } else {
-          Icon(
-            painter = painterResource(id = playlistInfo.type.icon),
-            contentDescription = "Playlist Icon",
-            modifier = Modifier.size(40.dp)
-          )
-        }
+        Image(
+          painter = if (playlistInfo.artwork !== Uri.EMPTY) rememberImagePainter(
+            data = playlistInfo.artwork,
+            builder = { error(playlistInfo.type.icon) }
+          ) else painterResource(id = playlistInfo.type.icon),
+          contentDescription = stringResource(R.string.Artwork),
+          modifier = Modifier.size(56.dp)
+        )
       },
       text = { ListItemText(text = playlistInfo.name.value) },
       secondaryText = {
-        Text(
-          text = LocalContext.current.resources.getQuantityString(
-            R.plurals.SongCount,
-            playlistInfo.songCount,
-            playlistInfo.songCount,
-          ), maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
+        CountDurationYear(playlistInfo.songCount, playlistInfo.duration, year = 0)
       },
       trailing = {
         PopupMenu(items = playlistInfo.makePopupMenuItems(editSmartPlaylist, deletePlaylist))
@@ -308,14 +291,14 @@ private fun PlaylistInfo.makePopupMenuItems(
 
 private interface PlaylistsViewModel : ActionsViewModel {
   @Immutable
-  @Parcelize
   data class PlaylistInfo(
     val id: PlaylistId,
     val name: PlaylistName,
     val type: PlayListType,
     val songCount: Int,
+    val duration: Duration,
     val artwork: Uri
-  ) : Parcelable
+  )
 
   val categoryItem: LibraryCategories.CategoryItem
   val playlistsFlow: StateFlow<List<PlaylistInfo>>
@@ -359,9 +342,9 @@ private class PlaylistsViewModelImpl(
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefs: AppPrefsSingleton,
   private val backstack: Backstack,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : PlaylistsViewModel, ScopedServices.Registered, ScopedServices.HandlesBack, Bundleable {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private val playlistDao: PlaylistDao = audioMediaDao.playlistDao
   private val albumDao: AlbumDao = audioMediaDao.albumDao
 
@@ -378,7 +361,12 @@ private class PlaylistsViewModelImpl(
   private fun getPlaylistsKeys() = playlistsFlow.value.mapTo(mutableSetOf()) { it.id }
   override fun clearSelection() = selectedItems.clearSelection()
 
-  private fun offSelectMode() = selectedItems.turnOffSelectionMode()
+  private fun selectModeOff() = selectedItems.turnOffSelectionMode()
+
+  private suspend fun selectModeOffMaybeGoHome() {
+    selectModeOff()
+    if (appPrefs.instance().goToNowPlaying()) backstack.goToRootScreen()
+  }
 
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedPlaylists())
@@ -399,27 +387,26 @@ private class PlaylistsViewModelImpl(
     .filterIfHasSelection(selectedItems.value) { it.id }
 
   override fun play() {
-    scope.launch { localQueueOps.doOp(Op.Play, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.play(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun shuffle() {
-    scope.launch { localQueueOps.doOp(Op.Shuffle, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.shuffle(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun playNext() {
-    scope.launch { localQueueOps.doOp(Op.PlayNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.playNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToUpNext() {
-    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToUpNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToPlaylist() {
-    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
     playlistDao
       .playlistDaoEvents
       .onStart { requestPlaylists() }
@@ -449,6 +436,7 @@ private class PlaylistsViewModelImpl(
     name = name,
     type = type,
     songCount = songCount.toInt(),
+    duration = duration,
     artwork = albumDao.getAlbumArtFor(id, type, name)
       .onFailure { LOG.e { it("Error getting artwork for %s %s %s", id, type, name) } }
       .getOrElse { Uri.EMPTY }

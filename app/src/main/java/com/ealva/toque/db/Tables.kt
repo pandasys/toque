@@ -71,6 +71,7 @@ object AlbumTable : Table() {
   val albumTitle = text("Album") { collateNoCase() }
   val albumSort = text("AlbumSort") { collateNoCase() }
   val albumArtist = text("AlbumArtist") { collateNoCase() }
+  val albumYear = integer("AlbumYear") { default(0) }
   val albumLocalArtUri = text("AlbumLocalArtUri") { default("") }
   val albumArtUri = text("AlbumArtUri") { default("") }
   val releaseMbid = text("AlbumReleaseMbid") { default("") }

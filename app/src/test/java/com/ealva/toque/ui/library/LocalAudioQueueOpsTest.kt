@@ -30,13 +30,12 @@ import com.ealva.toque.test.shared.CoroutineRule
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
 import com.ealva.toque.ui.common.DialogPrompt
-import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.library.LocalAudioQueueOps.OpMessage
 import com.ealva.toque.ui.main.Notification
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.get
 import com.nhaarman.expect.expect
-import com.nhaarman.expect.fail
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,76 +58,131 @@ class LocalAudioQueueOpsTest {
   }
 
   @Test
-  fun testGetMediaListReturnsError() = runTest {
-    Op.values().forEach { op ->
-      var clearCalled = false
-      when (
-        val result = queueOps.doOp(op, { Err(NotImplementedError()) }, { clearCalled = true })
-      ) {
-        is Ok -> fail("Expected Err")
-        is Err -> expect(result).toBeInstanceOf<DaoResult<NotImplementedError>>()
-      }
-      expect(clearCalled).toBe(false)
-    }
+  fun testPlayGetMediaListReturnsError() = runTest {
+    var clearCalled = false
+    expect(queueOps.play({ Err(NotImplementedError()) }, { clearCalled = true }))
+      .toBeInstanceOf<DaoResult<NotImplementedError>>()
+    expect(clearCalled).toBe(false)
   }
 
   @Test
-  fun testGetMediaListReturnsEmptyList() = runTest {
-    Op.values().forEach { op ->
-      var clearCalled = false
-      when (val result = queueOps.doOp(op, { Ok(EMPTY_MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> fail("Expected Err")
-        is Err -> expect(result).toBeInstanceOf<Err<OpMessage.EmptyList>>()
-      }
-      expect(clearCalled).toBe(false)
-    }
+  fun testShuffleGetMediaListReturnsError() = runTest {
+    var clearCalled = false
+    expect(queueOps.shuffle({ Err(NotImplementedError()) }, { clearCalled = true }))
+      .toBeInstanceOf<DaoResult<NotImplementedError>>()
+    expect(clearCalled).toBe(false)
   }
 
   @Test
-  fun testDismissedReturned() = runTest {
-    val ops = listOf(Op.Play, Op.Shuffle, Op.AddToPlaylist)
+  fun testPlayNextGetMediaListReturnsError() = runTest {
+    var clearCalled = false
+    queueOps.playNext({ Err(NotImplementedError()) }, { clearCalled = true })
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testAddToUpNextGetMediaListReturnsError() = runTest {
+    var clearCalled = false
+    queueOps.addToUpNext({ Err(NotImplementedError()) }, { clearCalled = true })
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testAddToPlaylistGetMediaListReturnsError() = runTest {
+    var clearCalled = false
+    expect(queueOps.addToPlaylist({ Err(NotImplementedError()) }, { clearCalled = true }))
+      .toBeInstanceOf<DaoResult<NotImplementedError>>()
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testPlayGetMediaListReturnsEmptyList() = runTest {
+    var clearCalled = false
+    expect(queueOps.play({ Ok(EMPTY_MEDIA_LIST) }, { clearCalled = true }))
+      .toBeInstanceOf<Err<OpMessage.EmptyList>>()
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testShuffleGetMediaListReturnsEmptyList() = runTest {
+    var clearCalled = false
+    expect(queueOps.shuffle({ Ok(EMPTY_MEDIA_LIST) }, { clearCalled = true }))
+      .toBeInstanceOf<Err<OpMessage.EmptyList>>()
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testAddToPlaylistGetMediaListReturnsEmptyList() = runTest {
+    var clearCalled = false
+    expect(queueOps.addToPlaylist({ Ok(EMPTY_MEDIA_LIST) }, { clearCalled = true }))
+      .toBeInstanceOf<Err<OpMessage.EmptyList>>()
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testPlayDismissedReturned() = runTest {
     queueStub._playReturn = PromptResult.Dismissed
     queueStub._shuffleReturn = PromptResult.Dismissed
     queueStub._addToPlaylistReturn = PromptResult.Dismissed
-    ops.forEach { op ->
-      var clearCalled = false
-      when (val result = queueOps.doOp(op, { Ok(MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> expect(result.value).toBe(PromptResult.Dismissed)
-        is Err -> fail("Expected Ok")
-      }
-      expect(clearCalled).toBe(false)
-    }
+    var clearCalled = false
+    expect(queueOps.play({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
+      .toBe(PromptResult.Dismissed)
+    expect(clearCalled).toBe(false)
   }
 
   @Test
-  fun testAlwaysReturnExecuted() = runTest {
-    val alwaysExecOps = listOf(Op.PlayNext, Op.AddToUpNext)
+  fun testShuffleDismissedReturned() = runTest {
     queueStub._playReturn = PromptResult.Dismissed
     queueStub._shuffleReturn = PromptResult.Dismissed
     queueStub._addToPlaylistReturn = PromptResult.Dismissed
-    alwaysExecOps.forEach { op ->
-      var clearCalled = false
-      when (val result = queueOps.doOp(op, { Ok(MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> expect(result.value).toBe(PromptResult.Executed)
-        is Err -> fail("Expected Ok")
-      }
-      expect(clearCalled).toBe(true)
-    }
+    var clearCalled = false
+    expect(queueOps.shuffle({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
+      .toBe(PromptResult.Dismissed)
+    expect(clearCalled).toBe(false)
   }
 
   @Test
-  fun testExecutedReturned() = runTest {
+  fun testAddToPlaylistDismissedReturned() = runTest {
+    queueStub._playReturn = PromptResult.Dismissed
+    queueStub._shuffleReturn = PromptResult.Dismissed
+    queueStub._addToPlaylistReturn = PromptResult.Dismissed
+    var clearCalled = false
+    expect(queueOps.addToPlaylist({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
+      .toBe(PromptResult.Dismissed)
+    expect(clearCalled).toBe(false)
+  }
+
+  @Test
+  fun testPlayExecutedReturned() = runTest {
     queueStub._playReturn = PromptResult.Executed
     queueStub._shuffleReturn = PromptResult.Executed
     queueStub._addToPlaylistReturn = PromptResult.Executed
-    Op.values().forEach { op ->
-      var clearCalled = false
-      when (val result = queueOps.doOp(op, { Ok(MEDIA_LIST) }, { clearCalled = true })) {
-        is Ok -> expect(result.value).toBe(PromptResult.Executed)
-        is Err -> fail("Expected Ok")
-      }
-      expect(clearCalled).toBe(true)
-    }
+    var clearCalled = false
+    expect(queueOps.play({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
+      .toBe(PromptResult.Executed)
+    expect(clearCalled).toBe(true)
+  }
+
+  @Test
+  fun testShuffleExecutedReturned() = runTest {
+    queueStub._playReturn = PromptResult.Executed
+    queueStub._shuffleReturn = PromptResult.Executed
+    queueStub._addToPlaylistReturn = PromptResult.Executed
+    var clearCalled = false
+    expect(queueOps.shuffle({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
+      .toBe(PromptResult.Executed)
+    expect(clearCalled).toBe(true)
+  }
+
+  @Test
+  fun testAddToPlaylistExecutedReturned() = runTest {
+    queueStub._playReturn = PromptResult.Executed
+    queueStub._shuffleReturn = PromptResult.Executed
+    queueStub._addToPlaylistReturn = PromptResult.Executed
+    var clearCalled = false
+    expect(queueOps.addToPlaylist({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
+      .toBe(PromptResult.Executed)
+    expect(clearCalled).toBe(true)
   }
 }
 

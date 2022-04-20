@@ -46,6 +46,7 @@ import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
+import com.ealva.welite.db.expr.sum
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.JoinType
@@ -76,6 +77,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
 
 sealed class GenreDaoEvent {
   data class GenresCreatedOrUpdated(val genreIdList: GenreIdList) : GenreDaoEvent()
@@ -86,7 +88,8 @@ data class GenreIdName(val genreId: GenreId, val genreName: GenreName)
 data class GenreDescription(
   val genreId: GenreId,
   val genreName: GenreName,
-  val songCount: Long
+  val songCount: Long,
+  val duration: Duration
 )
 
 /**
@@ -151,6 +154,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }.delete()
 
   private val songCountColumn = GenreMediaTable.mediaId.countDistinct()
+  private val durationColumn = MediaTable.duration.sum()
   override suspend fun getAllGenres(
     filter: Filter,
     limit: Limit
@@ -158,7 +162,8 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     db.query {
       GenreTable
         .join(GenreMediaTable, JoinType.INNER, GenreTable.id, GenreMediaTable.genreId)
-        .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn) }
+        .join(MediaTable, JoinType.INNER, GenreMediaTable.mediaId, MediaTable.id)
+        .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn, durationColumn) }
         .where { filter.whereCondition() }
         .groupBy { GenreTable.genre }
         .orderByAsc { GenreTable.genre }
@@ -167,7 +172,8 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
           GenreDescription(
             GenreId(cursor[GenreTable.id]),
             GenreName(cursor[GenreTable.genre]),
-            cursor[songCountColumn]
+            cursor[songCountColumn],
+            cursor[durationColumn]
           )
         }
         .toList()

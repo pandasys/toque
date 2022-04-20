@@ -39,6 +39,8 @@ interface AudioItem : HasId {
   val rating: Rating
   val location: Uri
   val fileUri: Uri
-
   val albumId: AlbumId
+
+  val artwork: Uri
+    get() = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
 }

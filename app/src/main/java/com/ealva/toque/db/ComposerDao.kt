@@ -46,6 +46,7 @@ import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
+import com.ealva.welite.db.expr.sum
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.table.Cursor
@@ -76,11 +77,13 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
 
 data class ComposerDescription(
   val composerId: ComposerId,
   val composerName: ComposerName,
-  val songCount: Long
+  val songCount: Long,
+  val duration: Duration
 )
 
 sealed class ComposerDaoEvent {
@@ -210,6 +213,7 @@ private class ComposerDaoImpl(
   }
 
   private val songCountColumn = ComposerMediaTable.mediaId.count()
+  private val durationColumn = MediaTable.duration.sum()
   override suspend fun getAllComposers(
     filter: Filter,
     limit: Limit
@@ -217,7 +221,10 @@ private class ComposerDaoImpl(
     db.query {
       ComposerTable
         .join(ComposerMediaTable, JoinType.INNER, ComposerTable.id, ComposerMediaTable.composerId)
-        .selects { listOf(ComposerTable.id, ComposerTable.composer, songCountColumn) }
+        .join(MediaTable, JoinType.INNER, ComposerMediaTable.mediaId, MediaTable.id)
+        .selects {
+          listOf(ComposerTable.id, ComposerTable.composer, songCountColumn, durationColumn)
+        }
         .where { filter.whereCondition() }
         .groupBy { ComposerTable.composer }
         .orderByAsc { ComposerTable.composerSort }
@@ -234,7 +241,8 @@ private class ComposerDaoImpl(
     get() = ComposerDescription(
       composerId = ComposerId(this[ComposerTable.id]),
       composerName = ComposerName(this[ComposerTable.composer]),
-      songCount = this[songCountColumn]
+      songCount = this[songCountColumn],
+      duration = this[durationColumn]
     )
 
   override suspend fun getNext(composerId: ComposerId): DaoResult<ComposerId> = runSuspendCatching {

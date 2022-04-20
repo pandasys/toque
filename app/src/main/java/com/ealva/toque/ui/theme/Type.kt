@@ -47,9 +47,15 @@ val typography = Typography(
     fontWeight = FontWeight.SemiBold,
     fontSize = 14.sp,
     letterSpacing = 1.25.sp
-  )
+  ),
+//  overline = TextStyle(
+//    fontWeight = FontWeight.Normal,
+//    fontSize = 10.sp,
+//    letterSpacing = 1.0.sp
+//  )
 )
 
+@Suppress("unused")
 data class ToqueTypography(
   val material: Typography = typography,
   val nowPlayingTitle: TextStyle = material.subtitle1.copy(

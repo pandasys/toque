@@ -19,74 +19,101 @@ package com.ealva.toque.ui.library
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
+import com.ealva.toque.ui.library.LocalAudioQueueOps.OpMessage
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.mapError
 import com.github.michaelbull.result.onSuccess
 import com.github.michaelbull.result.toErrorIf
 
-/**
- * This encapsulates the behavior of the various "play" or "add" functions as they are very similar
- * from the UI perspective. Gather the media to be operated on, return a value indicating if the
- * operation was executed, and if it was executed clear any user selection.
- */
-class LocalAudioQueueOps(private val localAudioQueueModel: LocalAudioQueueViewModel) {
-  enum class Op {
-    Play {
-      override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueViewModel,
-        mediaList: CategoryMediaList
-      ): PromptResult = localAudioQueueModel.play(mediaList)
-    },
-    Shuffle {
-      override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueViewModel,
-        mediaList: CategoryMediaList
-      ): PromptResult = localAudioQueueModel.shuffle(mediaList)
-    },
-    PlayNext {
-      override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueViewModel,
-        mediaList: CategoryMediaList
-      ): PromptResult {
-        localAudioQueueModel.playNext(mediaList)
-        return PromptResult.Executed
-      }
-    },
-    AddToUpNext {
-      override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueViewModel,
-        mediaList: CategoryMediaList
-      ): PromptResult {
-        localAudioQueueModel.addToUpNext(mediaList)
-        return PromptResult.Executed
-      }
-    },
-    AddToPlaylist {
-      override suspend fun invoke(
-        localAudioQueueModel: LocalAudioQueueViewModel,
-        mediaList: CategoryMediaList
-      ): PromptResult = localAudioQueueModel.addToPlaylist(mediaList.idList)
-    };
-
-    abstract suspend operator fun invoke(
-      localAudioQueueModel: LocalAudioQueueViewModel,
-      mediaList: CategoryMediaList
-    ): PromptResult
-  }
-
+interface LocalAudioQueueOps {
   sealed interface OpMessage {
     data class DaoExceptionResult(val cause: Throwable) : OpMessage
     object EmptyList : OpMessage
   }
 
-  suspend fun doOp(
-    op: Op,
+  suspend fun play(
     getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
-    clearSelection: () -> Unit
+    onSuccess: suspend () -> Unit
+  ): Result<PromptResult, OpMessage>
+
+  suspend fun shuffle(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ): Result<PromptResult, OpMessage>
+
+  suspend fun playNext(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  )
+
+  suspend fun addToUpNext(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  )
+
+  suspend fun addToPlaylist(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ): Result<PromptResult, OpMessage>
+
+  companion object {
+    operator fun invoke(localAudioQueueModel: LocalAudioQueueViewModel): LocalAudioQueueOps =
+      LocalAudioQueueOpsImpl(localAudioQueueModel)
+  }
+}
+
+private class LocalAudioQueueOpsImpl(
+  private val localAudioQueueModel: LocalAudioQueueViewModel
+) : LocalAudioQueueOps {
+  override suspend fun play(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ): Result<PromptResult, OpMessage> = getListDoOp(getMediaList, onSuccess) { list ->
+    localAudioQueueModel.play(list)
+  }
+
+  override suspend fun shuffle(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ): Result<PromptResult, OpMessage> = getListDoOp(getMediaList, onSuccess) { list ->
+    localAudioQueueModel.shuffle(list)
+  }
+
+  override suspend fun playNext(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ) {
+    getListDoOp(getMediaList, onSuccess) { list ->
+      localAudioQueueModel.playNext(list)
+      PromptResult.Executed
+    }
+  }
+
+  override suspend fun addToUpNext(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ) {
+    getListDoOp(getMediaList, onSuccess) { list ->
+      localAudioQueueModel.addToUpNext(list)
+      PromptResult.Executed
+    }
+  }
+
+  override suspend fun addToPlaylist(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit
+  ) = getListDoOp(getMediaList, onSuccess) { list ->
+    localAudioQueueModel.addToPlaylist(list.idList)
+  }
+
+  private suspend fun getListDoOp(
+    getMediaList: suspend () -> Result<CategoryMediaList, Throwable>,
+    onSuccess: suspend () -> Unit,
+    operation: suspend (CategoryMediaList) -> PromptResult
   ): Result<PromptResult, OpMessage> = getMediaList()
     .mapError { daoMessage -> OpMessage.DaoExceptionResult(daoMessage) }
     .toErrorIf({ it.isEmpty }) { OpMessage.EmptyList }
-    .map { list: CategoryMediaList -> op(localAudioQueueModel, list) }
-    .onSuccess { if (it.wasExecuted) clearSelection() }
+    .map { list: CategoryMediaList -> operation(list) }
+    .onSuccess { promptResult -> if (promptResult.wasExecuted) onSuccess() }
 }

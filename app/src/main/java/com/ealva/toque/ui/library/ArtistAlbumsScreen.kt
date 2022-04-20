@@ -55,6 +55,8 @@ import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumIdList
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.BackToButton
 import com.ealva.toque.ui.common.ListItemText
@@ -112,6 +114,7 @@ data class ArtistAlbumsScreen(
           albumDao = get(),
           audioMediaDao = get(),
           localAudioQueueModel = lookup(),
+          appPrefs = get(AppPrefs.QUALIFIER),
           backstack = backstack
         )
       )
@@ -270,7 +273,7 @@ private fun AllArtistSongsHeader(
     secondaryText = {
       Text(
         text = LocalContext.current.resources.getQuantityString(
-          R.plurals.SongCount,
+          R.plurals.ClefSongCount,
           songCount,
           songCount,
         ),
@@ -296,6 +299,7 @@ interface ArtistAlbumsViewModel : AlbumsViewModel {
       albumDao: AlbumDao,
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
+      appPrefs: AppPrefsSingleton,
       backstack: Backstack
     ): ArtistAlbumsViewModel = ArtistAlbumsViewModelImpl(
       artistId,
@@ -305,6 +309,7 @@ interface ArtistAlbumsViewModel : AlbumsViewModel {
       albumDao,
       audioMediaDao,
       localAudioQueueModel,
+      appPrefs,
       backstack
     )
   }
@@ -318,8 +323,10 @@ private class ArtistAlbumsViewModelImpl(
   albumDao: AlbumDao,
   private val audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
+  appPrefs: AppPrefsSingleton,
   backstack: Backstack
-) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel), ArtistAlbumsViewModel {
+) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel, appPrefs),
+  ArtistAlbumsViewModel {
   override val artistArt = MutableStateFlow(artwork)
 
   override suspend fun doGetAlbums(

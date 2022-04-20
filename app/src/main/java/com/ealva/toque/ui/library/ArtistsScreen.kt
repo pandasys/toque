@@ -37,7 +37,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ButtonColors
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Icon
 import androidx.compose.material.ListItem
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -74,6 +73,8 @@ import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asArtistIdList
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectArtistArtScreen
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
@@ -84,8 +85,8 @@ import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.common.modifyIf
 import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
-import com.ealva.toque.ui.library.LocalAudioQueueOps.Op
 import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
@@ -121,6 +122,8 @@ import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 private val LOG by lazyLogger(ArtistsScreen::class)
 
@@ -145,7 +148,9 @@ data class ArtistsScreen(
 
   override fun bindServices(serviceBinder: ServiceBinder) {
     val key = this
-    with(serviceBinder) { add(ArtistsViewModel(key, get(), lookup(), artistType, backstack)) }
+    with(serviceBinder) {
+      add(ArtistsViewModel(key, get(), lookup(), artistType, get(AppPrefs.QUALIFIER), backstack))
+    }
   }
 
   @Composable
@@ -265,41 +270,20 @@ private fun ArtistItem(
         onLongClick = { itemLongClicked(artistInfo.artistId) }
       ),
     icon = {
-      if (artistInfo.artwork !== Uri.EMPTY) {
-        Image(
-          painter = rememberImagePainter(
-            data = artistInfo.artwork,
-            builder = {
-              error(artistType.typeIcon)
-            }
-          ),
-          contentDescription = stringResource(R.string.ArtistArt),
-          modifier = Modifier.size(56.dp)
-        )
-      } else {
-        Icon(
-          painter = painterResource(id = artistType.typeIcon),
-          contentDescription = stringResource(R.string.ArtistArt),
-          modifier = Modifier.size(40.dp)
-        )
-      }
+      Image(
+        painter = if (artistInfo.artwork !== Uri.EMPTY) rememberImagePainter(
+          data = artistInfo.artwork,
+          builder = { error(artistType.typeIcon) }
+        ) else painterResource(id = artistType.typeIcon),
+        contentDescription = stringResource(R.string.Artwork),
+        modifier = Modifier.size(56.dp)
+      )
     },
     text = { ListItemText(text = artistInfo.name.value) },
-    secondaryText = { AlbumCount(artistInfo.albumCount) },
-    overlineText = { SongCount(artistInfo.songCount) }
-  )
-}
-
-@Composable
-private fun SongCount(songCount: Int) {
-  Text(
-    text = LocalContext.current.resources.getQuantityString(
-      R.plurals.SongCount,
-      songCount,
-      songCount,
-    ),
-    maxLines = 1,
-    overflow = TextOverflow.Ellipsis,
+    overlineText = { AlbumCount(artistInfo.albumCount) },
+    secondaryText = {
+      CountDurationYear(artistInfo.songCount, artistInfo.duration, year = 0)
+    }
   )
 }
 
@@ -318,14 +302,14 @@ private fun AlbumCount(albumCount: Int) {
 
 private interface ArtistsViewModel : ActionsViewModel {
   @Immutable
-  @Parcelize
   data class ArtistInfo(
     val artistId: ArtistId,
     val name: ArtistName,
     val artwork: Uri,
     val albumCount: Int,
-    val songCount: Int
-  ) : Parcelable
+    val songCount: Int,
+    val duration: Duration
+  )
 
   val categoryItem: LibraryCategories.CategoryItem
   val artistFlow: StateFlow<List<ArtistInfo>>
@@ -347,10 +331,18 @@ private interface ArtistsViewModel : ActionsViewModel {
       audioDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       artistType: ArtistType,
+      appPrefs: AppPrefsSingleton,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
-    ): ArtistsViewModel =
-      ArtistsViewModelImpl(key, audioDao, localAudioQueueModel, artistType, backstack, dispatcher)
+    ): ArtistsViewModel = ArtistsViewModelImpl(
+      key = key,
+      audioMediaDao = audioDao,
+      localAudioQueueModel = localAudioQueueModel,
+      artistType = artistType,
+      appPrefs = appPrefs,
+      backstack = backstack,
+      dispatcher = dispatcher
+    )
   }
 }
 
@@ -359,6 +351,7 @@ private class ArtistsViewModelImpl(
   private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val artistType: ArtistType,
+  private val appPrefs: AppPrefsSingleton,
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : ArtistsViewModel, ScopedServices.Registered, ScopedServices.Activated,
@@ -495,28 +488,34 @@ private class ArtistsViewModelImpl(
   private fun getArtistKeys() = artistFlow.value.mapTo(mutableSetOf()) { it.artistId }
   override fun clearSelection() = selectedItems.clearSelection()
 
-  private fun offSelectMode() = selectedItems.turnOffSelectionMode()
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
     makeCategoryMediaList(getSelectedArtists())
 
+  private fun selectModeOff() = selectedItems.turnOffSelectionMode()
+
+  private suspend fun selectModeOffMaybeGoHome() {
+    selectModeOff()
+    if (appPrefs.instance().goToNowPlaying()) backstack.goToRootScreen()
+  }
+
   override fun play() {
-    scope.launch { localQueueOps.doOp(Op.Play, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.play(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun shuffle() {
-    scope.launch { localQueueOps.doOp(Op.Shuffle, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.shuffle(::getMediaList, ::selectModeOffMaybeGoHome) }
   }
 
   override fun playNext() {
-    scope.launch { localQueueOps.doOp(Op.PlayNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.playNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToUpNext() {
-    scope.launch { localQueueOps.doOp(Op.AddToUpNext, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToUpNext(::getMediaList, ::selectModeOff) }
   }
 
   override fun addToPlaylist() {
-    scope.launch { localQueueOps.doOp(Op.AddToPlaylist, ::getMediaList, ::offSelectMode) }
+    scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
   private suspend fun makeCategoryMediaList(
@@ -552,7 +551,8 @@ private class ArtistsViewModelImpl(
       .getAlbumArtFor(artistId, artistType)
       .getOrElse { Uri.EMPTY },
     albumCount = albumCount.toInt(),
-    songCount = songCount.toInt()
+    songCount = songCount.toInt(),
+    duration = duration
   )
 
   override fun itemClicked(artistInfo: ArtistInfo) = selectedItems
@@ -580,14 +580,16 @@ fun AllArtistsListPreview() {
       name = ArtistName("George Harrison"),
       artwork = Uri.EMPTY,
       albumCount = 12,
-      songCount = 85
+      songCount = 85,
+      duration = 4.hours
     ),
     ArtistInfo(
       artistId = ArtistId(2),
       name = ArtistName("John Lennon"),
       artwork = Uri.EMPTY,
       albumCount = 15,
-      songCount = 100
+      songCount = 100,
+      duration = 5.hours
     ),
   )
   ProvideScreenConfig(

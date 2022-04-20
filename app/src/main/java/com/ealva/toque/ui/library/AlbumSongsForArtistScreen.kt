@@ -32,6 +32,8 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -73,6 +75,7 @@ data class AlbumSongsForArtistScreen(
           artistType = artistType,
           audioMediaDao = get(),
           localAudioQueueModel = lookup(),
+          appPrefs = get(AppPrefs.QUALIFIER),
           backstack = backstack
         )
       )
@@ -122,9 +125,10 @@ private class AlbumSongsForArtistViewModel(
   private val artistType: ArtistType,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
+  appPrefs: AppPrefsSingleton,
   backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
-) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, backstack, dispatcher),
+) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, appPrefs, backstack, dispatcher),
   ScopedServices.Activated {
   override val categoryToken: CategoryToken get() = CategoryToken(albumId)
 

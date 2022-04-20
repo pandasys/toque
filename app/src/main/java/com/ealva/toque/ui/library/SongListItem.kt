@@ -30,6 +30,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isUnspecified
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
@@ -71,8 +73,6 @@ fun SongListItem(
       .modifyIf(highlightBackground) { background(toqueColors.selectedBackground) },
     icon = icon,
     text = { ListItemText(text = songTitle.value, color = textColor) },
-//    secondaryText = { Text(text = artistName.value, color = textColor) },
-//    overlineText = { Text(text = albumTitle.value, color = textColor) }
     secondaryText = { ArtistAndDuration(artistName, songDuration, textColor) },
     overlineText = { AlbumAndRating(albumTitle, rating, textColor) }
   )
@@ -116,22 +116,14 @@ fun SongListItem(
 
 @Composable
 fun SongListItemIcon(artwork: Uri) {
-  if (artwork === Uri.EMPTY) {
-    Image(
-      painter = rememberImagePainter(data = R.drawable.ic_big_album),
-      contentDescription = "Artwork",
-      modifier = Modifier.size(56.dp)
-    )
-  } else {
-    Image(
-      painter = rememberImagePainter(
-        data = artwork,
-        builder = { error(R.drawable.ic_big_album) }
-      ),
-      contentDescription = "Artwork",
-      modifier = Modifier.size(56.dp)
-    )
-  }
+  Image(
+    painter = if (artwork !== Uri.EMPTY) rememberImagePainter(
+      data = artwork,
+      builder = { error(R.drawable.ic_album) }
+    ) else painterResource(id = R.drawable.ic_big_album),
+    contentDescription = stringResource(R.string.Artwork),
+    modifier = Modifier.size(56.dp)
+  )
 }
 
 @Composable

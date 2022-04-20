@@ -67,6 +67,7 @@ import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.expr.neq
 import com.ealva.welite.db.expr.or
+import com.ealva.welite.db.expr.sum
 import com.ealva.welite.db.statements.deleteWhere
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
@@ -101,6 +102,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.time.Duration
 
 private val LOG by lazyLogger(AlbumDao::class)
 
@@ -117,10 +119,12 @@ sealed interface AlbumDaoEvent {
 data class AlbumDescription(
   val albumId: AlbumId,
   val albumTitle: AlbumTitle,
+  val artistName: ArtistName,
+  val albumYear: Int,
   override val localArtwork: Uri,
   override val remoteArtwork: Uri,
-  val artistName: ArtistName,
-  val songCount: Long
+  val songCount: Long,
+  val duration: Duration
 ) : EntityArtwork
 
 /**
@@ -141,6 +145,7 @@ interface AlbumDao {
     albumSort: String,
     albumArt: Uri,
     albumArtist: String,
+    year: Int,
     releaseMbid: ReleaseMbid?,
     releaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Millis,
@@ -220,6 +225,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     albumSort: String,
     albumArt: Uri,
     albumArtist: String,
+    year: Int,
     releaseMbid: ReleaseMbid?,
     releaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Millis,
@@ -229,8 +235,9 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     doUpsertAlbum(
       album,
       albumSort,
-      albumArtist,
       albumArt,
+      albumArtist,
+      year,
       releaseMbid,
       releaseGroupMbid,
       createUpdateTime,
@@ -257,10 +264,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
           listOf<SqlTypeExpression<out Any>>(
             AlbumTable.id,
             AlbumTable.albumTitle,
+            ArtistTable.artistName,
+            AlbumTable.albumYear,
             AlbumTable.albumLocalArtUri,
             AlbumTable.albumArtUri,
-            ArtistTable.artistName,
-            songCountColumn
+            songCountColumn,
+            totalDurationColumn
           )
         }
         .where { filter.whereCondition() }
@@ -271,10 +280,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
           AlbumDescription(
             cursor[AlbumTable.id].asAlbumId,
             cursor[AlbumTable.albumTitle].asAlbumTitle,
+            cursor[ArtistTable.artistName].asArtistName,
+            cursor[AlbumTable.albumYear],
             cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
             cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
-            ArtistName(cursor[ArtistTable.artistName]),
-            cursor[songCountColumn]
+            cursor[songCountColumn],
+            cursor[totalDurationColumn]
           )
         }
         .toList()
@@ -307,10 +318,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       listOf(
         AlbumTable.id,
         AlbumTable.albumTitle,
+        ArtistTable.artistName,
+        AlbumTable.albumYear,
         AlbumTable.albumLocalArtUri,
         AlbumTable.albumArtUri,
-        ArtistTable.artistName,
-        songCountColumn
+        songCountColumn,
+        totalDurationColumn
       )
     }
     .where { ArtistAlbumTable.artistId eq artistId.value }
@@ -321,10 +334,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       AlbumDescription(
         cursor[AlbumTable.id].asAlbumId,
         cursor[AlbumTable.albumTitle].asAlbumTitle,
+        cursor[ArtistTable.artistName].asArtistName,
+        cursor[AlbumTable.albumYear],
         cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
         cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
-        ArtistName(cursor[ArtistTable.artistName]),
-        cursor[songCountColumn]
+        cursor[songCountColumn],
+        cursor[totalDurationColumn]
       )
     }
     .toList()
@@ -336,10 +351,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       listOf(
         AlbumTable.id,
         AlbumTable.albumTitle,
+        ArtistTable.artistName,
+        AlbumTable.albumYear,
         AlbumTable.albumLocalArtUri,
         AlbumTable.albumArtUri,
-        ArtistTable.artistName,
-        songCountColumn
+        songCountColumn,
+        totalDurationColumn
       )
     }
     .where { if (artistId == null) null else MediaTable.artistId eq artistId.value }
@@ -350,10 +367,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       AlbumDescription(
         cursor[AlbumTable.id].asAlbumId,
         cursor[AlbumTable.albumTitle].asAlbumTitle,
+        cursor[ArtistTable.artistName].asArtistName,
+        cursor[AlbumTable.albumYear],
         cursor[AlbumTable.albumLocalArtUri].toUriOrEmpty(),
         cursor[AlbumTable.albumArtUri].toUriOrEmpty(),
-        cursor[ArtistTable.artistName].asArtistName,
-        cursor[songCountColumn]
+        cursor[songCountColumn],
+        cursor[totalDurationColumn]
       )
     }
     .toList()
@@ -585,8 +604,9 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   private fun TransactionInProgress.doUpsertAlbum(
     newAlbum: String,
     newAlbumSort: String,
-    newAlbumArtist: String,
     albumArt: Uri,
+    newAlbumArtist: String,
+    newYear: Int,
     newReleaseMbid: ReleaseMbid?,
     newReleaseGroupMbid: ReleaseGroupMbid?,
     createUpdateTime: Millis,
@@ -596,6 +616,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       newAlbum,
       newAlbumSort,
       newAlbumArtist,
+      newYear,
       newReleaseMbid,
       newReleaseGroupMbid,
       createUpdateTime,
@@ -604,6 +625,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
       it[albumTitle] = newAlbum
       it[albumSort] = newAlbumSort
       it[albumArtist] = newAlbumArtist
+      it[albumYear] = newYear
       it[albumLocalArtUri] = albumArt.toString()
       it[releaseMbid] = newReleaseMbid?.value ?: ""
       it[releaseGroupMbid] = newReleaseGroupMbid?.value ?: ""
@@ -624,33 +646,35 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     newAlbum: String,
     newAlbumSort: String,
     newAlbumArtist: String,
+    newYear: Int,
     newReleaseMbid: ReleaseMbid?,
     newReleaseGroupMbid: ReleaseGroupMbid?,
     newUpdateTime: Millis,
     upsertResults: AudioUpsertResults
   ): AlbumId? = queryAlbumInfo(newAlbum, newAlbumArtist)?.let { info ->
     // album could match on query yet differ in case, so update if case changes
-    val updateAlbum = info.album.updateOrNull { newAlbum }
-    val updateAlbumSort = info.albumSort.updateOrNull { newAlbumSort }
-    val updateAlbumArtist = info.albumArtist.updateOrNull { newAlbumArtist }
-    val updateReleaseMbid = info.releaseMbid.updateOrNull { newReleaseMbid }
-    val updateReleaseGroupMbid = info.releaseGroupMbid.updateOrNull { newReleaseGroupMbid }
+    val updateAlbum = newAlbum.takeIfSupersedes(info.album)
+    val updateAlbumSort = newAlbumSort.takeIfSupersedes(info.albumSort)
+    val updateAlbumArtist = newAlbumArtist.takeIfSupersedes(info.albumArtist)
+    val updateYear = newYear.takeIfSupersedes(info.albumYear)
+    val updateReleaseMbid = newReleaseMbid?.takeIfSupersedes(info.releaseMbid)
+    val updateReleaseGroupMbid = newReleaseGroupMbid?.takeIfSupersedes(info.releaseGroupMbid)
 
-    val updateNeeded = anyNotNull {
-      arrayOf(
-        updateAlbum,
-        updateAlbumSort,
-        updateAlbumArtist,
-        updateReleaseMbid,
-        updateReleaseGroupMbid
-      )
-    }
+    val updateNeeded = anyNotNull(
+      updateAlbum,
+      updateAlbumSort,
+      updateAlbumArtist,
+      updateYear,
+      updateReleaseMbid,
+      updateReleaseGroupMbid
+    )
     if (updateNeeded) {
       val updated = AlbumTable
         .updateColumns {
           updateAlbum?.let { update -> it[albumTitle] = update }
           updateAlbumSort?.let { update -> it[albumSort] = update }
           updateAlbumArtist?.let { update -> it[albumArtist] = update }
+          updateYear?.let { update -> it[albumYear] = update }
           updateReleaseMbid?.let { update -> it[releaseMbid] = update.value }
           updateReleaseGroupMbid?.let { update -> it[releaseGroupMbid] = update.value }
           it[updatedTime] = newUpdateTime()
@@ -685,6 +709,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         cursor[albumTitle],
         cursor[albumSort],
         cursor[albumArtist],
+        cursor[albumYear],
         ReleaseMbid(cursor[releaseMbid]),
         ReleaseGroupMbid(cursor[releaseGroupMbid])
       )
@@ -695,6 +720,7 @@ private val INSERT_STATEMENT = AlbumTable.insertValues {
   it[albumTitle].bindArg()
   it[albumSort].bindArg()
   it[albumArtist].bindArg()
+  it[albumYear].bindArg()
   it[albumLocalArtUri].bindArg()
   it[releaseMbid].bindArg()
   it[releaseGroupMbid].bindArg()
@@ -704,7 +730,17 @@ private val INSERT_STATEMENT = AlbumTable.insertValues {
 
 private val QUERY_ALBUM_INFO = Query(
   AlbumTable
-    .selects { listOf(id, albumTitle, albumSort, albumArtist, releaseMbid, releaseGroupMbid) }
+    .selects {
+      listOf(
+        id,
+        albumTitle,
+        albumSort,
+        albumArtist,
+        albumYear,
+        releaseMbid,
+        releaseGroupMbid
+      )
+    }
     .where { (albumTitle eq bindString()) and (albumArtist eq bindString()) }
 )
 
@@ -713,6 +749,7 @@ private data class AlbumInfo(
   val album: String,
   val albumSort: String,
   val albumArtist: String,
+  val albumYear: Int,
   val releaseMbid: ReleaseMbid,
   val releaseGroupMbid: ReleaseGroupMbid,
 )
@@ -720,6 +757,7 @@ private data class AlbumInfo(
 fun AlbumTitle.isEmpty(): Boolean = value.isEmpty()
 
 private val songCountColumn = MediaTable.id.countDistinct()
+private val totalDurationColumn = MediaTable.duration.sum()
 
 private val BIND_ALBUM_ID: BindExpression<Long> = bindLong()
 private val SELECT_ALBUM_SORT_FROM_BIND_ID: Expression<String> = AlbumTable
