@@ -81,7 +81,8 @@ data class ToqueTypography(
   val headerSecondary: TextStyle = material.body2.copy(
     fontFamily = FONT_FAMILY,
     letterSpacing = 0.1.sp
-  )
+  ),
+  val headerTertiary: TextStyle = material.caption,
 ) {
   val h1: TextStyle get() = material.h1
   val h2: TextStyle get() = material.h2

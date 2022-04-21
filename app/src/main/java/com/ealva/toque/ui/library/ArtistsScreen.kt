@@ -540,6 +540,7 @@ private class ArtistsViewModelImpl(
         artistName = artistInfo.name,
         artwork = artistInfo.artwork,
         songCount = artistInfo.songCount,
+        tertiaryInfo = formatSongsInfo(artistInfo.songCount, artistInfo.duration),
         backTo = fetch(artistType.categoryTitleRes)
       )
     )

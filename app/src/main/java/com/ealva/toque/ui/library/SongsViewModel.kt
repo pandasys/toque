@@ -131,6 +131,14 @@ interface SongsViewModel : ActionsViewModel {
   fun goBack()
 }
 
+fun List<SongInfo>.toSongCount(year: Int = 0): String = formatSongsInfo(
+  size,
+  fold(Duration.ZERO) { duration, songInfo: SongInfo ->
+    duration + songInfo.duration
+  },
+  year
+)
+
 abstract class BaseSongsViewModel(
   private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,

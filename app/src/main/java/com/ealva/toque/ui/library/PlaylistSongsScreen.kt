@@ -95,6 +95,8 @@ data class PlaylistSongsScreen(
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
+    val tertiaryInfo = songs.value.toSongCount()
+
     Column(
       modifier = Modifier
         .fillMaxSize()
@@ -105,6 +107,7 @@ data class PlaylistSongsScreen(
         SongListHeaderInfo(
           title = playlistName.value,
           subtitle = null,
+          tertiaryInfo = tertiaryInfo,
           itemCount = songs.value.size,
           selectedItems = selected.value,
           viewModel = viewModel,

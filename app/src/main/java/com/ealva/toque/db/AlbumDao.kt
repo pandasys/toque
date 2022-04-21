@@ -197,6 +197,8 @@ interface AlbumDao {
     playlistName: PlaylistName
   ): DaoResult<Uri>
 
+  suspend fun getAlbumYear(albumId: AlbumId): Int
+
   companion object {
     operator fun invoke(
       db: Database,
@@ -580,6 +582,19 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         }
       }
     }
+  }
+
+  override suspend fun getAlbumYear(albumId: AlbumId): Int = try {
+    db.query {
+      AlbumTable
+        .select(AlbumTable.albumYear)
+        .where { id eq albumId.value }
+        .longForQuery()
+        .toInt()
+    }
+  } catch (e: Exception) {
+    LOG.e(e) { it("Error querying year for %s", albumId) }
+    0
   }
 
   private fun Queryable.getArtwork(

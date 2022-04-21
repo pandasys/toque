@@ -17,6 +17,7 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.ui.common.BackToButton
@@ -37,10 +39,13 @@ import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.statusBarsPadding
 
+private const val ID_PIN_TO_TOP = "PIN_TO_TOP_ID"
+
 @Composable
 fun SongListHeaderInfo(
   title: String,
   subtitle: String?,
+  tertiaryInfo: String?,
   itemCount: Int,
   selectedItems: SelectedItems<MediaId>,
   viewModel: SongsViewModel,
@@ -53,6 +58,7 @@ fun SongListHeaderInfo(
   SongListHeaderInfo(
     title = title,
     subtitle = subtitle,
+    tertiaryInfo = tertiaryInfo,
     itemCount = itemCount,
     selectedItems = selectedItems,
     viewModel = viewModel,
@@ -68,6 +74,7 @@ fun SongListHeaderInfo(
 private fun SongListHeaderInfo(
   title: String,
   subtitle: String?,
+  tertiaryInfo: String?,
   itemCount: Int,
   selectedItems: SelectedItems<MediaId>,
   viewModel: SongsViewModel,
@@ -92,7 +99,9 @@ private fun SongListHeaderInfo(
 
       val notInSelectionMode = !selectedItems.inSelectionMode
       if (notInSelectionMode) {
-        Column {
+        Column(
+          modifier = Modifier.layoutId(ID_PIN_TO_TOP)
+        ) {
           Spacer(modifier = Modifier.height(2.dp))
           BackToButton(
             modifier = Modifier,
@@ -121,6 +130,16 @@ private fun SongListHeaderInfo(
           style = toqueTypography.headerSecondary
         )
       }
+      if (tertiaryInfo != null) {
+        TextOvalBackground(
+          modifier = Modifier.padding(vertical = 2.dp),
+          text = tertiaryInfo,
+          textPadding = PaddingValues(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 2.dp),
+          color = contentColor,
+          ovalColor = ovalColor,
+          style = toqueTypography.headerTertiary
+        )
+      }
       Spacer(modifier = Modifier.height(8.dp))
       SongsItemsActions(
         modifier = Modifier.padding(bottom = 2.dp),
@@ -133,7 +152,8 @@ private fun SongListHeaderInfo(
     measurePolicy = BottomUpResizeHeightMeasurePolicy(
       heightSubtrahend,
       scrollConnection,
-      screenConfig.preferredArtworkHeaderHeightPx
+      screenConfig.preferredArtworkHeaderHeightPx,
+      ID_PIN_TO_TOP
     )
   )
 }

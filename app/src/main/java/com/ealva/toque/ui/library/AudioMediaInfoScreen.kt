@@ -58,7 +58,7 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.common.Title
-import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.asHourMinutesSeconds
 import com.ealva.toque.common.fetch
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
@@ -575,7 +575,7 @@ private fun TrackDiscRow(mediaInfo: MediaInfoViewModel.MediaInfo, labelColor: Co
   ) {
     LabeledTextValue(R.string.Track, numOfTotal(mediaInfo.track, mediaInfo.totalTracks), labelColor)
     LabeledTextValue(R.string.Disc, numOfTotal(mediaInfo.disc, mediaInfo.totalDiscs), labelColor)
-    LabeledTextValue(R.string.Duration, mediaInfo.duration.asDurationString, labelColor)
+    LabeledTextValue(R.string.Duration, mediaInfo.duration.asHourMinutesSeconds, labelColor)
     LabeledTextValue(R.string.Year, mediaInfo.year.toString(), labelColor)
   }
 }

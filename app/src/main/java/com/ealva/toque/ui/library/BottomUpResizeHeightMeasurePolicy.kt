@@ -17,19 +17,23 @@
 package com.ealva.toque.ui.library
 
 import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layoutId
 
 @Suppress("FunctionName")
 fun BottomUpResizeHeightMeasurePolicy(
   heightSubtrahend: Int,
   scrollConnection: HeightResizeScrollConnection,
-  minimumHeight: Int = 0
+  minimumHeight: Int = 0,
+  pinToTopId: String,
 ): MeasurePolicy = MeasurePolicy { measurables, constraints ->
   val itemConstraints = constraints.copy(minWidth = 0)
+  var pinPlaceable: Placeable? = null
   val placeables = measurables.mapIndexed { index, measurable ->
     when (index) {
       measurables.indices.last -> measurable.measure(constraints)
       else -> measurable.measure(itemConstraints)
-    }
+    }.also { current -> if (measurable.layoutId == pinToTopId) pinPlaceable = current }
   }
 
   val width = placeables.maxOf { placeable -> placeable.width }
@@ -42,9 +46,9 @@ fun BottomUpResizeHeightMeasurePolicy(
 
   layout(width, height) {
     var y = height
-    placeables.asReversed().forEachIndexed { index, placeable ->
+    placeables.asReversed().forEach { placeable ->
       y -= placeable.height
-      if (index == placeables.indices.last) {
+      if (placeable === pinPlaceable) {
         y = y.coerceAtMost(0)
       }
       placeable.place(x = 0, y = y)

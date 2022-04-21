@@ -19,6 +19,7 @@ package com.ealva.toque.ui.library
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -88,6 +90,8 @@ import org.koin.core.component.get
 @Suppress("unused")
 private val LOG by lazyLogger(ArtistAlbumsScreen::class)
 
+private const val ID_PIN_TO_TOP = "PIN_TO_TOP_ID"
+
 @Parcelize
 @Immutable
 data class ArtistAlbumsScreen(
@@ -96,6 +100,7 @@ data class ArtistAlbumsScreen(
   private val artistName: ArtistName,
   private val artwork: Uri,
   private val songCount: Int,
+  private val tertiaryInfo: String,
   private val backTo: String
 ) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
 
@@ -139,6 +144,7 @@ data class ArtistAlbumsScreen(
         ArtistAlbumsHeaderInfo(
           artistName = artistName,
           albumCount = albums.value.size,
+          tertiaryInfo = tertiaryInfo,
           selectedItems = selected.value,
           viewModel = viewModel,
           backTo = backTo,
@@ -166,6 +172,7 @@ data class ArtistAlbumsScreen(
 private fun ArtistAlbumsHeaderInfo(
   artistName: ArtistName,
   albumCount: Int,
+  tertiaryInfo: String,
   selectedItems: SelectedItems<*>,
   viewModel: ActionsViewModel,
   backTo: String,
@@ -176,6 +183,7 @@ private fun ArtistAlbumsHeaderInfo(
   ArtistAlbumsHeaderInfo(
     artistName = artistName,
     albumCount = albumCount,
+    tertiaryInfo = tertiaryInfo,
     selectedItems = selectedItems,
     viewModel = viewModel,
     backTo = backTo,
@@ -189,6 +197,7 @@ private fun ArtistAlbumsHeaderInfo(
 private fun ArtistAlbumsHeaderInfo(
   artistName: ArtistName,
   albumCount: Int,
+  tertiaryInfo: String,
   selectedItems: SelectedItems<*>,
   viewModel: ActionsViewModel,
   backTo: String,
@@ -212,7 +221,7 @@ private fun ArtistAlbumsHeaderInfo(
 
       val notInSelectionMode = !selectedItems.inSelectionMode
       if (notInSelectionMode) {
-        Column {
+        Column(modifier = Modifier.layoutId(ID_PIN_TO_TOP)) {
           Spacer(modifier = Modifier.height(2.dp))
           BackToButton(
             modifier = Modifier,
@@ -230,6 +239,14 @@ private fun ArtistAlbumsHeaderInfo(
         ovalColor = ovalColor,
         style = toqueTypography.headerPrimary
       )
+      TextOvalBackground(
+        modifier = Modifier.padding(vertical = 2.dp),
+        text = tertiaryInfo,
+        textPadding = PaddingValues(start = 4.dp, top = 3.dp, end = 4.dp, bottom = 2.dp),
+        color = contentColor,
+        ovalColor = ovalColor,
+        style = toqueTypography.headerTertiary
+      )
       LibraryItemsActions(
         itemCount = albumCount,
         selectedItems = selectedItems,
@@ -240,7 +257,8 @@ private fun ArtistAlbumsHeaderInfo(
     measurePolicy = BottomUpResizeHeightMeasurePolicy(
       heightSubtrahend,
       scrollConnection,
-      screenConfig.preferredArtworkHeaderHeightPx
+      screenConfig.preferredArtworkHeaderHeightPx,
+      ID_PIN_TO_TOP
     )
   )
 }
@@ -342,8 +360,8 @@ private class ArtistAlbumsViewModelImpl(
         artistType,
         artistName,
         album.title,
+        formatSongsInfo(album.songCount, album.duration, album.year),
         album.artwork,
-
         )
     )
 

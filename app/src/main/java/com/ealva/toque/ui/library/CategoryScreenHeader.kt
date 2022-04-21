@@ -27,12 +27,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.ui.common.BackToButton
 import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.common.timesAlpha
 import com.google.accompanist.insets.statusBarsPadding
+
+private const val ID_PIN_TO_TOP = "PIN_TO_TOP_ID"
 
 @Composable
 fun CategoryScreenHeader(
@@ -87,7 +90,7 @@ private fun CategoryScreenHeader(
       val contentColor = LocalContentColor.current.timesAlpha(alphaPercentage)
       val notInSelectionMode = !selectedItems.inSelectionMode
       if (notInSelectionMode) {
-        Column {
+        Column(modifier = Modifier.layoutId(ID_PIN_TO_TOP)) {
           Spacer(modifier = Modifier.height(2.dp))
           BackToButton(
             modifier = Modifier,
@@ -108,6 +111,10 @@ private fun CategoryScreenHeader(
         selectActions = selectActions
       )
     },
-    measurePolicy = BottomUpResizeHeightMeasurePolicy(heightSubtrahend, scrollConnection)
+    measurePolicy = BottomUpResizeHeightMeasurePolicy(
+      heightSubtrahend = heightSubtrahend,
+      scrollConnection = scrollConnection,
+      pinToTopId = ID_PIN_TO_TOP
+    )
   )
 }

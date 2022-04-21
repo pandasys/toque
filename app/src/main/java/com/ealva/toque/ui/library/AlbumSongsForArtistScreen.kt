@@ -58,6 +58,7 @@ data class AlbumSongsForArtistScreen(
   private val artistType: ArtistType,
   private val artistName: ArtistName,
   private val albumTitle: AlbumTitle,
+  private val tertiaryInfo: String,
   private val artwork: Uri,
   private val backTo: String = artistName.value
 ) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
@@ -100,6 +101,7 @@ data class AlbumSongsForArtistScreen(
         SongListHeaderInfo(
           title = albumTitle.value,
           subtitle = artistName.value,
+          tertiaryInfo = tertiaryInfo,
           itemCount = songs.value.size,
           selectedItems = selected.value,
           viewModel = viewModel,

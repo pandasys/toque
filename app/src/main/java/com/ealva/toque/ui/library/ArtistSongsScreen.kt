@@ -103,6 +103,8 @@ data class ArtistSongsScreen(
     val selected = viewModel.selectedItems.asState()
     val artwork = viewModel.artistArt.collectAsState()
 
+    val tertiaryInfo = songs.value.toSongCount()
+
     Column(
       modifier = Modifier
         .fillMaxSize()
@@ -113,6 +115,7 @@ data class ArtistSongsScreen(
         SongListHeaderInfo(
           title = stringResource(id = artistType.allSongsRes),
           subtitle = null,
+          tertiaryInfo = tertiaryInfo,
           itemCount = songs.value.size,
           selectedItems = selected.value,
           viewModel = viewModel,

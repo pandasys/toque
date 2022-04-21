@@ -30,7 +30,7 @@ import com.ealva.toque.common.Rating
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.Title
-import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.asHourMinutesSeconds
 import com.ealva.toque.common.asMillis
 import com.ealva.toque.common.debugRequire
 import com.ealva.toque.common.fetch
@@ -94,7 +94,7 @@ interface NowPlayingViewModel {
     val localAlbumArt: Uri,
     val albumArt: Uri,
     val rating: Rating,
-    val albumId: AlbumId
+    val albumId: AlbumId,
   ) {
     val artwork: Uri
       get() = if (localAlbumArt !== Uri.EMPTY) localAlbumArt else albumArt
@@ -137,9 +137,9 @@ interface NowPlayingViewModel {
       get() = if (queueIndex in queue.indices) queue[queueIndex] else NullQueueItem
 
     fun getDurationDisplay(): String =
-      (if (showTimeRemaining) position.toDuration() - duration else duration).asDurationString
+      (if (showTimeRemaining) position.toDuration() - duration else duration).asHourMinutesSeconds
 
-    fun getPositionDisplay(): String = position.toDuration().asDurationString
+    fun getPositionDisplay(): String = position.toDuration().asHourMinutesSeconds
 
     companion object {
       val NONE = NowPlayingState(
@@ -382,6 +382,7 @@ private class NowPlayingViewModelImpl(
         item.albumTitle,
         item.artwork,
         item.albumArtist,
+        null,
         fetch(R.string.NowPlaying)
       )
     )
@@ -493,6 +494,6 @@ private inline val AudioItem.asQueueItem: QueueItem
     localAlbumArt,
     albumArt,
     rating,
-    albumId
+    albumId,
   )
 

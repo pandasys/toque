@@ -32,6 +32,7 @@ import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
@@ -46,6 +47,8 @@ import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -58,6 +61,7 @@ data class AlbumSongsScreen(
   private val title: AlbumTitle,
   private val artwork: Uri,
   private val artist: ArtistName,
+  private val tertiaryInfo: String?,
   private val backTo: String
 ) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
 
@@ -78,6 +82,23 @@ data class AlbumSongsScreen(
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
+    val year = viewModel.albumYear.collectAsState()
+
+    AlbumSongs(songs.value, scrollConnection, selected.value, year.value, viewModel)
+  }
+
+  @OptIn(ExperimentalFoundationApi::class)
+  @Composable
+  private fun AlbumSongs(
+    songs: List<SongsViewModel.SongInfo>,
+    scrollConnection: HeightResizeScrollConnection,
+    selected: SelectedItems<MediaId>,
+    year: Int,
+    viewModel: AlbumSongsViewModel
+  ) {
+    // Coming from Now Playing we do not have count/duration/year info. We will calculate count,
+    // and duration, and the model queries the year and we get via flow
+    val tertiary = tertiaryInfo ?: songs.toSongCount(year)
 
     Column(
       modifier = Modifier
@@ -89,8 +110,9 @@ data class AlbumSongsScreen(
         SongListHeaderInfo(
           title = title.value,
           subtitle = artist.value,
-          itemCount = songs.value.size,
-          selectedItems = selected.value,
+          tertiaryInfo = tertiary,
+          itemCount = songs.size,
+          selectedItems = selected,
           viewModel = viewModel,
           buttonColors = ActionButtonDefaults.overArtworkColors(),
           backTo = backTo,
@@ -99,8 +121,8 @@ data class AlbumSongsScreen(
         )
       }
       SongItemList(
-        list = songs.value,
-        selectedItems = selected.value,
+        list = songs,
+        selectedItems = selected,
         itemClicked = { viewModel.mediaClicked(it.id) },
         itemLongClicked = { viewModel.mediaLongClicked(it.id) },
       )
@@ -108,7 +130,29 @@ data class AlbumSongsScreen(
   }
 }
 
-private class AlbumSongsViewModel(
+interface AlbumSongsViewModel : SongsViewModel {
+  val albumYear: StateFlow<Int>
+
+  companion object {
+    operator fun invoke(
+      albumId: AlbumId,
+      audioMediaDao: AudioMediaDao,
+      localAudioQueueModel: LocalAudioQueueViewModel,
+      appPrefs: AppPrefsSingleton,
+      backstack: Backstack,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): AlbumSongsViewModel = AlbumSongsViewModelImpl(
+      albumId,
+      audioMediaDao,
+      localAudioQueueModel,
+      appPrefs,
+      backstack,
+      dispatcher
+    )
+  }
+}
+
+private class AlbumSongsViewModelImpl(
   private val albumId: AlbumId,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
@@ -116,13 +160,18 @@ private class AlbumSongsViewModel(
   backstack: Backstack,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : BaseSongsViewModel(audioMediaDao, localAudioQueueModel, appPrefs, backstack, dispatcher),
-  ScopedServices.Activated {
+  AlbumSongsViewModel, ScopedServices.Activated {
+
+  override val albumYear = MutableStateFlow(0)
+
   override val categoryToken: CategoryToken
     get() = CategoryToken(albumId)
 
   override suspend fun getAudioList(
     audioMediaDao: AudioMediaDao,
     filter: Filter
-  ): Result<List<AudioDescription>, Throwable> =
-    audioMediaDao.getAlbumAudio(id = albumId, filter = filter)
+  ): Result<List<AudioDescription>, Throwable> {
+    albumYear.value = audioMediaDao.albumDao.getAlbumYear(albumId)
+    return audioMediaDao.getAlbumAudio(id = albumId, filter = filter)
+  }
 }

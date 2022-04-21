@@ -77,6 +77,8 @@ data class ComposerSongsScreen(
     val songs = viewModel.songsFlow.collectAsState()
     val selected = viewModel.selectedItems.asState()
 
+    val tertiaryInfo = songs.value.toSongCount()
+
     Column(
       modifier = Modifier
         .fillMaxSize()
@@ -87,6 +89,7 @@ data class ComposerSongsScreen(
         SongListHeaderInfo(
           title = composerName.value,
           subtitle = null,
+          tertiaryInfo = tertiaryInfo,
           itemCount = songs.value.size,
           selectedItems = selected.value,
           viewModel = viewModel,

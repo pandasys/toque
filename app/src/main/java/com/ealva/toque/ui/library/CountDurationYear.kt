@@ -19,7 +19,7 @@ package com.ealva.toque.ui.library
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextOverflow
-import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.asHourMinutesSeconds
 import kotlin.time.Duration
 
 @Composable
@@ -33,11 +33,11 @@ fun CountDurationYear(songCount: Int, duration: Duration, year: Int) {
 
 private const val TREBLE_CLEF = "\uD834\uDD1E  "
 
-fun formatSongsInfo(count: Int, duration: Duration, year: Int): String = buildString {
+fun formatSongsInfo(count: Int, duration: Duration, year: Int = 0): String = buildString {
   append(TREBLE_CLEF)
   append(count)
   append(" | ")
-  append(duration.asDurationString)
+  append(duration.asHourMinutesSeconds)
   if (year > 0) {
     append(" | ")
     append(year)

@@ -134,7 +134,14 @@ private class AllAlbumsViewModel(
   ): DaoResult<List<AlbumDescription>> = albumDao.getAllAlbums(filter)
 
   override fun goToAlbumSongs(album: AlbumInfo) = backstack.goToScreen(
-    AlbumSongsScreen(album.id, album.title, album.artwork, album.artist, fetch(R.string.Albums))
+    AlbumSongsScreen(
+      album.id,
+      album.title,
+      album.artwork,
+      album.artist,
+      formatSongsInfo(album.songCount, album.duration, album.year),
+      fetch(R.string.Albums)
+    )
   )
 
   override suspend fun makeCategoryMediaList(

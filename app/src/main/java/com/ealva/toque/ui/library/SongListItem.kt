@@ -42,7 +42,7 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.R
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
-import com.ealva.toque.common.asDurationString
+import com.ealva.toque.common.asHourMinutesSeconds
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.modifyIf
@@ -142,7 +142,7 @@ private fun ArtistAndDuration(artistName: ArtistName, songDuration: Duration, te
       }
     )
     Text(
-      text = songDuration.asDurationString,
+      text = songDuration.asHourMinutesSeconds,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
       color = textColor,

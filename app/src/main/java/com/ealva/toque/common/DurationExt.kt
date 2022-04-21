@@ -26,7 +26,7 @@ private inline fun <T> Duration.toAbsComponents(
 }
 
 private val BUILDER = StringBuilder(16)
-val Duration.asDurationString: String
+val Duration.asHourMinutesSeconds: String
   get() = toAbsComponents { hours, minutes, seconds ->
     debug { require(isUiThread) }   // don't share BUILDER across threads
     BUILDER.run {
