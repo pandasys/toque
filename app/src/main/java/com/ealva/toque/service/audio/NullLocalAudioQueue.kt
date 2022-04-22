@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.emptyFlow
 
 object NullLocalAudioQueue : LocalAudioQueue {
   override val queueState = MutableStateFlow(LocalAudioQueueState.NONE)
-  override val notification = emptyFlow<ServiceNotification>()
+  override val notificationFlow = emptyFlow<ServiceNotification>()
   override fun toggleEqMode() = Unit
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
   override suspend fun addToUpNext(

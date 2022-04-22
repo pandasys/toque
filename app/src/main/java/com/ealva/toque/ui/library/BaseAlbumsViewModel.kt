@@ -55,12 +55,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
-import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG by lazyLogger(BaseAlbumsViewModel::class)
 
@@ -86,7 +87,9 @@ abstract class BaseAlbumsViewModel(
   @OptIn(FlowPreview::class)
   override fun onServiceRegistered() {
     filterFlow
-      .debounce(500.milliseconds)
+      .onStart { requestAlbums() }
+      .drop(1)
+      .debounce(Filter.debounceDuration)
       .onEach { requestAlbums() }
       .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
       .launchIn(scope)

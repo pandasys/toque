@@ -18,6 +18,7 @@ package com.ealva.toque.common
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlin.time.Duration.Companion.milliseconds
 
 @Parcelize
 @JvmInline
@@ -27,6 +28,7 @@ value class Filter(val value: String) : Parcelable {
 
   companion object {
     val NoFilter = Filter("")
+    val debounceDuration = 250.milliseconds
   }
 }
 

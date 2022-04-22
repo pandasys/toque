@@ -110,9 +110,9 @@ interface MainViewModel : MainBridge {
 private class MainViewModelImpl(
   private val mainBridge: MainBridge,
   private val backstack: Backstack,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : MainViewModel, ScopedServices.Registered, KoinComponent, MainBridge by mainBridge {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private lateinit var playerServiceConnection: MediaPlayerServiceConnection
   private val keyguardManager: KeyguardManager by inject()
   private var mediaController: ToqueMediaController = NullMediaController
@@ -124,7 +124,6 @@ private class MainViewModelImpl(
   private var activeNotification: Notification? = null
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
     playerServiceConnection = MediaPlayerServiceConnection(mainBridge.activityContext)
   }
 
@@ -223,7 +222,7 @@ private class MainViewModelImpl(
 
   private fun emitOrEnqueue(notification: Notification) {
     activeNotification?.let { active ->
-      if (active.isIndefiniteLength) {
+      if (active.doNotDismissEarly) {
         notificationDeque.addLast(notification)
       } else {
         active.dismiss()
@@ -255,6 +254,7 @@ private class MainViewModelImpl(
     override suspend fun showSnackbar(snackbarHostState: SnackbarHostState) {
       notificationActive(notification)
       notification.showSnackbar(snackbarHostState)
+      notificationDismissed()
     }
   }
 

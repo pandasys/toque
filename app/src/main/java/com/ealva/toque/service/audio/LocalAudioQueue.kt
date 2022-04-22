@@ -64,7 +64,6 @@ import com.ealva.toque.db.QueueDao
 import com.ealva.toque.db.QueuePositionState
 import com.ealva.toque.db.QueuePositionStateDao
 import com.ealva.toque.db.QueuePositionStateDaoFactory
-import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
@@ -214,7 +213,7 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   val queueState: StateFlow<LocalAudioQueueState>
 
   /** Notification source for events the service to possibly by shown to the user */
-  val notification: Flow<ServiceNotification>
+  val notificationFlow: Flow<ServiceNotification>
 
   /** Toggles Eq off/on which is then reflected in new state emission */
   fun toggleEqMode()
@@ -322,10 +321,9 @@ private class LocalAudioQueueImpl(
   private var lastShuffle = prefs.shuffleMode()
 
   override val queueState = MutableStateFlow(makeInitialState())
-  override val notification = MutableSharedFlow<ServiceNotification>()
+  override val notificationFlow = MutableSharedFlow<ServiceNotification>()
 
   private val focusRequest = AvPlayer.FocusRequest {
-    LOG._e { it("FocusRequest playState:%s", playState) }
     audioFocusManager.requestFocus(AudioFocusManager.ContentType.Audio) { playState.isPlaying }
   }
 
@@ -345,10 +343,7 @@ private class LocalAudioQueueImpl(
   private inline fun updateQueueState(
     @Suppress("UNUSED_PARAMETER") why: String,
     block: (LocalAudioQueueState) -> LocalAudioQueueState
-  ) = queueState.update { state ->
-//    LOG._e { it("updateQueueState %s", why) }
-    block(state)
-  }
+  ) = queueState.update { state -> block(state) }
 
   private val repeat: RepeatMode get() = prefs.repeatMode()
 
@@ -855,9 +850,8 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  private fun notify(msg: ServiceNotification) {
-    LOG._e { it("notify") }
-    scope.launch { notification.emit(msg) }
+  private fun notify(notification: ServiceNotification) {
+    scope.launch { notificationFlow.emit(notification) }
   }
 
   override suspend fun removeFromQueue(index: Int, item: AudioItem) {
@@ -1253,7 +1247,6 @@ private class LocalAudioQueueImpl(
   }
 
   private suspend fun onPrepared(event: PlayableItemEvent.Prepared) {
-    LOG._e { it("onPrepared") }
     isActive.value = true
     val item = event.audioItem
     updatePositionState(positionState.copy(mediaId = item.id, playbackPosition = event.position))

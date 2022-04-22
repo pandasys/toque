@@ -20,14 +20,8 @@ import androidx.compose.material.SnackbarDuration
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.SnackbarResult
 import androidx.compose.runtime.Immutable
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
 import com.ealva.toque.ui.main.Notification.Action.Companion.NoAction
 import java.util.concurrent.atomic.AtomicInteger
-
-@Suppress("unused")
-private val LOG by lazyLogger(Notification::class)
 
 @Immutable
 interface Notification {
@@ -91,12 +85,10 @@ interface Notification {
           )
         ) {
           SnackbarResult.ActionPerformed -> {
-            LOG._e { it("action performed") }
             hasBeenDismissed = true
             action.action()
           }
           SnackbarResult.Dismissed -> {
-            LOG._e { it("action expired") }
             hasBeenDismissed = true
             action.expired()
           }
@@ -132,5 +124,8 @@ interface Notification {
     ): Notification = NotificationData(msg, duration, action, nextVersion.getAndIncrement())
   }
 }
+
+inline val Notification.displaysAction: Boolean get() = !action.label.isNullOrBlank()
+inline val Notification.doNotDismissEarly: Boolean get() = isIndefiniteLength || displaysAction
 
 private val nextVersion = AtomicInteger(0)

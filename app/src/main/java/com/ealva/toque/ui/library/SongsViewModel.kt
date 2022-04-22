@@ -74,14 +74,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import javax.annotation.concurrent.Immutable
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG by lazyLogger(BaseSongsViewModel::class)
 
@@ -181,7 +182,9 @@ abstract class BaseSongsViewModel(
   @OptIn(FlowPreview::class)
   override fun onServiceRegistered() {
     filterFlow
-      .debounce(500.milliseconds)
+      .onStart { requestAudio() }
+      .drop(1)
+      .debounce(Filter.debounceDuration)
       .onEach { requestAudio() }
       .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
       .launchIn(scope)

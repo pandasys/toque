@@ -116,9 +116,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
@@ -126,7 +128,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 private val LOG by lazyLogger(ArtistsScreen::class)
@@ -382,7 +383,9 @@ private class ArtistsViewModelImpl(
     scope = CoroutineScope(Job() + dispatcher)
     // may want onStart+drop(1) for chunking and onEach to not chunk
     filterFlow
-      .debounce(500.milliseconds)
+      .onStart { requestArtists(processChunks = true) }
+      .drop(1)
+      .debounce(Filter.debounceDuration)
       .onEach { requestArtists(processChunks = true) }
       .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
       .launchIn(scope)

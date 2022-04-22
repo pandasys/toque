@@ -387,7 +387,7 @@ class LocalAudioQueueViewModelImpl(
       .onEach { audioQueueState -> lastState = audioQueueState }
       .launchIn(scope)
 
-    queueNotificationJob = queue.notification
+    queueNotificationJob = queue.notificationFlow
       .onEach { serviceNotification -> mainViewModel.notify(serviceNotification) }
       .launchIn(scope)
   }
