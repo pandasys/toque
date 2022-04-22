@@ -335,10 +335,9 @@ private class MediaSessionImpl(
     LOG._e { it("session.setCallback") }
     session.setCallback(sessionCallback)
     playbackStateFlow
-      .onStart { LOG.i { it("PlaybackStateFlow started") } }
       .onEach { state -> handlePlaybackState(state) }
-      .catch { cause -> LOG.e(cause) { it("Error processing PlaybackStateFlow") } }
-      .onCompletion { cause -> LOG.i(cause) { it("PlaybackStateFlow completed") } }
+      .catch { cause -> LOG.e(cause) { it("PlaybackStateFlow error") } }
+      .onCompletion { LOG.i { it("PlaybackStateFlow completed") } }
       .launchIn(scope)
 
     metadataFlow

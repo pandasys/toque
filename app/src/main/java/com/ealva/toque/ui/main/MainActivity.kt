@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.navigation.ComposeKey
@@ -82,6 +83,7 @@ interface MainBridge {
   fun exit()
   val canDrawOverlays: Boolean
   fun requestOverlayPermission()
+  val activityIsVisible: Boolean
 }
 
 class MainActivity : ComponentActivity(), MainBridge {
@@ -190,6 +192,9 @@ class MainActivity : ComponentActivity(), MainBridge {
       }
     )
   }
+
+  override val activityIsVisible: Boolean
+    get() = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 
   override fun onBackPressed() {
     if (!Navigator.onBackPressed(this)) super.onBackPressed()

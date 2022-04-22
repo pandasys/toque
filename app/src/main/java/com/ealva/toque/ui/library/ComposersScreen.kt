@@ -92,12 +92,14 @@ import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
@@ -106,6 +108,7 @@ import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 private val LOG by lazyLogger(ComposersScreen::class)
 
@@ -352,9 +355,11 @@ private class ComposersViewModelImpl(
       )
     )
 
+  @OptIn(FlowPreview::class)
   override fun onServiceRegistered() {
     // may want onStart+drop(1) for chunking and onEach to not chunk
     filterFlow
+      .debounce(500.milliseconds)
       .onEach { requestComposers(processChunks = true) }
       .catch { cause -> LOG.e(cause) { it("Error in filterFlow for %s", javaClass) } }
       .launchIn(scope)

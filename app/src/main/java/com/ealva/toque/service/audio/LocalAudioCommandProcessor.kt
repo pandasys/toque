@@ -172,9 +172,8 @@ class LocalAudioCommandProcessor(
 
   private fun collectMediaSessionEventFlow(mediaSession: MediaSessionControl) {
     mediaSession.eventFlow
-      .onStart { LOG._i { it("Start collection SessionControlEvent") } }
       .onEach { mediaSessionEvent -> handleSessionEvent(mediaSessionEvent) }
-      .catch { cause -> LOG.e(cause) { it("Error collecting SessionControlEvent") } }
+      .catch { cause -> LOG.e(cause) { it("SessionControlEvent flow error") } }
       .onCompletion { cause -> LOG.i(cause) { it("Collect SessionControlEvent complete") } }
       .launchIn(scope)
   }
@@ -269,9 +268,8 @@ class LocalAudioCommandProcessor(
 
   private fun collectCommandFlow() {
     commandFlow
-      .onStart { LOG._i { it("Start collecting LocalAudioCommand") } }
       .onEach { command -> processCommand(command) }
-      .catch { cause -> LOG.e(cause) { it("Error collecting LocalAudioCommand") } }
+      .catch { cause -> LOG.e(cause) { it("LocalAudioCommand flow error") } }
       .onCompletion { LOG._i { it("Collecting LocalAudioCommand complete") } }
       .launchIn(scope)
   }

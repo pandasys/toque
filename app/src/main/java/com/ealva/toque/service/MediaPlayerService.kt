@@ -169,7 +169,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     incomingActionsJob = if (queue !== NullPlayableMediaQueue) {
       incomingActions
         .onEach { action -> executeAction(action) }
-        .catch { cause -> LOG.e(cause) { it("Error collecting incoming actions flow") } }
+        .catch { cause -> LOG.e(cause) { it("Incoming action flow error") } }
         .launchIn(scope)
     } else {
       null
@@ -187,7 +187,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
 
   private val binder = MediaServiceBinder()
   override fun onBind(intent: Intent): IBinder? {
-    LOG._e { it("onBind %s", intent.action ?: "null") }
+//    LOG._e { it("onBind %s", intent.action ?: "null") }
     dispatcher.onServicePreSuperOnBind()
     return if (doNotHaveReadPermission()) {
       LOG.e { it("Don't have read external permission. Bind disallowed.") }
@@ -201,7 +201,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    LOG._e { it("onStartCommand %s", intent?.action ?: "null") }
+//    LOG._e { it("onStartCommand %s", intent?.action ?: "null") }
     dispatcher.onServicePreSuperOnStart()
 
     val startIntent = intent.orNullObject()
@@ -215,7 +215,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   }
 
   private fun handleStartIntent(intent: Intent, action: String) {
-    LOG._e { it("handleStartIntent action:%s", action) }
+//    LOG._e { it("handleStartIntent action:%s", action) }
     if (action.isNotEmpty()) {
       if (ACTION_MEDIA_BUTTON == action) {
         mediaSession.handleMediaButtonIntent(intent)?.let {
@@ -422,7 +422,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   }
 
   private fun updateWidgets(@Suppress("UNUSED_PARAMETER") appWidgetIds: IntArray) {
-    LOG._e { it("updateWidgets") }
     currentQueue.ifActiveRefreshMediaState()
   }
 
@@ -457,7 +456,6 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
       appWidgetIds: IntArray,
 //      componentName: ComponentName
     ) = with(context) {
-      LOG._e { it("startForWidgetsUpdate") }
       ContextCompat.startForegroundService(
         this,
         makeStartIntent(this, Action.UpdateWidgets, null)

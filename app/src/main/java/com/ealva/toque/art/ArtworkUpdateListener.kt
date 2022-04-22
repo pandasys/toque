@@ -58,13 +58,13 @@ class ArtworkUpdateListener(
     scope = CoroutineScope(SupervisorJob() + dispatcher)
     albumDao.albumDaoEvents
       .onEach { event -> if (event is AlbumArtworkUpdated) handleAlbumUpdate(event) }
-      .catch { cause -> LOG.e(cause) { it("Error updating from Album Dao events") } }
+      .catch { cause -> LOG.e(cause) { it("AlbumDao event flow error") } }
       .onCompletion { LOG._e { it("Completed ArtworkUpdate album dao event flow") } }
       .launchIn(scope)
 
     artistDao.artistDaoEvents
       .onEach { event -> if (event is ArtistArtworkUpdated) handleArtistUpdate(event) }
-      .catch { cause -> LOG.e(cause) { it("Error updating from Artist Dao events") } }
+      .catch { cause -> LOG.e(cause) { it("ArtistDao event flow error") } }
       .onCompletion { LOG._e { it("Completed ArtworkUpdate artist dao event flow") } }
       .launchIn(scope)
   }

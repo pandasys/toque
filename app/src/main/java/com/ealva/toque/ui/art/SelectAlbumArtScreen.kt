@@ -414,7 +414,7 @@ private class SelectAlbumArtViewModelImpl(
         .take(12)
         .map { remoteImage -> ensureSize(remoteImage) }
         .onEach { remoteImage -> addImage(remoteImage) }
-        .catch { cause -> LOG.e(cause) { it("Error collecting artwork") } }
+        .catch { cause -> LOG.e(cause) { it("MusicInfoService album art flow error") } }
         .onCompletion { cancelSearch() }
         .collect()
     }

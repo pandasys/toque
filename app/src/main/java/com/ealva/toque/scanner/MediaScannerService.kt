@@ -63,7 +63,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
@@ -122,18 +121,16 @@ class MediaScannerService : LifecycleService() {
     }
     startNotification()
     job = workFlow
-      .onStart { LOG._i { it("Work flow started") } }
-      .onEach { work ->
-        workEnqueuer?.serviceProcessingStarted()
-        if (work.intent != null) onHandleWork(work.intent)
-        stopSelf(work.startId)
-      }
-      .catch { cause -> LOG.e(cause) { it("Error processing work flow") } }
-      .onCompletion {
-        LOG._i { it("Work flow completed") }
-        workEnqueuer?.serviceProcessingFinished()
-      }
+      .onEach { work -> handleNewWork(work) }
+      .catch { cause -> LOG.e(cause) { it("Work flow error") } }
+      .onCompletion { workEnqueuer?.serviceProcessingFinished() }
       .launchIn(lifecycleScope + Dispatchers.IO)
+  }
+
+  private suspend fun handleNewWork(work: Work) {
+    workEnqueuer?.serviceProcessingStarted()
+    if (work.intent != null) onHandleWork(work.intent)
+    stopSelf(work.startId)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -235,7 +232,7 @@ class MediaScannerService : LifecycleService() {
         .map { async { persistAudio(it, parser, minimumDuration, createUpdateTime) } }
         .buffer(PERSIST_WORKER_COUNT)
         .map { it.await() }
-        .catch { cause -> LOG.e(cause) { it("Scan completed: %s", cause.message ?: "failed") } }
+        .catch { cause -> LOG.e(cause) { it("AudioFlow processing error") } }
         .onCompletion { onCompletion() }
         .collect()
     }

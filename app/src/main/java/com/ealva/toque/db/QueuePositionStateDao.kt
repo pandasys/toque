@@ -143,7 +143,7 @@ private class QueuePositionStateDaoImpl(
   private val stateFlow = MutableStateFlow(QueuePositionState.INACTIVE_QUEUE_STATE)
   private val collectJob = stateFlow
     .onEach { state -> handleNewQueueState(state) }
-    .catch { cause -> LOG.e(cause) { it("Error processing QueueDao state flow") } }
+    .catch { cause -> LOG.e(cause) { it("QueueDao state flow error") } }
     .onCompletion { LOG.i { it("QueueStateDao $queueId completed") } }
     .launchIn(scope)
 

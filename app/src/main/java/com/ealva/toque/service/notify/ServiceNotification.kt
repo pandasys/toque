@@ -16,6 +16,7 @@
 
 package com.ealva.toque.service.notify
 
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -42,7 +43,7 @@ interface ServiceNotification {
   }
 
   @Suppress("unused")
-  enum class Duration {
+  enum class NotificationDuration {
     Notify,
     Important,
     WaitForReply
@@ -52,7 +53,7 @@ interface ServiceNotification {
   val msg: String
 
   /** How long should this info be displayed */
-  val duration: Duration
+  val duration: NotificationDuration
 
   /**
    * Action to be performed. If this is [Action.NoAction] or the [Action.label] is null, then
@@ -67,23 +68,42 @@ interface ServiceNotification {
    */
   val version: Int
 
+  val type: UUID
+
   companion object {
     private data class NotificationData(
       override val msg: String,
-      override val duration: Duration,
+      override val duration: NotificationDuration,
       override val action: Action,
-      override val version: Int
+      override val version: Int,
+      override val type: UUID
     ) : ServiceNotification
 
-    operator fun invoke(msg: String, duration: Duration = Duration.Notify): ServiceNotification =
-      NotificationData(msg, duration, Action.NoAction, nextVersion.getAndIncrement())
+    operator fun invoke(
+      msg: String,
+      duration: NotificationDuration = NotificationDuration.Notify,
+      type: UUID = UUID.randomUUID()
+    ): ServiceNotification =
+      NotificationData(
+        msg,
+        duration,
+        Action.NoAction,
+        nextVersion.getAndIncrement(),
+        type
+      )
 
     operator fun invoke(
       msg: String,
       action: Action,
-      duration: Duration = Duration.Important
-    ): ServiceNotification = NotificationData(msg, duration, action, nextVersion.getAndIncrement())
-
+      duration: NotificationDuration = NotificationDuration.Important,
+      type: UUID = UUID.randomUUID()
+    ): ServiceNotification = NotificationData(
+      msg,
+      duration,
+      action,
+      nextVersion.getAndIncrement(),
+      type
+    )
   }
 }
 

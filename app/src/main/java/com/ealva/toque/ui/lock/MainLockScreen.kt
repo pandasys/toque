@@ -32,7 +32,6 @@ import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.LocalContentColor
 import androidx.compose.material.Scaffold
-import androidx.compose.material.SnackbarResult
 import androidx.compose.material.Surface
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
@@ -102,18 +101,7 @@ fun MainLockScreen(
 
       LaunchedEffect(Unit) {
         mainModel.notificationFlow
-          .collect { notification ->
-            when (
-              snackbarHostState.showSnackbar(
-                message = notification.msg,
-                actionLabel = notification.action.label,
-                duration = notification.duration
-              )
-            ) {
-              SnackbarResult.ActionPerformed -> notification.action.action()
-              SnackbarResult.Dismissed -> notification.action.expired()
-            }
-          }
+          .collect { notification -> notification.showSnackbar(snackbarHostState) }
       }
     }
   }

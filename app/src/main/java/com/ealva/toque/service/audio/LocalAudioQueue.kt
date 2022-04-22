@@ -501,7 +501,7 @@ private class LocalAudioQueueImpl(
   private fun reactToEqModeChanges() {
     sharedPlayerState.eqMode
       .onEach { mode -> handleNewEqMode(mode) }
-      .catch { cause -> LOG.e(cause) { it("Error handling EqMode change") } }
+      .catch { cause -> LOG.e(cause) { it("EqMode flow error") } }
       .launchIn(scope)
   }
 
@@ -513,14 +513,14 @@ private class LocalAudioQueueImpl(
   private fun reactToHeadsetChanges() {
     audioOutputState.stateChange
       .onEach { event -> handleOutputStateEvent(event) }
-      .catch { cause -> LOG.e(cause) { it("Error in audio output state change flow") } }
+      .catch { cause -> LOG.e(cause) { it("Audio output state change flow error") } }
       .launchIn(scope)
   }
 
   private fun reactToAudioFocusChanges() {
     audioFocusManager.reactionFlow
       .onEach { reaction -> handleFocusReaction(reaction) }
-      .catch { cause -> LOG.e(cause) { it("Error in audio focus reaction flow") } }
+      .catch { cause -> LOG.e(cause) { it("Audio focus reaction flow error") } }
       .onCompletion { LOG._i { it("Audio focus reaction flow completed") } }
       .launchIn(scope)
   }
@@ -1234,8 +1234,8 @@ private class LocalAudioQueueImpl(
   private fun PlayableAudioItem.collectEvents(doOnStart: () -> Unit) = eventFlow
     .onStart { doOnStart() }
     .onEach { event -> handleAudioItemEvent(event) }
-    .catch { cause -> LOG.e(cause) { it("%s%s event handled exception", id, title) } }
-    .onCompletion { cause -> LOG._i(cause) { it("%s%s event flow completed", id, title) } }
+    .catch { cause -> LOG.e(cause) { it("Event flow error: %s%s", id, title) } }
+    .onCompletion { LOG._i { it("Event flow completed %s%s", id, title) } }
     .launchIn(scope)
 
   private suspend fun handleAudioItemEvent(event: PlayableItemEvent) {

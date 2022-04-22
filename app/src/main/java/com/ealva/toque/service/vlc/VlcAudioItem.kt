@@ -285,8 +285,8 @@ class VlcAudioItem private constructor(
               if (startPaused.value) player.playStartPaused() else isPreparing = false
             }
             .onEach { event -> handleAvPlayerEvent(event) }
-            .catch { cause -> LOG.e(cause) { it("Error processing MediaPlayerEvent") } }
-            .onCompletion { LOG.i { it("MediaPlayer event flow completed") } }
+            .catch { cause -> LOG.e(cause) { it("AvPlayerEvent flow error") } }
+            .onCompletion { LOG.i { it("AvPlayerEvent flow completed") } }
             .launchIn(scope)
         }
       }
@@ -326,7 +326,7 @@ class VlcAudioItem private constructor(
     if (!hasBeenMarkedPlayed) {
       countDownJob = CountDownFlow(remainingToMarkPlayed, 1.seconds)
         .onEach { remaining -> remainingToMarkPlayed = remaining }
-        .catch { cause -> LOG.e(cause) { it("Error in mark played count down") } }
+        .catch { cause -> LOG.e(cause) { it("Mark played countdown flow error") } }
         .onCompletion { cause -> if (cause == null) markPlayed() }
         .launchIn(scope)
     }

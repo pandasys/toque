@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
@@ -192,4 +193,6 @@ class LockScreenActivity : ComponentActivity(), MainBridge {
   override fun exit() = Unit
   override val canDrawOverlays: Boolean = false
   override fun requestOverlayPermission() = Unit
+  override val activityIsVisible: Boolean
+    get() = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 }

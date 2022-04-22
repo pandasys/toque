@@ -87,25 +87,25 @@ class WidgetUpdaterImpl(private val ctx: Context, dispatcher: CoroutineDispatche
   private fun MediaSession.listenToShuffleMode() = shuffleModeFlow
     .drop(1)
     .onEach { shuffleMode -> handleShuffleMode(shuffleMode) }
-    .catch { cause -> LOG.e(cause) { it("Error collecting shuffleModeFlow") } }
+    .catch { cause -> LOG.e(cause) { it("ShuffleMode flow error") } }
     .launchIn(scope)
 
   private fun MediaSession.listenToRepeatMode() = repeatModeFlow
     .drop(1)
     .onEach { repeatMode -> handleRepeatMode(repeatMode) }
-    .catch { cause -> LOG.e(cause) { it("Error collecting repeatModeFlow") } }
+    .catch { cause -> LOG.e(cause) { it("RepeatMode flow error") } }
     .launchIn(scope)
 
   private fun MediaSession.listenToMetadata() = metadataFlow
     .drop(1)
     .onEach { metadata -> handleMetadata(metadata) }
-    .catch { cause -> LOG.e(cause) { it("Error collecting metadataFlow") } }
+    .catch { cause -> LOG.e(cause) { it("Metadata flow error") } }
     .launchIn(scope)
 
   private fun MediaSession.listenToPlaybackState() = playbackStateFlow
     .drop(1)
     .onEach { state -> handlePlaybackState(state) }
-    .catch { cause -> LOG.e(cause) { it("Error collecting playbackStateFlow") } }
+    .catch { cause -> LOG.e(cause) { it("PlaybackState flow error") } }
     .launchIn(scope)
 
 
@@ -139,7 +139,7 @@ class WidgetUpdaterImpl(private val ctx: Context, dispatcher: CoroutineDispatche
 
   private fun listenToWidgetStateFlow() = widgetStateFlow
     .onEach { widgetInfo -> handleWidgetInfo(widgetInfo) }
-    .catch { cause -> LOG.e(cause) { it("Error collecting widgetState flow") } }
+    .catch { cause -> LOG.e(cause) { it("WidgetState flow error") } }
     .launchIn(scope)
 
   private fun handleWidgetInfo(state: WidgetState) =

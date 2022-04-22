@@ -40,6 +40,11 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.ealva.ealvalog.e
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.log._e
+import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.SwipeableSnackbarHost
@@ -47,13 +52,12 @@ import com.ealva.toque.ui.now.NowPlayingScreen
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestackcomposeintegration.core.ComposeStateChanger
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlin.math.roundToInt
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
 
 @Suppress("unused")
 private val LOG by lazyLogger("MainScreen")
@@ -147,20 +151,9 @@ fun MainScreen(
 
         LaunchedEffect(Unit) {
           mainModel.notificationFlow
-            .onStart { LOG._e { it("Start collecting notifications") }}
-            .onEach {  notification ->
-              LOG._e { it("handleNotification") }
-              when (
-                snackbarHostState.showSnackbar(
-                  message = notification.msg,
-                  actionLabel = notification.action.label,
-                  duration = notification.duration
-                )
-              ) {
-                SnackbarResult.ActionPerformed -> notification.action.action()
-                SnackbarResult.Dismissed -> notification.action.expired()
-              }
-            }
+            .onEach { notification -> notification.showSnackbar(snackbarHostState) }
+            .catch { cause -> LOG.e(cause) { it("NotificationFlow error") } }
+            .onCompletion { LOG._i { it("NotificationFlow complete") } }
             .launchIn(this)
         }
       }
