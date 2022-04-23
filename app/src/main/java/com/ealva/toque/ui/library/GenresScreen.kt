@@ -135,7 +135,7 @@ data class GenresScreen(
     val viewModel = rememberService<GenresViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val genres = viewModel.genreFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
 
     Column(
       modifier = Modifier

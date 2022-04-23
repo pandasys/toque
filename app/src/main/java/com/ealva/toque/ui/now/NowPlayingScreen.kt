@@ -33,7 +33,7 @@ import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
-private const val NOW_PLAYING_SCREEN_MODEL_SERVICE_TAG = "LockScreenViewModel"
+private const val NOW_PLAYING_SCREEN_MODEL_SERVICE_TAG = "NowPlayingScreenViewModel"
 
 @Immutable
 @Parcelize

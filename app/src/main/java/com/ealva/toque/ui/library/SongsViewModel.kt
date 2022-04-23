@@ -280,7 +280,7 @@ abstract class BaseSongsViewModel(
     val selected = selectedItems.value
     if (selected.selectedCount == 1) {
       songsFlow.value
-        .find { info -> info.id == selected.single() }
+        .find { info -> info.id == selected.singleOrNull() }
         ?.let { info ->
           backstack.goToScreen(
             AudioMediaInfoScreen(

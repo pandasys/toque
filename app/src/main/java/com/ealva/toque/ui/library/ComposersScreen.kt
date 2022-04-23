@@ -135,7 +135,7 @@ data class ComposersScreen(
     val viewModel = rememberService<ComposersViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val composers = viewModel.composerFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
 
     Column(
       modifier = Modifier

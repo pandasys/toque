@@ -149,7 +149,7 @@ data class PlaylistsScreen(
     val viewModel = rememberService<PlaylistsViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val playlists = viewModel.playlistsFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
 
     Column(
       modifier = Modifier

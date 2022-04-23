@@ -163,7 +163,7 @@ data class ArtistsScreen(
     val viewModel = rememberService<ArtistsViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val artists = viewModel.artistFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
 
     Column(
       modifier = Modifier

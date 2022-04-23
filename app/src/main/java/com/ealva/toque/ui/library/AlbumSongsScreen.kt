@@ -81,7 +81,7 @@ data class AlbumSongsScreen(
     val viewModel = rememberService<AlbumSongsViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
     val year = viewModel.albumYear.collectAsState()
 
     AlbumSongs(songs.value, scrollConnection, selected.value, year.value, viewModel)

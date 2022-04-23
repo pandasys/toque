@@ -256,7 +256,6 @@ private class NowPlayingViewModelImpl(
         .collect()
     }
 
-
     currentQueueJob = localAudioQueueModel.localAudioQueue
       .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)
@@ -281,7 +280,7 @@ private class NowPlayingViewModelImpl(
     audioQueue = queue
     queueStateJob = audioQueue.queueState
       .onEach { state -> handleServiceState(state) }
-      .catch { cause -> LOG.e(cause) { it("") } }
+      .catch { cause -> LOG.e(cause) { it("LocalAudioQueue state flow error") } }
       .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }

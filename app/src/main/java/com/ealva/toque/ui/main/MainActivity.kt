@@ -72,13 +72,11 @@ import org.koin.android.ext.android.inject
 private val LOG by lazyLogger(MainActivity::class)
 
 private val topOfStackFlow = MutableStateFlow<ComposeKey>(SplashScreen())
-
 private val KEY_BACKSTACK = "${MainActivity::class.java.name}_BACK_STACK"
 
 interface MainBridge {
   val haveReadExternalPermission: Boolean
   val activityContext: Context
-
   fun startAppSettingsActivity()
   fun exit()
   val canDrawOverlays: Boolean
@@ -113,7 +111,6 @@ class MainActivity : ComponentActivity(), MainBridge {
       BackstackProvider(backstack) {
         val themeViewModel = rememberService<ThemeViewModel>()
         val themeChoice by themeViewModel.themeChoice.collectAsState()
-
         val topOfStackState by topOfStackFlow.collectAsState()
 
         ToqueTheme(themeChoice) {

@@ -131,7 +131,7 @@ data class ArtistAlbumsScreen(
     val viewModel = rememberService<ArtistAlbumsViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val albums = viewModel.albumFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
     val art = viewModel.artistArt.collectAsState()
 
     Column(
@@ -362,7 +362,7 @@ private class ArtistAlbumsViewModelImpl(
         album.title,
         formatSongsInfo(album.songCount, album.duration, album.year),
         album.artwork,
-        )
+      )
     )
 
   override suspend fun makeCategoryMediaList(

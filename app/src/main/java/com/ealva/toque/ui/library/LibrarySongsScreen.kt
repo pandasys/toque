@@ -76,7 +76,7 @@ data class LibrarySongsScreen(
     val viewModel = rememberService<LibrarySongsViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
 
     Column(
       modifier = Modifier

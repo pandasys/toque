@@ -75,7 +75,7 @@ data class GenreSongsScreen(
     val viewModel = rememberService<GenreSongsViewModel>()
     val scrollConnection = remember { HeightResizeScrollConnection() }
     val songs = viewModel.songsFlow.collectAsState()
-    val selected = viewModel.selectedItems.asState()
+    val selected = viewModel.selectedItems.collectAsState()
 
     val tertiaryInfo = songs.value.toSongCount()
 

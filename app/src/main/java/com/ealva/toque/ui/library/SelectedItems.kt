@@ -17,22 +17,17 @@
 package com.ealva.toque.ui.library
 
 import android.os.Parcelable
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import com.ealva.toque.common.alsoIf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
 typealias SelectedItemsFlow<E> = StateFlow<SelectedItems<E>>
 typealias MutableSelectedItemsFlow<E> = MutableStateFlow<SelectedItems<E>>
 
 /**
- * Represents items marked as "selected" within another container. This is basically an immutables
+ * Represents items marked as "selected" within another container. This is basically an immutable
  * set of item keys. If a key is in the set [hasSelection] is true and [isSelected] for that
  * particular key is true. As this is a set, no duplicates are allowed. The key class [E] must have
  * correctly defined equals and hashCode functions.
@@ -74,7 +69,7 @@ interface SelectedItems<E : Parcelable> : Parcelable {
 
   val selectedCount: Int
 
-  fun single(): E
+  fun singleOrNull(): E?
 
   companion object {
     operator fun <E : Parcelable> invoke(keySet: Set<E> = emptySet()): SelectedItems<E> =
@@ -148,7 +143,7 @@ private class SelectedItemsImpl<E : Parcelable>(
   override val selectedCount: Int
     get() = keySet.size
 
-  override fun single(): E = keySet.single()
+  override fun singleOrNull(): E? = keySet.singleOrNull()
 }
 
 @Suppress("FunctionName")
@@ -163,20 +158,11 @@ private fun <E> Set<E>.removeIfContainsElseAdd(item: E): Set<E> =
   if (contains(item)) this - item else this + item
 
 /**
- * Collect the SelectedItems as a state value, which is a set of E
- */
-@Composable
-fun <E : Parcelable> SelectedItemsFlow<E>.asState(
-  context: CoroutineContext = EmptyCoroutineContext
-): State<SelectedItems<E>> = collectAsState(value, context)
-
-/**
  * If in selection mode returns true and turns off selection mode. Otherwise returns false.
  * Useful for "onBack"
  */
 fun <E : Parcelable> MutableSelectedItemsFlow<E>.inSelectionModeThenTurnOff(): Boolean =
   inSelectionMode.alsoIf { turnOffSelectionMode() }
-
 
 /** Clear any selection. Doesn't turn off selection mode */
 fun <E : Parcelable> MutableSelectedItemsFlow<E>.clearSelection() {
@@ -191,10 +177,6 @@ fun <E : Parcelable> MutableSelectedItemsFlow<E>.deselect(key: E) {
 fun <E : Parcelable> MutableSelectedItemsFlow<E>.turnOffSelectionMode() {
   value = value.turnOffSelectionMode()
 }
-
-//fun <E : Parcelable> MutableSelectedItemsFlow<E>.toggleSelectionMode() {
-//  value = value.toggleSelectionMode()
-//}
 
 /**
  * If in selection mode, toggle the selection of [key], else call [block] with

@@ -80,7 +80,6 @@ import com.ealva.toque.ui.library.QueueItemsActionBar
 import com.ealva.toque.ui.library.SelectedItems
 import com.ealva.toque.ui.library.SelectedItemsFlow
 import com.ealva.toque.ui.library.SongListItem
-import com.ealva.toque.ui.library.asState
 import com.ealva.toque.ui.library.clearSelection
 import com.ealva.toque.ui.library.deselect
 import com.ealva.toque.ui.library.filterIfHasSelection
@@ -144,7 +143,7 @@ data class QueueScreen(private val noArg: String = "") : ComposeKey(), ScopeKey.
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<QueueViewModel>()
     val queueState = viewModel.queueState.collectAsState()
-    val selectedItems = viewModel.selectedFlow.asState()
+    val selectedItems = viewModel.selectedFlow.collectAsState()
     val reorderState = rememberReorderState()
 
     val listState = reorderState.listState
@@ -489,7 +488,7 @@ private class QueueViewModelImpl(
 
     if (selected.selectedCount == 1) {
       queueState.value.queue
-        .find { info -> info.instanceId == selected.single() }
+        .find { info -> info.instanceId == selected.singleOrNull() }
         ?.let { info ->
           backstack.goToScreen(
             AudioMediaInfoScreen(
