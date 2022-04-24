@@ -65,7 +65,7 @@ class FadeInTransition(
       .coerceAtMost(minFadeStartVolumeAdjustment)
 
     if (duration > MIN_FADE_LENGTH) {
-      val countDownFlow = CountDownFlow(duration, MIN_FADE_LENGTH)
+      val countDownFlow = CountDownFlow(total = duration, interval = MIN_FADE_LENGTH)
       val multiplier = (maxVolume - startVolume).value.toDouble() / duration.inWholeMilliseconds
 
       countDownFlow

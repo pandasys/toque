@@ -543,17 +543,14 @@ private class LocalAudioQueueImpl(
   )
 
   private fun reactToLibVlcPrefs() {
-    // Keep a map of all prefs and value. Detect change from LibVlcPrefs.updateFlow and react
-    // accordingly
     val libVlcPrefsMap = reactToPrefs.associateTo(mutableMapOf()) { it.keyValue() }
 
     fun Preferences.Key<*>.isOutputModuleAlsoReset(): Boolean =
       this == libVlcPrefs.audioOutputModule.key.also { resetCurrent() }
 
     /*
-     * React to LibVlcPrefs changes. If the AudioOutputModule changes, just reset the current
-     * player and nothing else. On any other preference change reset LibVLC and then reset the
-     * current player.
+     * If the AudioOutputModule changes, just reset the current player. On any other preference
+     * change reset LibVLC and then reset the current player.
      */
     libVlcPrefs.updateFlow
       .map { holder -> holder.store }
@@ -566,13 +563,13 @@ private class LocalAudioQueueImpl(
             .any()
         ) resetLibVlcSingleton()
       }
+      .catch { cause -> LOG.e(cause) { it("LibVLCPrefs flow error") } }
       .launchIn(scope)
   }
 
-  private suspend fun resetLibVlcSingleton(): Boolean {
+  private suspend fun resetLibVlcSingleton() {
     libVlcSingleton.reset()
     resetCurrent()
-    return true
   }
 
   private fun resetCurrent() {
@@ -1241,8 +1238,7 @@ private class LocalAudioQueueImpl(
       is PlayableItemEvent.Stopped -> onStopped(event)
       is PlayableItemEvent.PlaybackComplete -> onPlaybackCompleted(event)
       is PlayableItemEvent.Error -> onError(event)
-      is PlayableItemEvent.None -> {
-      }
+      is PlayableItemEvent.None -> Unit
     }
   }
 

@@ -453,14 +453,12 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
 
     fun startForWidgetsUpdate(
       context: Context,
-      appWidgetIds: IntArray,
-//      componentName: ComponentName
+      appWidgetIds: IntArray
     ) = with(context) {
       ContextCompat.startForegroundService(
         this,
         makeStartIntent(this, Action.UpdateWidgets, null)
           .putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
-//          .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, componentName)
       )
     }
 

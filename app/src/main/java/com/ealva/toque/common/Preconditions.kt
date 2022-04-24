@@ -54,3 +54,19 @@ inline fun <T> checkThen(value: Boolean, block: () -> T): T {
   }
   return checkThen(value, { "Check failed." }, block)
 }
+
+/**
+ * Returns `this` value if it satisfies the given [predicate] or throws IllegalArgumentException
+ * if it doesn't.
+ */
+inline fun <T> T.takeRequire(predicate: T.() -> Boolean): T =
+  takeRequire(predicate) { "Failed requirement." }
+
+/**
+ * Returns `this` value if it satisfies the given [predicate] or throws IllegalArgumentException
+ * if it doesn't.
+ */
+inline fun <T> T.takeRequire(
+  predicate: T.() -> Boolean,
+  lazyMessage: () -> Any
+): T  = apply { require(predicate(), lazyMessage) }

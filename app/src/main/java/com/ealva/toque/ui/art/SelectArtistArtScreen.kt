@@ -57,6 +57,8 @@ import com.ealva.toque.art.MusicInfoProvider
 import com.ealva.toque.db.ArtistDao
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.prefs.AppPrefs
+import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectArtistArtViewModel.SelectState
 import com.ealva.toque.ui.nav.back
 import com.ealva.toque.ui.settings.AppBarTitle
@@ -107,7 +109,8 @@ data class SelectArtistArtScreen(
           artistName = artistName,
           backstack = backstack,
           artistDao = get(),
-          musicInfoProvider = get()
+          musicInfoProvider = get(),
+          appPrefs = get(AppPrefs.QUALIFIER)
         )
       )
     }
@@ -224,14 +227,18 @@ interface SelectArtistArtViewModel {
       artistName: ArtistName,
       backstack: Backstack,
       artistDao: ArtistDao,
-      musicInfoProvider: MusicInfoProvider
+      musicInfoProvider: MusicInfoProvider,
+      appPrefs: AppPrefsSingleton,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): SelectArtistArtViewModel =
       SelectArtistArtViewModelImpl(
         artistId,
         artistName,
         backstack,
         artistDao,
-        musicInfoProvider
+        musicInfoProvider,
+        appPrefs,
+        dispatcher
       )
   }
 }
@@ -242,7 +249,8 @@ private class SelectArtistArtViewModelImpl(
   private val backstack: Backstack,
   private val artistDao: ArtistDao,
   private val musicInfoProvider: MusicInfoProvider,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Main
+  private val appPrefs: AppPrefsSingleton,
+  private val dispatcher: CoroutineDispatcher
 ) : SelectArtistArtViewModel, ScopedServices.Activated {
   private lateinit var scope: CoroutineScope
   private var allowHighRes = true
@@ -293,7 +301,7 @@ private class SelectArtistArtViewModelImpl(
         .filterNot { remoteImage -> remoteImage.location == Uri.EMPTY }
         .filter { remoteImage -> remoteImage.types.any { type -> type is FRONT } }
         .filter { remoteImage -> acceptableSizes.contains(remoteImage.sizeBucket) }
-        .take(12)
+        .take(appPrefs.instance().maxImageSearch())
         .map { remoteImage -> ensureSize(remoteImage) }
         .onEach { remoteImage -> addImage(remoteImage) }
         .catch { cause -> LOG.e(cause) { it("MusicInfoService album art flow error") } }

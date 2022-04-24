@@ -16,9 +16,11 @@
 
 package com.ealva.toque.flow
 
+import com.ealva.toque.common.takeRequire
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.AbstractFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
@@ -26,21 +28,30 @@ import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.measureTime
 
+interface CountDownFlow : Flow<Duration> {
+  companion object {
+    operator fun invoke(
+      total: Duration,
+      interval: Duration,
+      clock: Clock = Clock.System
+    ): CountDownFlow = CountDownFlowImpl(
+      total,
+      interval.takeRequire({ isPositive() }) { "Interval must be > 0" },
+      clock
+    )
+  }
+}
+
 /**
  * Original from:
  * https://programmerr47.medium.com/count-down-timer-with-kotlin-coroutines-flow-a59c36167247
  */
 @OptIn(FlowPreview::class)
-class CountDownFlow(
+private class CountDownFlowImpl(
   private val total: Duration,
-  private val interval: Duration
-) : AbstractFlow<Duration>() {
-  private val clock = Clock.System
-
-  init {
-    require(interval.isPositive())
-  }
-
+  private val interval: Duration,
+  private val clock: Clock
+) : AbstractFlow<Duration>(), CountDownFlow {
   override suspend fun collectSafely(collector: FlowCollector<Duration>) {
     val deadline = clock.now() + total
 

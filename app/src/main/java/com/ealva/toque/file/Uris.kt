@@ -69,6 +69,7 @@ private fun String.getFileExtensionWithDot(): String = lastIndexOf(".").let { do
 /**
  * Mime Type based on file extension or an empty string if no association found
  */
+@Suppress("unused")
 val Uri.mimeType: String
   get() = mediaFormat.preferredMimeType ?: ""
 

@@ -324,7 +324,7 @@ class VlcAudioItem private constructor(
 
   private fun startMarkPlayedCountDown() {
     if (!hasBeenMarkedPlayed) {
-      countDownJob = CountDownFlow(remainingToMarkPlayed, 1.seconds)
+      countDownJob = CountDownFlow(total = remainingToMarkPlayed, interval = 1.seconds)
         .onEach { remaining -> remainingToMarkPlayed = remaining }
         .catch { cause -> LOG.e(cause) { it("Mark played countdown flow error") } }
         .onCompletion { cause -> if (cause == null) markPlayed() }
