@@ -17,14 +17,8 @@
 package com.ealva.toque.common
 
 import android.os.Looper
-import com.ealva.ealvalog.Logger
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.unaryPlus
-import com.ealva.toque.log._e
 
-@JvmField
-val mainLooper: Looper = Looper.getMainLooper()!!
-@JvmField
+val mainLooper: Looper = Looper.getMainLooper()
 val uiThread: Thread = mainLooper.thread
 val isUiThread: Boolean
   inline get() = uiThread === Thread.currentThread()
@@ -34,11 +28,4 @@ val isUiThread: Boolean
  */
 fun ensureUiThread() = check(isUiThread) {
   "Required execution on UI thread, current=${Thread.currentThread()}"
-}
-
-fun ensureUiThread(logger: Logger) {
-  check(isUiThread) {
-    logger._e(IllegalStateException()) { +it("Not UI thread") }
-    "Required execution on UI thread, current=${Thread.currentThread()}"
-  }
 }

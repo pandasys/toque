@@ -18,55 +18,57 @@
 
 package com.ealva.toque.common
 
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.contract
-
-@OptIn(ExperimentalContracts::class)
+/**
+ * Throws an [IllegalArgumentException] with the result of calling [lazyMessage] if the [value] is
+ * false, else executes [block] and returns the result.
+ */
 inline fun <T> requireThen(value: Boolean, lazyMessage: () -> Any, block: () -> T): T {
-  contract {
-    returns() implies value
-  }
   require(value, lazyMessage)
   return block()
 }
 
-@OptIn(ExperimentalContracts::class)
-inline fun <T> requireThen(value: Boolean, block: () -> T): T {
-  contract {
-    returns() implies value
-  }
-  return requireThen(value, { "Failed requirement." }, block)
-}
+/**
+ * Throws an [IllegalArgumentException] if the [value] is false, else executes [block]
+ */
+inline fun <T> requireThen(value: Boolean, block: () -> T): T =
+  requireThen(value, { "Failed requirement." }, block)
 
-@OptIn(ExperimentalContracts::class)
 inline fun <T> checkThen(value: Boolean, lazyMessage: () -> Any, block: () -> T): T {
-  contract {
-    returns() implies value
-  }
   check(value, lazyMessage)
   return block()
 }
 
-@OptIn(ExperimentalContracts::class)
-inline fun <T> checkThen(value: Boolean, block: () -> T): T {
-  contract {
-    returns() implies value
-  }
-  return checkThen(value, { "Check failed." }, block)
-}
+inline fun <T> checkThen(value: Boolean, block: () -> T): T =
+  checkThen(value, { "Check failed." }, block)
 
 /**
- * Returns `this` value if it satisfies the given [predicate] or throws IllegalArgumentException
+ * Returns `this` value if it satisfies the given [requisite] or throws IllegalArgumentException
  * if it doesn't.
  */
-inline fun <T> T.takeRequire(predicate: T.() -> Boolean): T =
-  takeRequire(predicate) { "Failed requirement." }
+inline fun <T> T.takeRequire(requisite: T.() -> Boolean): T =
+  takeRequire(requisite) { "Failed requirement." }
 
 /**
- * Returns `this` value if it satisfies the given [predicate] or throws IllegalArgumentException
+ * Returns `this` value if it satisfies the given [requisite] or throws IllegalArgumentException
  * if it doesn't.
  */
 inline fun <T> T.takeRequire(
-  predicate: T.() -> Boolean,
+  requisite: T.() -> Boolean,
   lazyMessage: () -> Any
-): T  = apply { require(predicate(), lazyMessage) }
+): T = apply { require(requisite(), lazyMessage) }
+
+/**
+ * Returns `this` value if it satisfies the given [requisite] or throws IllegalArgumentException
+ * if it doesn't.
+ */
+inline fun <T> T.takeCheck(requisite: T.() -> Boolean): T =
+  takeCheck(requisite) { "Failed requirement." }
+
+/**
+ * Returns `this` value if it satisfies the given [requisite] or throws IllegalStateException
+ * if it doesn't.
+ */
+inline fun <T> T.takeCheck(
+  requisite: T.() -> Boolean,
+  lazyMessage: () -> Any
+): T = apply { check(requisite(), lazyMessage) }

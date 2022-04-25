@@ -111,16 +111,16 @@ private class SmartPlaylistDaoImpl(private val db: Database) : SmartPlaylistDao 
   override fun TransactionInProgress.createSmartPlaylist(
     smartPlaylist: SmartPlaylist
   ): SmartPlaylist = smartPlaylist.apply {
-    check(smartPlaylist.id.isValid) { "Could not create playlist $smartPlaylist" }
-    val rowId = SmartPlaylistTable.insert {
-      it[smartId] = smartPlaylist.id.value
-      it[smartName] = name.value
-      it[smartAnyOrAll] = anyOrAll.id
-      it[smartLimit] = limit.value
-      it[smartOrderBy] = selectBy.id
-      it[smartEndOfListAction] = endOfListAction.id
-    }
-    require(rowId > 0) { "Could not create smart playlist $smartPlaylist" }
+    require(smartPlaylist.id.isValid) { "Could not create playlist $smartPlaylist" }
+    check(
+      SmartPlaylistTable.insert {
+        it[smartId] = smartPlaylist.id.value
+        it[smartName] = name.value
+        it[smartAnyOrAll] = anyOrAll.id
+        it[smartLimit] = limit.value
+        it[smartOrderBy] = selectBy.id
+        it[smartEndOfListAction] = endOfListAction.id
+      } > 0) { "Could not create smart playlist $smartPlaylist" }
     replacePlaylistRules(id, ruleList)
     createOrUpdateView(this)
   }

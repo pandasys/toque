@@ -55,16 +55,12 @@ private class WorkImpl(private val appContext: Context) : Work {
     else -> LOG.e { it("Attempt to add WorkerFactory for %s more than once", workerClassName) }
   }
 
-  override fun getWorkManagerConfiguration(): Configuration = (if (BuildConfig.DEBUG) {
+  override fun getWorkManagerConfiguration(): Configuration =
     Configuration.Builder()
-      .setMinimumLoggingLevel(Log.DEBUG)
-  } else {
-    Configuration.Builder()
-      .setMinimumLoggingLevel(Log.ERROR)
-  })
-    .setJobSchedulerJobIdRange(1, Int.MAX_VALUE)
-    .setWorkerFactory(delegatingWorkerFactory)
-    .build()
+      .setMinimumLoggingLevel(if (BuildConfig.DEBUG) Log.DEBUG else Log.ERROR)
+      .setJobSchedulerJobIdRange(1, Int.MAX_VALUE)
+      .setWorkerFactory(delegatingWorkerFactory)
+      .build()
 
   override fun enqueue(request: WorkRequest): Operation = workManager.enqueue(request)
 }

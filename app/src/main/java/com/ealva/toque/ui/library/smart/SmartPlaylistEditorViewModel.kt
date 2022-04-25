@@ -27,6 +27,8 @@ import com.ealva.toque.common.Limit
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.common.fetch
+import com.ealva.toque.common.requireThen
+import com.ealva.toque.common.takeCheck
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.PlaylistDao
 import com.ealva.toque.db.SchemaDao
@@ -187,10 +189,10 @@ private class SmartPlaylistEditorViewModelImpl(
   private val audioMediaDao: AudioMediaDao,
   private val playlistDao: PlaylistDao,
   private val schemaDao: SchemaDao,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : SmartPlaylistEditorViewModel, ScopedServices.Registered, Bundleable,
   ScopedServices.HandlesBack {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private lateinit var original: SmartPlaylist
 
   private val allPlaylistNames = mutableListOf<PlaylistName>()
@@ -225,7 +227,6 @@ private class SmartPlaylistEditorViewModelImpl(
   }
 
   override fun onServiceRegistered() {
-    if (!::scope.isInitialized) scope = CoroutineScope(SupervisorJob() + dispatcher)
     collectRuleUpdateFlow(scope)
     if (!initialized) {
       initialized = true
@@ -675,7 +676,6 @@ private class SmartPlaylistEditorViewModelImpl(
   }
 
   override fun fromBundle(bundle: StateBundle?) {
-    if (!::scope.isInitialized) scope = CoroutineScope(SupervisorJob() + dispatcher)
     original = bundle?.getParcelable(KEY_ORIGINAL) ?: makeDefaultSmartPlaylist()
     bundle?.getStringArrayList(KEY_ALL_PLAYLIST_NAMES)?.let { playlistNames ->
       allPlaylistNames.clear()
@@ -700,9 +700,8 @@ private class SmartPlaylistEditorViewModelImpl(
 }
 
 private val SmartPlaylistData.asSmartPlaylist: SmartPlaylist
-  get() {
-    require(nameValidity.isValid) { "$editingName is not valid" }
-    return SmartPlaylist(
+  get() = requireThen(nameValidity.isValid, { "$editingName is not valid" }) {
+    SmartPlaylist(
       id = id,
       name = editingName.asPlaylistName,
       anyOrAll = anyOrAll,
@@ -712,7 +711,7 @@ private val SmartPlaylistData.asSmartPlaylist: SmartPlaylist
       ruleList = ruleList.mapTo(ArrayList(ruleList.size)) { editorRule ->
         editorRule.rule.also { rule -> require(rule.isValid) { "Rule is not valid: $rule" } }
       }
-    ).also { playlist -> require(playlist.isValid) { "Playlist is not valid. $playlist" } }
+    ).takeCheck({ isValid }) { "Playlist is not valid. $this" }
   }
 
 private val String.isValidName: NameValidity

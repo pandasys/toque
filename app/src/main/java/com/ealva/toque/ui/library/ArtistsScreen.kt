@@ -358,10 +358,10 @@ private class ArtistsViewModelImpl(
   private val artistType: ArtistType,
   private val appPrefs: AppPrefsSingleton,
   private val backstack: Backstack,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : ArtistsViewModel, ScopedServices.Registered, ScopedServices.Activated,
   ScopedServices.HandlesBack, Bundleable {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(Job() + dispatcher)
   private var requestJob: Job? = null
   private var daoEventsJob: Job? = null
   private var wentInactive = false
@@ -380,7 +380,6 @@ private class ArtistsViewModelImpl(
 
   @OptIn(ExperimentalTime::class, FlowPreview::class)
   override fun onServiceRegistered() {
-    scope = CoroutineScope(Job() + dispatcher)
     // may want onStart+drop(1) for chunking and onEach to not chunk
     filterFlow
       .onStart { requestArtists(processChunks = true) }

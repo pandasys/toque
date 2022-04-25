@@ -42,7 +42,26 @@ import kotlinx.coroutines.flow.onEach
 
 private val LOG by lazyLogger(ArtworkUpdateListener::class)
 
-class ArtworkUpdateListener(
+interface ArtworkUpdateListener {
+  fun start()
+  fun stop()
+
+  companion object {
+    operator fun invoke(
+      work: Work,
+      albumDao: AlbumDao,
+      artistDao: ArtistDao,
+      appPrefs: AppPrefsSingleton,
+      albumArtWorkerFactory: DownloadAlbumArtWorkerFactory,
+      artistArtWorkerFactory: DownloadArtistArtWorkerFactory,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): ArtworkUpdateListener = ArtworkUpdateListenerImpl(
+      work, albumDao, artistDao, appPrefs, albumArtWorkerFactory, artistArtWorkerFactory, dispatcher
+    )
+  }
+}
+
+private class ArtworkUpdateListenerImpl(
   private val work: Work,
   private val albumDao: AlbumDao,
   private val artistDao: ArtistDao,
@@ -50,10 +69,10 @@ class ArtworkUpdateListener(
   private val albumArtWorkerFactory: DownloadAlbumArtWorkerFactory,
   private val artistArtWorkerFactory: DownloadArtistArtWorkerFactory,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Main
-) {
+) : ArtworkUpdateListener {
   private lateinit var scope: CoroutineScope
 
-  fun start() {
+  override fun start() {
     loadFactories(work)
     scope = CoroutineScope(SupervisorJob() + dispatcher)
     albumDao.albumDaoEvents
@@ -69,7 +88,7 @@ class ArtworkUpdateListener(
       .launchIn(scope)
   }
 
-  fun stop() {
+  override fun stop() {
     scope.cancel()
   }
 

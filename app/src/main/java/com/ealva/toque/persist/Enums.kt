@@ -19,6 +19,7 @@ import android.util.SparseArray
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.takeRequire
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
@@ -40,6 +41,7 @@ inline fun <T> KClass<out T>.reify(id: Int, defaultValue: T): T where T : Enum<T
 @Suppress("NOTHING_TO_INLINE")
 inline fun <T> KClass<T>.reify(id: Int): T? where T : Enum<T>, T : HasConstId = java.reify(id)
 
+@Suppress("unused")
 inline fun <reified T> Int?.toEnum(defaultValue: T): T where T : Enum<T>, T : HasConstId =
   if (this == null) defaultValue else defaultValue.javaClass.reify(this, defaultValue)
 
@@ -162,8 +164,7 @@ private class EnumValuesIndexed<T>(
   private val indices = 0 until listSize
   private val list: List<T> = MutableList(listSize) { values[0] }.apply {
     values.forEach { value ->
-      require(value.id in indices) { "${value.id} not in $indices" }
-      set(value.id, value)
+      set(value.id.takeRequire({ this in indices }) { "${value.id} not in $indices" }, value)
     }
   }
 

@@ -408,7 +408,7 @@ private class QueueViewModelImpl(
   private val backstack: Backstack,
   private val dispatcher: CoroutineDispatcher
 ) : QueueViewModel, ScopedServices.Registered, ScopedServices.HandlesBack {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private var queueStateJob: Job? = null
   private var localAudioQueue: LocalAudioQueue = NullLocalAudioQueue
 
@@ -508,7 +508,6 @@ private class QueueViewModelImpl(
     queue.filterIfHasSelection(selectedFlow.value) { it.instanceId }
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
     localAudioQueueModel.localAudioQueue
       .onEach { queue -> handleQueueChange(queue) }
       .launchIn(scope)

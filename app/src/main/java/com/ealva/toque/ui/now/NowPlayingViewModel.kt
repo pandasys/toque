@@ -235,7 +235,7 @@ private class NowPlayingViewModelImpl(
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefsSingleton: AppPrefsSingleton
 ) : NowPlayingViewModel, ScopedServices.Registered {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private var currentQueueJob: Job? = null
   private var queueStateJob: Job? = null
   private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
@@ -248,7 +248,6 @@ private class NowPlayingViewModelImpl(
   private suspend fun appPrefs(): AppPrefs = appPrefsSingleton.instance()
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     scope.launch {
       appPrefs().showTimeRemaining
         .asFlow()

@@ -206,7 +206,7 @@ object Libs {
   }
 
   object NumberPicker {
-    const val COMPOSE = "com.chargemap.compose:numberpicker:0.0.12"
+    const val COMPOSE = "com.chargemap.compose:numberpicker:1.0.3"
   }
 
   object Phoenix {

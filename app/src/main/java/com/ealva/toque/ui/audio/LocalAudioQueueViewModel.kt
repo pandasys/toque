@@ -118,9 +118,9 @@ class LocalAudioQueueViewModelImpl(
   private val mainViewModel: MainViewModel,
   private val appPrefsSingleton: AppPrefsSingleton,
   private val playlistDao: PlaylistDao,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : LocalAudioQueueViewModel, ScopedServices.Registered {
-  private lateinit var scope: CoroutineScope
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private var queueStateJob: Job? = null
   private var queueNotificationJob: Job? = null
   private val prefsHolder = MutableStateFlow(PrefsHolder())
@@ -134,7 +134,6 @@ class LocalAudioQueueViewModelImpl(
     get() = lastState.playingState.isPlaying
 
   override fun onServiceRegistered() {
-    scope = CoroutineScope(SupervisorJob() + dispatcher)
     scope.launch {
       val appPrefs = appPrefsSingleton.instance()
       prefsHolder.value = PrefsHolder(appPrefs)

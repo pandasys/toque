@@ -37,7 +37,7 @@ object ArtworkModule {
         artworkDownloader = get()
       )
     }
-    single {
+    factory {
       ArtworkUpdateListener(
         work = get(),
         albumDao = get(),
