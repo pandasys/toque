@@ -86,6 +86,7 @@ import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -298,6 +299,7 @@ private class SelectArtistArtViewModelImpl(
       musicInfoProvider.getMusicInfoService()
         .artFinder
         .findArtistArt(artist.asArtistName)
+        .onStart { newSearchStarted() }
         .filterNot { remoteImage -> remoteImage.location == Uri.EMPTY }
         .filter { remoteImage -> remoteImage.types.any { type -> type is FRONT } }
         .filter { remoteImage -> acceptableSizes.contains(remoteImage.sizeBucket) }
@@ -338,9 +340,12 @@ private class SelectArtistArtViewModelImpl(
   override fun reset() {
     searchJob?.cancel()
     artist = artistName.value
+    search()
+  }
+
+  private fun newSearchStarted() {
     imageList.clear()
     selectStateFlow.update { makeCurrentState() }
-    search()
   }
 
   override fun selectImage(image: RemoteImage) {

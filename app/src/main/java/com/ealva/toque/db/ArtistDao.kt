@@ -41,6 +41,7 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.BindExpression
+import com.ealva.welite.db.expr.EscapedLikeOp
 import com.ealva.welite.db.expr.Expression
 import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.and
@@ -389,8 +390,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       .toList()
   }
 
-  private fun Filter.whereCondition() =
-    if (isEmpty) null else ArtistTable.artistName like value escape ESC_CHAR
+  private fun Filter.whereCondition(): EscapedLikeOp? =
+    if (isNotEmpty) ArtistTable.artistName like value escape ESC_CHAR else null
 
   override suspend fun getAllArtistNames(
     limit: Limit

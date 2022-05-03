@@ -64,11 +64,12 @@ import com.ealva.toque.db.smart.Matcher
 import com.ealva.toque.db.smart.MatcherData
 import com.ealva.toque.db.smart.RuleField
 import com.ealva.toque.db.smart.SmartOrderBy
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.ui.common.AutoCompleteTextView
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ScreenConfig
-import com.ealva.toque.ui.library.BaseLibraryItemsScreen
+import com.ealva.toque.ui.library.LibraryItemsScreen
 import com.ealva.toque.ui.library.smart.EditorRule.DateEditorRule
 import com.ealva.toque.ui.library.smart.EditorRule.DurationRule
 import com.ealva.toque.ui.library.smart.EditorRule.NumberEditorRule
@@ -94,7 +95,7 @@ import org.koin.core.component.get
 @Parcelize
 data class SmartPlaylistEditorScreen(
   private val playlistId: PlaylistId = PlaylistId.INVALID
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, KoinComponent {
   @IgnoredOnParcel
   private lateinit var viewModel: SmartPlaylistEditorViewModel
 

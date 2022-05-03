@@ -490,7 +490,7 @@ style:
     active: false
     includeLineWrapping: false
   ForbiddenComment:
-    active: false
+    active: true
     values: ['TODO:', 'FIXME:', 'STOPSHIP:']
     allowedPatterns: ''
   ForbiddenImport:
@@ -545,7 +545,7 @@ style:
   NestedClassesVisibility:
     active: false
   NewLineAtEndOfFile:
-    active: false
+    active: true
   NoTabs:
     active: true
   OptionalAbstractKeyword:

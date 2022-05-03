@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:Suppress("unused")
-
 package com.ealva.toque.common
 
 /**
@@ -30,6 +28,7 @@ inline fun <T> requireThen(value: Boolean, lazyMessage: () -> Any, block: () -> 
 /**
  * Throws an [IllegalArgumentException] if the [value] is false, else executes [block]
  */
+@Suppress("unused")
 inline fun <T> requireThen(value: Boolean, block: () -> T): T =
   requireThen(value, { "Failed requirement." }, block)
 

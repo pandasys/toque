@@ -43,7 +43,7 @@ import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.preset.EqPresetEditorScreen
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
-import com.ealva.toque.ui.library.SearchScreen
+import com.ealva.toque.ui.library.search.SearchScreen
 import com.ealva.toque.ui.nav.goToAboveRoot
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.nav.goToRootScreen

@@ -63,17 +63,23 @@ import org.koin.core.component.get
 @Parcelize
 data class AlbumsScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name
   )
 
-  override fun bindServices(serviceBinder: ServiceBinder) {
-    val key = this
-    with(serviceBinder) {
-      add(AllAlbumsViewModel(key, get(), get(), get(AppPrefs.QUALIFIER), backstack, lookup()))
-    }
+  override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
+    add(
+      AllAlbumsViewModel(
+        categoryItem = LibraryCategories.Albums,
+        albumDao = get(),
+        audioMediaDao = get(),
+        appPrefs = get(AppPrefs.QUALIFIER),
+        backstack = backstack,
+        localAudioQueueModel = lookup()
+      )
+    )
   }
 
   @Composable
@@ -115,19 +121,32 @@ data class AlbumsScreen(
   }
 }
 
-private class AllAlbumsViewModel(
-  private val key: ComposeKey,
+interface AllAlbumsViewModel : AlbumsViewModel {
+
+  val categoryItem: LibraryCategories.CategoryItem
+
+  companion object {
+    operator fun invoke(
+      categoryItem: LibraryCategories.CategoryItem,
+      albumDao: AlbumDao,
+      audioMediaDao: AudioMediaDao,
+      appPrefs: AppPrefsSingleton,
+      backstack: Backstack,
+      localAudioQueueModel: LocalAudioQueueViewModel
+    ): AllAlbumsViewModel = AllAlbumsViewModelImpl(
+      categoryItem, albumDao, audioMediaDao, appPrefs, backstack, localAudioQueueModel
+    )
+  }
+}
+
+private class AllAlbumsViewModelImpl(
+  override val categoryItem: LibraryCategories.CategoryItem,
   albumDao: AlbumDao,
   private val audioMediaDao: AudioMediaDao,
   appPrefs: AppPrefsSingleton,
   backstack: Backstack,
   localAudioQueueModel: LocalAudioQueueViewModel
-) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel, appPrefs) {
-  private val categories = LibraryCategories()
-
-  val categoryItem: LibraryCategories.CategoryItem
-    get() = categories[key]
-
+) : BaseAlbumsViewModel(albumDao, backstack, localAudioQueueModel, appPrefs), AllAlbumsViewModel {
   override suspend fun doGetAlbums(
     albumDao: AlbumDao,
     filter: Filter

@@ -19,11 +19,13 @@ package com.ealva.toque.db
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.common.getOrThrow
+import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.PlaylistDaoEvent.PlaylistCreated
 import com.ealva.toque.db.PlaylistDaoEvent.PlaylistUpdated
 import com.ealva.toque.db.smart.SmartPlaylist
@@ -46,9 +48,11 @@ import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.count
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.inList
 import com.ealva.welite.db.expr.less
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
 import com.ealva.welite.db.expr.sum
@@ -151,7 +155,10 @@ interface PlaylistDao {
 
   suspend fun addToUserPlaylist(id: PlaylistId, mediaIdList: MediaIdList): DaoResult<Long>
 
-  suspend fun getAllPlaylists(): DaoResult<List<PlaylistDescription>>
+  suspend fun getAllPlaylists(
+    filter: Filter,
+    limit: Limit = Limit.NoLimit
+  ): DaoResult<List<PlaylistDescription>>
 
   fun Queryable.getPlaylistName(playlistId: PlaylistId, type: PlayListType): PlaylistName
 
@@ -212,7 +219,7 @@ private class PlaylistDaoImpl(
         it[playListName] = name.value
         it[playListType] = PlayListType.UserCreated.id
         it[createdTime] = Millis.currentUtcEpochMillis().value
-        it[sort] = PlayListType.UserCreated.sortPosition
+        it[playlistTypeSort] = PlayListType.UserCreated.sortPosition
       }.asPlaylistId
 
       if (playlistId >= 1) {
@@ -280,7 +287,7 @@ private class PlaylistDaoImpl(
       it[playListName] = playlist.name.value
       it[playListType] = PlayListType.Rules.id
       it[createdTime] = Millis.currentUtcEpochMillis().value
-      it[sort] = PlayListType.Rules.sortPosition
+      it[playlistTypeSort] = PlayListType.Rules.sortPosition
     }.asPlaylistId
   )
 
@@ -317,7 +324,8 @@ private class PlaylistDaoImpl(
 
   private val playlistSongCountColumn = PlayListMediaTable.mediaId.count()
   private val durationColumn = MediaTable.duration.sum()
-  override suspend fun getAllPlaylists() = runSuspendCatching {
+  override suspend fun getAllPlaylists(filter: Filter, limit: Limit) = runSuspendCatching {
+    require(limit.isValid) { "Invalid limit $limit" }
     db.query {
       mutableListOf<PlaylistDescription>().apply {
         PlayListTable
@@ -331,8 +339,10 @@ private class PlaylistDaoImpl(
               durationColumn
             )
           }
-          .where { PlayListTable.playListType eq PlayListType.UserCreated.id }
-          .groupBy { PlayListTable.playListName }
+          .where { (PlayListTable.playListType eq PlayListType.UserCreated.id).filter(filter) }
+          .groupBy { PlayListTable.playListType }
+          .orderByAsc { PlayListTable.playListName }
+          .limit(limit.value)
           .sequence { cursor ->
             PlaylistDescription(
               PlaylistId(cursor[PlayListTable.id]),
@@ -344,24 +354,32 @@ private class PlaylistDaoImpl(
           }
           .forEach { add(it) }
 
-        PlayListTable
-          .join(SmartPlaylistTable, JoinType.INNER, PlayListTable.id, SmartPlaylistTable.smartId)
-          .selects {
-            listOf(PlayListTable.id, PlayListTable.playListName, SmartPlaylistTable.smartName)
-          }
-          .where { PlayListTable.playListType eq PlayListType.Rules.id }
-          .sequence { cursor ->
-            SmartPlaylistDescription(
-              PlaylistId(cursor[PlayListTable.id]),
-              cursor[PlayListTable.playListName].asPlaylistName,
-              cursor[SmartPlaylistTable.smartName]
-            )
-          }
-          .map { smart -> getSmartPlaylistSongCount(smart) }
-          .forEach { add(it) }
+        val newLimit = if (limit == Limit.NoLimit) limit.value else limit.value - size
+        if (newLimit == Limit.NoLimit.value || newLimit > 0) {
+          PlayListTable
+            .join(SmartPlaylistTable, JoinType.INNER, PlayListTable.id, SmartPlaylistTable.smartId)
+            .selects {
+              listOf(PlayListTable.id, PlayListTable.playListName, SmartPlaylistTable.smartName)
+            }
+            .where { (PlayListTable.playListType eq PlayListType.Rules.id).filter(filter) }
+            .orderByAsc { PlayListTable.playListName }
+            .limit(newLimit)
+            .sequence { cursor ->
+              SmartPlaylistDescription(
+                PlaylistId(cursor[PlayListTable.id]),
+                cursor[PlayListTable.playListName].asPlaylistName,
+                cursor[SmartPlaylistTable.smartName]
+              )
+            }
+            .map { smart -> getSmartPlaylistSongCount(smart) }
+            .forEach { add(it) }
+        }
       }
-    }
+    }.apply {  }
   }
+
+  private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isEmpty) this else
+    this and (PlayListTable.playListName like filter.value escape ESC_CHAR)
 
   private fun Queryable.getSmartPlaylistSongCount(
     smart: SmartPlaylistDescription
@@ -476,7 +494,7 @@ private class PlaylistDaoImpl(
             type = PlayListType::class.reifyRequire(cursor[playListType]),
             createdTime = cursor[createdTime],
             updatedTime = cursor[updatedTime],
-            sort = cursor[sort]
+            sort = cursor[playlistTypeSort]
           )
         }
         .map { playlistData -> delete(playlistData, ::playlistDeleteUndo) }
@@ -586,7 +604,7 @@ private class PlaylistDaoImpl(
         it[playListType] = playlistData.type.id
         it[createdTime] = playlistData.createdTime
         it[updatedTime] = playlistData.updatedTime
-        it[sort] = playlistData.sort
+        it[playlistTypeSort] = playlistData.sort
       }
     }
   }.toErrorIf({ it < 1 }) { DaoException("Could not restore ${playlistData.name}") }

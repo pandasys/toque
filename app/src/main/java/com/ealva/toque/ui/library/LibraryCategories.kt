@@ -24,6 +24,13 @@ import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.navigation.NullComposeKey
 import com.ealva.toque.ui.library.LibraryCategories.CategoryItem
+import com.ealva.toque.ui.library.LibraryCategories.Companion.AlbumArtists
+import com.ealva.toque.ui.library.LibraryCategories.Companion.Albums
+import com.ealva.toque.ui.library.LibraryCategories.Companion.AllSongs
+import com.ealva.toque.ui.library.LibraryCategories.Companion.Artists
+import com.ealva.toque.ui.library.LibraryCategories.Companion.Composers
+import com.ealva.toque.ui.library.LibraryCategories.Companion.Genres
+import com.ealva.toque.ui.library.LibraryCategories.Companion.Playlists
 import com.ealva.toque.ui.theme.AlbumArtists
 import com.ealva.toque.ui.theme.Albums
 import com.ealva.toque.ui.theme.AllSongs
@@ -55,58 +62,71 @@ interface LibraryCategories {
 
   companion object {
     operator fun invoke(): LibraryCategories = LibraryCategoriesImpl()
+
+    val AllSongs = CategoryItem(
+      R.drawable.ic_treble_clef,
+      R.string.AllSongs,
+      LibrarySongsScreen(),
+      Color.AllSongs
+    )
+
+    val Albums = CategoryItem(
+      R.drawable.ic_album,
+      R.string.Albums,
+      AlbumsScreen(),
+      Color.Albums
+    )
+
+    val Artists = CategoryItem(
+      R.drawable.ic_microphone,
+      R.string.Artists,
+      ArtistsScreen(ArtistType.SongArtist),
+      Color.Artists
+    )
+
+    val AlbumArtists = CategoryItem(
+      R.drawable.ic_account_box,
+      R.string.AlbumArtists,
+      ArtistsScreen(ArtistType.AlbumArtist),
+      Color.AlbumArtists
+    )
+
+    val Genres = CategoryItem(
+      R.drawable.ic_guitar_acoustic,
+      R.string.Genres,
+      GenresScreen(),
+      Color.Genres
+    )
+
+    val Composers = CategoryItem(
+      R.drawable.ic_person,
+      R.string.Composers,
+      ComposersScreen(),
+      Color.Composers
+    )
+
+    val Playlists = CategoryItem(
+      R.drawable.ic_list,
+      R.string.Playlists,
+      PlaylistsScreen(),
+      Color.Playlists
+    )
   }
 }
 
 private class LibraryCategoriesImpl : LibraryCategories {
   private val categoryList = listOf(
-    CategoryItem(
-      R.drawable.ic_treble_clef,
-      R.string.AllSongs,
-      LibrarySongsScreen(),
-      Color.AllSongs
-    ),
-    CategoryItem(
-      R.drawable.ic_album,
-      R.string.Albums,
-      AlbumsScreen(),
-      Color.Albums
-    ),
-    CategoryItem(
-      R.drawable.ic_microphone,
-      R.string.Artists,
-      ArtistsScreen(ArtistType.SongArtist),
-      Color.Artists
-    ),
-    CategoryItem(
-      R.drawable.ic_account_box,
-      R.string.AlbumArtists,
-      ArtistsScreen(ArtistType.AlbumArtist),
-      Color.AlbumArtists
-    ),
-    CategoryItem(
-      R.drawable.ic_guitar_acoustic,
-      R.string.Genres,
-      GenresScreen(),
-      Color.Genres
-    ),
-    CategoryItem(
-      R.drawable.ic_person,
-      R.string.Composers,
-      ComposersScreen(),
-      Color.Composers
-    ),
-    CategoryItem(
-      R.drawable.ic_list,
-      R.string.Playlists,
-      PlaylistsScreen(),
-      Color.Playlists
-    ),
+    AllSongs,
+    Albums,
+    Artists,
+    AlbumArtists,
+    Genres,
+    Composers,
+    Playlists
   )
 
   override fun getItems(): List<CategoryItem> = categoryList
 
   override fun get(key: ComposeKey): CategoryItem =
     categoryList.find { it.key == key } ?: CategoryItem.NullCategoryItem
-
 }

@@ -22,7 +22,7 @@ object SdkVersion {
 
 object PluginsVersion {
   const val AGP = "7.1.3"
-  const val DETEKT = "1.19.0"
+  const val DETEKT = "1.20.0"
   const val DOKKA = "1.6.10"
   const val KOTLIN = "1.6.10"
   const val PUBLISH = "0.19.0"
@@ -137,7 +137,7 @@ object Libs {
   }
 
   object EAlvaMusicInfo {
-    private const val VERSION = "0.2.12-0"
+    private const val VERSION = "0.2.15-0"
     const val MUSIC_INFO = "com.ealva:musicinfo:$VERSION"
   }
 

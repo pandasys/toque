@@ -117,17 +117,22 @@ private val LOG by lazyLogger(GenresScreen::class)
 @Parcelize
 data class GenresScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name
   )
 
-  override fun bindServices(serviceBinder: ServiceBinder) {
-    val key = this
-    with(serviceBinder) {
-      add(GenresViewModel(key, get(), lookup(), get(AppPrefs.QUALIFIER), backstack))
-    }
+  override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
+    add(
+      GenresViewModel(
+        categoryItem = LibraryCategories.Genres,
+        audioMediaDao = get(),
+        localAudioQueueModel = lookup(),
+        appPrefs = get(AppPrefs.QUALIFIER),
+        backstack = backstack
+      )
+    )
   }
 
   @Composable
@@ -231,7 +236,7 @@ private fun GenreItem(
   )
 }
 
-private interface GenresViewModel : ActionsViewModel {
+interface GenresViewModel : ActionsViewModel {
   @Immutable
   data class GenreInfo(
     val id: GenreId,
@@ -256,14 +261,14 @@ private interface GenresViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      key: ComposeKey,
+      categoryItem: LibraryCategories.CategoryItem,
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       appPrefs: AppPrefsSingleton,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): GenresViewModel = GenresViewModelImpl(
-      key,
+      categoryItem,
       audioMediaDao,
       localAudioQueueModel,
       appPrefs,
@@ -274,7 +279,7 @@ private interface GenresViewModel : ActionsViewModel {
 }
 
 private class GenresViewModelImpl(
-  private val key: ComposeKey,
+  override val categoryItem: LibraryCategories.CategoryItem,
   private val audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val appPrefs: AppPrefsSingleton,
@@ -287,12 +292,7 @@ private class GenresViewModelImpl(
   private var daoEventsJob: Job? = null
   private var wentInactive = false
 
-  private val categories = LibraryCategories()
   private val genreDao: GenreDao = audioMediaDao.genreDao
-
-  override val categoryItem: LibraryCategories.CategoryItem
-    get() = categories[key]
-
   override val genreFlow = MutableStateFlow<List<GenreInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<GenreId>()
   override val searchFlow = MutableStateFlow("")
@@ -350,25 +350,14 @@ private class GenresViewModelImpl(
           .chunked(20)
           .forEach { sublist ->
             genreFlow.value = sublist
-              .mapTo(infoList) { genreDescription -> genreDescription.toGenreInfo() }
+              .mapTo(infoList) { genre -> genre.toGenreInfo(audioMediaDao) }
               .toList()
           }
       } else {
-        genreFlow.value = genreList.map { genreDescription -> genreDescription.toGenreInfo() }
+        genreFlow.value = genreList.map { genre -> genre.toGenreInfo(audioMediaDao) }
       }
     }
   }
-
-  private suspend fun GenreDescription.toGenreInfo(): GenreInfo = GenreInfo(
-    id = genreId,
-    name = genreName,
-    songCount = songCount.toInt(),
-    duration = duration,
-    artwork = audioMediaDao.albumDao
-      .getAlbumArtFor(genreId)
-      .onFailure { cause -> LOG.e(cause) { it("Error getting art for %s %s", genreId, genreName) } }
-      .getOrElse { Uri.EMPTY }
-  )
 
   override fun setSearch(search: String) {
     searchFlow.value = search
@@ -451,6 +440,25 @@ private class GenresViewModelImpl(
     }
   }
 }
+
+suspend fun Result<List<GenreDescription>, Throwable>.mapToGenreInfo(
+  audioMediaDao: AudioMediaDao
+): List<GenreInfo> = onFailure { cause -> LOG.e(cause) { it("Error getting Genres") } }
+  .getOrElse { emptyList() }
+  .map { genreDescription -> genreDescription.toGenreInfo(audioMediaDao) }
+
+private suspend fun GenreDescription.toGenreInfo(
+  audioMediaDao: AudioMediaDao
+): GenreInfo = GenreInfo(
+  id = genreId,
+  name = genreName,
+  songCount = songCount.toInt(),
+  duration = duration,
+  artwork = audioMediaDao.albumDao
+    .getAlbumArtFor(genreId)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting art for %s %s", genreId, genreName) } }
+    .getOrElse { Uri.EMPTY }
+)
 
 @Parcelize
 private data class GenresViewModelState(val selected: SelectedItems<GenreId>) : Parcelable

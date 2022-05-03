@@ -49,7 +49,7 @@ class LocalAudioQueueOpsTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
-  private val queueStub = LocalAudioQueueViewModelStub()
+  private val queueStub = LocalAudioQueueViewModelSpy()
   private lateinit var queueOps: LocalAudioQueueOps
 
   @Before
@@ -186,7 +186,7 @@ class LocalAudioQueueOpsTest {
   }
 }
 
-private class LocalAudioQueueViewModelStub : LocalAudioQueueViewModel {
+private class LocalAudioQueueViewModelSpy : LocalAudioQueueViewModel {
   override val localAudioQueue: StateFlow<LocalAudioQueue> = MutableStateFlow(NullLocalAudioQueue)
   override val playUpNextAction: StateFlow<PlayUpNextAction> =
     MutableStateFlow(PlayUpNextAction.Prompt)

@@ -50,9 +50,9 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
+import com.ealva.toque.common.Filter
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.fetch
-import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
@@ -124,25 +124,22 @@ private val LOG by lazyLogger(PlaylistsScreen::class)
 @Parcelize
 data class PlaylistsScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name
   )
 
-  override fun bindServices(serviceBinder: ServiceBinder) {
-    val key = this
-    serviceBinder.add(
-      PlaylistsViewModel(
-        key = key,
-        audioMediaDao = get(),
-        mainViewModel = serviceBinder.lookup(),
-        localAudioQueueModel = serviceBinder.lookup(),
-        appPrefs = get(AppPrefs.QUALIFIER),
-        backstack = serviceBinder.backstack
-      )
+  override fun bindServices(serviceBinder: ServiceBinder) = serviceBinder.add(
+    PlaylistsViewModel(
+      categoryItem = LibraryCategories.Playlists,
+      audioMediaDao = get(),
+      mainViewModel = serviceBinder.lookup(),
+      localAudioQueueModel = serviceBinder.lookup(),
+      appPrefs = get(AppPrefs.QUALIFIER),
+      backstack = serviceBinder.backstack
     )
-  }
+  )
 
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
@@ -289,7 +286,7 @@ private fun PlaylistInfo.makePopupMenuItems(
   }
 }
 
-private interface PlaylistsViewModel : ActionsViewModel {
+interface PlaylistsViewModel : ActionsViewModel {
   @Immutable
   data class PlaylistInfo(
     val id: PlaylistId,
@@ -315,7 +312,7 @@ private interface PlaylistsViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      key: ComposeKey,
+      categoryItem: LibraryCategories.CategoryItem,
       audioMediaDao: AudioMediaDao,
       mainViewModel: MainViewModel,
       localAudioQueueModel: LocalAudioQueueViewModel,
@@ -324,7 +321,7 @@ private interface PlaylistsViewModel : ActionsViewModel {
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): PlaylistsViewModel =
       PlaylistsViewModelImpl(
-        key,
+        categoryItem,
         audioMediaDao,
         mainViewModel,
         localAudioQueueModel,
@@ -336,7 +333,7 @@ private interface PlaylistsViewModel : ActionsViewModel {
 }
 
 private class PlaylistsViewModelImpl(
-  private val key: ComposeKey,
+  override val categoryItem: LibraryCategories.CategoryItem,
   private val audioMediaDao: AudioMediaDao,
   private val mainViewModel: MainViewModel,
   localAudioQueueModel: LocalAudioQueueViewModel,
@@ -346,12 +343,6 @@ private class PlaylistsViewModelImpl(
 ) : PlaylistsViewModel, ScopedServices.Registered, ScopedServices.HandlesBack, Bundleable {
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private val playlistDao: PlaylistDao = audioMediaDao.playlistDao
-  private val albumDao: AlbumDao = audioMediaDao.albumDao
-
-  private val categories = LibraryCategories()
-
-  override val categoryItem: LibraryCategories.CategoryItem
-    get() = categories[key]
 
   override val playlistsFlow = MutableStateFlow<List<PlaylistInfo>>(emptyList())
   override val selectedItems = SelectedItemsFlow<PlaylistId>()
@@ -424,23 +415,11 @@ private class PlaylistsViewModelImpl(
 
   private fun requestPlaylists() {
     scope.launch {
-      playlistsFlow.value = playlistDao.getAllPlaylists()
-        .onFailure { cause -> LOG.e(cause) { it("Error getting all playlists") } }
-        .getOrElse { emptyList() }
-        .map { playlistDescription -> playlistDescription.toPlaylistInfo() }
+      playlistsFlow.value = playlistDao
+        .getAllPlaylists(Filter.NoFilter)
+        .mapToPlaylistInfo(audioMediaDao)
     }
   }
-
-  private suspend fun PlaylistDescription.toPlaylistInfo() = PlaylistInfo(
-    id = id,
-    name = name,
-    type = type,
-    songCount = songCount.toInt(),
-    duration = duration,
-    artwork = albumDao.getAlbumArtFor(id, type, name)
-      .onFailure { LOG.e { it("Error getting artwork for %s %s %s", id, type, name) } }
-      .getOrElse { Uri.EMPTY }
-  )
 
   override fun itemClicked(playlistInfo: PlaylistInfo) =
     selectedItems.ifInSelectionModeToggleElse(playlistInfo.id) { goToPlaylistSongs(playlistInfo) }
@@ -509,6 +488,25 @@ private class PlaylistsViewModelImpl(
     }
   }
 }
+
+suspend fun Result<List<PlaylistDescription>, Throwable>.mapToPlaylistInfo(
+  audioMediaDao: AudioMediaDao
+): List<PlaylistInfo> = onFailure { cause -> LOG.e(cause) { it("Error getting all playlists") } }
+  .getOrElse { emptyList() }
+  .map { playlistDescription -> playlistDescription.toPlaylistInfo(audioMediaDao) }
+
+private suspend fun PlaylistDescription.toPlaylistInfo(
+  audioMediaDao: AudioMediaDao
+) = PlaylistInfo(
+  id = id,
+  name = name,
+  type = type,
+  songCount = songCount.toInt(),
+  duration = duration,
+  artwork = audioMediaDao.albumDao.getAlbumArtFor(id, type, name)
+    .onFailure { LOG.e { it("Error getting artwork for %s %s %s", id, type, name) } }
+    .getOrElse { Uri.EMPTY }
+)
 
 @Parcelize
 private data class PlaylistsViewModelState(val selected: SelectedItems<PlaylistId>) : Parcelable

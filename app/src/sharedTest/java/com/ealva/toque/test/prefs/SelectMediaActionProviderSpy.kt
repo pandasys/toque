@@ -19,7 +19,8 @@ package com.ealva.toque.test.prefs
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.SelectMediaActionProvider
 
-class SelectMediaActionProviderStub : SelectMediaActionProvider {
+@Suppress("PropertyName")
+class SelectMediaActionProviderSpy : SelectMediaActionProvider {
   var _playSongList: MediaIdList? = null
   var _playSongListCalled = 0
   override fun playMediaList(mediaIdList: MediaIdList) {

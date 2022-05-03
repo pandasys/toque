@@ -712,14 +712,14 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
   private fun Queryable.queryAlbumInfo(
     albumName: String,
     artistName: String
-  ): AlbumInfo? = QUERY_ALBUM_INFO
+  ): AlbumQueryInfo? = QUERY_ALBUM_INFO
     .sequence(
       { bindings ->
         bindings[0] = albumName
         bindings[1] = artistName
       }
     ) { cursor ->
-      AlbumInfo(
+      AlbumQueryInfo(
         cursor[id].asAlbumId,
         cursor[albumTitle],
         cursor[albumSort],
@@ -759,7 +759,7 @@ private val QUERY_ALBUM_INFO = Query(
     .where { (albumTitle eq bindString()) and (albumArtist eq bindString()) }
 )
 
-private data class AlbumInfo(
+private data class AlbumQueryInfo(
   val id: AlbumId,
   val album: String,
   val albumSort: String,

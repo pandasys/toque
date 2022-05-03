@@ -135,6 +135,23 @@ interface SongsViewModel : ActionsViewModel {
   fun goBack()
 }
 
+fun AudioDescription.toSongInfo() = SongInfo(
+  id = mediaId,
+  title = title,
+  duration = duration,
+  rating = rating,
+  album = album,
+  artist = artist,
+  artwork = if (localArtwork !== Uri.EMPTY) localArtwork else remoteArtwork
+)
+
+fun Result<List<AudioDescription>, Throwable>.mapToSongInfo(
+  onFailure: (Throwable) -> Unit,
+  mapTo: (index: Int, audio: AudioDescription) -> SongInfo = { _, audio -> audio.toSongInfo() }
+): List<SongInfo> = onFailure(onFailure)
+  .getOrElse { emptyList() }
+  .mapIndexed(mapTo)
+
 fun List<SongInfo>.toSongCount(year: Int = 0): String = formatSongsInfo(
   size,
   fold(Duration.ZERO) { duration, songInfo: SongInfo ->
@@ -212,24 +229,18 @@ abstract class BaseSongsViewModel(
     requestJob?.cancel()
     requestJob = scope.launch(Dispatchers.IO) {
       songsFlow.value = getAudioList(audioMediaDao, filterFlow.value)
-        .onFailure { cause ->
-          LOG.e(cause) { it("Error getting audio list") }
-          localAudioQueueModel.emitNotification(Notification(fetch(R.string.ErrorReadingMediaList)))
-        }
-        .getOrElse { emptyList() }
-        .mapIndexed { index, audioDescription -> makeSongInfo(index, audioDescription) }
+        .mapToSongInfo(
+          onFailure = { cause ->
+            LOG.e(cause) { it("Error getting audio list") }
+            localAudioQueueModel
+              .emitNotification(Notification(fetch(R.string.ErrorReadingMediaList)))
+          },
+          mapTo = { index, audioDescription -> makeSongInfo(index, audioDescription) }
+        )
     }
   }
 
-  protected open fun makeSongInfo(index: Int, audio: AudioDescription) = SongInfo(
-    id = audio.mediaId,
-    title = audio.title,
-    duration = audio.duration,
-    rating = audio.rating,
-    album = audio.album,
-    artist = audio.artist,
-    artwork = if (audio.localArtwork !== Uri.EMPTY) audio.localArtwork else audio.remoteArtwork
-  )
+  protected open fun makeSongInfo(index: Int, audio: AudioDescription) = audio.toSongInfo()
 
   override fun mediaClicked(mediaId: MediaId) =
     selectedItems.ifInSelectionModeToggleElse(mediaId) {}

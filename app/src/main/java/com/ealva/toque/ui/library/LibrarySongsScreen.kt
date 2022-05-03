@@ -57,17 +57,22 @@ private val LOG by lazyLogger(LibrarySongsScreen::class)
 @Parcelize
 data class LibrarySongsScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name
   )
 
-  override fun bindServices(serviceBinder: ServiceBinder) {
-    val key = this
-    with(serviceBinder) {
-      add(LibrarySongsViewModel(key, get(), lookup(), get(AppPrefs.QUALIFIER), backstack))
-    }
+  override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
+    add(
+      LibrarySongsViewModel(
+        categoryItem = LibraryCategories.AllSongs,
+        audioMediaDao = get(),
+        localAudioQueueModel = lookup(),
+        appPrefs = get(AppPrefs.QUALIFIER),
+        backstack = backstack
+      )
+    )
   }
 
   @OptIn(ExperimentalFoundationApi::class)
@@ -104,7 +109,7 @@ data class LibrarySongsScreen(
 }
 
 private class LibrarySongsViewModel(
-  private val key: ComposeKey,
+  val categoryItem: LibraryCategories.CategoryItem,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   appPrefs: AppPrefsSingleton,
@@ -117,11 +122,6 @@ private class LibrarySongsViewModel(
   backstack,
   dispatcher
 ) {
-  private val categories = LibraryCategories()
-
-  val categoryItem: LibraryCategories.CategoryItem
-    get() = categories[key]
-
   override val categoryToken: CategoryToken = CategoryToken.All
 
   override suspend fun getAudioList(

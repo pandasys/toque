@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,32 +14,31 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.ui.library
+package com.ealva.toque.ui.library.search
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.ealva.ealvalog.e
 import com.ealva.toque.navigation.ComposeKey
-import com.zhuinden.simplestack.ScopedServices
 import kotlinx.parcelize.Parcelize
 import javax.annotation.concurrent.Immutable
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
 @Suppress("unused")
 private val LOG by lazyLogger(SearchScreen::class)
 
 @Immutable
 @Parcelize
-data class SearchScreen(private val noArg: String = "") : ComposeKey() {
-  override fun bindServices(serviceBinder: ServiceBinder) {
-    serviceBinder.add(SearchModel())
+data class SearchScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
+  override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
+    add(SearchModel(get()))
   }
 
   @Composable
@@ -51,25 +50,3 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey() {
   }
 }
 
-class SearchModel : ScopedServices.Registered, ScopedServices.Activated {
-  init {
-    LOG.e { it("SearchModel") }
-  }
-
-  override fun onServiceRegistered() {
-    LOG.e { it("onServiceRegistered") }
-  }
-
-  override fun onServiceUnregistered() {
-    LOG.e { it("onServiceUnregistered") }
-  }
-
-  override fun onServiceActive() {
-    LOG.e { it("onServiceActive") }
-  }
-
-  override fun onServiceInactive() {
-    LOG.e { it("onServiceInactive") }
-  }
-
-}

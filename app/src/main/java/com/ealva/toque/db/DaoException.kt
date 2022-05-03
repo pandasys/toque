@@ -16,25 +16,11 @@
 
 package com.ealva.toque.db
 
-import androidx.annotation.StringRes
-import com.ealva.toque.R
 import com.ealva.toque.common.Millis
-import com.ealva.toque.common.fetch
 import com.github.michaelbull.result.Result
-import java.io.PrintWriter
-import java.io.StringWriter
-
-private fun Throwable.stackTraceToString(): String {
-  return StringWriter().apply {
-    PrintWriter(this).also { pw ->
-      printStackTrace(pw)
-    }
-  }.toString()
-}
 
 typealias DaoResult<T> = Result<T, Throwable>
 typealias BoolResult = DaoResult<Boolean>
-typealias LongResult = DaoResult<Long>
 typealias MillisResult = DaoResult<Millis>
 
 /**
@@ -45,18 +31,3 @@ open class DaoException(msg: String) : RuntimeException(msg)
 class DaoInsertFailedException(msg: String) : DaoException(msg)
 class DaoNotFoundException(msg: String) : DaoException(msg)
 
-sealed class DaoMessage
-
-class DaoExceptionMessage(val ex: Throwable) : DaoMessage() {
-  override fun toString(): String = """$ex\n${ex.stackTraceToString()}"""
-}
-
-abstract class DaoStringMessage(
-  @StringRes private val res: Int,
-  private vararg val args: Any
-) : DaoMessage() {
-  override fun toString(): String = fetch(res, args)
-}
-
-class DaoNotFound(itemNotFound: Any) : DaoStringMessage(R.string.NotFoundItem, itemNotFound)
-class DaoFailedToInsert(item: Any) : DaoStringMessage(R.string.FailedToInsertItem, item)

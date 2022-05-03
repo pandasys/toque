@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="JavaProjectCodeInsightSettings">
+    <excluded-names>
+      <name>android.*.Result</name>
+      <name>androidx.*.Result</name>
+      <name>javax.xml.transform.Result</name>
+      <name>kotlin.Result</name>
+      <name>org.junit.*.Result</name>
+    </excluded-names>
+  </component>
+</project>

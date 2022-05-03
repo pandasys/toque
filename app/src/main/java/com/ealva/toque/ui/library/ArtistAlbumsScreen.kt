@@ -55,6 +55,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoResult
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.prefs.AppPrefs
@@ -102,7 +103,7 @@ data class ArtistAlbumsScreen(
   private val songCount: Int,
   private val tertiaryInfo: String,
   private val backTo: String
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name

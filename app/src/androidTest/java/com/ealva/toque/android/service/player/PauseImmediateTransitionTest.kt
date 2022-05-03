@@ -24,7 +24,7 @@ import com.ealva.toque.service.player.PauseImmediateTransition
 import com.ealva.toque.service.player.PlayImmediateTransition
 import com.ealva.toque.service.player.ShutdownFadeOutTransition
 import com.ealva.toque.service.player.ShutdownImmediateTransition
-import com.ealva.toque.test.service.player.TransitionPlayerStub
+import com.ealva.toque.test.service.player.TransitionPlayerSpy
 import com.ealva.toque.test.shared.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,12 +40,12 @@ class PauseImmediateTransitionTest {
   @get:Rule
   var coroutineRule = CoroutineRule()
 
-  private lateinit var player: TransitionPlayerStub
+  private lateinit var player: TransitionPlayerSpy
   private lateinit var transition: PlayerTransition
 
   @Before
   fun init() {
-    player = TransitionPlayerStub()
+    player = TransitionPlayerSpy()
     transition = PauseImmediateTransition()
     transition.setPlayer(player)
   }

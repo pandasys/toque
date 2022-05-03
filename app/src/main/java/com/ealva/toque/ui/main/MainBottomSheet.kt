@@ -58,8 +58,8 @@ import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.service.media.PlayState
 import com.ealva.toque.ui.common.LocalScreenConfig
-import com.ealva.toque.ui.library.BaseLibraryItemsScreen
-import com.ealva.toque.ui.library.SearchScreen
+import com.ealva.toque.ui.library.LibraryItemsScreen
+import com.ealva.toque.ui.library.search.SearchScreen
 import com.ealva.toque.ui.preset.EqPresetEditorScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.BaseAppSettingsScreen
@@ -141,7 +141,7 @@ private fun MainBottomSheetButtonRow(
   modifier: Modifier
 ) {
   val onSettingScreen = topOfStack is BaseAppSettingsScreen
-  val onLibraryScreen = topOfStack is BaseLibraryItemsScreen
+  val onLibraryScreen = topOfStack is LibraryItemsScreen
   val onQueueScreen = topOfStack is QueueScreen
   val onSearchScreen = topOfStack is SearchScreen
   val onPresetScreen = topOfStack is EqPresetEditorScreen

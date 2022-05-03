@@ -63,6 +63,7 @@ object ArtistTable : Table() {
 
   init {
     uniqueIndex(artistName) // artist may appear only once
+    index(artistSort)
   }
 }
 
@@ -83,6 +84,7 @@ object AlbumTable : Table() {
 
   init {
     uniqueIndex(albumTitle, albumArtist)
+    index(albumSort)
   }
 }
 
@@ -218,6 +220,7 @@ object MediaTable : Table() {
     index(lastSkippedTime) // smart playlist query (eg. find music "recently" skipped)
     index(duration) // smart playlist query (eg. find all songs longer than 5 minutes)
     index(comment) // smart playlist query (eg. user can use this a a freeform search area)
+    index(titleSort)
   }
 }
 
@@ -229,6 +232,7 @@ object ComposerTable : Table() {
 
   init {
     uniqueIndex(composer)
+    index(composerSort)
   }
 }
 
@@ -396,8 +400,11 @@ object PlayListTable : Table() {
   val createdTime = long("PlayListTimeCreated")
   val updatedTime = long("PlayListUpdated") { default(0) }
 
-  /** This column should be equal to [PlayListType.sortPosition] */
-  val sort = integer("PlayListSort")
+  /**
+   * This column determines how playlists are grouped before being sorted by name. This should be
+   * equal to [PlayListType.sortPosition]
+   */
+  val playlistTypeSort = integer("PlayListSort")
 
   init {
     uniqueIndex(playListName)

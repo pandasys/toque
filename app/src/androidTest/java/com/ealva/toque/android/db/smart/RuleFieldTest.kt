@@ -418,7 +418,7 @@ class RuleFieldTest {
   }
 
   private fun expectSuggestionProvider(field: RuleField, column: Column<*>) {
-    val factory = SuggestionProviderFactoryStub()
+    val factory = SuggestionProviderFactorySpy()
     val provider = field.getSuggestionsSource(factory)
     expect(factory._getProviderCalled).toBe(true)
     expect(provider).toBe(SuggestionProviderFake)
@@ -426,7 +426,7 @@ class RuleFieldTest {
   }
 
   private fun expectSuggestionProviderNotCalled(field: RuleField) {
-    val factory = SuggestionProviderFactoryStub()
+    val factory = SuggestionProviderFactorySpy()
     val provider = field.getSuggestionsSource(factory)
     expect(factory._getProviderCalled).toBe(false)
     expect(provider).toBe(EmptySuggestionProvider)
@@ -434,7 +434,7 @@ class RuleFieldTest {
 }
 
 @Suppress("PropertyName")
-private class SuggestionProviderFactoryStub : SuggestionProviderFactory {
+private class SuggestionProviderFactorySpy : SuggestionProviderFactory {
   var _getProviderCalled = false
   var _getProviderColumn : Column<*>? = null
   var _getProviderReturn: SuggestionProvider = SuggestionProviderFake

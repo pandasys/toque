@@ -129,23 +129,9 @@ abstract class BaseAlbumsViewModel(
   private fun requestAlbums() {
     if (requestJob?.isActive == true) requestJob?.cancel()
     requestJob = scope.launch {
-      albumFlow.value = doGetAlbums(albumDao, filterFlow.value)
-        .onFailure { cause -> LOG.e(cause) { it("Error getting Albums") } }
-        .getOrElse { emptyList() }
-        .map { album -> album.asAlbumInfo }
+      albumFlow.value = doGetAlbums(albumDao, filterFlow.value).mapToAlbumInfo()
     }
   }
-
-  private inline val AlbumDescription.asAlbumInfo: AlbumInfo
-    get() = AlbumInfo(
-      id = albumId,
-      title = albumTitle,
-      artist = artistName,
-      year = albumYear,
-      artwork = preferredArt,
-      songCount = songCount.toInt(),
-      duration = duration
-    )
 
   protected abstract suspend fun doGetAlbums(
     albumDao: AlbumDao,
@@ -247,3 +233,19 @@ private data class AlbumsViewModelState(
   val selected: SelectedItems<AlbumId>,
   val search: String
 ) : Parcelable
+
+fun Result<List<AlbumDescription>, Throwable>.mapToAlbumInfo(): List<AlbumInfo> =
+  onFailure { cause -> LOG.e(cause) { it("Error getting Albums") } }
+    .getOrElse { emptyList() }
+    .map { album -> album.toAlbumInfo() }
+
+private fun AlbumDescription.toAlbumInfo(): AlbumInfo = AlbumInfo(
+  id = albumId,
+  title = albumTitle,
+  artist = artistName,
+  year = albumYear,
+  artwork = preferredArt,
+  songCount = songCount.toInt(),
+  duration = duration
+)
+

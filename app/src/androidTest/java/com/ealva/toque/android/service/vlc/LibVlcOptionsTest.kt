@@ -40,7 +40,7 @@ private const val GAIN_DEFAULT = "--audio-replay-gain-default"
 private const val NETWORK_CACHING = "--network-caching"
 private const val STATS = "--stats"
 private const val RESAMPLER = "--audio-resampler"
-private const val LOG_VERBOSE = "--log-verbose"
+//private const val LOG_VERBOSE = "--log-verbose"
 private const val SKIP_LOOP_FILTER = "--avcodec-skiploopfilter"
 private const val SKIP_FRAME = "--avcodec-skip-frame"
 private const val SKIP_IDCT = "--avcodec-skip-idct"
@@ -73,7 +73,7 @@ class LibVlcOptionsTest {
     val prefs = StubLibVlcPrefs()
     prefs.skipLoopFilter._value = SkipLoopFilter.All
     libVlcOptions(prefs, vlcUtil).let { options ->
-//      expect(options.size).toBe(26)
+      expect(options.size).toBe(25)
       expect(options[0]).toBe(AUDIO_TIME_STRETCH)
       expect(options[1]).toBe(GAIN_MODE)
       expect(options[2]).toBe(ReplayGainMode.None.toString())
@@ -89,7 +89,7 @@ class LibVlcOptionsTest {
         .toBe(if (vlcUtil.machineSpecs.processors > 2) SOXR_RESAMPLER else UGLY_RESAMPLER)
       expect(options[12]).toBe(V_VERBOSE)
       expect(options[13]).toBe(SKIP_LOOP_FILTER)
-      // expect(options[14]).toBe() todo depends on machine specs, revisit
+      // expect(options[14]).toBe() depends on machine specs
       expect(options[15]).toBe(SKIP_FRAME)
       expect(options[16]).toBe("0")
       expect(options[17]).toBe(SKIP_IDCT)
@@ -209,14 +209,15 @@ class LibVlcOptionsTest {
     skipLoopFilter: SkipLoopFilter,
     machineSpecs: VLCUtil.MachineSpecs
   ) {
-//    libVlcOptions(
-//      prefs,
-//      VlcUtilStub(machineSpecs)
-//    ).let { options ->
-//      expect(options.size).toBe(26)
-//      expect(options[14]).toBe(SKIP_LOOP_FILTER)
-//      expect(options[15]).toBe(skipLoopFilter.toString())
-//    }
+    libVlcOptions(
+      prefs,
+      VlcUtilStub(machineSpecs)
+    ).let { options ->
+      options.forEach { option -> println(option) }
+      expect(options.size).toBe(25)
+      expect(options[13]).toBe(SKIP_LOOP_FILTER)
+      expect(options[14]).toBe(skipLoopFilter.toString())
+    }
   }
 }
 

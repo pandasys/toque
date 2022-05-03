@@ -117,17 +117,22 @@ private val LOG by lazyLogger(ComposersScreen::class)
 @Parcelize
 data class ComposersScreen(
   private val noArg: String = ""
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name
   )
 
-  override fun bindServices(serviceBinder: ServiceBinder) {
-    val key = this
-    with(serviceBinder) {
-      add(ComposersViewModel(key, get(), lookup(), backstack, get(AppPrefs.QUALIFIER)))
-    }
+  override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
+    add(
+      ComposersViewModel(
+        categoryItem = LibraryCategories.Composers,
+        audioMediaDao = get(),
+        localAudioQueueModel = lookup(),
+        backstack = backstack,
+        appPrefs = get(AppPrefs.QUALIFIER)
+      )
+    )
   }
 
   @Composable
@@ -231,7 +236,7 @@ private fun ComposerItem(
   )
 }
 
-private interface ComposersViewModel : ActionsViewModel {
+interface ComposersViewModel : ActionsViewModel {
   @Immutable
   data class ComposerInfo(
     val id: ComposerId,
@@ -255,7 +260,7 @@ private interface ComposersViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      key: ComposeKey,
+      categoryItem: CategoryItem,
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
@@ -263,7 +268,7 @@ private interface ComposersViewModel : ActionsViewModel {
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ComposersViewModel =
       ComposersViewModelImpl(
-        key,
+        categoryItem,
         audioMediaDao,
         localAudioQueueModel,
         backstack,
@@ -274,7 +279,7 @@ private interface ComposersViewModel : ActionsViewModel {
 }
 
 private class ComposersViewModelImpl(
-  private val key: ComposeKey,
+  override val categoryItem: CategoryItem,
   private val audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
@@ -288,11 +293,6 @@ private class ComposersViewModelImpl(
   private var wentInactive = false
 
   private val composerDao = audioMediaDao.composerDao
-  private val categories = LibraryCategories()
-
-  override val categoryItem: CategoryItem
-    get() = categories[key]
-
   override val composerFlow = MutableStateFlow<List<ComposerInfo>>(emptyList())
 
   override val selectedItems = SelectedItemsFlow<ComposerId>()
@@ -408,28 +408,15 @@ private class ComposersViewModelImpl(
           .chunked(20)
           .forEach { sublist ->
             composerFlow.value = sublist
-              .mapTo(infoList) { composerDescription -> composerDescription.toComposerInfo() }
+              .mapTo(infoList) { composer -> composer.toComposerInfo(audioMediaDao) }
               .toList()
           }
       } else {
         composerFlow.value = composerList
-          .map { composerDescription -> composerDescription.toComposerInfo() }
+          .map { composer -> composer.toComposerInfo(audioMediaDao) }
       }
     }
   }
-
-  private suspend fun ComposerDescription.toComposerInfo() = ComposerInfo(
-    id = composerId,
-    name = composerName,
-    songCount = songCount.toInt(),
-    duration = duration,
-    artwork = audioMediaDao.albumDao
-      .getAlbumArtFor(composerId)
-      .onFailure { cause ->
-        LOG.e(cause) { it("Error getting art for %s %s", composerId, composerName) }
-      }
-      .getOrElse { Uri.EMPTY }
-  )
 
   override fun setSearch(search: String) {
     searchFlow.value = search
@@ -460,6 +447,27 @@ private class ComposersViewModelImpl(
     }
   }
 }
+
+suspend fun Result<List<ComposerDescription>, Throwable>.mapToComposerInfo(
+  audioMediaDao: AudioMediaDao
+): List<ComposerInfo> = onFailure { cause -> LOG.e(cause) { it("Error getting Composers") } }
+  .getOrElse { emptyList() }
+  .map { composer -> composer.toComposerInfo(audioMediaDao) }
+
+suspend fun ComposerDescription.toComposerInfo(
+  audioMediaDao: AudioMediaDao
+) = ComposerInfo(
+  id = composerId,
+  name = composerName,
+  songCount = songCount.toInt(),
+  duration = duration,
+  artwork = audioMediaDao.albumDao
+    .getAlbumArtFor(composerId)
+    .onFailure { cause ->
+      LOG.e(cause) { it("Error getting art for %s %s", composerId, composerName) }
+    }
+    .getOrElse { Uri.EMPTY }
+)
 
 @Parcelize
 private data class ComposersViewModelState(val selected: SelectedItems<ComposerId>) : Parcelable

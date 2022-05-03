@@ -23,7 +23,9 @@ object DaoCommon {
   const val ESC_CHAR = '\\'
 
   /**
-   * Wrap with LIKE operator '%' wildcards and escape any necessary characters within the string
+   * Wrap with LIKE operator wildcard '%' and escape any necessary characters within the string,
+   * '%', '_', and [ESC_CHAR]. If we want to support wildcard searches later we could add our
+   * own wildcards and map them.
    */
   fun String.wrapAsFilter(): Filter = trim().let { toWrap ->
       if (toWrap.isEmpty()) toWrap else buildString {

@@ -42,11 +42,13 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import kotlinx.parcelize.Parcelize
 
-abstract class BaseLibraryItemsScreen : ComposeKey()
+interface LibraryItemsScreen
 
 @Immutable
 @Parcelize
-data class LibraryCategoriesScreen(private val noArg: String = "") : BaseLibraryItemsScreen() {
+data class LibraryCategoriesScreen(
+  private val noArg: String = ""
+) : ComposeKey(), LibraryItemsScreen {
   override fun bindServices(serviceBinder: ServiceBinder) {
     with(serviceBinder) { add(LibraryItemsViewModel(backstack)) }
   }

@@ -17,18 +17,18 @@
 package com.ealva.toque.prefs
 
 import com.ealva.toque.persist.MediaIdList
-import com.ealva.toque.test.prefs.SelectMediaActionProviderStub
+import com.ealva.toque.test.prefs.SelectMediaActionProviderSpy
 import com.nhaarman.expect.expect
 import org.junit.Before
 import org.junit.Test
 
 class SelectMediaActionTest {
-  private lateinit var provider: SelectMediaActionProviderStub
+  private lateinit var provider: SelectMediaActionProviderSpy
   private var list: MediaIdList = MediaIdList(0)
 
   @Before
   fun setup() {
-    provider = SelectMediaActionProviderStub()
+    provider = SelectMediaActionProviderSpy()
   }
 
   @Test

@@ -63,6 +63,7 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.FullAudioInfo
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.MediaId
@@ -119,7 +120,7 @@ data class AudioMediaInfoScreen(
   private val albumArtist: ArtistName,
   private val rating: Rating,
   private val durationMillis: Millis,
-) : BaseLibraryItemsScreen(), KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, KoinComponent {
   @IgnoredOnParcel
   private val duration: Duration = durationMillis.toDuration()
 

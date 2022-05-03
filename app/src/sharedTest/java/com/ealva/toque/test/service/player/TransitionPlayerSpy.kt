@@ -25,7 +25,7 @@ import com.ealva.toque.service.player.TransitionPlayer
 import com.nhaarman.expect.fail
 import kotlin.time.Duration
 
-class TransitionPlayerStub : TransitionPlayer {
+class TransitionPlayerSpy : TransitionPlayer {
   override val mediaTitle: Title = Title.UNKNOWN
 
   var _isPlaying = false

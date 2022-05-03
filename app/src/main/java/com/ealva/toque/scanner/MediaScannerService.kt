@@ -80,7 +80,23 @@ private const val SUFFIX = ".MediaScannerJobIntentService"
 private const val ACTION_FULL_RESCAN = "FullRescan$SUFFIX"
 private const val NOTIFICATION_ID = 39000
 private const val SCANNER_CHANNEL_ID = "com.ealva.toque.scanner.MediaScannerNotificationChannel"
-private const val PERSIST_WORKER_COUNT = 3
+
+/**
+ * Surprisingly (to me), increasing this number was still showing performance improvements, albeit
+ * in quickly decreasing increments, for non-debug builds on a real device. When I say performance,
+ * I'm speaking of total time to scan over 2500 files, mostly MP3s. I'm choosing this value as a
+ * stopping point as it is already eating a substantial amount of resources.
+ *
+ * I'm guessing a more efficient "concurrent" flow operator will require this to be revisited. Also,
+ * a proper performance test harness is needed to select this number. For now, it seems high as it
+ * requires spinning up a lot of threads that probably wouldn't exist otherwise. But that cost seems
+ * to be worth it, given the current design of this app and my simple, homegrown, attempt at
+ * concurrency. See [MediaScannerService.scanAllAudioAfter]. Also, keep increasing this number and
+ * performance will eventually decline - especially on a low-end device.
+ *
+ * [Parallel flow processing #1147][https://github.com/Kotlin/kotlinx.coroutines/issues/1147]
+ */
+private const val PERSIST_WORKER_COUNT = 20
 
 private const val EXTRAS_KEY_SUFFIX = ".MediaScanner"
 
@@ -223,15 +239,15 @@ class MediaScannerService : LifecycleService() {
   private suspend fun scanAllAudioAfter(
     modifiedAfter: Date,
     parser: MediaMetadataParser,
-    minimumDuration: Duration,
-    createUpdateTime: Millis,
+    minDuration: Duration,
+    modifiedTime: Millis,
     onCompletion: suspend () -> Unit
   ) {
     withContext(Dispatchers.IO) {
-      storage.audioFlow(modifiedAfter, minimumDuration)
-        .map { async { persistAudio(it, parser, minimumDuration, createUpdateTime) } }
+      storage.audioFlow(modifiedAfter, minDuration)
+        .map { audioInfo -> async { persistAudio(audioInfo, parser, minDuration, modifiedTime) } }
         .buffer(PERSIST_WORKER_COUNT)
-        .map { it.await() }
+        .map { deferred -> deferred.await() }
         .catch { cause -> LOG.e(cause) { it("AudioFlow processing error") } }
         .onCompletion { onCompletion() }
         .collect()

@@ -22,7 +22,8 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 @JvmInline
 value class Limit(val value: Long) : Parcelable {
-  inline val isValid: Boolean get() = value > 0
+  /** Limit must be > 0 or [NoLimit] */
+  inline val isValid: Boolean get() = value > 0 || value == NoLimit.value
 
   companion object {
     val NoLimit = Limit(-1)

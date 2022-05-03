@@ -145,16 +145,24 @@ enum class ArtistType(
 @Parcelize
 data class ArtistsScreen(
   private val artistType: ArtistType
-) : BaseLibraryItemsScreen(), ScopeKey.Child, KoinComponent {
+) : ComposeKey(), LibraryItemsScreen, ScopeKey.Child, KoinComponent {
 
   override fun getParentScopes(): List<String> = listOf(
     LocalAudioQueueViewModel::class.java.name
   )
 
   override fun bindServices(serviceBinder: ServiceBinder) {
-    val key = this
     with(serviceBinder) {
-      add(ArtistsViewModel(key, get(), lookup(), artistType, get(AppPrefs.QUALIFIER), backstack))
+      add(
+        ArtistsViewModel(
+          categoryItem = LibraryCategories.Artists,
+          audioDao = get(),
+          localAudioQueueModel = lookup(),
+          artistType = artistType,
+          appPrefs = get(AppPrefs.QUALIFIER),
+          backstack = backstack
+        )
+      )
     }
   }
 
@@ -305,7 +313,7 @@ private fun AlbumCount(albumCount: Int) {
   )
 }
 
-private interface ArtistsViewModel : ActionsViewModel {
+interface ArtistsViewModel : ActionsViewModel {
   @Immutable
   data class ArtistInfo(
     val artistId: ArtistId,
@@ -332,7 +340,7 @@ private interface ArtistsViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      key: ComposeKey,
+      categoryItem: LibraryCategories.CategoryItem,
       audioDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       artistType: ArtistType,
@@ -340,7 +348,7 @@ private interface ArtistsViewModel : ActionsViewModel {
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ArtistsViewModel = ArtistsViewModelImpl(
-      key = key,
+      categoryItem = categoryItem,
       audioMediaDao = audioDao,
       localAudioQueueModel = localAudioQueueModel,
       artistType = artistType,
@@ -352,7 +360,7 @@ private interface ArtistsViewModel : ActionsViewModel {
 }
 
 private class ArtistsViewModelImpl(
-  private val key: ComposeKey,
+  override val categoryItem: LibraryCategories.CategoryItem,
   private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val artistType: ArtistType,
@@ -367,9 +375,6 @@ private class ArtistsViewModelImpl(
   private var wentInactive = false
 
   private val artistDao = audioMediaDao.artistDao
-  private val categories = LibraryCategories()
-
-  override val categoryItem: LibraryCategories.CategoryItem get() = categories[key]
   private val stateKey: String get() = artistType.javaClass.name
 
   override val artistFlow = MutableStateFlow<List<ArtistInfo>>(emptyList())
@@ -441,7 +446,7 @@ private class ArtistsViewModelImpl(
   private fun requestArtists(processChunks: Boolean) {
     requestJob?.cancel()
     requestJob = scope.launch(Dispatchers.IO) {
-      val artistList = when (artistType) {
+      val list = when (artistType) {
         ArtistType.AlbumArtist -> artistDao.getAlbumArtists(filterFlow.value)
         ArtistType.SongArtist -> artistDao.getSongArtists(filterFlow.value)
       }.onFailure { cause -> LOG.e(cause) { it("Error getting %s artists", artistType) } }
@@ -450,17 +455,17 @@ private class ArtistsViewModelImpl(
       if (processChunks) {
         // We convert to sequence and break into chunks because we may be querying the DB for
         // artwork and this gets the first chunk to the UI quickly.
-        val infoList = ArrayList<ArtistInfo>(artistList.size)
-        artistList
+        val infoList = ArrayList<ArtistInfo>(list.size)
+        list
           .asSequence()
           .chunked(20)
           .forEach { sublist ->
             artistFlow.value = sublist
-              .mapTo(infoList) { artistDescription -> artistDescription.toArtistInfo() }
+              .mapTo(infoList) { artist -> artist.toArtistInfo(artistType, audioMediaDao) }
               .toList()
           }
       } else {
-        artistFlow.value = artistList.map { artistDescription -> artistDescription.toArtistInfo() }
+        artistFlow.value = list.map { artist -> artist.toArtistInfo(artistType, audioMediaDao) }
       }
     }
   }
@@ -553,17 +558,6 @@ private class ArtistsViewModelImpl(
       )
     )
 
-  private suspend fun ArtistDescription.toArtistInfo(artwork: Uri = preferredArt) = ArtistInfo(
-    artistId = artistId,
-    name = name,
-    artwork = if (artwork !== Uri.EMPTY) artwork else audioMediaDao.albumDao
-      .getAlbumArtFor(artistId, artistType)
-      .getOrElse { Uri.EMPTY },
-    albumCount = albumCount.toInt(),
-    songCount = songCount.toInt(),
-    duration = duration
-  )
-
   override fun itemClicked(artistInfo: ArtistInfo) = selectedItems
     .ifInSelectionModeToggleElse(artistInfo.artistId) { goToArtistAlbums(artistInfo) }
 
@@ -579,6 +573,29 @@ private data class ArtistsViewModelState(
   val selected: SelectedItems<ArtistId>,
   val search: String
 ) : Parcelable
+
+suspend fun Result<List<ArtistDescription>, Throwable>.mapToArtistInfo(
+  artistType: ArtistType,
+  audioMediaDao: AudioMediaDao
+): List<ArtistInfo> = onFailure { cause -> LOG.e(cause) { it("Error getting %s", artistType) } }
+  .getOrElse { emptyList() }
+  .map { artistDescription -> artistDescription.toArtistInfo(artistType, audioMediaDao) }
+
+private suspend fun ArtistDescription.toArtistInfo(
+  artistType: ArtistType,
+  audioMediaDao: AudioMediaDao,
+  artwork: Uri = preferredArt,
+) = ArtistInfo(
+  artistId = artistId,
+  name = name,
+  artwork = if (artwork !== Uri.EMPTY) artwork else audioMediaDao.albumDao
+    .getAlbumArtFor(artistId, artistType)
+    .getOrElse { Uri.EMPTY },
+  albumCount = albumCount.toInt(),
+  songCount = songCount.toInt(),
+  duration = duration
+)
+
 
 @Preview
 @Composable
