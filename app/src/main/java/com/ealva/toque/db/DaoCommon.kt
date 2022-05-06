@@ -16,27 +16,24 @@
 
 package com.ealva.toque.db
 
-import com.ealva.toque.common.Filter
-import com.ealva.toque.common.asFilter
-
-object DaoCommon {
-  const val ESC_CHAR = '\\'
-
-  /**
-   * Wrap with LIKE operator wildcard '%' and escape any necessary characters within the string,
-   * '%', '_', and [ESC_CHAR]. If we want to support wildcard searches later we could add our
-   * own wildcards and map them.
-   */
-  fun String.wrapAsFilter(): Filter = trim().let { toWrap ->
-      if (toWrap.isEmpty()) toWrap else buildString {
-        append('%')
-        toWrap.forEach { ch ->
-          when (ch) {
-            '%', '_', ESC_CHAR -> append(ESC_CHAR)
-          }
-          append(ch)
-        }
-        append('%')
-      }
-    }.asFilter
-}
+//object DaoCommon {
+//  const val ESC_CHAR = '\\'
+//
+//  /**
+//   * Wrap with LIKE operator wildcard '%' and escape any necessary characters within the string,
+//   * '%', '_', and [ESC_CHAR]. If we want to support wildcard searches later we could add our
+//   * own wildcards and map them.
+//   */
+//  fun String.wrapAsFilter(): Filter = trim().let { toWrap ->
+//      if (toWrap.isEmpty()) toWrap else buildString {
+//        append('%')
+//        toWrap.forEach { ch ->
+//          when (ch) {
+//            '%', '_', ESC_CHAR -> append(ESC_CHAR)
+//          }
+//          append(ch)
+//        }
+//        append('%')
+//      }
+//    }.asFilter
+//}

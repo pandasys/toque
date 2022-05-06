@@ -25,12 +25,12 @@ import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.asPlaylistName
 import com.ealva.toque.common.getOrThrow
-import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.PlaylistDaoEvent.PlaylistCreated
 import com.ealva.toque.db.PlaylistDaoEvent.PlaylistUpdated
 import com.ealva.toque.db.smart.SmartPlaylist
 import com.ealva.toque.db.smart.SmartPlaylistDao
 import com.ealva.toque.db.smart.SmartPlaylistTable
+import com.ealva.toque.db.wildcard.SqliteLike.ESC_CHAR
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
@@ -375,10 +375,10 @@ private class PlaylistDaoImpl(
             .forEach { add(it) }
         }
       }
-    }.apply {  }
+    }.apply { }
   }
 
-  private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isEmpty) this else
+  private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isBlank) this else
     this and (PlayListTable.playListName like filter.value escape ESC_CHAR)
 
   private fun Queryable.getSmartPlaylistSongCount(

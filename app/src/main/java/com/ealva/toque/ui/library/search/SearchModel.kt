@@ -22,7 +22,7 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.DaoCommon.wrapAsFilter
+import com.ealva.toque.db.wildcard.SqliteLike.wrapAsFilter
 import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo

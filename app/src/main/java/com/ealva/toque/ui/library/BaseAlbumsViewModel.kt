@@ -26,8 +26,8 @@ import com.ealva.toque.common.preferredArt
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.CategoryMediaList
-import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.DaoResult
+import com.ealva.toque.db.wildcard.SqliteLike.wrapAsFilter
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.prefs.AppPrefsSingleton

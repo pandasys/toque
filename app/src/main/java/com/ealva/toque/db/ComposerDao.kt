@@ -23,6 +23,8 @@ import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ComposerDaoEvent.ComposerCreatedOrUpdated
+import com.ealva.toque.db.wildcard.SqliteLike.ESC_CHAR
+import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asComposerId
@@ -234,8 +236,8 @@ private class ComposerDaoImpl(
     }
   }
 
-  private fun Filter.whereCondition() =
-    if (isEmpty) null else ComposerTable.composer like value escape DaoCommon.ESC_CHAR
+  private fun Filter.whereCondition() = if (isBlank) null else
+    ComposerTable.composer.likeEscaped(value)
 
   private val Cursor.asComposerDescription: ComposerDescription
     get() = ComposerDescription(
@@ -313,7 +315,7 @@ private class ComposerDaoImpl(
     db.query {
       ComposerTable
         .select { composer }
-        .where { composer like textSearch.applyWildcards(partial) escape DaoCommon.ESC_CHAR }
+        .where { textSearch.makeWhereOp(composer, partial) }
         .sequence { it[composer] }
         .toList()
     }

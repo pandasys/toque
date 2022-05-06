@@ -22,8 +22,9 @@ import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
-import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.GenreDaoEvent.GenresCreatedOrUpdated
+import com.ealva.toque.db.wildcard.SqliteLike.ESC_CHAR
+import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.MediaId
@@ -180,8 +181,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }
 
-  private fun Filter.whereCondition() =
-    if (isEmpty) null else GenreTable.genre like value escape ESC_CHAR
+  private fun Filter.whereCondition() = if (isBlank) null else GenreTable.genre.likeEscaped(value)
 
   override suspend fun getAllGenreNames(
     limit: Limit
@@ -214,7 +214,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     db.query {
       GenreTable
         .select { genre }
-        .where { genre like textSearch.applyWildcards(partial) escape ESC_CHAR }
+        .where { textSearch.makeWhereOp(genre, partial) }
         .sequence { it[genre] }
         .toList()
     }

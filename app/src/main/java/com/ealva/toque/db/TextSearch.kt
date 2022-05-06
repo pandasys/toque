@@ -16,23 +16,55 @@
 
 package com.ealva.toque.db
 
+import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
+import com.ealva.toque.db.wildcard.SqliteLike.notLikeEscaped
+import com.ealva.welite.db.expr.Op
+import com.ealva.welite.db.expr.SqlTypeExpression
+import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.neq
+
 enum class TextSearch {
-  /** Use for Is and IsNot */
   Is {
-    override fun applyWildcards(partial: String): String = partial
+    override fun <T : String?> makeWhereOp(
+      column: SqlTypeExpression<T>,
+      match: T
+    ): Op<Boolean> = column eq match
   },
-  /** User for Contains and DoesNotContain */
+  IsNot {
+    override fun <T : String?> makeWhereOp(
+      column: SqlTypeExpression<T>,
+      match: T
+    ): Op<Boolean> = column neq match
+  },
   Contains {
-    override fun applyWildcards(partial: String): String = "%$partial%"
+    override fun <T : String?> makeWhereOp(
+      column: SqlTypeExpression<T>,
+      match: T
+    ): Op<Boolean> = column.likeEscaped(match)
+  },
+  DoesNotContain {
+    override fun <T : String?> makeWhereOp(
+      column: SqlTypeExpression<T>,
+      match: T
+    ): Op<Boolean> = column.notLikeEscaped(match)
   },
   BeginsWith {
-    override fun applyWildcards(partial: String): String = "$partial%"
+    override fun <T : String?> makeWhereOp(
+      column: SqlTypeExpression<T>,
+      match: T
+    ): Op<Boolean> = column.likeEscaped(search = match, prefix = "")
   },
   EndsWith {
-    override fun applyWildcards(partial: String): String = "%$partial"
+    override fun <T : String?> makeWhereOp(
+      column: SqlTypeExpression<T>,
+      match: T
+    ): Op<Boolean> = column.likeEscaped(search = match, postfix = "")
   };
 
-  abstract fun applyWildcards(partial: String): String
+  abstract fun <T : String?> makeWhereOp(
+    column: SqlTypeExpression<T>,
+    match: T
+  ): Op<Boolean>
 }
 
 interface HasTextSearch {

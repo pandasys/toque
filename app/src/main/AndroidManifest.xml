@@ -153,6 +153,8 @@
         android:resource="@xml/medium_appwidget_info" />
     </receiver>
 
+    <activity android:name="androidx.activity.ComponentActivity" />
+
   </application>
 
 </manifest>

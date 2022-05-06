@@ -53,9 +53,9 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoCommon.wrapAsFilter
 import com.ealva.toque.db.GenreDao
 import com.ealva.toque.db.GenreDescription
+import com.ealva.toque.db.wildcard.SqliteLike.wrapAsFilter
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.GenreId

@@ -50,11 +50,11 @@ import com.ealva.toque.db.ArtistDao.Companion.albumArtistTableName
 import com.ealva.toque.db.ArtistDao.Companion.songArtistTableId
 import com.ealva.toque.db.ArtistDao.Companion.songArtistTableName
 import com.ealva.toque.db.AudioMediaDao.Companion.QUEUE_ID
-import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.PlayListType.File
 import com.ealva.toque.db.PlayListType.Rules
 import com.ealva.toque.db.PlayListType.System
 import com.ealva.toque.db.PlayListType.UserCreated
+import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.extension
 import com.ealva.toque.file.toUriOrEmpty
@@ -94,15 +94,12 @@ import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
-import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.inList
 import com.ealva.welite.db.expr.isNotNull
-import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.expr.plus
 import com.ealva.welite.db.statements.insertValues
 import com.ealva.welite.db.statements.updateColumns
-import com.ealva.welite.db.table.ArgBindings
 import com.ealva.welite.db.table.Cursor
 import com.ealva.welite.db.table.Join
 import com.ealva.welite.db.table.JoinType.INNER
@@ -575,7 +572,7 @@ private class AudioMediaDaoImpl(
         .where { (MediaTable.mediaType eq MediaType.Audio.id).filter(filter) }
         .orderByAsc { MediaTable.titleSort }
         .limit(limit.value)
-        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+        .sequence { cursor -> AudioDescription(cursor) }
         .toList()
     }
   }
@@ -601,7 +598,7 @@ private class AudioMediaDaoImpl(
           )
         }
         .limit(limit.value)
-        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+        .sequence { cursor -> AudioDescription(cursor) }
         .toList()
     }
   }
@@ -625,7 +622,7 @@ private class AudioMediaDaoImpl(
           )
         }
         .limit(limit.value)
-        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+        .sequence { cursor -> AudioDescription(cursor) }
         .toList()
     }
   }
@@ -649,7 +646,7 @@ private class AudioMediaDaoImpl(
           )
         }
         .limit(limit.value)
-        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+        .sequence { cursor -> AudioDescription(cursor) }
         .toList()
     }
   }
@@ -676,7 +673,7 @@ private class AudioMediaDaoImpl(
           )
         }
         .limit(limit.value)
-        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+        .sequence { cursor -> AudioDescription(cursor) }
         .toList()
     }
   }
@@ -695,7 +692,7 @@ private class AudioMediaDaoImpl(
         .where { (ComposerMediaTable.composerId eq composerId.value).filter(filter) }
         .ordersBy { listOf(OrderBy(AlbumTable.albumTitle), OrderBy(MediaTable.trackNumber)) }
         .limit(limit.value)
-        .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+        .sequence { cursor -> AudioDescription(cursor) }
         .toList()
     }
   }
@@ -725,7 +722,7 @@ private class AudioMediaDaoImpl(
       .where { (PlayListMediaTable.playListId eq playlistId.value).filter(filter) }
       .orderByAsc { PlayListMediaTable.sort }
       .limit(limit.value)
-      .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+      .sequence { cursor -> AudioDescription(cursor) }
       .toList()
   }
 
@@ -742,9 +739,9 @@ private class AudioMediaDaoImpl(
       .join(AlbumTable, INNER, MediaTable.albumId, AlbumTable.id)
       .join(ArtistTable, INNER, MediaTable.artistId, ArtistTable.id)
       .selects { AUDIO_DESCRIPTION_SELECTS }
-      .where { viewId.isNotNull() }
+      .where { viewId.isNotNull().filter(filter) }
       .limit(limit.value)
-      .sequence({ bindings -> bindings.filter(filter) }) { cursor -> AudioDescription(cursor) }
+      .sequence { cursor -> AudioDescription(cursor) }
       .toList()
   }
 
@@ -1287,7 +1284,7 @@ private class AudioMediaDaoImpl(
     db.query {
       MediaTable
         .select { title }
-        .where { title like textSearch.applyWildcards(partialTitle) escape ESC_CHAR }
+        .where { textSearch.makeWhereOp(title, partialTitle) }
         .sequence { it[title] }
         .toList()
     }
@@ -1576,22 +1573,10 @@ private val AUDIO_DESCRIPTION_SELECTS = listOf(
   ArtistTable.artistName,
 )
 
-private val BIND_FILTER_ONE = bindString()
-private val BIND_FILTER_TWO = bindString()
-private val BIND_FILTER_THREE = bindString()
-private val AUDIO_LIKE_CONDITION = (MediaTable.title like BIND_FILTER_ONE escape ESC_CHAR) or
-  (AlbumTable.albumTitle like BIND_FILTER_TWO escape ESC_CHAR) or
-  (ArtistTable.artistName like BIND_FILTER_THREE escape ESC_CHAR)
-
-private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> =
-  if (filter.isEmpty) this else this and AUDIO_LIKE_CONDITION
-
-private fun ArgBindings.filter(filter: Filter): ArgBindings = apply {
-  if (filter.isNotEmpty) {
-    this[BIND_FILTER_ONE] = filter.value
-    this[BIND_FILTER_TWO] = filter.value
-    this[BIND_FILTER_THREE] = filter.value
-  }
+private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isBlank) this else {
+  this and (MediaTable.title.likeEscaped(filter.value) or
+    AlbumTable.albumTitle.likeEscaped(filter.value) or
+    ArtistTable.artistName.likeEscaped(filter.value))
 }
 
 private fun Op<Boolean>.restrictTo(artistId: ArtistId?): Op<Boolean> =

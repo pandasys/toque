@@ -136,7 +136,6 @@ fun NowPlaying(
 ) {
   val screenConfig = LocalScreenConfig.current
 
-//  val useDarkIcons = toqueColors.isLight
   val systemUiController = rememberSystemUiController()
   SideEffect {
     systemUiController.setSystemBarsColor(

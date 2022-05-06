@@ -34,7 +34,7 @@ import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.db.AlbumDaoEvent.AlbumArtworkUpdated
-import com.ealva.toque.db.DaoCommon.ESC_CHAR
+import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -57,11 +57,9 @@ import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
-import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.isNotNull
 import com.ealva.welite.db.expr.less
-import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
@@ -294,9 +292,8 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }
 
-  private fun Filter.whereCondition() =
-    if (isEmpty) null else (AlbumTable.albumTitle like value escape ESC_CHAR) or
-      (ArtistTable.artistName like value escape ESC_CHAR)
+  private fun Filter.whereCondition() = if (isBlank) null else
+    AlbumTable.albumTitle.likeEscaped(value) or ArtistTable.artistName.likeEscaped(value)
 
   override suspend fun getAllAlbumsFor(
     artistId: ArtistId,
@@ -444,7 +441,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     db.query {
       AlbumTable
         .select { albumTitle }
-        .where { albumTitle like textSearch.applyWildcards(partialTitle) escape ESC_CHAR }
+        .where { textSearch.makeWhereOp(albumTitle, partialTitle) }
         .sequence { it[albumTitle] }
         .toList()
     }

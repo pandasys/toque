@@ -216,6 +216,7 @@ dependencies {
   testImplementation(Libs.Expect.EXPECT)
   testImplementation(Libs.Robolectric.ROBOLECTRIC)
   testImplementation(Libs.Kotlin.Coroutines.TEST)
+  testImplementation(Libs.AndroidX.Compose.MANIFEST)
 //  testImplementation(ThirdParty.KOIN_TEST)
 
   androidTestImplementation(Libs.AndroidX.Test.Ext.JUNIT)
@@ -224,6 +225,7 @@ dependencies {
   androidTestImplementation(Libs.Expect.EXPECT)
   androidTestImplementation(Libs.Kotlin.Coroutines.TEST)
   androidTestImplementation(Libs.Koin.TEST)
+  androidTestImplementation(Libs.AndroidX.Compose.JUNIT)
 
   implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
 }

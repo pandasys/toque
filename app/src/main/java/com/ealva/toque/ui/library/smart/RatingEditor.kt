@@ -31,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
 import com.ealva.toque.common.Rating
@@ -47,27 +49,35 @@ import com.gowtham.ratingbar.StepSize
 
 
 @Composable
-fun RatingEditor(editorRule: EditorRule, ruleDataChanged: (EditorRule, MatcherData) -> Unit) {
+fun RatingEditor(
+  editorRule: EditorRule,
+  ruleDataChanged: (EditorRule, MatcherData) -> Unit,
+  modifier: Modifier = Modifier
+) {
   when (editorRule.rule.matcher as RatingMatcher) {
-    RatingMatcher.IsInTheRange -> RatingRangeEditor(editorRule, ruleDataChanged)
-    else -> SingleRatingEditor(editorRule, ruleDataChanged)
+    RatingMatcher.IsInTheRange -> RatingRangeEditor(editorRule, ruleDataChanged, modifier)
+    else -> SingleRatingEditor(editorRule, ruleDataChanged, modifier)
   }
 }
 
 @Composable
 private fun SingleRatingEditor(
   editorRule: EditorRule,
-  ruleDataChanged: (EditorRule, MatcherData) -> Unit
+  ruleDataChanged: (EditorRule, MatcherData) -> Unit,
+  modifier: Modifier
 ) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(vertical = 8.dp),
+      .padding(vertical = 8.dp)
+      .then(modifier),
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically
   ) {
     RatingBar(
-      modifier = Modifier.wrapContentSize(),
+      modifier = Modifier
+        .wrapContentSize()
+        .clearAndSetSemantics { testTag = "RatingBar" },
       value = editorRule.firstStarRating.value,
       config = RatingBarConfig()
         .size(22.dp)
@@ -92,7 +102,8 @@ private fun SingleRatingEditor(
 @Composable
 private fun RatingRangeEditor(
   editorRule: EditorRule,
-  ruleDataChanged: (EditorRule, MatcherData) -> Unit
+  ruleDataChanged: (EditorRule, MatcherData) -> Unit,
+  modifier: Modifier
 ) {
   var low: Float by remember { mutableStateOf(editorRule.firstStarRating.value) }
   var high: Float by remember { mutableStateOf(editorRule.secondStarRating.value) }
@@ -139,12 +150,15 @@ private fun RatingRangeEditor(
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(vertical = 8.dp),
+      .padding(vertical = 8.dp)
+      .then(modifier),
     horizontalArrangement = Arrangement.Center,
     verticalAlignment = Alignment.CenterVertically
   ) {
     RatingBar(
-      modifier = Modifier.wrapContentSize(),
+      modifier = Modifier
+        .wrapContentSize()
+        .clearAndSetSemantics { testTag = "RatingBarLow" },
       value = low,
       config = RatingBarConfig()
         .size(22.dp)
@@ -163,7 +177,9 @@ private fun RatingRangeEditor(
       style = toqueTypography.caption
     )
     RatingBar(
-      modifier = Modifier.wrapContentSize(),
+      modifier = Modifier
+        .wrapContentSize()
+        .clearAndSetSemantics { testTag = "RatingBarHigh" },
       value = high,
       config = RatingBarConfig()
         .size(22.dp)

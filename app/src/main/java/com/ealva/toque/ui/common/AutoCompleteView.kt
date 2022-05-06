@@ -32,12 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.log._e
-
-@Suppress("unused")
-private val LOG by lazyLogger("AutoCompleteView")
 
 @Composable
 fun <T> AutoCompleteView(

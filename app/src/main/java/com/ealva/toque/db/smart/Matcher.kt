@@ -45,13 +45,4 @@ interface Matcher<T> : HasConstId, Parcelable {
 
   val defaultData: MatcherData
     get() = MatcherData.EMPTY
-
-  companion object {
-    const val SQL_LIKE_WILDCARD = "%"
-    const val ESCAPED_SQL_LIKE_WILDCARD = "%%"
-  }
-}
-
-fun String.escapeWildcard(): String {
-  return replace(Matcher.SQL_LIKE_WILDCARD, Matcher.ESCAPED_SQL_LIKE_WILDCARD)
 }

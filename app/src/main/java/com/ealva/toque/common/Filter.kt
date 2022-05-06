@@ -23,8 +23,8 @@ import kotlin.time.Duration.Companion.milliseconds
 @Parcelize
 @JvmInline
 value class Filter(val value: String) : Parcelable {
-  inline val isEmpty: Boolean get() = value.isEmpty()
-  inline val isNotEmpty: Boolean get() = value.isNotEmpty()
+  inline val isBlank: Boolean get() = value.isBlank()
+  inline val isNotBlank: Boolean get() = value.isNotBlank()
 
   companion object {
     val NoFilter = Filter("")

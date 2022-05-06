@@ -30,7 +30,7 @@ import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ArtistDaoEvent.ArtistArtworkUpdated
-import com.ealva.toque.db.DaoCommon.ESC_CHAR
+import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ArtistIdList
@@ -41,17 +41,15 @@ import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.compound.union
 import com.ealva.welite.db.expr.BindExpression
-import com.ealva.welite.db.expr.EscapedLikeOp
 import com.ealva.welite.db.expr.Expression
+import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.expr.Order
 import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
-import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
-import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
@@ -390,8 +388,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       .toList()
   }
 
-  private fun Filter.whereCondition(): EscapedLikeOp? =
-    if (isNotEmpty) ArtistTable.artistName like value escape ESC_CHAR else null
+  private fun Filter.whereCondition(): Op<Boolean>? = if (isBlank) null else
+    ArtistTable.artistName.likeEscaped(value)
 
   override suspend fun getAllArtistNames(
     limit: Limit
@@ -471,9 +469,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       ArtistDao.SongArtistTable
         .join(MediaTable, JoinType.INNER, ArtistDao.songArtistTableId, MediaTable.artistId)
         .select { ArtistDao.songArtistTableName }
-        .where {
-          ArtistDao.songArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR
-        }
+        .where { textSearch.makeWhereOp(ArtistDao.songArtistTableName, partial) }
         .distinct()
         .sequence { it[ArtistDao.songArtistTableName] }
         .toList()
@@ -488,9 +484,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       ArtistDao.AlbumArtistTable
         .join(MediaTable, JoinType.INNER, ArtistDao.albumArtistTableId, MediaTable.albumArtistId)
         .select { ArtistDao.albumArtistTableName }
-        .where {
-          ArtistDao.albumArtistTableName like textSearch.applyWildcards(partial) escape ESC_CHAR
-        }
+        .where { textSearch.makeWhereOp(ArtistDao.albumArtistTableName, partial) }
         .distinct()
         .sequence { it[ArtistDao.albumArtistTableName] }
         .toList()

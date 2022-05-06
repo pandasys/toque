@@ -19,73 +19,36 @@ package com.ealva.toque.db.smart
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.common.fetch
-import com.ealva.toque.db.DaoCommon.ESC_CHAR
 import com.ealva.toque.db.HasTextSearch
 import com.ealva.toque.db.TextSearch
 import com.ealva.welite.db.expr.Op
-import com.ealva.welite.db.expr.eq
-import com.ealva.welite.db.expr.escape
-import com.ealva.welite.db.expr.like
-import com.ealva.welite.db.expr.neq
-import com.ealva.welite.db.expr.notLike
 import com.ealva.welite.db.table.Column
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
 enum class TextMatcher(
   override val id: Int,
-  @StringRes private val stringRes: Int
+  @StringRes private val stringRes: Int,
+  override val textSearch: TextSearch
 ) : Matcher<String>, HasTextSearch {
-  Contains(1, R.string.contains) {
-    override val textSearch: TextSearch = TextSearch.Contains
-    override fun makeClause(column: Column<String>, value: String): Op<Boolean> =
-      column like textSearch.applyWildcards(value) escape ESC_CHAR
-  },
-  DoesNotContain(2, R.string.does_not_contain) {
-    override val textSearch: TextSearch = TextSearch.Contains
-    override fun makeClause(column: Column<String>, value: String): Op<Boolean> =
-      column notLike textSearch.applyWildcards(value) escape ESC_CHAR
-  },
-  Is(3, R.string.is_) {
-    override val textSearch: TextSearch = TextSearch.Contains
-    override fun makeClause(column: Column<String>, value: String): Op<Boolean> =
-      column eq value
-  },
-  IsNot(4, R.string.is_not) {
-    override val textSearch: TextSearch = TextSearch.Contains
-    override fun makeClause(column: Column<String>, value: String): Op<Boolean> =
-      column neq value
-  },
-  BeginsWith(5, R.string.begins_with) {
-    override val textSearch: TextSearch = TextSearch.BeginsWith
-    override fun makeClause(column: Column<String>, value: String): Op<Boolean> =
-      column like textSearch.applyWildcards(value) escape ESC_CHAR
-  },
-  EndsWith(6, R.string.ends_with) {
-    override val textSearch: TextSearch = TextSearch.EndsWith
-    override fun makeClause(column: Column<String>, value: String): Op<Boolean> =
-      column like textSearch.applyWildcards(value) escape ESC_CHAR
-  };
+  Contains(1, R.string.contains, TextSearch.Contains),
+  DoesNotContain(2, R.string.does_not_contain, TextSearch.DoesNotContain),
+  Is(3, R.string.is_, TextSearch.Is),
+  IsNot(4, R.string.is_not, TextSearch.IsNot),
+  BeginsWith(5, R.string.begins_with, TextSearch.BeginsWith),
+  EndsWith(6, R.string.ends_with, TextSearch.EndsWith);
 
   override fun makeWhereClause(column: Column<String>, data: MatcherData): Op<Boolean> =
-    makeClause(column, data.text.escapeWildcard())
+    textSearch.makeWhereOp(column, data.text)
 
-  protected abstract fun makeClause(column: Column<String>, value: String): Op<Boolean>
+  override fun willAccept(data: MatcherData): Boolean = data.text.isNotBlank()
 
-  override fun willAccept(data: MatcherData): Boolean {
-    return data.text.isNotBlank()
-  }
-
-  override fun toString(): String {
-    return fetch(stringRes)
-  }
+  override fun toString(): String = fetch(stringRes)
 
   companion object {
     val ALL_VALUES: List<TextMatcher> = values().toList()
 
-    fun fromId(matcherId: Int): TextMatcher {
-      return ALL_VALUES.find { it.id == matcherId }
-        ?: throw IllegalArgumentException("No matcher with id=$matcherId")
-    }
+    fun fromId(matcherId: Int): TextMatcher = ALL_VALUES.find { it.id == matcherId }
+      ?: throw IllegalArgumentException("No matcher with id=$matcherId")
   }
 }

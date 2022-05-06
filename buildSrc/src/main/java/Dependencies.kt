@@ -76,6 +76,9 @@ object Libs {
 //      const val LAYOUT = "androidx.compose.foundation:foundation-layout:${VERSION}"
 //      const val MATERIAL_ICONS_EXTENDED =
 //        "androidx.compose.material:material-icons-extended:${VERSION}"
+
+      const val JUNIT = "androidx.compose.ui:ui-test-junit4:$VERSION"
+      const val MANIFEST = "androidx.compose.ui:ui-test-manifest:$VERSION"
     }
 
     const val EXIF = "androidx.exifinterface:exifinterface:1.3.3"
@@ -87,8 +90,6 @@ object Libs {
       const val COMMON_JAVA8 = "androidx.lifecycle:lifecycle-common-java8:$VERSION"
       const val SERVICE = "androidx.lifecycle:lifecycle-service:$VERSION"
       const val EXTS = "androidx.lifecycle:lifecycle-extensions:2.2.0"
-//    const val VIEW_MODEL_COMPOSE = "androidx.lifecycle:lifecycle-viewmodel-compose:1.0.0-alpha05"
-//    const val VIEW_MODEL_KTX = "androidx.lifecycle:lifecycle-viewmodel-ktx:$VERSION"
     }
 
     object Test {
@@ -220,7 +221,7 @@ object Libs {
   }
 
   object Result {
-    private const val VERSION = "1.1.14"
+    private const val VERSION = "1.1.16"
     const val RESULT = "com.michael-bull.kotlin-result:kotlin-result:$VERSION"
     const val COROUTINES = "com.michael-bull.kotlin-result:kotlin-result-coroutines:$VERSION"
   }
@@ -230,9 +231,9 @@ object Libs {
   }
 
   object SimpleStack {
-    const val CORE = "com.github.Zhuinden:simple-stack:2.6.2"
-    const val EXT = "com.github.Zhuinden:simple-stack-extensions:2.2.2"
-    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.4"
+    const val CORE = "com.github.Zhuinden:simple-stack:2.6.4"
+    const val EXT = "com.github.Zhuinden:simple-stack-extensions:2.2.4"
+    const val COMPOSE = "com.github.Zhuinden:simple-stack-compose-integration:0.9.5"
   }
 
   object Square {

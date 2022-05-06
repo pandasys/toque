@@ -39,8 +39,8 @@ data class Rule(
 
   fun makeJoinTemplate(): JoinTemplate? = ruleField.makeJoinClause(matcher, data)
 
-  fun hasSameFieldAndMatcher(newRule: Rule): Boolean =
-    ruleField === newRule.ruleField && matcher === newRule.matcher
+//  fun hasSameFieldAndMatcher(newRule: Rule): Boolean =
+//    ruleField === newRule.ruleField && matcher === newRule.matcher
 
   /**
    * Is the Rule consistent and [data] is valid for the [matcher]
@@ -54,7 +54,6 @@ data class Rule(
   }
 
   companion object {
-
     operator fun invoke(
       id: Long,
       ruleField: RuleField,
@@ -66,6 +65,5 @@ data class Rule(
       matcher = ruleField.reifyMatcher(matcherId),
       data = data
     )
-
   }
 }
