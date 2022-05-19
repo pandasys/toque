@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Color
 import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.navigation.NullComposeKey
-import com.ealva.toque.ui.library.LibraryCategories.CategoryItem
+import com.ealva.toque.ui.library.LibraryCategories.LibraryCategory
 import com.ealva.toque.ui.library.LibraryCategories.Companion.AlbumArtists
 import com.ealva.toque.ui.library.LibraryCategories.Companion.Albums
 import com.ealva.toque.ui.library.LibraryCategories.Companion.AllSongs
@@ -45,67 +45,67 @@ import com.ealva.toque.ui.theme.Playlists
  */
 interface LibraryCategories {
   @Immutable
-  data class CategoryItem(
-    @DrawableRes val icon: Int,
-    @StringRes val title: Int,
+  data class LibraryCategory(
+    @DrawableRes override val icon: Int,
+    @StringRes override val title: Int,
     val key: ComposeKey,
     val color: Color
-  ) {
+  ) : Category {
     companion object {
-      val NullCategoryItem = CategoryItem(0, R.string.None, NullComposeKey, Color.Unspecified)
+      val NullCategoryItem = LibraryCategory(0, R.string.None, NullComposeKey, Color.Unspecified)
     }
   }
 
-  fun getItems(): List<CategoryItem>
+  fun getItems(): List<LibraryCategory>
 
-  operator fun get(key: ComposeKey): CategoryItem
+  operator fun get(key: ComposeKey): LibraryCategory
 
   companion object {
     operator fun invoke(): LibraryCategories = LibraryCategoriesImpl()
 
-    val AllSongs = CategoryItem(
+    val AllSongs = LibraryCategory(
       R.drawable.ic_treble_clef,
       R.string.AllSongs,
       LibrarySongsScreen(),
       Color.AllSongs
     )
 
-    val Albums = CategoryItem(
+    val Albums = LibraryCategory(
       R.drawable.ic_album,
       R.string.Albums,
       AlbumsScreen(),
       Color.Albums
     )
 
-    val Artists = CategoryItem(
+    val Artists = LibraryCategory(
       R.drawable.ic_microphone,
       R.string.Artists,
       ArtistsScreen(ArtistType.SongArtist),
       Color.Artists
     )
 
-    val AlbumArtists = CategoryItem(
+    val AlbumArtists = LibraryCategory(
       R.drawable.ic_account_box,
       R.string.AlbumArtists,
       ArtistsScreen(ArtistType.AlbumArtist),
       Color.AlbumArtists
     )
 
-    val Genres = CategoryItem(
+    val Genres = LibraryCategory(
       R.drawable.ic_guitar_acoustic,
       R.string.Genres,
       GenresScreen(),
       Color.Genres
     )
 
-    val Composers = CategoryItem(
+    val Composers = LibraryCategory(
       R.drawable.ic_person,
       R.string.Composers,
       ComposersScreen(),
       Color.Composers
     )
 
-    val Playlists = CategoryItem(
+    val Playlists = LibraryCategory(
       R.drawable.ic_list,
       R.string.Playlists,
       PlaylistsScreen(),
@@ -125,8 +125,8 @@ private class LibraryCategoriesImpl : LibraryCategories {
     Playlists
   )
 
-  override fun getItems(): List<CategoryItem> = categoryList
+  override fun getItems(): List<LibraryCategory> = categoryList
 
-  override fun get(key: ComposeKey): CategoryItem =
-    categoryList.find { it.key == key } ?: CategoryItem.NullCategoryItem
+  override fun get(key: ComposeKey): LibraryCategory =
+    categoryList.find { it.key == key } ?: LibraryCategory.NullCategoryItem
 }

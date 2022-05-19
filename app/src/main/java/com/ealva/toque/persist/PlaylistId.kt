@@ -26,7 +26,7 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 @JvmInline
-value class PlaylistId(override val value: Long) : PersistentId, Parcelable {
+value class PlaylistId(override val value: Long) : PersistentId<PlaylistId>, Parcelable {
   inline operator fun compareTo(other: Long): Int = value.compareTo(other)
 
   companion object {

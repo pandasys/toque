@@ -165,7 +165,7 @@ private class MainViewModelImpl(
   }
 
   override fun bindIfHaveReadExternalPermission() {
-    if (mainBridge.haveReadExternalPermission && playerServiceConnection.isNotBound)
+    if (mainBridge.haveWriteExternalPermission.value && playerServiceConnection.isNotBound)
       gainedReadExternalPermission()
   }
 

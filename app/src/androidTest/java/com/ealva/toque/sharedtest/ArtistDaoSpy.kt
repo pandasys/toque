@@ -30,7 +30,7 @@ import com.ealva.toque.db.ArtistDescription
 import com.ealva.toque.db.ArtistIdName
 import com.ealva.toque.db.AudioUpsertResults
 import com.ealva.toque.db.DaoResult
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.TextSearchType
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ArtistIdList
 import com.ealva.toque.persist.MediaId
@@ -114,14 +114,14 @@ class ArtistDaoSpy : ArtistDao {
 
   override suspend fun getArtistSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> {
     TODO("Not yet implemented")
   }
 
   override suspend fun getAlbumArtistSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> {
     TODO("Not yet implemented")
   }

@@ -16,11 +16,11 @@
 
 package com.ealva.toque.ui.main
 
-import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Build.VERSION.SDK_INT
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -36,17 +36,20 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.BuildConfig
+import com.ealva.toque.android.content.canReadStorage
+import com.ealva.toque.android.content.canWriteStorage
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
-import com.ealva.toque.ui.preset.EqPresetEditorScreen
 import com.ealva.toque.ui.library.LibraryCategoriesScreen
 import com.ealva.toque.ui.library.search.SearchScreen
 import com.ealva.toque.ui.nav.goToAboveRoot
-import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.nav.goToRootScreen
+import com.ealva.toque.ui.nav.goToScreen
+import com.ealva.toque.ui.preset.EqPresetEditorScreen
 import com.ealva.toque.ui.queue.QueueScreen
 import com.ealva.toque.ui.settings.AppSettingsScreen
 import com.ealva.toque.ui.settings.SettingScreenKeys.PrimarySettings
@@ -65,8 +68,10 @@ import com.zhuinden.simplestackextensions.servicesktx.lookup
 import com.zhuinden.statebundle.StateBundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
+
 
 @Suppress("unused")
 private val LOG by lazyLogger(MainActivity::class)
@@ -75,7 +80,7 @@ private val topOfStackFlow = MutableStateFlow<ComposeKey>(SplashScreen())
 private val KEY_BACKSTACK = "${MainActivity::class.java.name}_BACK_STACK"
 
 interface MainBridge {
-  val haveReadExternalPermission: Boolean
+  val haveWriteExternalPermission: StateFlow<Boolean>
   val activityContext: Context
   fun startAppSettingsActivity()
   fun exit()
@@ -89,6 +94,7 @@ class MainActivity : ComponentActivity(), MainBridge {
   private val composeStateChanger = makeAppComposeStateChanger()
   private lateinit var backstack: Backstack
   private val appPrefsSingleton: AppPrefsSingleton by inject(AppPrefs.QUALIFIER)
+  override val haveWriteExternalPermission = MutableStateFlow(false)
 
   private val overlayLauncher = registerForActivityResult(StartActivityForResult()) {
     scope.launch { appPrefsSingleton.instance().showLockScreenPlayer.set(canDrawOverlays) }
@@ -97,6 +103,7 @@ class MainActivity : ComponentActivity(), MainBridge {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     scope = lifecycleScope
+    haveWriteExternalPermission.value = canWriteStorage()
 
     WindowCompat.setDecorFitsSystemWindows(window, false) // we'll handle the system insets
 
@@ -143,14 +150,20 @@ class MainActivity : ComponentActivity(), MainBridge {
     super.onRestoreInstanceState(savedInstanceState)
     savedInstanceState.getParcelable<StateBundle>(KEY_BACKSTACK)?.let { stateBundle ->
       backstack.fromBundle(stateBundle)
-      // SplashScreen typically requests read external permission, but if we have a backstack
-      // and SplashScreen is not at the top, we should have the permission and need to behave as
-      // such
+      // SplashScreen requests required permission, but if we have a backstack and SplashScreen is
+      // not at the top, we should have the permission and need to behave as such
       if (backstack.top<ComposeKey>() !is SplashScreen) {
-        if (checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+        if (canReadStorage()) {
           backstack.lookup<MainViewModel>().gainedReadExternalPermission()
         }
       }
+    }
+  }
+
+  override fun onResume() {
+    super.onResume()
+    if (!haveWriteExternalPermission.value) {
+      haveWriteExternalPermission.value = canWriteStorage()
     }
   }
 
@@ -159,20 +172,29 @@ class MainActivity : ComponentActivity(), MainBridge {
     super.onSaveInstanceState(outState)
   }
 
-  override val haveReadExternalPermission: Boolean
-    get() = checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-
-
   override val activityContext: Context
     get() = this
 
   override fun startAppSettingsActivity() {
-    startActivity(
-      Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.fromParts("package", packageName, null)
+    if (SDK_INT >= Build.VERSION_CODES.R) {
+      try {
+        startActivity(
+          Intent(
+            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+            Uri.parse("package:${BuildConfig.APPLICATION_ID}")
+          )
+        )
+      } catch (e: Exception) {
+        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+      }
+    } else {
+      startActivity(
+        Intent(
+          Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+          Uri.fromParts("package", packageName, null)
+        )
       )
-    )
+    }
   }
 
   override fun exit() {
@@ -183,6 +205,7 @@ class MainActivity : ComponentActivity(), MainBridge {
     get() = Settings.canDrawOverlays(this)
 
   override fun requestOverlayPermission() {
+    Settings.System.canWrite(this)
     overlayLauncher.launch(
       Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
         intent.data = Uri.fromParts("package", packageName, null)

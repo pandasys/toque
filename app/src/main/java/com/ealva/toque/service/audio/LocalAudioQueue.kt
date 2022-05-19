@@ -35,7 +35,7 @@ import com.ealva.toque.android.telcom.isIdle
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.audioout.AudioOutputState
-import com.ealva.toque.common.AllowDuplicates
+import com.ealva.toque.common.Duplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.QueueChangedException
@@ -455,7 +455,7 @@ private class LocalAudioQueueImpl(
         transitionToNext(
           NullPlayableAudioItem,
           item,
-          if (playNow.value) DirectTransition() else NoOpMediaTransition,
+          if (playNow.play) DirectTransition() else NoOpMediaTransition,
           playNow,
           startingPosition
         )
@@ -740,11 +740,11 @@ private class LocalAudioQueueImpl(
           val prevCurrentIndex = currentItemIndex
           val prevCurrent = currentItem
 
-          val allowDuplicates = AllowDuplicates(appPrefs.allowDuplicates())
+          val duplicates = Duplicates(appPrefs.allowDuplicates())
 
           val idList: LongCollection = categoryMediaList.list
-            .removeDuplicatesIf(remove = !allowDuplicates())
-            .removeItemIf(item = prevCurrent.id.value, remove = !allowDuplicates())
+            .removeDuplicatesIf(remove = duplicates.doNotAllow)
+            .removeItemIf(item = prevCurrent.id.value, remove = duplicates.doNotAllow)
 
           if (idList.isNotEmpty()) {
             val (newQueue, newShuffled, newIndex) = addItemsToQueues(
@@ -755,7 +755,7 @@ private class LocalAudioQueueImpl(
               idList = idList,
               addAt = AddAt.AtEnd,
               clearAndRemakeQueues = false,
-              allowDuplicates = allowDuplicates,
+              duplicates = duplicates,
               shuffleMedia = shuffleMedia
             )
 
@@ -796,11 +796,11 @@ private class LocalAudioQueueImpl(
       when {
         categoryMediaList.isNotEmpty -> {
           val upNextEmptyOrCleared = upNextQueue.isEmpty() || clearUpNext() || !prevCurrent.isValid
-          val allowDuplicates = AllowDuplicates(appPrefs.allowDuplicates())
+          val duplicates = Duplicates(appPrefs.allowDuplicates())
 
           val idList: LongCollection = categoryMediaList.list
-            .removeDuplicatesIf(!allowDuplicates())
-            .removeItemIf(prevCurrent.id.value, !allowDuplicates() && !upNextEmptyOrCleared)
+            .removeDuplicatesIf(duplicates.doNotAllow)
+            .removeItemIf(prevCurrent.id.value, duplicates.doNotAllow && !upNextEmptyOrCleared)
 
           val (newQueue, newShuffled, newIndex) = addItemsToQueues(
             currentQueue = upNextQueue,
@@ -810,7 +810,7 @@ private class LocalAudioQueueImpl(
             idList = idList,
             addAt = AddAt.AfterCurrent,
             clearAndRemakeQueues = upNextEmptyOrCleared,
-            allowDuplicates = allowDuplicates,
+            duplicates = duplicates,
             shuffleMedia = shuffleMedia
           )
 
@@ -833,7 +833,7 @@ private class LocalAudioQueueImpl(
 
           if (upNextEmptyOrCleared || firstIsCurrent) {
             transitionToNext(prevCurrent, currentItem, select(transitionType), playNow, Millis(0))
-          } else if (playNow.value) {
+          } else if (playNow.play) {
             nextSong(PlayNow(true), transitionType)
           }
           QueueSize(newQueue.size)
@@ -1212,11 +1212,11 @@ private class LocalAudioQueueImpl(
       currentItemFlowJob?.cancel()
       currentItemFlowJob = null
     }
-    if (playNow.value) currentItem.shutdown(transition.exitTransition) else currentItem.shutdown()
+    if (playNow.play) currentItem.shutdown(transition.exitTransition) else currentItem.shutdown()
     currentItemFlowJob = nextItem.collectEvents(doOnStart = {
       nextItem.prepareSeekMaybePlay(
         position,
-        if (playNow.value) transition.enterTransition else NoOpPlayerTransition,
+        if (playNow.play) transition.enterTransition else NoOpPlayerTransition,
         playNow
       )
     })
@@ -1467,7 +1467,7 @@ private class LocalAudioQueueImpl(
     idList: LongCollection,
     addAt: AddAt,
     clearAndRemakeQueues: Boolean,
-    allowDuplicates: AllowDuplicates,
+    duplicates: Duplicates,
     shuffleMedia: ShuffleMedia
   ): Triple<QueueList, QueueList, Int> = withContext(Dispatchers.Default) {
     val newQueue: QueueList
@@ -1484,19 +1484,19 @@ private class LocalAudioQueueImpl(
       newIndex = 0
     } else {
       val idSet = LongOpenHashSet(idList)
-      if (shuffleMedia.value) {
+      if (shuffleMedia.shuffle) {
         val queueInfo = currentShuffled.addNewItems(
           newQueueItems,
           prevCurrentIndex,
           prevCurrent,
           idSet,
-          allowDuplicates,
+          duplicates,
           addAt,
           shuffleMedia
         )
         newShuffled = queueInfo.queue
         newIndex = queueInfo.index
-        newQueue = currentQueue.filterIfNoDuplicatesAllowed(allowDuplicates, idSet)
+        newQueue = currentQueue.filterIfNoDuplicatesAllowed(duplicates, idSet)
           .apply { addAll(newQueueItems) }
       } else {
         val queueInfo = currentQueue.addNewItems(
@@ -1504,7 +1504,7 @@ private class LocalAudioQueueImpl(
           prevCurrentIndex,
           prevCurrent,
           idSet,
-          allowDuplicates,
+          duplicates,
           addAt,
           shuffleMedia
         )
@@ -1606,7 +1606,7 @@ private fun List<PlayableAudioItem>.itemIsAtIndex(item: PlayableAudioItem, index
 
 /**
  * Add [newQueueItems] into this list after [currentIndex] or at the end of the list depending on
- * [addAt], removing all items being added from queue history if ![allowDuplicates] using
+ * [addAt], removing all items being added from queue history if ![duplicates] using
  * [newItemsIdSet], and adjusting the index as necessary. If [shuffleMedia] then the new
  * items will be shuffled into the existing items in the list after [currentIndex].
  *
@@ -1617,15 +1617,15 @@ fun QueueList.addNewItems(
   currentIndex: Int,
   currentItem: PlayableAudioItem,
   newItemsIdSet: LongSet,
-  allowDuplicates: AllowDuplicates,
+  duplicates: Duplicates,
   addAt: AddAt,
   shuffleMedia: ShuffleMedia,
   shuffler: ListShuffler = LIST_SHUFFLER
 ): QueueInfo = if (newQueueItems.isEmpty()) QueueInfo(this, currentIndex) else {
   val beforeCurrent = sublistFromStartTo(currentIndex)
-  val queueStart = beforeCurrent.filterIfNoDuplicatesAllowed(allowDuplicates, newItemsIdSet)
+  val queueStart = beforeCurrent.filterIfNoDuplicatesAllowed(duplicates, newItemsIdSet)
   val afterCurrent = sublistToEndFrom(currentIndex + 1)
-    .filterIfNoDuplicatesAllowed(allowDuplicates, newItemsIdSet)
+    .filterIfNoDuplicatesAllowed(duplicates, newItemsIdSet)
 
   Pair(
     ArrayList<PlayableAudioItem>(queueStart.size + afterCurrent.size + 1).apply {
@@ -1638,10 +1638,10 @@ fun QueueList.addNewItems(
 }
 
 private fun List<PlayableAudioItem>.filterIfNoDuplicatesAllowed(
-  allowDuplicates: AllowDuplicates,
+  duplicates: Duplicates,
   idsToRemove: LongCollection
 ): MutableList<PlayableAudioItem> {
-  return if (!allowDuplicates()) {
+  return if (duplicates.doNotAllow) {
     asSequence()
       .filterNot { idsToRemove.contains(it.id.value) }
       .toCollection(ArrayList(size))

@@ -19,7 +19,6 @@ package com.ealva.toque.ui.library
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +28,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,21 +40,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
+import com.ealva.toque.common.Duplicates
 import com.ealva.toque.common.Filter
-import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
-import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.Memento
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
@@ -64,7 +58,6 @@ import com.ealva.toque.db.PlaylistDescription
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.PlaylistId
-import com.ealva.toque.persist.asPlaylistIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
@@ -75,20 +68,19 @@ import com.ealva.toque.ui.common.PopupMenu
 import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.library.PlaylistsViewModel.PlaylistInfo
+import com.ealva.toque.ui.library.data.PlaylistInfo
+import com.ealva.toque.ui.library.data.makeCategoryMediaList
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorScreen
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.getOrElse
-import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.onSuccess
-import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
@@ -99,7 +91,6 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import com.zhuinden.statebundle.StateBundle
-import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,7 +107,6 @@ import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import kotlin.time.Duration
 
 private val LOG by lazyLogger(PlaylistsScreen::class)
 
@@ -132,7 +122,7 @@ data class PlaylistsScreen(
 
   override fun bindServices(serviceBinder: ServiceBinder) = serviceBinder.add(
     PlaylistsViewModel(
-      categoryItem = LibraryCategories.Playlists,
+      category = LibraryCategories.Playlists,
       audioMediaDao = get(),
       mainViewModel = serviceBinder.lookup(),
       localAudioQueueModel = serviceBinder.lookup(),
@@ -156,7 +146,7 @@ data class PlaylistsScreen(
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
-        categoryItem = viewModel.categoryItem,
+        category = viewModel.category,
         menuItems = makeMenuItems(viewModel),
         itemCount = playlists.value.size,
         selectedItems = selected.value,
@@ -184,6 +174,7 @@ data class PlaylistsScreen(
   )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AllPlaylists(
   list: List<PlaylistInfo>,
@@ -214,8 +205,10 @@ private fun AllPlaylists(
         PlaylistItem(
           playlistInfo = playlistInfo,
           isSelected = selected.isSelected(playlistInfo.id),
-          itemClicked = itemClicked,
-          itemLongClicked = itemLongClicked,
+          modifier = Modifier.combinedClickable(
+            onClick = { itemClicked(playlistInfo) },
+            onLongClick = { itemLongClicked(playlistInfo) }
+          ),
           editSmartPlaylist = editSmartPlaylist,
           deletePlaylist = deletePlaylist
         )
@@ -224,13 +217,12 @@ private fun AllPlaylists(
   }
 }
 
-@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun PlaylistItem(
+fun PlaylistItem(
   playlistInfo: PlaylistInfo,
   isSelected: Boolean,
-  itemClicked: (PlaylistInfo) -> Unit,
-  itemLongClicked: (PlaylistInfo) -> Unit,
+  modifier: Modifier = Modifier,
   editSmartPlaylist: (PlaylistInfo) -> Unit,
   deletePlaylist: (PlaylistInfo) -> Unit
 ) {
@@ -240,23 +232,10 @@ private fun PlaylistItem(
     verticalAlignment = Alignment.CenterVertically
   ) {
     ListItem(
-      modifier = Modifier
+      modifier = modifier
         .weight(.80F)
-        .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
-        .combinedClickable(
-          onClick = { itemClicked(playlistInfo) },
-          onLongClick = { itemLongClicked(playlistInfo) }
-        ),
-      icon = {
-        Image(
-          painter = if (playlistInfo.artwork !== Uri.EMPTY) rememberImagePainter(
-            data = playlistInfo.artwork,
-            builder = { error(playlistInfo.type.icon) }
-          ) else painterResource(id = playlistInfo.type.icon),
-          contentDescription = stringResource(R.string.Artwork),
-          modifier = Modifier.size(56.dp)
-        )
-      },
+        .modifyIf(isSelected) { background(toqueColors.selectedBackground) },
+      icon = { ListItemArtwork(artwork = playlistInfo.artwork, fallback = playlistInfo.type.icon) },
       text = { ListItemText(text = playlistInfo.name.value) },
       secondaryText = {
         CountDurationYear(playlistInfo.songCount, playlistInfo.duration, year = 0)
@@ -287,17 +266,8 @@ private fun PlaylistInfo.makePopupMenuItems(
 }
 
 interface PlaylistsViewModel : ActionsViewModel {
-  @Immutable
-  data class PlaylistInfo(
-    val id: PlaylistId,
-    val name: PlaylistName,
-    val type: PlayListType,
-    val songCount: Int,
-    val duration: Duration,
-    val artwork: Uri
-  )
 
-  val categoryItem: LibraryCategories.CategoryItem
+  val category: LibraryCategories.LibraryCategory
   val playlistsFlow: StateFlow<List<PlaylistInfo>>
   val selectedItems: SelectedItemsFlow<PlaylistId>
 
@@ -312,7 +282,7 @@ interface PlaylistsViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      categoryItem: LibraryCategories.CategoryItem,
+      category: LibraryCategories.LibraryCategory,
       audioMediaDao: AudioMediaDao,
       mainViewModel: MainViewModel,
       localAudioQueueModel: LocalAudioQueueViewModel,
@@ -321,7 +291,7 @@ interface PlaylistsViewModel : ActionsViewModel {
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): PlaylistsViewModel =
       PlaylistsViewModelImpl(
-        categoryItem,
+        category,
         audioMediaDao,
         mainViewModel,
         localAudioQueueModel,
@@ -333,7 +303,7 @@ interface PlaylistsViewModel : ActionsViewModel {
 }
 
 private class PlaylistsViewModelImpl(
-  override val categoryItem: LibraryCategories.CategoryItem,
+  override val category: LibraryCategories.LibraryCategory,
   private val audioMediaDao: AudioMediaDao,
   private val mainViewModel: MainViewModel,
   localAudioQueueModel: LocalAudioQueueViewModel,
@@ -359,20 +329,8 @@ private class PlaylistsViewModelImpl(
     if (appPrefs.instance().goToNowPlaying()) backstack.goToRootScreen()
   }
 
-  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
-    makeCategoryMediaList(getSelectedPlaylists())
-
-  private suspend fun makeCategoryMediaList(
-    playlists: List<PlaylistInfo>
-  ): DaoResult<CategoryMediaList> = audioMediaDao
-    .getMediaForPlaylists(
-      playlistIds = playlists
-        .mapTo(LongArrayList(512)) { it.id.value }
-        .asPlaylistIdList,
-      removeDuplicates = !appPrefs.instance().allowDuplicates()
-    )
-    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
-    .map { idList -> CategoryMediaList(idList, CategoryToken(playlists.last().id)) }
+  private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> = getSelectedPlaylists()
+    .makeCategoryMediaList(audioMediaDao, Duplicates(appPrefs.instance().allowDuplicates()))
 
   private fun getSelectedPlaylists() = playlistsFlow.value
     .filterIfHasSelection(selectedItems.value) { it.id }
@@ -460,7 +418,7 @@ private class PlaylistsViewModelImpl(
 
   override fun goBack() {
     selectedItems.inSelectionModeThenTurnOff()
-    backstack.back()
+    backstack.backIfAllowed()
   }
 
   private fun goToPlaylistSongs(playlistInfo: PlaylistInfo) =

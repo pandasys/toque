@@ -37,6 +37,7 @@ import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.library.data.SongInfo
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -76,7 +77,6 @@ data class AlbumSongsScreen(
     }
   }
 
-  @OptIn(ExperimentalFoundationApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<AlbumSongsViewModel>()
@@ -91,7 +91,7 @@ data class AlbumSongsScreen(
   @OptIn(ExperimentalFoundationApi::class)
   @Composable
   private fun AlbumSongs(
-    songs: List<SongsViewModel.SongInfo>,
+    songs: List<SongInfo>,
     scrollConnection: HeightResizeScrollConnection,
     selected: SelectedItems<MediaId>,
     year: Int,

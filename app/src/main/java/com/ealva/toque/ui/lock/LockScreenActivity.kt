@@ -16,12 +16,10 @@
 
 package com.ealva.toque.ui.lock
 
-import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -62,6 +60,7 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.navigatorktx.androidContentFrame
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -74,6 +73,7 @@ class LockScreenActivity : ComponentActivity(), MainBridge {
   private val keyguardManager: KeyguardManager by inject()
   private lateinit var backstack: Backstack
   private val composeStateChanger = ComposeStateChanger()
+  override val haveWriteExternalPermission = MutableStateFlow(true)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -184,9 +184,6 @@ class LockScreenActivity : ComponentActivity(), MainBridge {
       }
     )
   }
-
-  override val haveReadExternalPermission: Boolean
-    get() = checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
 
   override val activityContext: Context get() = this
   override fun startAppSettingsActivity() = Unit

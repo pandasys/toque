@@ -34,7 +34,7 @@ import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.db.AlbumDaoEvent.AlbumArtworkUpdated
-import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
+import com.ealva.toque.db.wildcard.SqliteLike.ESC_CHAR
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
@@ -42,6 +42,7 @@ import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.asAlbumId
+import com.ealva.toque.service.media.MediaType
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -57,9 +58,11 @@ import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.isNotNull
 import com.ealva.welite.db.expr.less
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
@@ -78,7 +81,6 @@ import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.by
 import com.ealva.welite.db.table.countDistinct
 import com.ealva.welite.db.table.groupBy
-import com.ealva.welite.db.table.groupsBy
 import com.ealva.welite.db.table.inSubQuery
 import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
@@ -174,7 +176,7 @@ interface AlbumDao {
 
   suspend fun getAlbumSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>>
 
   suspend fun downloadArt(albumId: AlbumId, block: (AlbumDao) -> Unit)
@@ -272,8 +274,8 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
             totalDurationColumn
           )
         }
-        .where { filter.whereCondition() }
-        .groupsBy { listOf(AlbumTable.albumTitle, AlbumTable.albumArtist) }
+        .where { (MediaTable.mediaType eq MediaType.Audio.id).filter(filter) }
+        .groupBy { AlbumTable.albumSort }
         .orderByAsc { AlbumTable.albumSort }
         .limit(limit.value)
         .sequence { cursor ->
@@ -292,8 +294,9 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }
 
-  private fun Filter.whereCondition() = if (isBlank) null else
-    AlbumTable.albumTitle.likeEscaped(value) or ArtistTable.artistName.likeEscaped(value)
+  private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isBlank) this else
+    this and (AlbumTable.albumTitle.like(filter.value).escape(ESC_CHAR) or
+      ArtistTable.artistName.like(filter.value).escape(ESC_CHAR))
 
   override suspend fun getAllAlbumsFor(
     artistId: ArtistId,
@@ -436,12 +439,12 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
 
   override suspend fun getAlbumSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       AlbumTable
         .select { albumTitle }
-        .where { textSearch.makeWhereOp(albumTitle, partialTitle) }
+        .where { searchType.makeWhereOp(albumTitle, partialTitle) }
         .sequence { it[albumTitle] }
         .toList()
     }
@@ -603,6 +606,7 @@ private class AlbumDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     .where { columnAlias neq "" }
     .sequence { cursor -> cursor[columnAlias].toUriOrEmpty() }
     .filterNot { uri -> uri == Uri.EMPTY }
+    .toList()
     .firstOrNull() ?: Uri.EMPTY
 
   private fun buildUnion(join: Join, where: Op<Boolean>): CompoundSelect<Join> = join

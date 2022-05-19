@@ -361,7 +361,7 @@ private fun DragHandle(index: Int, modifier: Modifier) {
 }
 
 @Immutable
-data class QueueAudioItem(val item: AudioItem, val position: Int) : AudioItem by item
+data class  QueueAudioItem(val item: AudioItem, val position: Int) : AudioItem by item
 
 @Immutable
 data class QueueState(

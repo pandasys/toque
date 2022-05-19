@@ -26,24 +26,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import com.ealva.ealvabrainz.common.AlbumTitle
-import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.PlaylistName
-import com.ealva.toque.common.Rating
-import com.ealva.toque.common.Title
 import com.ealva.toque.common.preferredArt
 import com.ealva.toque.db.AudioDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.library.data.PlaylistSongInfo
+import com.ealva.toque.ui.library.data.SongInfo
 import com.github.michaelbull.result.Result
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -57,7 +54,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import kotlin.time.Duration
 
 @Immutable
 @Parcelize
@@ -130,45 +126,6 @@ data class PlaylistSongsScreen(
 
 interface PlaylistSongsViewModel : SongsViewModel {
 
-  @Immutable
-  interface PlaylistSongInfo : SongsViewModel.SongInfo {
-    val position: Int
-
-    companion object {
-      operator fun invoke(
-        position: Int,
-        id: MediaId,
-        title: Title,
-        duration: Duration,
-        rating: Rating,
-        album: AlbumTitle,
-        artist: ArtistName,
-        artwork: Uri
-      ): PlaylistSongInfo = PlaylistSongInfoData(
-        position,
-        id,
-        title,
-        duration,
-        rating,
-        album,
-        artist,
-        artwork
-      )
-
-      @Immutable
-      data class PlaylistSongInfoData(
-        override val position: Int,
-        override val id: MediaId,
-        override val title: Title,
-        override val duration: Duration,
-        override val rating: Rating,
-        override val album: AlbumTitle,
-        override val artist: ArtistName,
-        override val artwork: Uri
-      ) : PlaylistSongInfo
-    }
-  }
-
   companion object {
     operator fun invoke(
       playlistId: PlaylistId,
@@ -203,8 +160,8 @@ private class PlaylistSongsViewModelImpl(
   override val categoryToken: CategoryToken
     get() = CategoryToken(playlistId)
 
-  override fun makeSongInfo(index: Int, audio: AudioDescription): SongsViewModel.SongInfo {
-    return PlaylistSongsViewModel.PlaylistSongInfo(
+  override fun makeSongInfo(index: Int, audio: AudioDescription): SongInfo {
+    return PlaylistSongInfo(
       position = index,
       id = audio.mediaId,
       title = audio.title,

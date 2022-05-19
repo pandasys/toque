@@ -58,7 +58,7 @@ fun LibraryActionBar(
   playNext: () -> Unit,
   addToUpNext: () -> Unit,
   addToPlaylist: () -> Unit,
-  startSearch: () -> Unit = {},
+  startSearch: (() -> Unit)? = null,
   selectAllOrNone: (Boolean) -> Unit = {},
   buttonColors: ButtonColors,
   selectActions: (@Composable (Dp) -> Unit)? = null,
@@ -125,15 +125,17 @@ fun LibraryActionBar(
         colors = buttonColors,
         onClick = addToPlaylist
       )
-      ActionButton(
-        modifier = buttonModifier,
-        iconSize = buttonHeight,
-        drawable = R.drawable.ic_search,
-        description = R.string.Search,
-        enabled = enabled,
-        colors = buttonColors,
-        onClick = startSearch
-      )
+      if (startSearch != null) {
+        ActionButton(
+          modifier = buttonModifier,
+          iconSize = buttonHeight,
+          drawable = R.drawable.ic_search,
+          description = R.string.Search,
+          enabled = enabled,
+          colors = buttonColors,
+          onClick = startSearch
+        )
+      }
     }
     if (inSelectionMode && enabled) {
       val backgroundColor = buttonColors.backgroundColor(enabled = true).value

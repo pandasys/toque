@@ -24,7 +24,7 @@ import com.ealva.prefstore.store.PreferenceStoreSingleton
 import com.ealva.prefstore.store.Storage
 import com.ealva.prefstore.store.StorePref
 import com.ealva.toque.art.ArtworkDownloader.CompressionQuality
-import com.ealva.toque.common.AllowDuplicates
+import com.ealva.toque.common.Duplicates
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.Volume
 import com.ealva.toque.prefs.AppPrefs.Companion.DEFAULT_ALLOW_DUPLICATES
@@ -52,7 +52,6 @@ import com.ealva.toque.prefs.AppPrefs.Companion.MAX_IMAGE_SEARCH_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.MEDIA_FADE_DURATION_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.PLAY_PAUSE_FADE_RANGE
 import com.ealva.toque.prefs.AppPrefs.Companion.QUALITY_RANGE
-import org.koin.core.qualifier.StringQualifier
 import org.koin.core.qualifier.named
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -105,7 +104,7 @@ interface AppPrefs : PreferenceStore<AppPrefs> {
 
   companion object {
     val QUALIFIER = named("AppPrefs")
-    val DEFAULT_ALLOW_DUPLICATES = AllowDuplicates(false)
+    val DEFAULT_ALLOW_DUPLICATES = Duplicates(false)
     const val DEFAULT_GO_TO_NOW_PLAYING = true
     const val DEFAULT_IGNORE_SMALL_FILES = false
     val IGNORE_FILES_RANGE: ClosedRange<Duration> = 5.seconds..1.minutes

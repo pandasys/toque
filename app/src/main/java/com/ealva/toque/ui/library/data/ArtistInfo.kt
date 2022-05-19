@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,21 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.android.content
+package com.ealva.toque.ui.library.data
 
-import android.content.Intent
 import android.net.Uri
+import androidx.compose.runtime.Immutable
+import com.ealva.ealvabrainz.common.ArtistName
+import com.ealva.toque.persist.ArtistId
+import com.ealva.toque.persist.HasPersistentId
+import kotlin.time.Duration
 
-fun Intent?.orNullObject(): Intent = this ?: NullIntent
-
-object NullIntent : Intent("", Uri.EMPTY) {
-  override fun getData(): Uri {
-    return Uri.EMPTY
-  }
-}
+@Immutable
+data class ArtistInfo(
+  override val id: ArtistId,
+  val name: ArtistName,
+  val artwork: Uri,
+  val albumCount: Int,
+  val songCount: Int,
+  val duration: Duration
+) : HasPersistentId<ArtistId>

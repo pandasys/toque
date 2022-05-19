@@ -54,6 +54,7 @@ object DbModule {
     }
     single { QueuePositionStateDaoFactory(db = get()) }
     single { QueueDao(db = get()) }
+    single { SearchDao(db = get()) }
   }
 
   private fun makeDatabase(context: Context) = Database(

@@ -40,7 +40,7 @@ private const val ID_PIN_TO_TOP = "PIN_TO_TOP_ID"
 @Composable
 fun CategoryScreenHeader(
   viewModel: ActionsViewModel,
-  categoryItem: LibraryCategories.CategoryItem,
+  category: LibraryCategories.LibraryCategory,
   menuItems: List<PopupMenuItem> = emptyList(),
   itemCount: Int,
   selectedItems: SelectedItems<*>,
@@ -52,7 +52,7 @@ fun CategoryScreenHeader(
   val heightSubtrahend = scrollConnection.heightSubtrahend.collectAsState()
   CategoryScreenHeader(
     viewModel = viewModel,
-    categoryItem = categoryItem,
+    category = category,
     menuItems = menuItems,
     itemCount = itemCount,
     selectedItems = selectedItems,
@@ -67,7 +67,7 @@ fun CategoryScreenHeader(
 @Composable
 private fun CategoryScreenHeader(
   viewModel: ActionsViewModel,
-  categoryItem: LibraryCategories.CategoryItem,
+  category: LibraryCategories.LibraryCategory,
   menuItems: List<PopupMenuItem> = emptyList(),
   itemCount: Int,
   selectedItems: SelectedItems<*>,
@@ -102,11 +102,12 @@ private fun CategoryScreenHeader(
           Spacer(modifier = Modifier.height(22.dp))
         }
       }
-      CategoryTitleBar(categoryItem, menuItems, contentColor, alphaPercentage)
+      CategoryTitleBar(category, menuItems, contentColor, alphaPercentage)
       Spacer(modifier = Modifier.height(10.dp))
       LibraryItemsActions(
         itemCount = itemCount,
-        selectedItems = selectedItems,
+        selectedCount = selectedItems.selectedCount,
+        inSelectionMode = selectedItems.inSelectionMode,
         viewModel = viewModel,
         selectActions = selectActions
       )

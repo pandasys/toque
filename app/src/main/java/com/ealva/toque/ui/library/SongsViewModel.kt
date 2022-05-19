@@ -26,16 +26,12 @@ import androidx.compose.material.ButtonColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ealva.ealvabrainz.common.AlbumTitle
-import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
-import com.ealva.toque.common.Rating
-import com.ealva.toque.common.Title
 import com.ealva.toque.common.asMillis
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioDescription
@@ -49,9 +45,9 @@ import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.cancelFlingOnBack
-import com.ealva.toque.ui.library.SongsViewModel.SongInfo
+import com.ealva.toque.ui.library.data.SongInfo
 import com.ealva.toque.ui.main.Notification
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
@@ -81,45 +77,11 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
-import javax.annotation.concurrent.Immutable
 import kotlin.time.Duration
 
 private val LOG by lazyLogger(BaseSongsViewModel::class)
 
 interface SongsViewModel : ActionsViewModel {
-  @Immutable
-  interface SongInfo {
-    val id: MediaId
-    val title: Title
-    val duration: Duration
-    val rating: Rating
-    val album: AlbumTitle
-    val artist: ArtistName
-    val artwork: Uri
-
-    companion object {
-      operator fun invoke(
-        id: MediaId,
-        title: Title,
-        duration: Duration,
-        rating: Rating,
-        album: AlbumTitle,
-        artist: ArtistName,
-        artwork: Uri
-      ): SongInfo = SongInfoData(id, title, duration, rating, album, artist, artwork)
-
-      @Immutable
-      data class SongInfoData(
-        override val id: MediaId,
-        override val title: Title,
-        override val duration: Duration,
-        override val rating: Rating,
-        override val album: AlbumTitle,
-        override val artist: ArtistName,
-        override val artwork: Uri
-      ) : SongInfo
-    }
-  }
 
   val songsFlow: StateFlow<List<SongInfo>>
   val selectedItems: SelectedItemsFlow<MediaId>
@@ -309,7 +271,7 @@ abstract class BaseSongsViewModel(
 
   override fun goBack() {
     selectedItems.inSelectionModeThenTurnOff()
-    backstack.back()
+    backstack.backIfAllowed()
   }
 
   override fun onBackEvent(): Boolean = selectedItems
@@ -352,17 +314,17 @@ fun SongsItemsActions(
   LibraryItemsActions(
     modifier = modifier,
     itemCount = itemCount,
-    selectedItems = selectedItems,
+    selectedCount = selectedItems.selectedCount,
+    inSelectionMode = selectedItems.inSelectionMode,
     viewModel = viewModel,
-    buttonColors = buttonColors,
-    selectActions = {
-      SongSelectActions(
-        selectedCount = selectedItems.selectedCount,
-        buttonColors = buttonColors,
-        mediaInfoClick = { viewModel.displayMediaInfo() }
-      )
-    }
-  )
+    buttonColors = buttonColors
+  ) {
+    SongSelectActions(
+      selectedCount = selectedItems.selectedCount,
+      buttonColors = buttonColors,
+      mediaInfoClick = { viewModel.displayMediaInfo() }
+    )
+  }
 }
 
 @Composable

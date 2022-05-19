@@ -18,13 +18,11 @@ package com.ealva.toque.ui.library
 
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
@@ -36,15 +34,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.R
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.ListItemText
@@ -52,7 +46,7 @@ import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
+import com.ealva.toque.ui.library.data.AlbumInfo
 import com.ealva.toque.ui.theme.toqueColors
 import com.google.accompanist.insets.LocalWindowInsets
 import kotlin.time.Duration.Companion.hours
@@ -89,8 +83,10 @@ fun AlbumsList(
         AlbumItem(
           albumInfo = albumInfo,
           isSelected = selectedItems.isSelected(albumInfo.id),
-          itemClicked = { album -> itemClicked(album) },
-          itemLongClicked = { album -> itemLongClicked(album) }
+          modifier = Modifier.combinedClickable(
+            onClick = { itemClicked(albumInfo) },
+            onLongClick = { itemLongClicked(albumInfo) }
+          ),
         )
       }
     }
@@ -100,30 +96,16 @@ fun AlbumsList(
 @ExperimentalFoundationApi
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun AlbumItem(
+fun AlbumItem(
   albumInfo: AlbumInfo,
   isSelected: Boolean,
-  itemClicked: (AlbumInfo) -> Unit,
-  itemLongClicked: (AlbumInfo) -> Unit
+  modifier: Modifier = Modifier,
 ) {
   ListItem(
-    modifier = Modifier
+    modifier = modifier
       .fillMaxWidth()
-      .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
-      .combinedClickable(
-        onClick = { itemClicked(albumInfo) },
-        onLongClick = { itemLongClicked(albumInfo) }
-      ),
-    icon = {
-      Image(
-        painter = if (albumInfo.artwork !== Uri.EMPTY) rememberImagePainter(
-          data = albumInfo.artwork,
-          builder = { error(R.drawable.ic_album) }
-        ) else painterResource(id = R.drawable.ic_big_album),
-        contentDescription = stringResource(R.string.Artwork),
-        modifier = Modifier.size(56.dp)
-      )
-    },
+      .modifyIf(isSelected) { background(toqueColors.selectedBackground) },
+    icon = { ListItemAlbumArtwork(artwork = albumInfo.artwork) },
     text = { ListItemText(text = albumInfo.title.value) },
     overlineText = { ArtistAndSongCount(albumInfo = albumInfo) },
     secondaryText = {

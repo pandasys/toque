@@ -80,7 +80,7 @@ import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
 import com.ealva.toque.ui.main.MainViewModel
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.settings.SettingScreenKeys.AdvancedSettings
 import com.ealva.toque.ui.settings.SettingScreenKeys.ArtworkSettings
@@ -96,7 +96,6 @@ import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
-import com.google.accompanist.pager.ExperimentalPagerApi
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.core.LocalBackstack
@@ -137,6 +136,7 @@ object SettingScreenKeys {
   val AdvancedSettings = SettingScreenKey(R.string.Advanced, R.string.Settings)
 }
 
+@Suppress("UnnecessaryAbstractClass")
 abstract class BaseAppSettingsScreen : ComposeKey()
 
 private const val APP_PREFS_TAG = "AppPrefs"
@@ -154,14 +154,13 @@ data class AppSettingsScreen(
     }
   }
 
-  @OptIn(ExperimentalPagerApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val mainModel = rememberService<MainViewModel>()
     val appPrefsSingleton = rememberService<AppPrefsSingleton>(APP_PREFS_TAG)
     val libVlcPrefsSingleton = rememberService<LibVlcPrefsSingleton>(LIB_VLC_PREFS_TAG)
     val backstack = LocalBackstack.current
-    val goBack: () -> Unit = { backstack.back() }
+    val goBack: () -> Unit = { backstack.backIfAllowed() }
     if (key == AdvancedSettings) {
       ToqueSettingsScreen(
         title = stringResource(id = key.title),

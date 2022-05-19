@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,22 @@
  * limitations under the License.
  */
 
-@file:Suppress("NOTHING_TO_INLINE")
+package com.ealva.toque.ui.library.data
 
-package com.ealva.toque.common
+import android.net.Uri
+import androidx.compose.runtime.Immutable
+import com.ealva.toque.common.PlaylistName
+import com.ealva.toque.db.PlayListType
+import com.ealva.toque.persist.HasPersistentId
+import com.ealva.toque.persist.PlaylistId
+import kotlin.time.Duration
 
-@JvmInline
-value class AllowDuplicates(override val value: Boolean) : BooleanValue {
-  inline operator fun invoke(): Boolean = value
-  inline operator fun not(): AllowDuplicates = AllowDuplicates(!value)
-}
+@Immutable
+data class PlaylistInfo(
+  override val id: PlaylistId,
+  val name: PlaylistName,
+  val type: PlayListType,
+  val songCount: Int,
+  val duration: Duration,
+  val artwork: Uri
+) : HasPersistentId<PlaylistId>

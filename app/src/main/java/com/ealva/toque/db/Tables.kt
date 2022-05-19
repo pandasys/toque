@@ -46,7 +46,8 @@ val setOfAllTables = setOf(
   PlayListTable,
   PlayListMediaTable,
   SmartPlaylistTable,
-  SmartPlaylistRuleTable
+  SmartPlaylistRuleTable,
+  SearchHistoryTable
 )
 
 object ArtistTable : Table() {
@@ -85,6 +86,8 @@ object AlbumTable : Table() {
   init {
     uniqueIndex(albumTitle, albumArtist)
     index(albumSort)
+    index(albumArtUri)
+    index(albumLocalArtUri)
   }
 }
 

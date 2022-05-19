@@ -19,8 +19,8 @@ package com.ealva.toque.db.smart
 import androidx.annotation.StringRes
 import com.ealva.toque.R
 import com.ealva.toque.common.fetch
-import com.ealva.toque.db.HasTextSearch
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.HasTextSearchType
+import com.ealva.toque.db.TextSearchType
 import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.table.Column
 import kotlinx.parcelize.Parcelize
@@ -29,17 +29,17 @@ import kotlinx.parcelize.Parcelize
 enum class TextMatcher(
   override val id: Int,
   @StringRes private val stringRes: Int,
-  override val textSearch: TextSearch
-) : Matcher<String>, HasTextSearch {
-  Contains(1, R.string.contains, TextSearch.Contains),
-  DoesNotContain(2, R.string.does_not_contain, TextSearch.DoesNotContain),
-  Is(3, R.string.is_, TextSearch.Is),
-  IsNot(4, R.string.is_not, TextSearch.IsNot),
-  BeginsWith(5, R.string.begins_with, TextSearch.BeginsWith),
-  EndsWith(6, R.string.ends_with, TextSearch.EndsWith);
+  override val searchType: TextSearchType
+) : Matcher<String>, HasTextSearchType {
+  Contains(1, R.string.contains, TextSearchType.Contains),
+  DoesNotContain(2, R.string.does_not_contain, TextSearchType.DoesNotContain),
+  Is(3, R.string.is_, TextSearchType.Is),
+  IsNot(4, R.string.is_not, TextSearchType.IsNot),
+  BeginsWith(5, R.string.begins_with, TextSearchType.BeginsWith),
+  EndsWith(6, R.string.ends_with, TextSearchType.EndsWith);
 
   override fun makeWhereClause(column: Column<String>, data: MatcherData): Op<Boolean> =
-    textSearch.makeWhereOp(column, data.text)
+    searchType.makeWhereOp(column, data.text)
 
   override fun willAccept(data: MatcherData): Boolean = data.text.isNotBlank()
 

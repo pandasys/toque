@@ -65,6 +65,7 @@ import com.ealva.welite.db.table.all
 import com.ealva.welite.db.table.asExpression
 import com.ealva.welite.db.table.by
 import com.ealva.welite.db.table.groupBy
+import com.ealva.welite.db.table.groupsBy
 import com.ealva.welite.db.table.inSubQuery
 import com.ealva.welite.db.table.orderBy
 import com.ealva.welite.db.table.orderByAsc
@@ -340,7 +341,7 @@ private class PlaylistDaoImpl(
             )
           }
           .where { (PlayListTable.playListType eq PlayListType.UserCreated.id).filter(filter) }
-          .groupBy { PlayListTable.playListType }
+          .groupsBy { listOf(PlayListTable.playListType, PlayListTable.playListName) }
           .orderByAsc { PlayListTable.playListName }
           .limit(limit.value)
           .sequence { cursor ->
@@ -379,7 +380,7 @@ private class PlaylistDaoImpl(
   }
 
   private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isBlank) this else
-    this and (PlayListTable.playListName like filter.value escape ESC_CHAR)
+    this and PlayListTable.playListName.like(filter.value).escape(ESC_CHAR)
 
   private fun Queryable.getSmartPlaylistSongCount(
     smart: SmartPlaylistDescription

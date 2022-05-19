@@ -41,6 +41,7 @@ import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.makeScreenConfig
+import com.ealva.toque.ui.library.data.SongInfo
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -51,10 +52,10 @@ import kotlin.time.toDuration
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun SongItemList(
-  list: List<SongsViewModel.SongInfo>,
+  list: List<SongInfo>,
   selectedItems: SelectedItems<MediaId>,
-  itemClicked: (SongsViewModel.SongInfo) -> Unit,
-  itemLongClicked: (SongsViewModel.SongInfo) -> Unit,
+  itemClicked: (SongInfo) -> Unit,
+  itemLongClicked: (SongInfo) -> Unit,
   modifier: Modifier = Modifier
 ) {
   val listState: LazyListState = rememberLazyListState()
@@ -85,7 +86,7 @@ fun SongItemList(
           songDuration = songInfo.duration,
           rating = songInfo.rating,
           highlightBackground = selectedItems.isSelected(songInfo.id),
-          icon = { SongListItemIcon(songInfo.artwork) },
+          icon = { ListItemAlbumArtwork(songInfo.artwork) },
           modifier = Modifier.combinedClickable(
             onClick = { itemClicked(songInfo) },
             onLongClick = { itemLongClicked(songInfo) }
@@ -101,7 +102,7 @@ fun SongItemList(
 @Composable
 fun SongItemListPreview() {
   val list = listOf(
-    SongsViewModel.SongInfo(
+    SongInfo(
       id = MediaId(1),
       title = Title("A Song title"),
       duration = 178000.toDuration(DurationUnit.MILLISECONDS),
@@ -110,7 +111,7 @@ fun SongItemListPreview() {
       artist = ArtistName("Artist Name 1"),
       Uri.EMPTY
     ),
-    SongsViewModel.SongInfo(
+    SongInfo(
       id = MediaId(2),
       title = Title("Happy Little Ditty"),
       duration = 500.toDuration(DurationUnit.MILLISECONDS),
@@ -119,7 +120,7 @@ fun SongItemListPreview() {
       artist = ArtistName("Princess"),
       Uri.EMPTY
     ),
-    SongsViewModel.SongInfo(
+    SongInfo(
       id = MediaId(3),
       title = Title("Instead Here"),
       duration = 1178000.toDuration(DurationUnit.MILLISECONDS),

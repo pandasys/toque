@@ -26,7 +26,7 @@ import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 import kotlin.time.Duration
 
-interface AudioItem : HasId {
+interface AudioItem : HasId<MediaId> {
   override val id: MediaId
   val title: Title
   val albumTitle: AlbumTitle

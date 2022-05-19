@@ -28,7 +28,7 @@ value class Filter(val value: String) : Parcelable {
 
   companion object {
     val NoFilter = Filter("")
-    val debounceDuration = 250.milliseconds
+    val debounceDuration = 300.milliseconds
   }
 }
 

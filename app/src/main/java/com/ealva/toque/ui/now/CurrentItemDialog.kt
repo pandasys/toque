@@ -40,7 +40,7 @@ import com.ealva.toque.R
 import com.ealva.toque.ui.common.ToqueDialog
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.toque.ui.library.SongListItem
-import com.ealva.toque.ui.library.SongListItemIcon
+import com.ealva.toque.ui.library.ListItemAlbumArtwork
 import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
 import com.ealva.toque.ui.theme.toqueTypography
 
@@ -62,7 +62,7 @@ fun CurrentItemDialog(
         albumTitle = audioItem.albumTitle,
         artistName = audioItem.artist,
         highlightBackground = false,
-        icon = { SongListItemIcon(audioItem.artwork) },
+        icon = { ListItemAlbumArtwork(audioItem.artwork) },
       )
       LazyVerticalGrid(
         cells = GridCells.Fixed(2),

@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
-import com.google.accompanist.pager.ExperimentalPagerApi
 import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
@@ -53,7 +52,6 @@ data class NowPlayingScreen(
     }
   }
 
-  @OptIn(ExperimentalPagerApi::class)
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<NowPlayingViewModel>(NOW_PLAYING_SCREEN_MODEL_SERVICE_TAG)

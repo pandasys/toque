@@ -41,8 +41,8 @@ import com.ealva.toque.ui.common.timesAlpha
 import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
-fun LibraryCategory(
-  item: LibraryCategories.CategoryItem,
+fun LibraryCategoryTitle(
+  info: LibraryCategories.LibraryCategory,
   boxSize: Dp = 42.dp,
   iconSize: Dp = 34.dp,
   textStyle: TextStyle = toqueTypography.subtitle1,
@@ -62,18 +62,18 @@ fun LibraryCategory(
       modifier = Modifier
         .size(boxSize)
         .clip(RoundedCornerShape(50))
-        .background(item.color.timesAlpha(alphaPercentage)),
+        .background(info.color.timesAlpha(alphaPercentage)),
       contentAlignment = Alignment.Center
     ) {
       Icon(
-        painter = painterResource(id = item.icon),
-        contentDescription = stringResource(id = item.title),
+        painter = painterResource(id = info.icon),
+        contentDescription = stringResource(id = info.title),
         modifier = Modifier.size(iconSize),
         tint = Color.White.timesAlpha(alphaPercentage)
       )
     }
     Text(
-      text = stringResource(id = item.title),
+      text = stringResource(id = info.title),
       style = textStyle,
       color = contentColor,
       modifier = Modifier

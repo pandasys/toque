@@ -49,7 +49,7 @@ private val LOG by lazyLogger(CategoryToken::class)
  * and "previous category".
  */
 sealed interface CategoryToken : Parcelable {
-  val persistentId: PersistentId
+  val persistentId: PersistentId<*>
   val songListType: SongListType
 
   fun write(writer: (SongListType, Long) -> Unit) {
@@ -85,7 +85,7 @@ sealed interface CategoryToken : Parcelable {
     override suspend fun random(audioMediaDao: AudioMediaDao): CategoryToken =
       throw NotImplementedError("All invalid")
 
-    override val persistentId: PersistentId
+    override val persistentId: PersistentId<*>
       get() = PersistentId.INVALID
 
     override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken =
@@ -446,7 +446,7 @@ sealed interface CategoryToken : Parcelable {
       throw NotImplementedError("External invalid")
     }
 
-    override val persistentId: PersistentId
+    override val persistentId: PersistentId<*>
       get() = PersistentId.INVALID
 
     override suspend fun nextToken(audioMediaDao: AudioMediaDao): CategoryToken {

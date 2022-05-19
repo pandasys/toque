@@ -47,7 +47,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.ealvalog.unaryPlus
 import com.ealva.toque.R
-import com.ealva.toque.android.content.doNotHaveReadPermission
+import com.ealva.toque.android.content.cannotReadStorage
 import com.ealva.toque.android.content.intentFilterOf
 import com.ealva.toque.android.content.onBroadcast
 import com.ealva.toque.android.content.orNullObject
@@ -189,7 +189,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
   override fun onBind(intent: Intent): IBinder? {
 //    LOG._e { it("onBind %s", intent.action ?: "null") }
     dispatcher.onServicePreSuperOnBind()
-    return if (doNotHaveReadPermission()) {
+    return if (cannotReadStorage()) {
       LOG.e { it("Don't have read external permission. Bind disallowed.") }
       null
     } else {

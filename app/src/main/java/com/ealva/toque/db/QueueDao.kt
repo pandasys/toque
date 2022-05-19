@@ -26,6 +26,7 @@ import com.ealva.toque.db.QueueItemsTable.itemId
 import com.ealva.toque.db.QueueTable.queueId
 import com.ealva.toque.db.QueueTable.updatedTime
 import com.ealva.toque.persist.HasId
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
@@ -50,15 +51,15 @@ interface QueueDao {
    */
   suspend fun replaceQueueItems(
     queue: QueueId,
-    queueItems: List<HasId>,
-    shuffledItems: List<HasId> = emptyList(),
+    queueItems: List<HasId<MediaId>>,
+    shuffledItems: List<HasId<MediaId>> = emptyList(),
     updateTime: Millis = Millis.currentUtcEpochMillis()
   ): BoolResult
 
   suspend fun replaceIfQueueUnchanged(
     queue: QueueId,
-    queueItems: List<HasId>,
-    shuffledItems: List<HasId>,
+    queueItems: List<HasId<MediaId>>,
+    shuffledItems: List<HasId<MediaId>>,
     lastUpdated: Millis
   ): BoolResult
 
@@ -87,8 +88,8 @@ private class QueueDaoImpl(
 ) : QueueDao {
   override suspend fun replaceQueueItems(
     queue: QueueId,
-    queueItems: List<HasId>,
-    shuffledItems: List<HasId>,
+    queueItems: List<HasId<MediaId>>,
+    shuffledItems: List<HasId<MediaId>>,
     updateTime: Millis
   ): BoolResult = runSuspendCatching {
     db.transaction {
@@ -101,8 +102,8 @@ private class QueueDaoImpl(
 
   override suspend fun replaceIfQueueUnchanged(
     queue: QueueId,
-    queueItems: List<HasId>,
-    shuffledItems: List<HasId>,
+    queueItems: List<HasId<MediaId>>,
+    shuffledItems: List<HasId<MediaId>>,
     lastUpdated: Millis
   ): BoolResult = runSuspendCatching {
     db.transaction {
@@ -169,7 +170,7 @@ private class QueueDaoImpl(
 
   private fun TransactionInProgress.insertList(
     queue: QueueId,
-    items: List<HasId>,
+    items: List<HasId<MediaId>>,
     isShuffled: Boolean
   ): Boolean {
     items.forEach { item ->

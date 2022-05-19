@@ -30,13 +30,13 @@ import com.ealva.toque.ui.theme.toqueTypography
 
 @Composable
 fun CategoryTitleBar(
-  categoryItem: LibraryCategories.CategoryItem,
+  category: LibraryCategories.LibraryCategory,
   menuItems: List<PopupMenuItem> = emptyList(),
   contentColor: Color,
   alphaPercentage: Float
 ) {
   Row(verticalAlignment = Alignment.CenterVertically) {
-    CategoryTitle(categoryItem, contentColor, alphaPercentage)
+    CategoryTitle(category, contentColor, alphaPercentage)
     if (menuItems.isNotEmpty())
       Spacer(modifier = Modifier.weight(1.0F, fill = true))
     PopupMenu(items = menuItems)
@@ -45,12 +45,12 @@ fun CategoryTitleBar(
 
 @Composable
 private fun CategoryTitle(
-  categoryItem: LibraryCategories.CategoryItem,
+  category: LibraryCategories.LibraryCategory,
   contentColor: Color,
   alphaPercentage: Float
 ) {
-  LibraryCategory(
-    item = categoryItem,
+  LibraryCategoryTitle(
+    info = category,
     boxSize = 48.dp,
     iconSize = 38.dp,
     textStyle = toqueTypography.h5,

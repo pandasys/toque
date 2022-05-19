@@ -78,7 +78,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectAlbumArtViewModel.SelectState
 import com.ealva.toque.ui.common.LocalScreenConfig
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
@@ -481,6 +481,6 @@ private class SelectAlbumArtViewModelImpl(
   )
 
   override fun goBack() {
-    backstack.back()
+    backstack.backIfAllowed()
   }
 }

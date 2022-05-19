@@ -60,7 +60,7 @@ import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectArtistArtViewModel.SelectState
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
@@ -360,6 +360,6 @@ private class SelectArtistArtViewModelImpl(
   )
 
   override fun goBack() {
-    backstack.back()
+    backstack.backIfAllowed()
   }
 }

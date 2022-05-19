@@ -24,19 +24,21 @@ import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.GenreDaoEvent.GenresCreatedOrUpdated
 import com.ealva.toque.db.wildcard.SqliteLike.ESC_CHAR
-import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asGenreId
 import com.ealva.toque.service.media.MediaFileTagInfo
+import com.ealva.toque.service.media.MediaType
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.BindExpression
 import com.ealva.welite.db.expr.Expression
+import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
@@ -121,7 +123,7 @@ interface GenreDao {
 
   suspend fun getGenreSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>>
 
   fun Transaction.replaceGenreMedia(
@@ -132,8 +134,10 @@ interface GenreDao {
   )
 
   companion object {
-    operator fun invoke(db: Database, dispatcher: CoroutineDispatcher? = null): GenreDao =
-      GenreDaoImpl(db, dispatcher ?: Dispatchers.Main)
+    operator fun invoke(
+      db: Database,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): GenreDao = GenreDaoImpl(db, dispatcher)
   }
 }
 
@@ -165,7 +169,7 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
         .join(GenreMediaTable, JoinType.INNER, GenreTable.id, GenreMediaTable.genreId)
         .join(MediaTable, JoinType.INNER, GenreMediaTable.mediaId, MediaTable.id)
         .selects { listOf(GenreTable.id, GenreTable.genre, songCountColumn, durationColumn) }
-        .where { filter.whereCondition() }
+        .where { (MediaTable.mediaType eq MediaType.Audio.id).filter(filter) }
         .groupBy { GenreTable.genre }
         .orderByAsc { GenreTable.genre }
         .limit(limit.value)
@@ -181,7 +185,8 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
     }
   }
 
-  private fun Filter.whereCondition() = if (isBlank) null else GenreTable.genre.likeEscaped(value)
+  private fun Op<Boolean>.filter(filter: Filter) = if (filter.isBlank) this else
+    this and GenreTable.genre.like(filter.value).escape(ESC_CHAR)
 
   override suspend fun getAllGenreNames(
     limit: Limit
@@ -209,12 +214,12 @@ private class GenreDaoImpl(private val db: Database, dispatcher: CoroutineDispat
 
   override suspend fun getGenreSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       GenreTable
         .select { genre }
-        .where { textSearch.makeWhereOp(genre, partial) }
+        .where { searchType.makeWhereOp(genre, partial) }
         .sequence { it[genre] }
         .toList()
     }

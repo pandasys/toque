@@ -19,7 +19,6 @@ package com.ealva.toque.ui.library
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -39,11 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
-import com.ealva.ealvabrainz.common.ComposerName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
@@ -52,13 +46,11 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
-import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.ComposerDescription
 import com.ealva.toque.db.wildcard.SqliteLike.wrapAsFilter
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ComposerId
-import com.ealva.toque.persist.asComposerIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
@@ -67,17 +59,16 @@ import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.library.ComposersViewModel.ComposerInfo
-import com.ealva.toque.ui.library.LibraryCategories.CategoryItem
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.library.LibraryCategories.LibraryCategory
+import com.ealva.toque.ui.library.data.ComposerInfo
+import com.ealva.toque.ui.library.data.makeCategoryMediaList
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.getOrElse
-import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
@@ -88,7 +79,6 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import com.zhuinden.statebundle.StateBundle
-import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +99,6 @@ import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import kotlin.time.Duration
 
 private val LOG by lazyLogger(ComposersScreen::class)
 
@@ -126,7 +115,7 @@ data class ComposersScreen(
   override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
     add(
       ComposersViewModel(
-        categoryItem = LibraryCategories.Composers,
+        category = LibraryCategories.Composers,
         audioMediaDao = get(),
         localAudioQueueModel = lookup(),
         backstack = backstack,
@@ -150,7 +139,7 @@ data class ComposersScreen(
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
-        categoryItem = viewModel.categoryItem,
+        category = viewModel.category,
         itemCount = composers.value.size,
         selectedItems = selected.value,
         backTo = fetch(R.string.Library),
@@ -167,6 +156,7 @@ data class ComposersScreen(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AllComposers(
   list: List<ComposerInfo>,
@@ -195,40 +185,28 @@ private fun AllComposers(
         ComposerItem(
           composerInfo = composerInfo,
           isSelected = selected.isSelected(composerInfo.id),
-          itemClicked = itemClicked,
-          itemLongClicked = itemLongClicked
+          modifier = Modifier.combinedClickable(
+            onClick = { itemClicked(composerInfo) },
+            onLongClick = { itemLongClicked(composerInfo.id) }
+          )
         )
       }
     }
   }
 }
 
-@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun ComposerItem(
+fun ComposerItem(
   composerInfo: ComposerInfo,
   isSelected: Boolean,
-  itemClicked: (ComposerInfo) -> Unit,
-  itemLongClicked: (ComposerId) -> Unit
+  modifier: Modifier = Modifier,
 ) {
   ListItem(
-    modifier = Modifier
+    modifier = modifier
       .fillMaxWidth()
-      .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
-      .combinedClickable(
-        onClick = { itemClicked(composerInfo) },
-        onLongClick = { itemLongClicked(composerInfo.id) }
-      ),
-    icon = {
-      Image(
-        painter = if (composerInfo.artwork !== Uri.EMPTY) rememberImagePainter(
-          data = composerInfo.artwork,
-          builder = { error(R.drawable.ic_person) }
-        ) else painterResource(id = R.drawable.ic_person),
-        contentDescription = stringResource(R.string.Artwork),
-        modifier = Modifier.size(56.dp)
-      )
-    },
+      .modifyIf(isSelected) { background(toqueColors.selectedBackground) },
+    icon = { ListItemArtwork(artwork = composerInfo.artwork, fallback = R.drawable.ic_person) },
     text = { ListItemText(text = composerInfo.name.value) },
     secondaryText = {
       CountDurationYear(composerInfo.songCount, composerInfo.duration, year = 0)
@@ -237,16 +215,8 @@ private fun ComposerItem(
 }
 
 interface ComposersViewModel : ActionsViewModel {
-  @Immutable
-  data class ComposerInfo(
-    val id: ComposerId,
-    val name: ComposerName,
-    val songCount: Int,
-    val duration: Duration,
-    val artwork: Uri
-  )
 
-  val categoryItem: CategoryItem
+  val category: LibraryCategory
   val composerFlow: StateFlow<List<ComposerInfo>>
   val selectedItems: SelectedItemsFlow<ComposerId>
 
@@ -260,7 +230,7 @@ interface ComposersViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      categoryItem: CategoryItem,
+      category: LibraryCategory,
       audioMediaDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       backstack: Backstack,
@@ -268,7 +238,7 @@ interface ComposersViewModel : ActionsViewModel {
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ComposersViewModel =
       ComposersViewModelImpl(
-        categoryItem,
+        category,
         audioMediaDao,
         localAudioQueueModel,
         backstack,
@@ -279,7 +249,7 @@ interface ComposersViewModel : ActionsViewModel {
 }
 
 private class ComposersViewModelImpl(
-  override val categoryItem: CategoryItem,
+  override val category: LibraryCategory,
   private val audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
@@ -305,16 +275,10 @@ private class ComposersViewModelImpl(
   override fun clearSelection() = selectedItems.clearSelection()
 
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
-    makeCategoryMediaList(getSelectedComposers())
+    getSelectedComposers().makeCategoryMediaList()
 
-  private suspend fun makeCategoryMediaList(composerList: List<ComposerInfo>) = audioMediaDao
-    .getMediaForComposers(
-      composerList
-        .mapTo(LongArrayList(512)) { it.id.value }
-        .asComposerIdList
-    )
-    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
-    .map { idList -> CategoryMediaList(idList, CategoryToken(composerList.last().id)) }
+  private suspend fun List<ComposerInfo>.makeCategoryMediaList() =
+    makeCategoryMediaList(audioMediaDao)
 
   private fun getSelectedComposers() = composerFlow.value
     .filterIfHasSelection(selectedItems.value) { it.id }
@@ -425,7 +389,7 @@ private class ComposersViewModelImpl(
 
   override fun goBack() {
     selectedItems.inSelectionModeThenTurnOff()
-    backstack.back()
+    backstack.backIfAllowed()
   }
 
   override fun itemClicked(composer: ComposerInfo) =

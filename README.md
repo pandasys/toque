@@ -26,11 +26,11 @@ MainViewModel that handles binding to the MediaPlayerService, provides a Playabl
 (LocalAudio, Radio, Video, ...) flow, handles snackbars (Notification flow), and dialogs
 (DialogPrompt flow), and some permission acquisition.
 
-There is also a LocalAudioViewModel which connects to the underlying media player service.
-Later there will als be LocalVideo, Radio, etc view models which communicate with the corresponding
+There is also a LocalAudioViewModel which connects to the underlying media player service. Later
+there will eventually be LocalVideo, Radio, etc view models which communicate with the corresponding
 playable queue within the media player service.
 
 Screen view models obtain data via DAO objects which read the local SQLite DB, Retrofit interface
 implementations to external services, and the MediaPlayerService/PlayableQueue. The screens are
-provided data via one or more StateFlows of the view model. All view models have an interface
-and typically a factory function (operator invoke in the companion) to obtain the instance.
+provided data via one or more StateFlows of the view model. View models typically have an interface
+and a factory function (operator invoke in the companion) to obtain the instance.

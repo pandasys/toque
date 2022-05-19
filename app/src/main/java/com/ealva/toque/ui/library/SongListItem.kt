@@ -16,12 +16,9 @@
 
 package com.ealva.toque.ui.library
 
-import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ListItem
 import androidx.compose.material.LocalContentColor
@@ -30,28 +27,47 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isUnspecified
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
-import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
-import com.ealva.toque.R
 import com.ealva.toque.common.Rating
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.asHourMinutesSeconds
 import com.ealva.toque.common.toStarRating
 import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.modifyIf
+import com.ealva.toque.ui.library.data.SongInfo
 import com.ealva.toque.ui.theme.toqueColors
 import com.gowtham.ratingbar.RatingBar
 import com.gowtham.ratingbar.RatingBarConfig
 import com.gowtham.ratingbar.RatingBarStyle
 import com.gowtham.ratingbar.StepSize
 import kotlin.time.Duration
+
+@ExperimentalFoundationApi
+@Composable
+fun SongListItem(
+  songInfo: SongInfo,
+  highlightBackground: Boolean,
+  icon: @Composable () -> Unit,
+  modifier: Modifier = Modifier,
+  textColor: Color = Color.Unspecified
+) {
+  SongListItem(
+    songTitle = songInfo.title,
+    albumTitle = songInfo.album,
+    artistName = songInfo.artist,
+    songDuration = songInfo.duration,
+    rating = songInfo.rating,
+    highlightBackground = highlightBackground,
+    icon = icon,
+    modifier = modifier,
+    textColor = textColor
+  )
+}
 
 @ExperimentalFoundationApi
 @OptIn(ExperimentalMaterialApi::class)
@@ -111,18 +127,6 @@ fun SongListItem(
         color = textColor,
       )
     }
-  )
-}
-
-@Composable
-fun SongListItemIcon(artwork: Uri) {
-  Image(
-    painter = if (artwork !== Uri.EMPTY) rememberImagePainter(
-      data = artwork,
-      builder = { error(R.drawable.ic_album) }
-    ) else painterResource(id = R.drawable.ic_big_album),
-    contentDescription = stringResource(R.string.Artwork),
-    modifier = Modifier.size(56.dp)
   )
 }
 

@@ -35,23 +35,23 @@ interface ActionsViewModel {
 fun LibraryItemsActions(
   modifier: Modifier = Modifier,
   itemCount: Int,
-  selectedItems: SelectedItems<*>,
+  selectedCount: Int,
+  inSelectionMode: Boolean,
   viewModel: ActionsViewModel,
   buttonColors: ButtonColors = ActionButtonDefaults.colors(),
-  selectActions: (@Composable (Dp) -> Unit)? = null,
+  selectActions: @Composable() ((Dp) -> Unit)? = null,
 ) {
   LibraryActionBar(
     modifier = modifier,
     itemCount = itemCount,
-    inSelectionMode = selectedItems.inSelectionMode,
-    selectedCount = selectedItems.selectedCount,
+    inSelectionMode = inSelectionMode,
+    selectedCount = selectedCount,
     play = { viewModel.play() },
     shuffle = { viewModel.shuffle() },
     playNext = { viewModel.playNext() },
     addToUpNext = { viewModel.addToUpNext() },
     addToPlaylist = { viewModel.addToPlaylist() },
     selectAllOrNone = { all -> if (all) viewModel.selectAll() else viewModel.clearSelection() },
-    startSearch = {},
     buttonColors = buttonColors,
     selectActions = selectActions
   )

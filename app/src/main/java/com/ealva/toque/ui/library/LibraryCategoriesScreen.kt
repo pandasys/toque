@@ -74,8 +74,8 @@ data class LibraryCategoriesScreen(
         contentPadding = PaddingValues(horizontal = 12.dp)
       ) {
         items(viewModel.getItems()) { item ->
-          LibraryCategory(
-            item = item,
+          LibraryCategoryTitle(
+            info = item,
             iconSize = 36.dp,
             textStyle = toqueTypography.subtitle1,
             textStartPadding = 4.dp,
@@ -88,7 +88,7 @@ data class LibraryCategoriesScreen(
 }
 
 private interface LibraryItemsViewModel {
-  fun getItems(): List<LibraryCategories.CategoryItem>
+  fun getItems(): List<LibraryCategories.LibraryCategory>
   fun goToItem(key: ComposeKey)
 
   companion object {
@@ -103,5 +103,5 @@ private class LibraryItemsViewModelImpl(private val backstack: Backstack) : Libr
     backstack.goToScreen(key)
   }
 
-  override fun getItems(): List<LibraryCategories.CategoryItem> = categories.getItems()
+  override fun getItems(): List<LibraryCategories.LibraryCategory> = categories.getItems()
 }

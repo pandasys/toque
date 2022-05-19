@@ -37,7 +37,7 @@ import com.ealva.toque.db.FullAudioInfo
 import com.ealva.toque.db.GenreDao
 import com.ealva.toque.db.PlayListType
 import com.ealva.toque.db.PlaylistDao
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.TextSearchType
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.AlbumIdList
@@ -50,6 +50,7 @@ import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
+import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
 import com.ealva.toque.service.media.MediaMetadataParser
@@ -152,7 +153,9 @@ class AudioMediaDaoSpy : AudioMediaDao {
     TODO("Not yet implemented")
   }
 
-  override suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T> {
+  override suspend fun <T : HasId<K>, K : PersistentId<K>> makeShuffledQueue(
+    upNextQueue: List<T>
+  ): MutableList<T> {
     TODO("Not yet implemented")
   }
 
@@ -253,7 +256,7 @@ class AudioMediaDaoSpy : AudioMediaDao {
 
   override suspend fun getTitleSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> {
     TODO("Not yet implemented")
   }

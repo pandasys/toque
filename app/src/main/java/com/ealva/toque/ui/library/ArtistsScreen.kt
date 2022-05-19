@@ -21,7 +21,6 @@ import android.os.Parcelable
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -31,7 +30,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -48,12 +46,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
@@ -67,12 +62,10 @@ import com.ealva.toque.db.ArtistDaoEvent.ArtistArtworkUpdated
 import com.ealva.toque.db.ArtistDescription
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
-import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.wildcard.SqliteLike.wrapAsFilter
 import com.ealva.toque.log._i
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
-import com.ealva.toque.persist.asArtistIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectArtistArtScreen
@@ -84,16 +77,15 @@ import com.ealva.toque.ui.common.ProvideScreenConfig
 import com.ealva.toque.ui.common.cancelFlingOnBack
 import com.ealva.toque.ui.common.makeScreenConfig
 import com.ealva.toque.ui.common.modifyIf
-import com.ealva.toque.ui.library.ArtistsViewModel.ArtistInfo
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.library.data.ArtistInfo
+import com.ealva.toque.ui.library.data.makeCategoryMediaList
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.getOrElse
-import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -105,7 +97,6 @@ import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
 import com.zhuinden.statebundle.StateBundle
-import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,9 +117,7 @@ import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.ExperimentalTime
 
 private val LOG by lazyLogger(ArtistsScreen::class)
 
@@ -155,7 +144,7 @@ data class ArtistsScreen(
     with(serviceBinder) {
       add(
         ArtistsViewModel(
-          categoryItem = LibraryCategories.Artists,
+          category = LibraryCategories.Artists,
           audioDao = get(),
           localAudioQueueModel = lookup(),
           artistType = artistType,
@@ -181,7 +170,7 @@ data class ArtistsScreen(
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
-        categoryItem = viewModel.categoryItem,
+        category = viewModel.category,
         itemCount = artists.value.size,
         selectedItems = selected.value,
         backTo = fetch(R.string.Library),
@@ -227,6 +216,7 @@ fun ArtistSelectActions(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AllArtistsList(
   list: List<ArtistInfo>,
@@ -252,46 +242,34 @@ private fun AllArtistsList(
         end = 8.dp
       )
     ) {
-      items(items = list, key = { it.artistId }) { artistInfo ->
+      items(items = list, key = { it.id }) { artistInfo ->
         ArtistItem(
+          modifier = Modifier.combinedClickable(
+            onClick = { itemClicked(artistInfo) },
+            onLongClick = { itemLongClicked(artistInfo.id) }
+          ),
           artistInfo = artistInfo,
           artistType = artistType,
-          isSelected = selectedItems.isSelected(artistInfo.artistId),
-          itemClicked = itemClicked,
-          itemLongClicked = itemLongClicked
+          isSelected = selectedItems.isSelected(artistInfo.id),
         )
       }
     }
   }
 }
 
-@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun ArtistItem(
+fun ArtistItem(
+  modifier: Modifier = Modifier,
   artistInfo: ArtistInfo,
   artistType: ArtistType,
-  isSelected: Boolean,
-  itemClicked: (ArtistInfo) -> Unit,
-  itemLongClicked: (ArtistId) -> Unit
+  isSelected: Boolean
 ) {
   ListItem(
-    modifier = Modifier
+    modifier = modifier
       .fillMaxWidth()
-      .modifyIf(isSelected) { background(toqueColors.selectedBackground) }
-      .combinedClickable(
-        onClick = { itemClicked(artistInfo) },
-        onLongClick = { itemLongClicked(artistInfo.artistId) }
-      ),
-    icon = {
-      Image(
-        painter = if (artistInfo.artwork !== Uri.EMPTY) rememberImagePainter(
-          data = artistInfo.artwork,
-          builder = { error(artistType.typeIcon) }
-        ) else painterResource(id = artistType.typeIcon),
-        contentDescription = stringResource(R.string.Artwork),
-        modifier = Modifier.size(56.dp)
-      )
-    },
+      .modifyIf(isSelected) { background(toqueColors.selectedBackground) },
+    icon = { ListItemArtwork(artistInfo.artwork, artistType.typeIcon) },
     text = { ListItemText(text = artistInfo.name.value) },
     overlineText = { AlbumCount(artistInfo.albumCount) },
     secondaryText = {
@@ -314,17 +292,7 @@ private fun AlbumCount(albumCount: Int) {
 }
 
 interface ArtistsViewModel : ActionsViewModel {
-  @Immutable
-  data class ArtistInfo(
-    val artistId: ArtistId,
-    val name: ArtistName,
-    val artwork: Uri,
-    val albumCount: Int,
-    val songCount: Int,
-    val duration: Duration
-  )
-
-  val categoryItem: LibraryCategories.CategoryItem
+  val category: LibraryCategories.LibraryCategory
   val artistFlow: StateFlow<List<ArtistInfo>>
   val selectedItems: SelectedItemsFlow<ArtistId>
 
@@ -340,7 +308,7 @@ interface ArtistsViewModel : ActionsViewModel {
 
   companion object {
     operator fun invoke(
-      categoryItem: LibraryCategories.CategoryItem,
+      category: LibraryCategories.LibraryCategory,
       audioDao: AudioMediaDao,
       localAudioQueueModel: LocalAudioQueueViewModel,
       artistType: ArtistType,
@@ -348,7 +316,7 @@ interface ArtistsViewModel : ActionsViewModel {
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): ArtistsViewModel = ArtistsViewModelImpl(
-      categoryItem = categoryItem,
+      category = category,
       audioMediaDao = audioDao,
       localAudioQueueModel = localAudioQueueModel,
       artistType = artistType,
@@ -360,7 +328,7 @@ interface ArtistsViewModel : ActionsViewModel {
 }
 
 private class ArtistsViewModelImpl(
-  override val categoryItem: LibraryCategories.CategoryItem,
+  override val category: LibraryCategories.LibraryCategory,
   private val audioMediaDao: AudioMediaDao,
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val artistType: ArtistType,
@@ -383,7 +351,7 @@ private class ArtistsViewModelImpl(
   private val filterFlow = MutableStateFlow(Filter.NoFilter)
   private val localQueueOps = LocalAudioQueueOps(localAudioQueueModel)
 
-  @OptIn(ExperimentalTime::class, FlowPreview::class)
+  @OptIn(FlowPreview::class)
   override fun onServiceRegistered() {
     // may want onStart+drop(1) for chunking and onEach to not chunk
     filterFlow
@@ -436,7 +404,7 @@ private class ArtistsViewModelImpl(
   private fun updateArtwork(event: ArtistArtworkUpdated) {
     artistFlow.update { list ->
       list.map { artistInfo ->
-        if (artistInfo.artistId != event.artistId) artistInfo else {
+        if (artistInfo.id != event.artistId) artistInfo else {
           artistInfo.copy(artwork = event.preferredArt)
         }
       }
@@ -477,7 +445,7 @@ private class ArtistsViewModelImpl(
 
   override fun goBack() {
     selectedItems.inSelectionModeThenTurnOff()
-    backstack.back()
+    backstack.backIfAllowed()
   }
 
   override fun selectArtistArt() {
@@ -485,11 +453,11 @@ private class ArtistsViewModelImpl(
     val selected = selectedItems.value
     if (selected.selectedCount == 1) {
       artistFlow.value
-        .find { artist -> selected.isSelected(artist.artistId) }
+        .find { artist -> selected.isSelected(artist.id) }
         ?.let { artist ->
           backstack.goToScreen(
             SelectArtistArtScreen(
-              artist.artistId,
+              artist.id,
               artist.name
             )
           )
@@ -498,11 +466,11 @@ private class ArtistsViewModelImpl(
   }
 
   override fun selectAll() = selectedItems.selectAll(getArtistKeys())
-  private fun getArtistKeys() = artistFlow.value.mapTo(mutableSetOf()) { it.artistId }
+  private fun getArtistKeys() = artistFlow.value.mapTo(mutableSetOf()) { it.id }
   override fun clearSelection() = selectedItems.clearSelection()
 
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
-    makeCategoryMediaList(getSelectedArtists())
+    getSelectedArtists().makeCategoryMediaList()
 
   private fun selectModeOff() = selectedItems.turnOffSelectionMode()
 
@@ -531,24 +499,16 @@ private class ArtistsViewModelImpl(
     scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
-  private suspend fun makeCategoryMediaList(
-    artistList: List<ArtistInfo>
-  ): Result<CategoryMediaList, Throwable> = audioMediaDao
-    .getMediaForArtists(
-      artistList
-        .mapTo(LongArrayList(512)) { it.artistId.value }
-        .asArtistIdList
-    )
-    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
-    .map { idList -> CategoryMediaList(idList, CategoryToken(artistList.last().artistId)) }
+  private suspend fun List<ArtistInfo>.makeCategoryMediaList() =
+    makeCategoryMediaList(audioMediaDao)
 
   private fun getSelectedArtists() = artistFlow.value
-    .filterIfHasSelection(selectedItems.value) { it.artistId }
+    .filterIfHasSelection(selectedItems.value) { it.id }
 
   private fun goToArtistAlbums(artistInfo: ArtistInfo) =
     backstack.goToScreen(
       ArtistAlbumsScreen(
-        artistId = artistInfo.artistId,
+        artistId = artistInfo.id,
         artistType = artistType,
         artistName = artistInfo.name,
         artwork = artistInfo.artwork,
@@ -559,7 +519,7 @@ private class ArtistsViewModelImpl(
     )
 
   override fun itemClicked(artistInfo: ArtistInfo) = selectedItems
-    .ifInSelectionModeToggleElse(artistInfo.artistId) { goToArtistAlbums(artistInfo) }
+    .ifInSelectionModeToggleElse(artistInfo.id) { goToArtistAlbums(artistInfo) }
 
   override fun itemLongClicked(artistId: ArtistId) = selectedItems.toggleSelection(artistId)
 
@@ -586,7 +546,7 @@ private suspend fun ArtistDescription.toArtistInfo(
   audioMediaDao: AudioMediaDao,
   artwork: Uri = preferredArt,
 ) = ArtistInfo(
-  artistId = artistId,
+  id = artistId,
   name = name,
   artwork = if (artwork !== Uri.EMPTY) artwork else audioMediaDao.albumDao
     .getAlbumArtFor(artistId, artistType)
@@ -602,7 +562,7 @@ private suspend fun ArtistDescription.toArtistInfo(
 fun AllArtistsListPreview() {
   val list = listOf(
     ArtistInfo(
-      artistId = ArtistId(1),
+      id = ArtistId(1),
       name = ArtistName("George Harrison"),
       artwork = Uri.EMPTY,
       albumCount = 12,
@@ -610,7 +570,7 @@ fun AllArtistsListPreview() {
       duration = 4.hours
     ),
     ArtistInfo(
-      artistId = ArtistId(2),
+      id = ArtistId(2),
       name = ArtistName("John Lennon"),
       artwork = Uri.EMPTY,
       albumCount = 15,

@@ -54,7 +54,7 @@ object IdPrefixes {
  *
  * Note: calling this function causes boxing
  */
-fun PersistentId.toCompatMediaId(): String {
+fun PersistentId<*>.toCompatMediaId(): String {
   val prefix = when (this) {
     is MediaId -> MEDIA_PREFIX
     is AlbumId -> ALBUM_PREFIX
@@ -116,7 +116,7 @@ fun PersistentId.toCompatMediaId(): String {
  *
  * Note: This function causes boxing as it returns the base interface
  */
-fun String?.toPersistentId(): PersistentId {
+fun String?.toPersistentId(): PersistentId<*> {
   if (this == null) return PersistentId.INVALID
   val list = split('_')
   return when {

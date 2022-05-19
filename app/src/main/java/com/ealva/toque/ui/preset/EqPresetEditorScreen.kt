@@ -45,7 +45,7 @@ data class EqPresetEditorScreen(private val noArg: String = "") : ComposeKey(), 
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<EqPresetEditorModel>()
     Column(modifier = Modifier.fillMaxSize()) {
-      Text(text = "Search")
+      Text(text = "EQ Preset Editor")
     }
   }
 }

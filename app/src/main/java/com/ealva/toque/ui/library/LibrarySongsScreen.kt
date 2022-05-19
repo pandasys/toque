@@ -66,7 +66,7 @@ data class LibrarySongsScreen(
   override fun bindServices(serviceBinder: ServiceBinder) = with(serviceBinder) {
     add(
       LibrarySongsViewModel(
-        categoryItem = LibraryCategories.AllSongs,
+        category = LibraryCategories.AllSongs,
         audioMediaDao = get(),
         localAudioQueueModel = lookup(),
         appPrefs = get(AppPrefs.QUALIFIER),
@@ -91,7 +91,7 @@ data class LibrarySongsScreen(
     ) {
       CategoryScreenHeader(
         viewModel = viewModel,
-        categoryItem = viewModel.categoryItem,
+        category = viewModel.category,
         itemCount = songs.value.size,
         selectedItems = selected.value,
         backTo = fetch(R.string.Library),
@@ -109,7 +109,7 @@ data class LibrarySongsScreen(
 }
 
 private class LibrarySongsViewModel(
-  val categoryItem: LibraryCategories.CategoryItem,
+  val category: LibraryCategories.LibraryCategory,
   audioMediaDao: AudioMediaDao,
   localAudioQueueModel: LocalAudioQueueViewModel,
   appPrefs: AppPrefsSingleton,

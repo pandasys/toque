@@ -31,7 +31,7 @@ import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.AudioUpsertResults
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.PlayListType
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.TextSearchType
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ComposerId
@@ -114,7 +114,7 @@ class AlbumDaoSpy : AlbumDao {
 
   override suspend fun getAlbumSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> {
     TODO("Not yet implemented")
   }

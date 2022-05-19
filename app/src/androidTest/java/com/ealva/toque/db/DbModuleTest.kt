@@ -17,36 +17,6 @@
 package com.ealva.toque.db
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.db.AlbumDao
-import com.ealva.toque.db.AlbumTable
-import com.ealva.toque.db.ArtistAlbumDao
-import com.ealva.toque.db.ArtistAlbumTable
-import com.ealva.toque.db.ArtistDao
-import com.ealva.toque.db.ArtistMediaDao
-import com.ealva.toque.db.ArtistMediaTable
-import com.ealva.toque.db.ArtistTable
-import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.ComposerDao
-import com.ealva.toque.db.ComposerMediaDao
-import com.ealva.toque.db.ComposerMediaTable
-import com.ealva.toque.db.ComposerTable
-import com.ealva.toque.db.EqPresetAssociationDao
-import com.ealva.toque.db.EqPresetAssociationTable
-import com.ealva.toque.db.EqPresetDao
-import com.ealva.toque.db.EqPresetTable
-import com.ealva.toque.db.GenreDao
-import com.ealva.toque.db.GenreMediaDao
-import com.ealva.toque.db.GenreMediaTable
-import com.ealva.toque.db.GenreTable
-import com.ealva.toque.db.MediaTable
-import com.ealva.toque.db.PlayListMediaTable
-import com.ealva.toque.db.PlayListTable
-import com.ealva.toque.db.PlaylistDao
-import com.ealva.toque.db.QueueDao
-import com.ealva.toque.db.QueueItemsTable
-import com.ealva.toque.db.QueuePositionStateDaoFactory
-import com.ealva.toque.db.QueueStateTable
-import com.ealva.toque.db.QueueTable
 import com.ealva.toque.db.smart.SmartPlaylistRuleTable
 import com.ealva.toque.db.smart.SmartPlaylistTable
 import com.ealva.welite.db.Database
@@ -89,7 +59,8 @@ class DbModuleTest : KoinTest {
         PlayListTable,
         PlayListMediaTable,
         SmartPlaylistTable,
-        SmartPlaylistRuleTable
+        SmartPlaylistRuleTable,
+        SearchHistoryTable
       )
     )
   }
@@ -107,5 +78,6 @@ class DbModuleTest : KoinTest {
     expect(get<QueueDao>()).toNotBeNull()
     expect(get<QueuePositionStateDaoFactory>()).toNotBeNull()
     expect(get<PlaylistDao>()).toNotBeNull()
+    expect(get<SearchDao>()).toNotBeNull()
   }
 }

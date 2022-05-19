@@ -311,7 +311,7 @@ private class MediaSessionBrowserImpl(
     if (extras !== Bundle.EMPTY) setExtras(extras)
   }
 
-  private fun makeItemDesc(id: PersistentId, name: String, icon: Uri, subtitle: String? = null) =
+  private fun makeItemDesc(id: PersistentId<*>, name: String, icon: Uri, subtitle: String? = null) =
     makeItemDesc(id.toCompatMediaId(), name, icon, subtitle, Bundle.EMPTY)
 
   private suspend fun makeAlbumList(): List<MediaItem> = albumDao

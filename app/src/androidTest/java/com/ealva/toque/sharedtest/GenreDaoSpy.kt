@@ -25,7 +25,7 @@ import com.ealva.toque.db.GenreDao
 import com.ealva.toque.db.GenreDaoEvent
 import com.ealva.toque.db.GenreDescription
 import com.ealva.toque.db.GenreIdName
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.TextSearchType
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.MediaFileTagInfo
@@ -87,7 +87,7 @@ class GenreDaoSpy : GenreDao {
 
   override suspend fun getGenreSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> {
     TODO("Not yet implemented")
   }

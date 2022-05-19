@@ -149,7 +149,7 @@ private class LibVlcImpl(
     initialSeek: Millis,
     prefs: LibVlcPrefs
   ) = apply {
-    if (startPaused()) {
+    if (startPaused.paused) {
       addMediaOption { ":start-paused" }
     }
     if (initialSeek > Millis(0)) {

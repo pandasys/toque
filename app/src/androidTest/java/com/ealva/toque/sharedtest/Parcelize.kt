@@ -18,6 +18,7 @@ package com.ealva.toque.sharedtest
 
 import android.os.Parcel
 import android.os.Parcelable
+import com.ealva.toque.ui.library.search.SearchModel
 import com.nhaarman.expect.expect
 
 /**
@@ -29,7 +30,7 @@ inline fun <reified T : Parcelable> T.parcelize(
   parcelableFlags: Int = 0,
   loader: ClassLoader = requireNotNull(T::class.java.classLoader) { "${T::class} loader null" },
   verify: (T) -> Unit
-) : T {
+): T {
   val parcel: Parcel = Parcel.obtain().apply { writeParcelable(this@parcelize, parcelableFlags) }
   val amountWritten = parcel.dataPosition()
 

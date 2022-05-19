@@ -4,7 +4,12 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/toque.iml" filepath="$PROJECT_DIR$/.idea/modules/toque.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/toque.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/toque.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/toque.app.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/toque.app.androidTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/toque.app.main.iml" filepath="$PROJECT_DIR$/.idea/modules/app/toque.app.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/toque.app.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/toque.app.unitTest.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/toque.buildSrc.iml" filepath="$PROJECT_DIR$/.idea/modules/toque.buildSrc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/toque.buildSrc.main.iml" filepath="$PROJECT_DIR$/.idea/modules/toque.buildSrc.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/toque.buildSrc.test.iml" filepath="$PROJECT_DIR$/.idea/modules/toque.buildSrc.test.iml" />
     </modules>
   </component>
 </project>

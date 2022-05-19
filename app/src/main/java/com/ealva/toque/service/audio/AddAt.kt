@@ -19,6 +19,11 @@ package com.ealva.toque.service.audio
 import com.ealva.toque.common.ShuffleMedia
 
 enum class AddAt {
+  /**
+   * Always add one item from the new items directly after current so user is not surprised that
+   * next song is not from new items. When in shuffle mode, remaining items + new queue items are
+   * shuffled.
+   */
   AfterCurrent {
     override fun addTo(
         addTo: MutableList<PlayableAudioItem>,
@@ -27,11 +32,12 @@ enum class AddAt {
         shuffleMedia: ShuffleMedia,
         shuffler: ListShuffler
     ) {
+      addTo.addAll(newItems.sublistFromStartTo(1))
       addTo.addAll(
         ArrayList<PlayableAudioItem>(newItems.size + queueItems.size).apply {
-          addAll(newItems)
+          addAll(newItems.sublistToEndFrom(1))
           addAll(queueItems)
-          if (shuffleMedia.value) shuffler.shuffleInPlace(this)
+          if (shuffleMedia.shuffle) shuffler.shuffleInPlace(this)
         }
       )
     }
@@ -48,7 +54,7 @@ enum class AddAt {
         ArrayList<PlayableAudioItem>(newItems.size + queueItems.size).apply {
           addAll(queueItems)
           addAll(newItems)
-          if (shuffleMedia.value) shuffler.shuffleInPlace(this)
+          if (shuffleMedia.shuffle) shuffler.shuffleInPlace(this)
         }
       )
     }

@@ -16,7 +16,8 @@
 
 package com.ealva.toque.ui.main
 
-import android.Manifest.permission.READ_EXTERNAL_STORAGE
+import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,7 +44,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ealva.ealvalog.invoke
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
+import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.theme.toque
@@ -50,32 +55,120 @@ import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionRequired
 import com.google.accompanist.permissions.rememberPermissionState
+import com.zhuinden.simplestack.ScopeKey
+import com.zhuinden.simplestack.ScopedServices
+import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
+import com.zhuinden.simplestackextensions.servicesktx.add
+import com.zhuinden.simplestackextensions.servicesktx.lookup
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.parcelize.Parcelize
+
+@Suppress("unused")
+private val LOG by lazyLogger(SplashScreen::class)
 
 @Immutable
 @Parcelize
-data class SplashScreen(private val noArg: String = "") : ComposeKey() {
+data class SplashScreen(private val noArg: String = "") : ComposeKey(), ScopeKey.Child {
+  override fun getParentScopes(): List<String> = listOf(
+    MainViewModel::class.java.name
+  )
+
+  override fun bindServices(serviceBinder: ServiceBinder) {
+    with(serviceBinder) {
+      add(SplashScreenModel(lookup()))
+    }
+  }
+
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
-    val mainViewModel = rememberService<MainViewModel>()
+    val viewModel = rememberService<SplashScreenModel>()
+
     Splash(
-      exit = { mainViewModel.exit() },
-      navigateToSettingsScreen = { mainViewModel.startAppSettingsActivity() },
-      gainedPermission = { mainViewModel.gainedReadExternalPermission() }
+      viewModel.haveWritePermission.value,
+      viewModel.getWriteExternalPermission,
+      exit = { viewModel.exit() },
+      navigateToSettingsScreen = { viewModel.startAppSettingsActivity() },
+      gainedPermission = { viewModel.gainedReadExternalPermission() }
     )
+  }
+}
+
+interface SplashScreenModel {
+  val getWriteExternalPermission: Boolean
+  val haveWritePermission: State<Boolean>
+
+  fun exit()
+  fun startAppSettingsActivity()
+  fun gainedReadExternalPermission()
+
+  companion object {
+    operator fun invoke(
+      mainModel: MainViewModel,
+      dispatcher: CoroutineDispatcher = Dispatchers.Main
+    ): SplashScreenModel = SplashScreenModelImpl(mainModel, dispatcher)
+  }
+}
+
+private class SplashScreenModelImpl(
+  private val mainModel: MainViewModel,
+  dispatcher: CoroutineDispatcher,
+) : SplashScreenModel, ScopedServices.Activated {
+  private val scope = CoroutineScope(Job() + dispatcher)
+  override val getWriteExternalPermission: Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+  override val haveWritePermission = mutableStateOf(true)
+
+  /**
+   * Called when SplashScreen becomes active, either when the app starts or coming to the front
+   * after an activity is shown for permission, so check permissions here
+   */
+  override fun onServiceActive() {
+    LOG._e { it("onServiceActive") }
+    mainModel.haveWriteExternalPermission
+      .onEach { havePerm -> haveWritePermissionChanged(havePerm) }
+      .launchIn(scope)
+  }
+
+  private fun haveWritePermissionChanged(havePerm: Boolean) {
+    LOG._e { it("haveWritePermissionChanged %s", havePerm) }
+    if (havePerm) mainModel.gainedReadExternalPermission() else haveWritePermission.value = false
+  }
+
+  override fun onServiceInactive() {
+    LOG._e { it("onServiceInactive") }
+    scope.cancel()
+  }
+
+  override fun exit() {
+    mainModel.exit()
+  }
+
+  override fun startAppSettingsActivity() {
+    mainModel.startAppSettingsActivity()
+  }
+
+  override fun gainedReadExternalPermission() {
+    mainModel.gainedReadExternalPermission()
   }
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun Splash(
+  haveWritePermission: Boolean,
+  getWritePermission: Boolean,
   exit: () -> Unit,
   navigateToSettingsScreen: () -> Unit,
   gainedPermission: () -> Unit
 ) {
   var userExit by rememberSaveable { mutableStateOf(false) }
-  val readExternalState = rememberPermissionState(READ_EXTERNAL_STORAGE)
+  val readExternalState = rememberPermissionState(WRITE_EXTERNAL_STORAGE)
   val imageSize = if (LocalScreenConfig.current.inPortrait) 200.dp else 120.dp
 
   Column(
@@ -99,30 +192,39 @@ fun Splash(
       modifier = Modifier.align(alignment = Alignment.CenterHorizontally),
     )
     Spacer(modifier = Modifier.height(20.dp))
-    PermissionRequired(
-      permissionState = readExternalState,
-      permissionNotGrantedContent = {
-        if (userExit) {
-          exit()
-        } else {
-          Rationale(
-            userExit = { userExit = true },
-            onRequestPermission = { readExternalState.launchPermissionRequest() }
-          )
+    if (!haveWritePermission) {
+      if (getWritePermission) {
+        PermissionRequired(
+          permissionState = readExternalState,
+          permissionNotGrantedContent = {
+            if (userExit) {
+              exit()
+            } else {
+              Rationale(
+                userExit = { userExit = true },
+                onRequestPermission = { readExternalState.launchPermissionRequest() }
+              )
+            }
+          },
+          permissionNotAvailableContent = {
+            if (userExit) {
+              exit()
+            } else {
+              PermissionDenied(
+                userExit = { userExit = true },
+                navigateToSettingsScreen
+              )
+            }
+          }
+        ) {
+          gainedPermission()
         }
-      },
-      permissionNotAvailableContent = {
-        if (userExit) {
-          exit()
-        } else {
-          PermissionDenied(
-            userExit = { userExit = true },
-            navigateToSettingsScreen
-          )
-        }
+      } else {
+        Rationale(
+          userExit = exit,
+          onRequestPermission = navigateToSettingsScreen
+        )
       }
-    ) {
-      gainedPermission()
     }
   }
 }

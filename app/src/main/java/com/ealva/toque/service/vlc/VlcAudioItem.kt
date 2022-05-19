@@ -189,13 +189,13 @@ class VlcAudioItem private constructor(
    */
   override fun reset(playNow: PlayNow) {
     if (!isPreparing) {
-      val shouldPlayNow = PlayNow(playNow.value || isPlaying)
+      val shouldPlayNow = PlayNow(playNow.play || isPlaying)
       val currentTime = position
       avPlayer.shutdown()
       avPlayer = NullAvPlayer
       prepareSeekMaybePlay(
         currentTime,
-        if (playNow.value) PlayImmediateTransition() else NoOpPlayerTransition,
+        if (playNow.play) PlayImmediateTransition() else NoOpPlayerTransition,
         shouldPlayNow
       )
     }
@@ -258,7 +258,7 @@ class VlcAudioItem private constructor(
         position = startPosition
         remainingToMarkPlayed -= position.toDuration()
         hasBeenMarkedPlayed = remainingToMarkPlayed.isNegative() || remainingToMarkPlayed.isZero
-        startOnPrepared = playNow.value
+        startOnPrepared = playNow.play
         isShutdown = false
         isStopped = false
         avPlayer = libVlcSingleton.withInstance { libVlc ->
@@ -282,7 +282,7 @@ class VlcAudioItem private constructor(
         }.also { player ->
           player.eventFlow
             .onSubscription {
-              if (startPaused.value) player.playStartPaused() else isPreparing = false
+              if (startPaused.paused) player.playStartPaused() else isPreparing = false
             }
             .onEach { event -> handleAvPlayerEvent(event) }
             .catch { cause -> LOG.e(cause) { it("AvPlayerEvent flow error") } }

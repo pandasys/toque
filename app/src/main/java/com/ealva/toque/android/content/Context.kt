@@ -18,18 +18,41 @@ package com.ealva.toque.android.content
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import com.ealva.toque.BuildConfig
 
 inline fun <reified T : Any> Context.requireSystemService(): T = checkNotNull(getSystemService())
 
-fun Context.haveReadPermission() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+fun Context.canReadStorage() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+  Environment.isExternalStorageManager()
+} else {
   ContextCompat.checkSelfPermission(
     this,
     Manifest.permission.READ_EXTERNAL_STORAGE
   ) == PackageManager.PERMISSION_GRANTED
-} else true
+}
 
-fun Context.doNotHaveReadPermission() = !haveReadPermission()
+fun Context.cannotReadStorage() = !canReadStorage()
+
+fun Context.canWriteStorage() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+  Environment.isExternalStorageManager()
+} else ContextCompat.checkSelfPermission(
+  this,
+  Manifest.permission.WRITE_EXTERNAL_STORAGE
+) == PackageManager.PERMISSION_GRANTED
+
+fun Context.cannotWriteStorage() = !canWriteStorage()
+
+@RequiresApi(Build.VERSION_CODES.R)
+fun hasAllAccess(context: Context) = !Intent(
+  Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+  Uri.parse("package:${BuildConfig.APP_ID}")
+).isCallable(context) || Environment.isExternalStorageManager()

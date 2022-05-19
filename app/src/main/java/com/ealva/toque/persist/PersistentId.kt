@@ -24,6 +24,7 @@ import com.ealva.ealvabrainz.brainz.data.isValid
 import com.ealva.toque.persist.PersistentId.Companion.ID_INVALID
 import com.ealva.toque.persist.PersistentId.Companion.isValidId
 import it.unimi.dsi.fastutil.longs.LongArrayList
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongList
 import it.unimi.dsi.fastutil.longs.LongLists
 import kotlinx.parcelize.Parcelize
@@ -36,25 +37,34 @@ import javax.annotation.CheckReturnValue
  * extension functions [isValid] and [isInvalid] so expected inline subclasses do not need to define
  * these common functions.
  */
-interface PersistentId {
+interface PersistentId<T> : Parcelable {
   val value: Long
+
+  @Suppress("UNCHECKED_CAST")
+  val actual: T
+    get() = this as T
 
   companion object {
     const val ID_INVALID = -1L
     inline fun isValidId(id: Long): Boolean = id > 0
-    val INVALID = object : PersistentId {
-      override val value: Long = ID_INVALID
+    val INVALID: PersistentId<*> = InvalidPersistentId
+
+    @Parcelize
+    private object InvalidPersistentId : PersistentId<InvalidPersistentId> {
+      override val value: Long
+        get() = ID_INVALID
+
     }
   }
 }
 
-inline val PersistentId.isValid: Boolean
+inline val PersistentId<*>.isValid: Boolean
   get() = isValidId(value)
 
-inline val PersistentId.isInvalid: Boolean
+inline val PersistentId<*>.isInvalid: Boolean
   get() = !isValid
 
-inline fun <reified T : PersistentId> idIterator(
+inline fun <reified T : PersistentId<T>> idIterator(
   idList: LongList,
   crossinline maker: (Long) -> T
 ): Iterator<T> {
@@ -71,7 +81,7 @@ inline val Int.asMediaId get() = toLong().asMediaId
 
 @Parcelize
 @JvmInline
-value class MediaId(override val value: Long) : PersistentId, Parcelable {
+value class MediaId(override val value: Long) : PersistentId<MediaId>, Parcelable {
   inline operator fun invoke(): Long = value
 
   companion object {
@@ -92,6 +102,13 @@ value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parc
     value.add(mediaId.value)
   }
 
+  operator fun plus(rhs: MediaIdList): MediaIdList {
+    val result = LongArrayList(value.size + rhs.value.size)
+    result.addAll(value)
+    result.addAll(rhs.value)
+    return MediaIdList(result)
+  }
+
   inline operator fun get(index: Int): MediaId = value.getLong(index).asMediaId
 
   /**
@@ -106,6 +123,8 @@ value class MediaIdList(val value: @RawValue LongList) : Iterable<MediaId>, Parc
     append("MediaIdList")
     append(value.toString())
   }
+
+  fun removeDuplicates(): MediaIdList = MediaIdList(LongArrayList(LongLinkedOpenHashSet(value)))
 
   companion object {
     private val random: Random = Random()
@@ -131,7 +150,7 @@ inline val LongList.asMediaIdList: MediaIdList get() = MediaIdList(this)
  */
 @Parcelize
 @JvmInline
-value class InstanceId(val value: Long): Parcelable {
+value class InstanceId(val value: Long) : Parcelable {
   /** True if [value] is >= 0, else false */
   inline val isValid: Boolean get() = value >= 0
 
@@ -140,16 +159,19 @@ value class InstanceId(val value: Long): Parcelable {
   }
 }
 
+interface HasPersistentId<T> {
+  /**
+   * Unique persistent ID of instances of this interface
+   */
+  val id: PersistentId<T>
+}
+
 /**
  * Basically a marker interface indicating the instance has a unique, persistent [id].
  * This [id] is typically (always?) a row _id column which guarantees it's uniqueness and
  * persistence.
  */
-interface HasId {
-  /**
-   * Unique persistent ID of instances of this interface
-   */
-  val id: PersistentId
+interface HasId<T> : HasPersistentId<T> {
 
   /**
    * The "instance" ID is required as some persistent items may appear in lists more than once.

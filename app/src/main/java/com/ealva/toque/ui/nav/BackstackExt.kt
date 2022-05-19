@@ -54,7 +54,7 @@ fun Backstack.goToAboveRoot(screen: ComposeKey) =
 
 fun Backstack.goToScreen(screen: ComposeKey) = navigateIfAllowed { goTo(screen) }
 
-fun Backstack.back() = navigateIfAllowed { goBack() }
+fun Backstack.backIfAllowed() = navigateIfAllowed { goBack() }
 
 fun Backstack.setScreenHistory(newHistory: List<ComposeKey>, direction: Int) =
   navigateIfAllowed() { setHistory(newHistory, direction) }

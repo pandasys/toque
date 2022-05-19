@@ -67,7 +67,7 @@ import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.NameValidit
 import com.ealva.toque.ui.library.smart.SmartPlaylistEditorViewModel.SmartPlaylistData
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.onSuccess
 import com.zhuinden.simplestack.Backstack
@@ -269,7 +269,7 @@ private class SmartPlaylistEditorViewModelImpl(
     }
   }
 
-  override fun goBack() = backstack.back()
+  override fun goBack() = backstack.backIfAllowed()
 
   override fun addRule() = playlistFlow.update {
     it.copy(ruleList = it.ruleList.toMutableList().apply { add(makeDefaultRule()) })
@@ -690,14 +690,12 @@ private class SmartPlaylistEditorViewModelImpl(
     }
     initialized = true
   }
-
-  companion object {
-    private const val KEY_ORIGINAL = "SmartEditor_OriginalSmartPlaylist"
-    private const val KEY_ALL_PLAYLIST_NAMES = "SmartEditor_AllPlaylistNames"
-    private const val KEY_ALL_VIEW_NAMES = "SmartEditor_AllViewNames"
-    private const val KEY_EDITOR_DATA = "SmartEditor_EditorData"
-  }
 }
+
+private const val KEY_ORIGINAL = "SmartEditor_OriginalSmartPlaylist"
+private const val KEY_ALL_PLAYLIST_NAMES = "SmartEditor_AllPlaylistNames"
+private const val KEY_ALL_VIEW_NAMES = "SmartEditor_AllViewNames"
+private const val KEY_EDITOR_DATA = "SmartEditor_EditorData"
 
 private val SmartPlaylistData.asSmartPlaylist: SmartPlaylist
   get() = requireThen(nameValidity.isValid, { "$editingName is not valid" }) {

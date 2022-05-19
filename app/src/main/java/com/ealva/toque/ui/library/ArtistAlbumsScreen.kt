@@ -52,12 +52,9 @@ import com.ealva.toque.common.Filter
 import com.ealva.toque.db.AlbumDao
 import com.ealva.toque.db.AlbumDescription
 import com.ealva.toque.db.AudioMediaDao
-import com.ealva.toque.db.CategoryMediaList
-import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.ArtistId
-import com.ealva.toque.persist.asAlbumIdList
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
@@ -66,13 +63,11 @@ import com.ealva.toque.ui.common.ListItemText
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.TextOvalBackground
 import com.ealva.toque.ui.common.timesAlpha
-import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
+import com.ealva.toque.ui.library.data.AlbumInfo
+import com.ealva.toque.ui.library.data.makeCategoryMediaList
 import com.ealva.toque.ui.nav.goToScreen
 import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
-import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.map
-import com.github.michaelbull.result.toErrorIf
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.Backstack
@@ -81,7 +76,6 @@ import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
 import com.zhuinden.simplestackextensions.servicesktx.lookup
-import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.parcelize.Parcelize
@@ -250,7 +244,8 @@ private fun ArtistAlbumsHeaderInfo(
       )
       LibraryItemsActions(
         itemCount = albumCount,
-        selectedItems = selectedItems,
+        selectedCount = selectedItems.selectedCount,
+        inSelectionMode = selectedItems.inSelectionMode,
         viewModel = viewModel,
         buttonColors = ActionButtonDefaults.overArtworkColors(),
       )
@@ -366,17 +361,8 @@ private class ArtistAlbumsViewModelImpl(
       )
     )
 
-  override suspend fun makeCategoryMediaList(
-    albumList: List<AlbumInfo>
-  ): Result<CategoryMediaList, Throwable> = audioMediaDao
-    .getMediaForAlbums(
-      albumList
-        .mapTo(LongArrayList(512)) { it.id.value }
-        .asAlbumIdList,
-      artistId
-    )
-    .toErrorIf({ idList -> idList.isEmpty() }) { NoSuchElementException() }
-    .map { idList -> CategoryMediaList(idList, CategoryToken(albumList.last().id)) }
+  override suspend fun List<AlbumInfo>.makeCategoryMediaList() =
+    makeCategoryMediaList(audioMediaDao, artistId)
 
   override fun goToArtistSongs() = backstack.goToScreen(
     ArtistSongsScreen(

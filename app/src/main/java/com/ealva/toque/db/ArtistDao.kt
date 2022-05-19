@@ -30,12 +30,13 @@ import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ArtistDaoEvent.ArtistArtworkUpdated
-import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
+import com.ealva.toque.db.wildcard.SqliteLike
 import com.ealva.toque.file.toUriOrEmpty
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ArtistIdList
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asArtistId
+import com.ealva.toque.service.media.MediaType
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
@@ -48,8 +49,10 @@ import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.greater
 import com.ealva.welite.db.expr.less
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.literal
 import com.ealva.welite.db.expr.max
 import com.ealva.welite.db.expr.min
@@ -158,12 +161,12 @@ interface ArtistDao {
 
   suspend fun getArtistSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>>
 
   suspend fun getAlbumArtistSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>>
 
   fun TransactionInProgress.replaceMediaArtists(
@@ -329,7 +332,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           albumArtistAlbumCountColumn
         )
       }
-      .where { filter.whereCondition() }
+      .where { (MediaTable.mediaType eq MediaType.Audio.id).filter(filter) }
       .groupBy { ArtistTable.artistSort }
       .orderByAsc { ArtistTable.artistSort }
       .limit(limit.value)
@@ -370,7 +373,7 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
           songArtistAlbumCountColumn
         )
       }
-      .where { filter.whereCondition() }
+      .where { (MediaTable.mediaType eq MediaType.Audio.id).filter(filter) }
       .groupBy { ArtistTable.artistSort }
       .orderByAsc { ArtistTable.artistSort }
       .limit(limit.value)
@@ -388,8 +391,8 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
       .toList()
   }
 
-  private fun Filter.whereCondition(): Op<Boolean>? = if (isBlank) null else
-    ArtistTable.artistName.likeEscaped(value)
+  private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isBlank) this else
+    this and ArtistTable.artistName.like(filter.value).escape(SqliteLike.ESC_CHAR)
 
   override suspend fun getAllArtistNames(
     limit: Limit
@@ -463,13 +466,13 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
 
   override suspend fun getArtistSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       ArtistDao.SongArtistTable
         .join(MediaTable, JoinType.INNER, ArtistDao.songArtistTableId, MediaTable.artistId)
         .select { ArtistDao.songArtistTableName }
-        .where { textSearch.makeWhereOp(ArtistDao.songArtistTableName, partial) }
+        .where { searchType.makeWhereOp(ArtistDao.songArtistTableName, partial) }
         .distinct()
         .sequence { it[ArtistDao.songArtistTableName] }
         .toList()
@@ -478,13 +481,13 @@ private class ArtistDaoImpl(private val db: Database, dispatcher: CoroutineDispa
 
   override suspend fun getAlbumArtistSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       ArtistDao.AlbumArtistTable
         .join(MediaTable, JoinType.INNER, ArtistDao.albumArtistTableId, MediaTable.albumArtistId)
         .select { ArtistDao.albumArtistTableName }
-        .where { textSearch.makeWhereOp(ArtistDao.albumArtistTableName, partial) }
+        .where { searchType.makeWhereOp(ArtistDao.albumArtistTableName, partial) }
         .distinct()
         .sequence { it[ArtistDao.albumArtistTableName] }
         .toList()

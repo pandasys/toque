@@ -74,7 +74,7 @@ import com.ealva.toque.tag.ArtistParserFactory
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
@@ -273,7 +273,7 @@ private class MediaInfoViewModelImpl(
   )
 
   override fun goBack() {
-    backstack.back()
+    backstack.backIfAllowed()
   }
 
   override fun onServiceActive() {

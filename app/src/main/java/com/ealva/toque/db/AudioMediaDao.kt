@@ -54,7 +54,7 @@ import com.ealva.toque.db.PlayListType.File
 import com.ealva.toque.db.PlayListType.Rules
 import com.ealva.toque.db.PlayListType.System
 import com.ealva.toque.db.PlayListType.UserCreated
-import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
+import com.ealva.toque.db.wildcard.SqliteLike
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.extension
 import com.ealva.toque.file.toUriOrEmpty
@@ -69,6 +69,7 @@ import com.ealva.toque.persist.GenreIdList
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.MediaIdList
+import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.PlaylistIdList
 import com.ealva.toque.persist.asAlbumId
@@ -94,8 +95,10 @@ import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.eq
+import com.ealva.welite.db.expr.escape
 import com.ealva.welite.db.expr.inList
 import com.ealva.welite.db.expr.isNotNull
+import com.ealva.welite.db.expr.like
 import com.ealva.welite.db.expr.or
 import com.ealva.welite.db.expr.plus
 import com.ealva.welite.db.statements.insertValues
@@ -246,7 +249,9 @@ interface AudioMediaDao {
   ): Result<List<AudioDescription>, Throwable>
 
   suspend fun getAudioQueueItems(shuffled: Boolean): AudioItemListResult
-  suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
+  suspend fun <T : HasId<K>, K : PersistentId<K>> makeShuffledQueue(
+    upNextQueue: List<T>
+  ): MutableList<T>
 
   /**
    * Makes a list of AudioQueueItemsData returned in the same order as [idList]
@@ -307,7 +312,7 @@ interface AudioMediaDao {
 
   suspend fun getTitleSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>>
 
   companion object {
@@ -556,6 +561,7 @@ private class AudioMediaDaoImpl(
         .where { mediaType eq MediaType.Audio.id }
         .limit(1)
         .sequence { cursor -> cursor.count > 0 }
+        .toList()
         .firstOrNull() ?: false
     }
   }
@@ -803,7 +809,9 @@ private class AudioMediaDaoImpl(
    * data structure to support that. We'll use a map with ID as key and entry will be a list.
    * Removing from the end of the list won't require any copying
    */
-  override suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T> {
+  override suspend fun <T : HasId<K>, K : PersistentId<K>> makeShuffledQueue(
+    upNextQueue: List<T>
+  ): MutableList<T> {
     if (upNextQueue.isEmpty()) return mutableListOf()
     val queueMap = Long2ObjectOpenHashMap<MutableList<T>>(upNextQueue.size).apply {
       upNextQueue.forEach { item ->
@@ -1279,12 +1287,12 @@ private class AudioMediaDaoImpl(
 
   override suspend fun getTitleSuggestions(
     partialTitle: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       MediaTable
         .select { title }
-        .where { textSearch.makeWhereOp(title, partialTitle) }
+        .where { searchType.makeWhereOp(title, partialTitle) }
         .sequence { it[title] }
         .toList()
     }
@@ -1574,9 +1582,9 @@ private val AUDIO_DESCRIPTION_SELECTS = listOf(
 )
 
 private fun Op<Boolean>.filter(filter: Filter): Op<Boolean> = if (filter.isBlank) this else {
-  this and (MediaTable.title.likeEscaped(filter.value) or
-    AlbumTable.albumTitle.likeEscaped(filter.value) or
-    ArtistTable.artistName.likeEscaped(filter.value))
+  this and (MediaTable.title.like(filter.value).escape(SqliteLike.ESC_CHAR) or
+    AlbumTable.albumTitle.like(filter.value).escape(SqliteLike.ESC_CHAR) or
+    ArtistTable.artistName.like(filter.value).escape(SqliteLike.ESC_CHAR))
 }
 
 private fun Op<Boolean>.restrictTo(artistId: ArtistId?): Op<Boolean> =

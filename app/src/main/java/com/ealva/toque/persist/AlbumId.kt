@@ -24,7 +24,7 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 @JvmInline
-value class AlbumId(override val value: Long) : PersistentId, Parcelable {
+value class AlbumId(override val value: Long) : PersistentId<AlbumId>, Parcelable {
   companion object {
     val INVALID = AlbumId(PersistentId.ID_INVALID)
   }

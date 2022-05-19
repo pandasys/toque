@@ -20,5 +20,6 @@ import com.ealva.toque.common.BooleanValue
 
 @JvmInline
 value class PlayNow(override val value: Boolean) : BooleanValue {
-  operator fun not(): PlayNow = PlayNow(!value)
+  inline val play: Boolean
+    get() = value
 }

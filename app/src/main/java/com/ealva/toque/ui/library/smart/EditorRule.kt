@@ -30,7 +30,7 @@ import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.ComposerDao
 import com.ealva.toque.db.GenreDao
 import com.ealva.toque.db.PlaylistDao
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.TextSearchType
 import com.ealva.toque.db.smart.GenreMatcher
 import com.ealva.toque.db.smart.Matcher
 import com.ealva.toque.db.smart.MatcherData
@@ -320,11 +320,11 @@ private suspend fun makeTextEditorRuleWithSuggestions(
   matcher: Matcher<*>,
   data: MatcherData,
   showSuggestions: Boolean,
-  getSuggestions: suspend ((String, TextSearch) -> List<String>)
+  getSuggestions: suspend ((String, TextSearchType) -> List<String>)
 ): EditorRule {
   val newName = data.text.trim()
   val suggestions: List<String> = if (newName.isNotBlank() && showSuggestions) {
-    getSuggestions(newName, matcher.textSearch)
+    getSuggestions(newName, matcher.searchType)
   } else emptyList()
 
   return TextEditorRule(
@@ -580,11 +580,11 @@ private fun makeDurationEditorRule(
 ): EditorRule = DurationRule(Rule(ruleId, RuleField.Duration, matcher, data))
 
 /** If this is a matcher against text or genre (same thing) then return how it searches wildcards */
-private val Matcher<*>.textSearch: TextSearch
+private val Matcher<*>.searchType: TextSearchType
   get() = when (this) {
-    is TextMatcher -> textSearch
-    is GenreMatcher -> textSearch
-    else -> TextSearch.Is
+    is TextMatcher -> searchType
+    is GenreMatcher -> searchType
+    else -> TextSearchType.Is
   }
 
 private val String.isValidName: SmartPlaylistEditorViewModel.NameValidity

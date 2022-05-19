@@ -21,7 +21,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -34,11 +33,13 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.BuildConfig
 import com.ealva.toque.R
-import com.ealva.toque.android.content.doNotHaveReadPermission
+import com.ealva.toque.android.content.cannotWriteStorage
+import com.ealva.toque.android.content.canReadStorage
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.file.AudioInfo
 import com.ealva.toque.file.MediaStorage
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.HasConstId
 import com.ealva.toque.prefs.AppPrefs
@@ -120,7 +121,7 @@ class MediaScannerService : LifecycleService() {
 
   override fun onCreate() {
     super.onCreate()
-    if (doNotHaveReadPermission()) {
+    if (cannotWriteStorage()) {
       stopSelf()
       return
     }
@@ -151,7 +152,7 @@ class MediaScannerService : LifecycleService() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     super.onStartCommand(intent, flags, startId)
-    if (doNotHaveReadPermission()) {
+    if (cannotWriteStorage()) {
       return START_NOT_STICKY
     }
     workEnqueuer?.serviceStartReceived()
@@ -203,7 +204,7 @@ class MediaScannerService : LifecycleService() {
   }
 
   private suspend fun tryFullRescan(rescan: RescanType) {
-    if (checkSelfPermission(READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+    if (canReadStorage()) {
       doFullRescanWithPermission(rescan)
     } else {
       LOG.e { it("No permission %s", READ_EXTERNAL_STORAGE) }
@@ -243,6 +244,7 @@ class MediaScannerService : LifecycleService() {
     modifiedTime: Millis,
     onCompletion: suspend () -> Unit
   ) {
+    LOG._e { it("scanAllAfter %s", modifiedAfter) }
     withContext(Dispatchers.IO) {
       storage.audioFlow(modifiedAfter, minDuration)
         .map { audioInfo -> async { persistAudio(audioInfo, parser, minDuration, modifiedTime) } }
@@ -284,7 +286,7 @@ class MediaScannerService : LifecycleService() {
 
     fun startScanner(context: Context, reason: String, rescan: RescanType) {
       LOG.i { it("reason=%s rescan=%s", reason, rescan) }
-      if (context.doNotHaveReadPermission()) {
+      if (context.cannotWriteStorage()) {
         LOG.e { it("Don't have read external permission. Not starting media scanner.") }
       } else {
         val intent = Intent(context, MediaScannerService::class.java).apply {

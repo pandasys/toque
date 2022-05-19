@@ -38,6 +38,8 @@ android {
     minSdk = SdkVersion.MIN
     targetSdk = SdkVersion.TARGET
 
+    buildConfigField("String", "APP_ID", "\"${AppVersion.ID}\"")
+
     applicationId = AppVersion.ID
     versionCode = AppVersion.VERSION_CODE
     versionName = AppVersion.VERSION_NAME

@@ -17,26 +17,29 @@
 package com.ealva.toque.db
 
 import com.ealva.ealvabrainz.common.ComposerName
+import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Filter.Companion.NoFilter
 import com.ealva.toque.common.Limit
 import com.ealva.toque.common.Limit.Companion.NoLimit
 import com.ealva.toque.common.Millis
 import com.ealva.toque.db.ComposerDaoEvent.ComposerCreatedOrUpdated
-import com.ealva.toque.db.wildcard.SqliteLike.ESC_CHAR
-import com.ealva.toque.db.wildcard.SqliteLike.likeEscaped
+import com.ealva.toque.db.wildcard.SqliteLike
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asComposerId
 import com.ealva.toque.persist.isValid
 import com.ealva.toque.service.media.MediaFileTagInfo
+import com.ealva.toque.service.media.MediaType
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
 import com.ealva.welite.db.expr.BindExpression
 import com.ealva.welite.db.expr.Expression
+import com.ealva.welite.db.expr.Op
 import com.ealva.welite.db.expr.Order
+import com.ealva.welite.db.expr.and
 import com.ealva.welite.db.expr.bindLong
 import com.ealva.welite.db.expr.bindString
 import com.ealva.welite.db.expr.count
@@ -81,6 +84,9 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.time.Duration
 
+@Suppress("unused")
+private val LOG by lazyLogger(ComposerDao::class)
+
 data class ComposerDescription(
   val composerId: ComposerId,
   val composerName: ComposerName,
@@ -124,7 +130,7 @@ interface ComposerDao {
 
   suspend fun getComposerSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>>
 
   fun Transaction.replaceComposerMedia(
@@ -227,7 +233,7 @@ private class ComposerDaoImpl(
         .selects {
           listOf(ComposerTable.id, ComposerTable.composer, songCountColumn, durationColumn)
         }
-        .where { filter.whereCondition() }
+        .where { (MediaTable.mediaType eq MediaType.Audio.id).filter(filter) }
         .groupBy { ComposerTable.composer }
         .orderByAsc { ComposerTable.composerSort }
         .limit(limit.value)
@@ -236,8 +242,8 @@ private class ComposerDaoImpl(
     }
   }
 
-  private fun Filter.whereCondition() = if (isBlank) null else
-    ComposerTable.composer.likeEscaped(value)
+  private fun Op<Boolean>.filter(filter: Filter) = if (filter.isBlank) this else
+    this and ComposerTable.composer.like(filter.value).escape(SqliteLike.ESC_CHAR)
 
   private val Cursor.asComposerDescription: ComposerDescription
     get() = ComposerDescription(
@@ -310,12 +316,12 @@ private class ComposerDaoImpl(
 
   override suspend fun getComposerSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> = runSuspendCatching {
     db.query {
       ComposerTable
         .select { composer }
-        .where { textSearch.makeWhereOp(composer, partial) }
+        .where { searchType.makeWhereOp(composer, partial) }
         .sequence { it[composer] }
         .toList()
     }

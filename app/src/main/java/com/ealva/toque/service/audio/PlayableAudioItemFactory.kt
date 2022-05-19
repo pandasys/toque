@@ -20,9 +20,9 @@ import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
-import com.ealva.toque.common.asMillis
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.persist.HasId
+import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.service.player.AvPlayer
 import com.ealva.toque.service.player.WakeLockFactory
@@ -50,7 +50,7 @@ interface PlayableAudioItemFactory {
    * data structure to support that. We'll use a map with ID as key and entry will be a list.
    * Removing from the end of the list won't require any copying
    */
-  suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
+  suspend fun <T : HasId<MediaId>> makeShuffledQueue(upNextQueue: List<T>): MutableList<T>
 
   suspend fun makeNewQueueItems(
     idList: LongCollection,
@@ -130,8 +130,9 @@ private class PlayableAudioItemFactoryImpl(
     .onFailure { cause -> LOG.e(cause) { it("Failed to get UpNextQueue data.") } }
     .getOrElse { mutableListOf() }
 
-  override suspend fun <T : HasId> makeShuffledQueue(upNextQueue: List<T>): MutableList<T> =
-    audioMediaDao.makeShuffledQueue(upNextQueue)
+  override suspend fun <T : HasId<MediaId>> makeShuffledQueue(
+    upNextQueue: List<T>
+  ): MutableList<T> = audioMediaDao.makeShuffledQueue(upNextQueue)
 
   override suspend fun makeNewQueueItems(
     idList: LongCollection,

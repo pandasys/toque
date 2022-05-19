@@ -17,19 +17,11 @@
 package com.ealva.toque.service.audio
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.common.AllowDuplicates
+import com.ealva.toque.common.Duplicates
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.Title
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.service.audio.AddAt
-import com.ealva.toque.service.audio.ListShuffler
-import com.ealva.toque.service.audio.NullPlayableAudioItem
-import com.ealva.toque.service.audio.PlayableAudioItem
-import com.ealva.toque.service.audio.addNewItems
-import com.ealva.toque.service.audio.index
-import com.ealva.toque.service.audio.queue
-import com.ealva.toque.test.service.audio.PlayableAudioItemFake
 import com.nhaarman.expect.expect
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongSet
@@ -70,7 +62,7 @@ class LocalAudioQueueTest {
         STARTING_QUEUE,
         NEW_QUEUE_ITEMS,
         0,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AfterCurrent,
         shuffleMode,
         expectedInstanceIdList = listOf(1, 5, 6, 2, 3, 4)
@@ -85,7 +77,7 @@ class LocalAudioQueueTest {
         STARTING_QUEUE,
         NEW_QUEUE_ITEMS,
         1,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AfterCurrent,
         shuffleMode,
         expectedInstanceIdList = listOf(1, 2, 5, 6, 3, 4)
@@ -100,7 +92,7 @@ class LocalAudioQueueTest {
         STARTING_QUEUE,
         NEW_QUEUE_ITEMS,
         STARTING_QUEUE.indices.last,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AtEnd,
         shuffleMode,
         listOf(1, 2, 3, 4, 5, 6)
@@ -115,7 +107,7 @@ class LocalAudioQueueTest {
         STARTING_QUEUE,
         NEW_QUEUE_ITEMS,
         0,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AtEnd,
         shuffleMode,
         listOf(1, 2, 3, 4, 5, 6)
@@ -130,7 +122,7 @@ class LocalAudioQueueTest {
         emptyList(),
         NEW_QUEUE_ITEMS,
         -1,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AfterCurrent,
         shuffleMode,
         expectedInstanceIdList = listOf(5, 6),
@@ -146,7 +138,7 @@ class LocalAudioQueueTest {
         emptyList(),
         NEW_QUEUE_ITEMS,
         -1,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AtEnd,
         shuffleMode,
         listOf(5, 6),
@@ -162,7 +154,7 @@ class LocalAudioQueueTest {
         STARTING_QUEUE,
         emptyList(),
         0,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AtEnd,
         shuffleMode,
         listOf(1, 2, 3, 4),
@@ -172,7 +164,7 @@ class LocalAudioQueueTest {
         STARTING_QUEUE,
         emptyList(),
         0,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AfterCurrent,
         shuffleMode,
         listOf(1, 2, 3, 4),
@@ -182,7 +174,7 @@ class LocalAudioQueueTest {
         emptyList(),
         emptyList(),
         -1,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AfterCurrent,
         shuffleMode,
         emptyList(),
@@ -192,7 +184,7 @@ class LocalAudioQueueTest {
         emptyList(),
         emptyList(),
         -1,
-        AllowDuplicates(false),
+        Duplicates(false),
         AddAt.AtEnd,
         shuffleMode,
         emptyList(),
@@ -212,7 +204,7 @@ class LocalAudioQueueTest {
     startingQueue: List<PlayableAudioItem>,
     newQueueItems: List<PlayableAudioItem>,
     currentIndex: Int,
-    allowDuplicates: AllowDuplicates,
+    duplicates: Duplicates,
     addAt: AddAt,
     shuffleMode: ShuffleMode,
     expectedInstanceIdList: List<Long>,
@@ -224,7 +216,7 @@ class LocalAudioQueueTest {
       currentIndex,
       if (currentIndex < 0) NullPlayableAudioItem else startingQueue[currentIndex],
       newQueueItems.idSet,
-      allowDuplicates,
+      duplicates,
       addAt,
       shuffleMode.shuffleMedia,
       shufflerFake

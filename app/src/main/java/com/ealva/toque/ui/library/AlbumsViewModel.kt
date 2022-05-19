@@ -16,25 +16,11 @@
 
 package com.ealva.toque.ui.library
 
-import android.net.Uri
-import com.ealva.ealvabrainz.common.AlbumTitle
-import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.toque.persist.AlbumId
+import com.ealva.toque.ui.library.data.AlbumInfo
 import kotlinx.coroutines.flow.StateFlow
-import javax.annotation.concurrent.Immutable
-import kotlin.time.Duration
 
 interface AlbumsViewModel : ActionsViewModel {
-  @Immutable
-  data class AlbumInfo(
-    val id: AlbumId,
-    val title: AlbumTitle,
-    val artist: ArtistName,
-    val year: Int,
-    val artwork: Uri,
-    val songCount: Int,
-    val duration: Duration
-  )
 
   val albumFlow: StateFlow<List<AlbumInfo>>
   val selectedItems: SelectedItemsFlow<AlbumId>

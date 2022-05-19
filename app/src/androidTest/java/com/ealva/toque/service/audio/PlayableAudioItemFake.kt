@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Eric A. Snell
+ * Copyright 2022 Eric A. Snell
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.test.service.audio
+package com.ealva.toque.service.audio
 
 import android.net.Uri
 import com.ealva.ealvabrainz.common.AlbumTitle
@@ -28,10 +28,6 @@ import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asMediaId
-import com.ealva.toque.service.audio.NullPlayableAudioItem
-import com.ealva.toque.service.audio.PlayableAudioItem
-import com.ealva.toque.service.audio.PlayableItemEvent
-import com.ealva.toque.service.audio.PlayerTransition
 import com.ealva.toque.service.queue.MayFade
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.session.common.Metadata

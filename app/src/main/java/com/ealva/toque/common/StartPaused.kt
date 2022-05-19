@@ -20,5 +20,6 @@ package com.ealva.toque.common
 
 @JvmInline
 value class StartPaused(override val value: Boolean) : BooleanValue {
-  inline operator fun invoke(): Boolean = value
+  inline val paused: Boolean
+    get() = value
 }

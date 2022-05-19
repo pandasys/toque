@@ -34,8 +34,8 @@ import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectAlbumArtScreen
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.cancelFlingOnBack
-import com.ealva.toque.ui.library.AlbumsViewModel.AlbumInfo
-import com.ealva.toque.ui.nav.back
+import com.ealva.toque.ui.library.data.AlbumInfo
+import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToRootScreen
 import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
@@ -164,7 +164,7 @@ abstract class BaseAlbumsViewModel(
 
   override fun goBack() {
     selectedItems.inSelectionModeThenTurnOff()
-    backstack.back()
+    backstack.backIfAllowed()
   }
 
   override fun onBackEvent(): Boolean = selectedItems
@@ -189,12 +189,11 @@ abstract class BaseAlbumsViewModel(
   private fun getAlbumKeys() = albumFlow.value.mapTo(mutableSetOf()) { it.id }
   override fun clearSelection() = selectedItems.clearSelection()
 
-  protected abstract suspend fun makeCategoryMediaList(
-    albumList: List<AlbumInfo>
-  ): Result<CategoryMediaList, Throwable>
+  protected abstract suspend fun List<AlbumInfo>.makeCategoryMediaList():
+    Result<CategoryMediaList, Throwable>
 
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> =
-    makeCategoryMediaList(getSelectedAlbums())
+    getSelectedAlbums().makeCategoryMediaList()
 
   private fun selectModeOff() = selectedItems.turnOffSelectionMode()
 

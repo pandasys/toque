@@ -91,7 +91,19 @@ val ShuffleMode.drawable: Int
   }
 
 @JvmInline
-value class ShuffleMedia(val value: Boolean)
+value class ShuffleMedia(val value: Boolean) {
+  inline val shuffle: Boolean
+    get() = value
+
+  inline val doNotShuffle: Boolean
+    get() = !value
+}
 
 @JvmInline
-value class ShuffleLists(val value: Boolean)
+value class ShuffleLists(val value: Boolean) {
+  inline val shuffle: Boolean
+    get() = value
+
+  inline val doNotShuffle: Boolean
+    get() = !value
+}

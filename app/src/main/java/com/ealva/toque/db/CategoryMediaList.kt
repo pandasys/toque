@@ -60,6 +60,10 @@ data class CategoryMediaList(val idList: MediaIdList, val token: CategoryToken) 
   fun maybeShuffle(shuffleMode: ShuffleMode): CategoryMediaList =
     if (shuffleMode.shuffleMedia.value) shuffled() else this
 
+  /** Returns the list with all duplicates removed */
+  @CheckReturnValue
+  fun removeDuplicates(): CategoryMediaList = copy(idList = idList.removeDuplicates())
+
   inline val list: LongList get() = idList.value
   inline val size: Int get() = idList.size
   inline val isEmpty: Boolean get() = idList.isEmpty()

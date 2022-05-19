@@ -24,7 +24,7 @@ import com.ealva.toque.db.ComposerDao
 import com.ealva.toque.db.ComposerDaoEvent
 import com.ealva.toque.db.ComposerDescription
 import com.ealva.toque.db.DaoResult
-import com.ealva.toque.db.TextSearch
+import com.ealva.toque.db.TextSearchType
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.MediaFileTagInfo
@@ -90,7 +90,7 @@ class ComposerDaoSpy : ComposerDao {
 
   override suspend fun getComposerSuggestions(
     partial: String,
-    textSearch: TextSearch
+    searchType: TextSearchType
   ): DaoResult<List<String>> {
     TODO("Not yet implemented")
   }

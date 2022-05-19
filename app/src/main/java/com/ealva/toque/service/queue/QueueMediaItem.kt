@@ -18,13 +18,11 @@ package com.ealva.toque.service.queue
 
 import com.ealva.toque.persist.HasId
 import com.ealva.toque.persist.InstanceId
-import com.ealva.toque.persist.PersistentId
+import com.ealva.toque.persist.MediaId
 
-interface QueueMediaItem : HasId
+interface QueueMediaItem : HasId<MediaId>
 
 object NullQueueMediaItem : QueueMediaItem {
-  override val id = object : PersistentId {
-    override val value: Long = PersistentId.ID_INVALID
-  }
+  override val id = MediaId.INVALID
   override val instanceId: InstanceId = InstanceId(id.value)
 }

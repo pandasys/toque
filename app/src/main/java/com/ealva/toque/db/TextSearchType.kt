@@ -23,7 +23,7 @@ import com.ealva.welite.db.expr.SqlTypeExpression
 import com.ealva.welite.db.expr.eq
 import com.ealva.welite.db.expr.neq
 
-enum class TextSearch {
+enum class TextSearchType {
   Is {
     override fun <T : String?> makeWhereOp(
       column: SqlTypeExpression<T>,
@@ -67,6 +67,6 @@ enum class TextSearch {
   ): Op<Boolean>
 }
 
-interface HasTextSearch {
-  val textSearch: TextSearch
+interface HasTextSearchType {
+  val searchType: TextSearchType
 }
