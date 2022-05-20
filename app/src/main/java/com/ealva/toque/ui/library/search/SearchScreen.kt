@@ -91,7 +91,7 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
     val appPrefs: AppPrefsSingleton = get(AppPrefs.QUALIFIER)
     with(serviceBinder) {
       add(
-        SearchModel(
+        SearchViewModel(
           audioMediaDao = get(),
           searchDao = get(),
           localAudioQueue = lookup(),
@@ -113,7 +113,7 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
       keyboardController?.show()
     }
 
-    val viewModel = rememberService<SearchModel>()
+    val viewModel = rememberService<SearchViewModel>()
     val state = viewModel.stateFlow.collectAsState()
 //    val scrollConnection = remember { HeightResizeScrollConnection() }
 
@@ -164,7 +164,7 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SearchItemList(list: Collection<SearchModel.SearchResult<*, *>>) {
+fun SearchItemList(list: Collection<SearchViewModel.SearchResult<*, *>>) {
   val listState = rememberLazyListState()
   val config = LocalScreenConfig.current
 

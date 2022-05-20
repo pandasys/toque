@@ -39,9 +39,6 @@ typealias MutableSelectedItemsFlow<E> = MutableStateFlow<SelectedItems<E>>
  */
 @Immutable
 interface SelectedItems<E : Parcelable> : Parcelable {
-  /** Does this set contain any keys */
-  val hasSelection: Boolean
-
   /**
    * This class enters selection mode during construction, when the first [toggleSelection]
    * returns an instance containing a key. Since this class is immutable, the only way to exit
@@ -77,6 +74,12 @@ interface SelectedItems<E : Parcelable> : Parcelable {
   }
 }
 
+inline val SelectedItems<*>.hasSelection: Boolean
+  get() = selectedCount > 0
+
+inline val SelectedItems<*>.noSelection: Boolean
+  get() = !hasSelection
+
 /**
  * Given a sequence of type T and a function [getKey] which can produce a key of type E possibly
  * in [selectedItems], filter this matching only elements whose key appears in [selectedItems].
@@ -103,9 +106,6 @@ private class SelectedItemsImpl<E : Parcelable>(
   private val keySet: Set<E>,
   override val inSelectionMode: Boolean
 ) : SelectedItems<E> {
-  override val hasSelection: Boolean
-    get() = keySet.isNotEmpty()
-
   override fun turnOffSelectionMode(): SelectedItems<E> = SelectedItemsImpl(emptySet(), false)
 
   override fun toggleSelectionMode(): SelectedItems<E> =

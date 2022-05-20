@@ -60,7 +60,7 @@ import com.ealva.toque.ui.library.data.ComposerInfo
 import com.ealva.toque.ui.library.data.GenreInfo
 import com.ealva.toque.ui.library.data.PlaylistInfo
 import com.ealva.toque.ui.library.data.SongInfo
-import com.ealva.toque.ui.library.search.SearchModel.SearchResult
+import com.ealva.toque.ui.library.search.SearchViewModel.SearchResult
 import com.github.michaelbull.result.Ok
 import com.nhaarman.expect.expect
 import com.zhuinden.simplestack.Backstack
@@ -76,7 +76,7 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
-class SearchModelTest {
+class SearchViewModelTest {
   @OptIn(ExperimentalCoroutinesApi::class)
   @get:Rule
   var coroutineRule = CoroutineRule()
@@ -92,9 +92,11 @@ class SearchModelTest {
   private lateinit var genreDaoSpy: GenreDaoSpy
   private lateinit var composerDaoSpy: ComposerDaoSpy
   private lateinit var playlistDaoSpy: PlaylistDaoSpy
+  private lateinit var backstack: Backstack
 
   @Before
   fun setup() {
+    backstack = Backstack()
     searchCategorySpy = SearchCategorySpy()
     audioMediaDaoSpy = AudioMediaDaoSpy()
     albumDaoSpy = AlbumDaoSpy().apply {
@@ -187,7 +189,7 @@ class SearchModelTest {
   fun testSongsSearchCategory() = runTest {
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<SongInfo, MediaId>(LibraryCategories.AllSongs)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
 
       expect(result).toBeInstanceOf<SearchResult<SongInfo, MediaId>>()
       expect(result.category.libraryCategory).toBe(LibraryCategories.AllSongs)
@@ -217,7 +219,7 @@ class SearchModelTest {
     audioMediaDaoSpy.albumDao = albumDaoSpy
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<AlbumInfo, AlbumId>(LibraryCategories.Albums)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
       expect(result.category.libraryCategory).toBe(LibraryCategories.Albums)
       expect(result.isNotEmpty()).toBe(true)
       expect(albumDaoSpy._getAllAlbumsCalled).toBeGreaterThan(0)
@@ -249,7 +251,7 @@ class SearchModelTest {
 
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<ArtistInfo, ArtistId>(LibraryCategories.Artists)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
       expect(result.category.libraryCategory).toBe(LibraryCategories.Artists)
       expect(result.isNotEmpty()).toBe(true)
       expect(artistDaoSpy._getSongArtistsCount).toBeGreaterThan(0)
@@ -281,7 +283,7 @@ class SearchModelTest {
     audioMediaDaoSpy.albumDao = albumDaoSpy
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<ArtistInfo, ArtistId>(LibraryCategories.AlbumArtists)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
       expect(result.category.libraryCategory).toBe(LibraryCategories.AlbumArtists)
       expect(result.isNotEmpty()).toBe(true)
       expect(artistDaoSpy._getAlbumArtistsCount).toBeGreaterThan(0)
@@ -310,7 +312,7 @@ class SearchModelTest {
     audioMediaDaoSpy.albumDao = albumDaoSpy
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<GenreInfo, GenreId>(LibraryCategories.Genres)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
       expect(result.category.libraryCategory).toBe(LibraryCategories.Genres)
       expect(result.isNotEmpty()).toBe(true)
       expect(genreDaoSpy._getAllGenresCalled).toBeGreaterThan(0)
@@ -339,7 +341,7 @@ class SearchModelTest {
     audioMediaDaoSpy.albumDao = albumDaoSpy
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<ComposerInfo, ComposerId>(LibraryCategories.Composers)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
       expect(result.category.libraryCategory).toBe(LibraryCategories.Composers)
       expect(result.isNotEmpty()).toBe(true)
       expect(composerDaoSpy._getAllComposersCalled).toBeGreaterThan(0)
@@ -369,7 +371,7 @@ class SearchModelTest {
     audioMediaDaoSpy.albumDao = albumDaoSpy
     makeCloseableModel(audioMediaDaoSpy, searchDaoSpy).use { model ->
       val result = model.searchCategoryFor<PlaylistInfo, PlaylistId>(LibraryCategories.Playlists)
-        .find(audioMediaDaoSpy, testFilter, testLimit)
+        .find(testFilter, testLimit, audioMediaDaoSpy, backstack, {}, {})
       expect(result.category.libraryCategory).toBe(LibraryCategories.Playlists)
       expect(result.isNotEmpty()).toBe(true)
       expect(playlistDaoSpy._getAllPlaylistsCalled).toBeGreaterThan(0)
@@ -382,9 +384,9 @@ class SearchModelTest {
   private fun makeCloseableModel(
     audioMediaDao: AudioMediaDao,
     searchDao: SearchDao,
-  ): CloseableSearchModel =
-    CloseableSearchModel(
-      SearchModel(
+  ): CloseableSearchViewModel =
+    CloseableSearchViewModel(
+      SearchViewModel(
         audioMediaDao = audioMediaDao,
         searchDao = searchDao,
         localAudioQueue = LocalAudioQueueViewModelSpy(),
@@ -397,9 +399,9 @@ class SearchModelTest {
 
 
 @Suppress("UNCHECKED_CAST", "PropertyName")
-private class CloseableSearchModel(
-  realModel: SearchModel
-) : SearchModel by realModel, AutoCloseable {
+private class CloseableSearchViewModel(
+  realModel: SearchViewModel
+) : SearchViewModel by realModel, AutoCloseable {
   private var closed = false
   private val registered = (realModel as ScopedServices.Registered).apply { onServiceRegistered() }
 

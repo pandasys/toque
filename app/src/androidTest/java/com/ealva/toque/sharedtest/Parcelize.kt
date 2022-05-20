@@ -18,7 +18,6 @@ package com.ealva.toque.sharedtest
 
 import android.os.Parcel
 import android.os.Parcelable
-import com.ealva.toque.ui.library.search.SearchModel
 import com.nhaarman.expect.expect
 
 /**

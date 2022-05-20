@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
 import com.ealva.toque.common.Duplicates
 import com.ealva.toque.common.Filter
 import com.ealva.toque.common.Limit
@@ -32,24 +33,30 @@ import com.ealva.toque.common.fetch
 import com.ealva.toque.db.AudioMediaDao
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
-import com.ealva.toque.log._e
+import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.persist.ComposerId
 import com.ealva.toque.persist.GenreId
 import com.ealva.toque.persist.HasPersistentId
 import com.ealva.toque.persist.MediaId
+import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.persist.PersistentId
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.ui.library.AlbumItem
+import com.ealva.toque.ui.library.AlbumSongsScreen
 import com.ealva.toque.ui.library.ArtistItem
+import com.ealva.toque.ui.library.ArtistSongsScreen
 import com.ealva.toque.ui.library.ArtistType
 import com.ealva.toque.ui.library.ComposerItem
+import com.ealva.toque.ui.library.ComposerSongsScreen
 import com.ealva.toque.ui.library.GenreItem
+import com.ealva.toque.ui.library.GenreSongsScreen
 import com.ealva.toque.ui.library.LibraryCategories
 import com.ealva.toque.ui.library.ListItemAlbumArtwork
 import com.ealva.toque.ui.library.PlaylistItem
+import com.ealva.toque.ui.library.PlaylistSongsScreen
 import com.ealva.toque.ui.library.SelectedItems
 import com.ealva.toque.ui.library.SongListItem
 import com.ealva.toque.ui.library.data.AlbumInfo
@@ -59,14 +66,19 @@ import com.ealva.toque.ui.library.data.GenreInfo
 import com.ealva.toque.ui.library.data.PlaylistInfo
 import com.ealva.toque.ui.library.data.SongInfo
 import com.ealva.toque.ui.library.data.makeCategoryMediaList
+import com.ealva.toque.ui.library.formatSongsInfo
+import com.ealva.toque.ui.library.hasSelection
 import com.ealva.toque.ui.library.mapToAlbumInfo
 import com.ealva.toque.ui.library.mapToArtistInfo
 import com.ealva.toque.ui.library.mapToComposerInfo
 import com.ealva.toque.ui.library.mapToGenreInfo
 import com.ealva.toque.ui.library.mapToPlaylistInfo
 import com.ealva.toque.ui.library.mapToSongInfo
+import com.ealva.toque.ui.library.noSelection
+import com.ealva.toque.ui.nav.goToScreen
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.coroutines.runSuspendCatching
+import com.zhuinden.simplestack.Backstack
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import kotlinx.parcelize.Parcelize
 
@@ -74,40 +86,43 @@ import kotlinx.parcelize.Parcelize
 private val LOG by lazyLogger("SearchCategories")
 
 @Parcelize
-object AlbumsSearchCategory : SearchModel.SearchCategory<AlbumInfo, AlbumId> {
+object AlbumsSearchCategory : SearchViewModel.SearchCategory<AlbumInfo, AlbumId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.Albums
 
   @OptIn(ExperimentalFoundationApi::class)
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<AlbumInfo, AlbumId>) -> Unit
-  ): SearchModel.SearchResult<AlbumInfo, AlbumId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<AlbumInfo, AlbumId>) -> Unit
+  ): SearchViewModel.SearchResult<AlbumInfo, AlbumId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
       .albumDao
       .getAllAlbums(filter, limit)
       .mapToAlbumInfo(),
-    item = { albumInfo, selectedItems: SelectedItems<AlbumId>, searchResult ->
+    item = { album, selected: SelectedItems<AlbumId>, result ->
       AlbumItem(
-        albumInfo = albumInfo,
-        isSelected = selectedItems.isSelected(albumInfo.id),
+        albumInfo = album,
+        isSelected = selected.isSelected(album.id),
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(albumInfo.id))
+            selected.toggleElseGoTo(album, result, onChanged, backstack) { item ->
+              AlbumSongsScreen(
+                item.id,
+                item.title,
+                item.artwork,
+                item.artist,
+                formatSongsInfo(item.songCount, item.duration, item.year),
+                fetch(R.string.Search)
               )
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(albumInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(album.id))) }
         ),
       )
     }
@@ -121,7 +136,7 @@ object AlbumsSearchCategory : SearchModel.SearchCategory<AlbumInfo, AlbumId> {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Parcelize
-object ArtistsSearchCategory : SearchModel.SearchCategory<ArtistInfo, ArtistId> {
+object ArtistsSearchCategory : SearchViewModel.SearchCategory<ArtistInfo, ArtistId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.Artists
 
@@ -129,35 +144,37 @@ object ArtistsSearchCategory : SearchModel.SearchCategory<ArtistInfo, ArtistId> 
     get() = fetch(libraryCategory.title)
 
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<ArtistInfo, ArtistId>) -> Unit
-  ): SearchModel.SearchResult<ArtistInfo, ArtistId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<ArtistInfo, ArtistId>) -> Unit
+  ): SearchViewModel.SearchResult<ArtistInfo, ArtistId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
       .artistDao
       .getSongArtists(filter, limit)
       .mapToArtistInfo(ArtistType.AlbumArtist, audioMediaDao),
-    item = { artistInfo, selectedItems: SelectedItems<ArtistId>, searchResult ->
+    item = { artist, selected: SelectedItems<ArtistId>, result ->
       ArtistItem(
-        artistInfo = artistInfo,
+        artistInfo = artist,
         artistType = ArtistType.SongArtist,
-        isSelected = selectedItems.isSelected(artistInfo.id),
+        isSelected = selected.isSelected(artist.id),
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(artistInfo.id))
+            selected.toggleElseGoTo(artist, result, onChanged, backstack) { item ->
+              ArtistSongsScreen(
+                artistId = item.id,
+                artistType = ArtistType.SongArtist,
+                artistName = item.name,
+                artwork = item.artwork,
+                backTo = fetch(R.string.Search)
               )
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(artistInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(artist.id))) }
         ),
       )
     }
@@ -171,16 +188,18 @@ object ArtistsSearchCategory : SearchModel.SearchCategory<ArtistInfo, ArtistId> 
 
 @OptIn(ExperimentalFoundationApi::class)
 @Parcelize
-object AlbumArtistsSearchCategory : SearchModel.SearchCategory<ArtistInfo, ArtistId> {
+object AlbumArtistsSearchCategory : SearchViewModel.SearchCategory<ArtistInfo, ArtistId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.AlbumArtists
 
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<ArtistInfo, ArtistId>) -> Unit
-  ): SearchModel.SearchResult<ArtistInfo, ArtistId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<ArtistInfo, ArtistId>) -> Unit
+  ): SearchViewModel.SearchResult<ArtistInfo, ArtistId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
@@ -188,24 +207,24 @@ object AlbumArtistsSearchCategory : SearchModel.SearchCategory<ArtistInfo, Artis
       .getAlbumArtists(filter, limit)
       .mapToArtistInfo(ArtistType.AlbumArtist, audioMediaDao),
     key = { it.id.value.toString() }, // differentiate from Artists SearchCategory
-    item = { artistInfo, selectedItems: SelectedItems<ArtistId>, searchResult ->
+    item = { artist, selected: SelectedItems<ArtistId>, result ->
       ArtistItem(
-        artistInfo = artistInfo,
+        artistInfo = artist,
         artistType = ArtistType.AlbumArtist,
-        isSelected = selectedItems.isSelected(artistInfo.id),
+        isSelected = selected.isSelected(artist.id),
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(artistInfo.id))
+            selected.toggleElseGoTo(artist, result, onChanged, backstack) { item ->
+              ArtistSongsScreen(
+                artistId = item.id,
+                artistType = ArtistType.AlbumArtist,
+                artistName = item.name,
+                artwork = item.artwork,
+                backTo = fetch(R.string.Search)
               )
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(artistInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(artist.id))) }
         ),
       )
     }
@@ -219,39 +238,40 @@ object AlbumArtistsSearchCategory : SearchModel.SearchCategory<ArtistInfo, Artis
 
 @OptIn(ExperimentalFoundationApi::class)
 @Parcelize
-object GenresSearchCategory : SearchModel.SearchCategory<GenreInfo, GenreId> {
+object GenresSearchCategory : SearchViewModel.SearchCategory<GenreInfo, GenreId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.Genres
 
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<GenreInfo, GenreId>) -> Unit
-  ): SearchModel.SearchResult<GenreInfo, GenreId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<GenreInfo, GenreId>) -> Unit
+  ): SearchViewModel.SearchResult<GenreInfo, GenreId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
       .genreDao
       .getAllGenres(filter, limit)
       .mapToGenreInfo(audioMediaDao),
-    item = { genreInfo, selectedItems: SelectedItems<GenreId>, searchResult ->
+    item = { genre, selected: SelectedItems<GenreId>, result ->
       GenreItem(
-        genreInfo = genreInfo,
-        isSelected = selectedItems.isSelected(genreInfo.id),
+        genreInfo = genre,
+        isSelected = selected.isSelected(genre.id),
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(genreInfo.id))
+            selected.toggleElseGoTo(genre, result, onChanged, backstack) { item ->
+              GenreSongsScreen(
+                genreId = item.id,
+                genreName = item.name,
+                artwork = item.artwork,
+                backTo = fetch(R.string.Search)
               )
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(genreInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(genre.id))) }
         ),
       )
     }
@@ -265,39 +285,40 @@ object GenresSearchCategory : SearchModel.SearchCategory<GenreInfo, GenreId> {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Parcelize
-object ComposersSearchCategory : SearchModel.SearchCategory<ComposerInfo, ComposerId> {
+object ComposersSearchCategory : SearchViewModel.SearchCategory<ComposerInfo, ComposerId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.Composers
 
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<ComposerInfo, ComposerId>) -> Unit
-  ): SearchModel.SearchResult<ComposerInfo, ComposerId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<ComposerInfo, ComposerId>) -> Unit
+  ): SearchViewModel.SearchResult<ComposerInfo, ComposerId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
       .composerDao
       .getAllComposers(filter, limit)
       .mapToComposerInfo(audioMediaDao),
-    item = { composerInfo, selectedItems: SelectedItems<ComposerId>, searchResult ->
+    item = { composer, selected: SelectedItems<ComposerId>, result ->
       ComposerItem(
-        composerInfo = composerInfo,
-        isSelected = selectedItems.isSelected(composerInfo.id),
+        composerInfo = composer,
+        isSelected = selected.isSelected(composer.id),
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(composerInfo.id))
+            selected.toggleElseGoTo(composer, result, onChanged, backstack) { item ->
+              ComposerSongsScreen(
+                composerId = item.id,
+                composerName = item.name,
+                artwork = item.artwork,
+                backTo = fetch(R.string.Search)
               )
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(composerInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(composer.id))) }
         ),
       )
     }
@@ -311,39 +332,41 @@ object ComposersSearchCategory : SearchModel.SearchCategory<ComposerInfo, Compos
 
 @OptIn(ExperimentalFoundationApi::class)
 @Parcelize
-object PlaylistsSearchCategory : SearchModel.SearchCategory<PlaylistInfo, PlaylistId> {
+object PlaylistsSearchCategory : SearchViewModel.SearchCategory<PlaylistInfo, PlaylistId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.Playlists
 
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<PlaylistInfo, PlaylistId>) -> Unit
-  ): SearchModel.SearchResult<PlaylistInfo, PlaylistId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<PlaylistInfo, PlaylistId>) -> Unit
+  ): SearchViewModel.SearchResult<PlaylistInfo, PlaylistId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
       .playlistDao
       .getAllPlaylists(filter, limit)
       .mapToPlaylistInfo(audioMediaDao),
-    item = { playlistInfo, selectedItems: SelectedItems<PlaylistId>, searchResult ->
+    item = { playlist, selected: SelectedItems<PlaylistId>, result ->
       PlaylistItem(
-        playlistInfo = playlistInfo,
-        isSelected = selectedItems.isSelected(playlistInfo.id),
+        playlistInfo = playlist,
+        isSelected = selected.isSelected(playlist.id),
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(playlistInfo.id))
+            selected.toggleElseGoTo(playlist, result, onChanged, backstack) { item ->
+              PlaylistSongsScreen(
+                playlistId = item.id,
+                playListType = item.type,
+                playlistName = item.name,
+                artwork = item.artwork,
+                backTo = fetch(R.string.Search)
               )
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(playlistInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(playlist.id))) }
         ),
         editSmartPlaylist = {},
         deletePlaylist = {}
@@ -362,17 +385,19 @@ object PlaylistsSearchCategory : SearchModel.SearchCategory<PlaylistInfo, Playli
 }
 
 @Parcelize
-object SongsSearchCategory : SearchModel.SearchCategory<SongInfo, MediaId> {
+object SongsSearchCategory : SearchViewModel.SearchCategory<SongInfo, MediaId> {
   override val libraryCategory: LibraryCategories.LibraryCategory
     get() = LibraryCategories.AllSongs
 
   @OptIn(ExperimentalFoundationApi::class)
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchModel.SearchResult<SongInfo, MediaId>) -> Unit
-  ): SearchModel.SearchResult<SongInfo, MediaId> = SearchResultImpl(
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchViewModel.SearchResult<SongInfo, MediaId>) -> Unit
+  ): SearchViewModel.SearchResult<SongInfo, MediaId> = SearchResultImpl(
     audioMediaDao = audioMediaDao,
     category = this,
     itemList = if (filter.isBlank) emptyList() else audioMediaDao
@@ -380,24 +405,20 @@ object SongsSearchCategory : SearchModel.SearchCategory<SongInfo, MediaId> {
       .mapToSongInfo(
         onFailure = { cause -> LOG.e(cause) { it("Error getting songs %s %s", filter, limit) } }
       ),
-    item = { songInfo, selectedItems: SelectedItems<MediaId>, searchResult ->
+    item = { song, selected: SelectedItems<MediaId>, result ->
       SongListItem(
-        songInfo = songInfo,
-        highlightBackground = selectedItems.isSelected(songInfo.id),
-        icon = { ListItemAlbumArtwork(artwork = songInfo.artwork) },
+        songInfo = song,
+        highlightBackground = selected.isSelected(song.id),
+        icon = { ListItemAlbumArtwork(artwork = song.artwork) },
         modifier = Modifier.combinedClickable(
           onClick = {
-            if (selectedItems.inSelectionMode) {
-              resultChanged(
-                searchResult.copy(selectedItems = selectedItems.toggleSelection(songInfo.id))
-              )
+            if (selected.inSelectionMode) {
+              onChanged(result.copy(selected = selected.toggleSelection(song.id)))
+            } else {
+              playMedia(CategoryMediaList(MediaIdList(song.id), CategoryToken.All))
             }
           },
-          onLongClick = {
-            resultChanged(
-              searchResult.copy(selectedItems = selectedItems.toggleSelection(songInfo.id))
-            )
-          }
+          onLongClick = { onChanged(result.copy(selected = selected.toggleSelection(song.id))) }
         ),
       )
     }
@@ -417,28 +438,58 @@ object SongsSearchCategory : SearchModel.SearchCategory<SongInfo, MediaId> {
   }
 }
 
-/**
- * Would be nice to be able to have this class as package private so we could move these classes
- * into separate files
+/** If in selection mode, toggle the selected state of [item] and report the changed [result] via
+ * [onChanged]. Otherwise, navigate via [backstack] to the screen created by [makeScreen]
  */
+private inline fun <T : HasPersistentId<K>, K : PersistentId<K>> SelectedItems<K>.toggleElseGoTo(
+  item: T,
+  result: SearchResultImpl<T, K>,
+  onChanged: (SearchViewModel.SearchResult<T, K>) -> Unit,
+  backstack: Backstack,
+  makeScreen: (T) -> ComposeKey
+) = if (inSelectionMode) onChanged(result.copy(selected = toggleSelection(item.id.actual))) else
+  backstack.goToScreen(makeScreen(item))
+
 @Immutable
 private data class SearchResultImpl<T : HasPersistentId<K>, K : PersistentId<K>>(
   private val audioMediaDao: AudioMediaDao,
-  override val category: SearchModel.SearchCategory<T, K>,
+  override val category: SearchViewModel.SearchCategory<T, K>,
   private val itemList: List<T>,
   private val key: (T) -> Any = { it.id },
   private val item: @Composable LazyListScope.(T, SelectedItems<K>, SearchResultImpl<T, K>) -> Unit,
-  private val selectedItems: SelectedItems<K> = SelectedItems()
-) : SearchModel.SearchResult<T, K> {
-  override val itemCount: Int
-    get() = itemList.size
+  private val selected: SelectedItems<K> = SelectedItems()
+) : SearchViewModel.SearchResult<T, K> {
+  override val itemCount: Int get() = itemList.size
+  override val inSelectionMode: Boolean get() = selected.inSelectionMode
+  override val hasSelection: Boolean get() = selected.hasSelection
+  override val selectedCount: Int get() = selected.selectedCount
 
   override fun isNotEmpty(): Boolean = itemList.isNotEmpty()
+  override fun isSelected(item: T): Boolean = selected.isSelected(item.id.actual)
+  override fun selectAll() = copy(selected = SelectedItems(getAllKeys()))
+  override fun clearSelection() = copy(selected = selected.clearSelection())
+
+  override fun setSelectionMode(mode: Boolean): SearchViewModel.SearchResult<T, K> =
+    if (selected.inSelectionMode == mode) this else
+      copy(selected = selected.toggleSelectionMode())
+
+  override suspend fun getMediaList(
+    selectedOnly: Boolean
+  ): Result<CategoryMediaList, Throwable> = category.makeCategoryMediaList(
+    list = if (selectedOnly) itemList.getSelected() else itemList,
+    audioMediaDao = audioMediaDao
+  )
+
   override fun items(lazyListScope: LazyListScope) {
     lazyListScope.items(itemList.size, key = { index -> key(itemList[index]) }) { index ->
-      lazyListScope.item(itemList[index], selectedItems, this@SearchResultImpl)
+      lazyListScope.item(itemList[index], selected, this@SearchResultImpl)
     }
   }
+
+  private fun List<T>.getSelected(): List<T> = if (selected.noSelection) emptyList() else
+    filter { item -> selected.isSelected(item.id.actual) }
+
+  private fun getAllKeys() = itemList.mapTo(mutableSetOf()) { it.id.actual }
 
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
@@ -446,7 +497,7 @@ private data class SearchResultImpl<T : HasPersistentId<K>, K : PersistentId<K>>
 
     if (category != other.category) return false
     if (itemList != other.itemList) return false
-    if (selectedItems != other.selectedItems) return false
+    if (selected != other.selected) return false
 
     return true
   }
@@ -454,46 +505,7 @@ private data class SearchResultImpl<T : HasPersistentId<K>, K : PersistentId<K>>
   override fun hashCode(): Int {
     var result = category.hashCode()
     result = 31 * result + itemList.hashCode()
-    result = 31 * result + selectedItems.hashCode()
+    result = 31 * result + selected.hashCode()
     return result
   }
-
-  override val inSelectionMode: Boolean
-    get() = selectedItems.inSelectionMode
-
-  override val hasSelection: Boolean
-    get() = selectedItems.hasSelection
-
-  override val selectedCount: Int
-    get() = selectedItems.selectedCount
-
-  override fun setSelectionMode(mode: Boolean): SearchModel.SearchResult<T, K> =
-    if (selectedItems.inSelectionMode == mode) this else
-      copy(selectedItems = selectedItems.toggleSelectionMode())
-
-  override fun isSelected(item: T): Boolean {
-    return selectedItems.isSelected(item.id.actual)
-  }
-
-  override suspend fun getMediaList(
-    onlySelectedItems: Boolean
-  ): Result<CategoryMediaList, Throwable> {
-    LOG._e { it("getMediaIdList onlySelected:%s", onlySelectedItems) }
-    val list = if (onlySelectedItems) {
-      itemList.filter { item -> selectedItems.isSelected(item.id.actual) }
-    } else itemList
-    LOG._e { it("list.size:%d", list.size) }
-    return category.makeCategoryMediaList(list, audioMediaDao)
-  }
-
-  private fun getAllKeys() = itemList.mapTo(mutableSetOf()) { it.id.actual }
-
-  override fun selectAll(): SearchModel.SearchResult<T, K> = copy(
-    selectedItems = SelectedItems(
-      getAllKeys()
-    )
-  )
-
-  override fun clearSelection(): SearchModel.SearchResult<T, K> =
-    copy(selectedItems = selectedItems.clearSelection())
 }

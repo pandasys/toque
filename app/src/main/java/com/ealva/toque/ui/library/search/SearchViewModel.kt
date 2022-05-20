@@ -41,8 +41,8 @@ import com.ealva.toque.ui.library.ActionsViewModel
 import com.ealva.toque.ui.library.LibraryCategories.LibraryCategory
 import com.ealva.toque.ui.library.LocalAudioQueueOps
 import com.ealva.toque.ui.library.data.SongInfo
-import com.ealva.toque.ui.library.search.SearchModel.SearchCategory
-import com.ealva.toque.ui.library.search.SearchModel.SearchResult
+import com.ealva.toque.ui.library.search.SearchViewModel.SearchCategory
+import com.ealva.toque.ui.library.search.SearchViewModel.SearchResult
 import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToRootScreen
 import com.github.michaelbull.result.Err
@@ -76,9 +76,9 @@ import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 
 @Suppress("unused")
-private val LOG by lazyLogger(SearchModel::class)
+private val LOG by lazyLogger(SearchViewModel::class)
 
-interface SearchModel : ActionsViewModel {
+interface SearchViewModel : ActionsViewModel {
 
   data class SearchState(
     val results: List<SearchResult<*, *>>,
@@ -114,6 +114,8 @@ interface SearchModel : ActionsViewModel {
 
   fun goBack()
 
+  fun playMedia(mediaList: CategoryMediaList)
+
   fun <T : HasPersistentId<K>, K : PersistentId<K>> searchCategoryFor(
     libraryCategory: LibraryCategory
   ): SearchCategory<T, K>
@@ -126,12 +128,12 @@ interface SearchModel : ActionsViewModel {
     val hasSelection: Boolean
     val selectedCount: Int
     fun isNotEmpty(): Boolean
-    fun items(lazyListScope: LazyListScope)
-    fun setSelectionMode(mode: Boolean): SearchResult<T, K>
     fun isSelected(item: T): Boolean
-    suspend fun getMediaList(onlySelectedItems: Boolean): Result<CategoryMediaList, Throwable>
     fun selectAll(): SearchResult<T, K>
     fun clearSelection(): SearchResult<T, K>
+    fun setSelectionMode(mode: Boolean): SearchResult<T, K>
+    suspend fun getMediaList(selectedOnly: Boolean): Result<CategoryMediaList, Throwable>
+    fun items(lazyListScope: LazyListScope)
   }
 
   @Immutable
@@ -141,10 +143,12 @@ interface SearchModel : ActionsViewModel {
       get() = fetch(libraryCategory.title)
 
     suspend fun find(
-      audioMediaDao: AudioMediaDao,
       filter: Filter,
       limit: Limit = Limit.NoLimit,
-      resultChanged: (SearchResult<T, K>) -> Unit = {}
+      audioMediaDao: AudioMediaDao,
+      backstack: Backstack,
+      playMedia: (CategoryMediaList) -> Unit,
+      onChanged: (SearchResult<T, K>) -> Unit
     ): SearchResult<T, K>
 
     suspend fun makeCategoryMediaList(
@@ -161,7 +165,7 @@ interface SearchModel : ActionsViewModel {
       goToNowPlaying: suspend () -> Boolean,
       backstack: Backstack,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
-    ): SearchModel = SearchModelImpl(
+    ): SearchViewModel = SearchViewModelImpl(
       audioMediaDao = audioMediaDao,
       searchDao = searchDao,
       localAudioQueue = localAudioQueue,
@@ -173,14 +177,14 @@ interface SearchModel : ActionsViewModel {
 }
 
 @Suppress("UNCHECKED_CAST")
-private class SearchModelImpl(
+private class SearchViewModelImpl(
   private val audioMediaDao: AudioMediaDao,
   searchDao: SearchDao,
   localAudioQueue: LocalAudioQueueViewModel,
   private val goToNowPlaying: suspend () -> Boolean,
   private val backstack: Backstack,
   dispatcher: CoroutineDispatcher
-) : SearchModel, ScopedServices.Registered, ScopedServices.HandlesBack,
+) : SearchViewModel, ScopedServices.Registered, ScopedServices.HandlesBack,
   Bundleable {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private val localQueueOps = LocalAudioQueueOps(localAudioQueue)
@@ -200,7 +204,7 @@ private class SearchModelImpl(
   private var didFirstSearch = false
 
   override val stateFlow = MutableStateFlow(
-    SearchModel.SearchState(
+    SearchViewModel.SearchState(
       results = emptyList(),
       query = TextFieldValue(text = ""),
       previousSearches = emptyList(),
@@ -272,6 +276,10 @@ private class SearchModelImpl(
 
   override fun goBack() {
     backstack.backIfAllowed()
+  }
+
+  override fun playMedia(mediaList: CategoryMediaList) {
+    scope.launch { localQueueOps.play({ Ok(mediaList) }, ::selectModeOffMaybeGoHome) }
   }
 
   override fun <T : HasPersistentId<K>, K : PersistentId<K>> searchCategoryFor(
@@ -349,7 +357,13 @@ private class SearchModelImpl(
     didFirstSearch = true
     searchJob = categories
       .asFlow()
-      .map { category -> category.find(audioMediaDao, filter, resultChanged = ::resultChanged) }
+      .map { category -> category.find(
+        filter = filter,
+        audioMediaDao = audioMediaDao,
+        backstack = backstack,
+        playMedia = ::playMedia,
+        onChanged = ::resultChanged,
+      ) }
       .onEach { result -> handleCategoryResult(result) }
       .launchIn(scope)
   }
@@ -466,10 +480,12 @@ class SearchCategorySpy : SearchCategory<SongInfo, MediaId> {
   var _findLimit: Limit? = null
 
   override suspend fun find(
-    audioMediaDao: AudioMediaDao,
     filter: Filter,
     limit: Limit,
-    resultChanged: (SearchResult<SongInfo, MediaId>) -> Unit
+    audioMediaDao: AudioMediaDao,
+    backstack: Backstack,
+    playMedia: (CategoryMediaList) -> Unit,
+    onChanged: (SearchResult<SongInfo, MediaId>) -> Unit
   ): SearchResult<SongInfo, MediaId> {
     _findCalled++
     _findAudioMediaDao = audioMediaDao
