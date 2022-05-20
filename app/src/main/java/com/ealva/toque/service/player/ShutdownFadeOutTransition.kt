@@ -18,6 +18,7 @@ package com.ealva.toque.service.player
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.Clock
 import kotlin.time.Duration
 
 /**
@@ -25,9 +26,10 @@ import kotlin.time.Duration
  */
 class ShutdownFadeOutTransition(
   fadeLength: Duration,
+  clock: Clock = Clock.System,
   /** The dispatcher only need be changed for test */
   dispatcher: CoroutineDispatcher = Dispatchers.Default
-) : FadeOutTransition(fadeLength, dispatcher) {
+) : FadeOutTransition(requestedDuration = fadeLength, clock = clock, dispatcher = dispatcher) {
   /**
    * Going to a shutdown state during a fade out, which means this is being used to
    * cross-fade, so we won't notify paused since we are already fading in another player. We

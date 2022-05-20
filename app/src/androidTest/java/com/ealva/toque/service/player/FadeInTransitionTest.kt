@@ -18,18 +18,12 @@ package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.player.FadeInTransition
-import com.ealva.toque.service.player.PauseFadeOutTransition
-import com.ealva.toque.service.player.PauseImmediateTransition
-import com.ealva.toque.service.player.PlayImmediateTransition
-import com.ealva.toque.service.player.ShutdownFadeOutTransition
-import com.ealva.toque.service.player.ShutdownImmediateTransition
-import com.ealva.toque.test.service.player.TransitionPlayerSpy
-import com.ealva.toque.test.shared.CoroutineRule
+import com.ealva.toque.sharedtest.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Instant
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -44,12 +38,15 @@ class FadeInTransitionTest {
 
   private lateinit var player: TransitionPlayerSpy
   private lateinit var transition: PlayerTransition
+  private lateinit var clockStub: ClockStub
 
   @Before
   fun init() {
+    clockStub = ClockStub(Instant.fromEpochMilliseconds(0), FadeInTransition.MIN_FADE_LENGTH, 20)
     player = TransitionPlayerSpy()
     transition = FadeInTransition(
       2000.toDuration(DurationUnit.MILLISECONDS),
+      clock = clockStub,
       dispatcher = coroutineRule.testDispatcher
     )
     transition.setPlayer(player)

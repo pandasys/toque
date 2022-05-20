@@ -19,21 +19,20 @@ package com.ealva.toque.service.player
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.flow.CountDownFlow
 import com.ealva.toque.service.audio.PlayerTransition.Type
+import com.ealva.toque.service.player.FadeInTransition.Companion.MIN_FADE_LENGTH
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
 @Suppress("unused")
 private val LOG by lazyLogger(FadeInTransition::class)
-
-private val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
-private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
 
 /**
  * PlayerTransition that fades in from start volume to max volume over [requestedDuration]. We will
@@ -50,6 +49,7 @@ private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
 class FadeInTransition(
   /** Requested fade duration, may be adjusted depending on remaining duration */
   private val requestedDuration: Duration,
+  private val clock: Clock = Clock.System,
   dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : BasePlayerTransition(Type.Play, dispatcher) {
 
@@ -65,7 +65,7 @@ class FadeInTransition(
       .coerceAtMost(minFadeStartVolumeAdjustment)
 
     if (duration > MIN_FADE_LENGTH) {
-      val countDownFlow = CountDownFlow(total = duration, interval = MIN_FADE_LENGTH)
+      val countDownFlow = CountDownFlow(total = duration, interval = MIN_FADE_LENGTH, clock = clock)
       val multiplier = (maxVolume - startVolume).value.toDouble() / duration.inWholeMilliseconds
 
       countDownFlow
@@ -88,5 +88,10 @@ class FadeInTransition(
     append("FadeInTransition(requestedFadeLength=")
     append(requestedDuration)
     append(')')
+  }
+
+  companion object {
+    val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
+    val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
   }
 }

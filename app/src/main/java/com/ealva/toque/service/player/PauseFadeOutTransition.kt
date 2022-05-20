@@ -18,6 +18,7 @@ package com.ealva.toque.service.player
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.Clock
 import kotlin.time.Duration
 
 /**
@@ -25,9 +26,10 @@ import kotlin.time.Duration
  */
 class PauseFadeOutTransition(
   fadeLength: Duration,
+  clock: Clock = Clock.System,
   /** The dispatcher only need be changed for test */
   dispatcher: CoroutineDispatcher = Dispatchers.Default
-) : FadeOutTransition(fadeLength, dispatcher) {
+) : FadeOutTransition(requestedDuration = fadeLength, clock = clock, dispatcher = dispatcher) {
   override fun cancelTransition(player: TransitionPlayer) = Unit
 
   override fun finishTransition(player: TransitionPlayer) {

@@ -18,14 +18,7 @@ package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.player.FadeInTransition
-import com.ealva.toque.service.player.PauseFadeOutTransition
-import com.ealva.toque.service.player.PauseImmediateTransition
-import com.ealva.toque.service.player.PlayImmediateTransition
-import com.ealva.toque.service.player.ShutdownFadeOutTransition
-import com.ealva.toque.service.player.ShutdownImmediateTransition
-import com.ealva.toque.test.service.player.TransitionPlayerSpy
-import com.ealva.toque.test.shared.CoroutineRule
+import com.ealva.toque.sharedtest.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle

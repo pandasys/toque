@@ -18,18 +18,12 @@ package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Volume
 import com.ealva.toque.service.audio.PlayerTransition
-import com.ealva.toque.service.player.FadeInTransition
-import com.ealva.toque.service.player.PauseFadeOutTransition
-import com.ealva.toque.service.player.PauseImmediateTransition
-import com.ealva.toque.service.player.PlayImmediateTransition
-import com.ealva.toque.service.player.ShutdownFadeOutTransition
-import com.ealva.toque.service.player.ShutdownImmediateTransition
-import com.ealva.toque.test.service.player.TransitionPlayerSpy
-import com.ealva.toque.test.shared.CoroutineRule
+import com.ealva.toque.sharedtest.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Instant
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -44,13 +38,16 @@ class ShutdownFadeoutTransitionTest {
 
   private lateinit var player: TransitionPlayerSpy
   private lateinit var transition: PlayerTransition
+  private lateinit var clockStub: ClockStub
 
   @Before
   fun setup() {
+    clockStub = ClockStub(Instant.fromEpochMilliseconds(0), FadeInTransition.MIN_FADE_LENGTH, 20)
     player = TransitionPlayerSpy()
     transition = ShutdownFadeOutTransition(
-      2000.toDuration(DurationUnit.MILLISECONDS),
-      coroutineRule.testDispatcher
+      fadeLength = 2000.toDuration(DurationUnit.MILLISECONDS),
+      clock = clockStub,
+      dispatcher = coroutineRule.testDispatcher
     )
     transition.setPlayer(player)
   }
@@ -102,7 +99,7 @@ class ShutdownFadeoutTransitionTest {
     expect(player._notifyPausedCalled).toBe(0)
     expect(player._volumeGetCalled).toBe(1)
     expect(player._remainingTimeCalled).toBe(1)
-    expect(player._volumeSetCalled).toBeGreaterThan(19)
+    expect(player._volumeSetCalled).toBe(19)
     expect(player._volume).toBe(Volume.NONE)
     expect(transition.isCancelled).toBe(false)
     expect(transition.isFinished).toBe(true)

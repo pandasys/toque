@@ -16,12 +16,11 @@
 
 @file:Suppress("MemberVisibilityCanBePrivate", "PropertyName")
 
-package com.ealva.toque.test.service.player
+package com.ealva.toque.service.player
 
 import com.ealva.toque.common.Title
 import com.ealva.toque.common.Volume
 import com.ealva.toque.common.VolumeRange
-import com.ealva.toque.service.player.TransitionPlayer
 import com.nhaarman.expect.fail
 import kotlin.time.Duration
 

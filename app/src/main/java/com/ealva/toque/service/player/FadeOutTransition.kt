@@ -20,17 +20,16 @@ import com.ealva.toque.common.Volume
 import com.ealva.toque.common.asVolume
 import com.ealva.toque.flow.CountDownFlow
 import com.ealva.toque.service.audio.PlayerTransition.Type
+import com.ealva.toque.service.player.FadeOutTransition.Companion.MIN_FADE_LENGTH
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
-
-private val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
-private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
 
 /**
  * PlayerTransition that fades out from start volume to min volume over [requestedDuration]. We will
@@ -45,7 +44,8 @@ private val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
  */
 abstract class FadeOutTransition(
   protected val requestedDuration: Duration,
-  dispatcher: CoroutineDispatcher
+  private val clock: Clock = Clock.System,
+  dispatcher: CoroutineDispatcher,
 ) : BasePlayerTransition(Type.Pause, dispatcher) {
 
   override val isPlaying: Boolean = false
@@ -60,7 +60,7 @@ abstract class FadeOutTransition(
       .coerceAtMost(minFadeStartVolumeAdjustment)
 
     if (duration > MIN_FADE_LENGTH) {
-      val countDownFlow = CountDownFlow(total = duration, interval = MIN_FADE_LENGTH)
+      val countDownFlow = CountDownFlow(total = duration, interval = MIN_FADE_LENGTH, clock = clock)
       val multiplier = maxVolume.value.toDouble() / duration.inWholeMilliseconds
 
       countDownFlow
@@ -75,6 +75,11 @@ abstract class FadeOutTransition(
 
   protected open fun maybeNotifyPaused(player: TransitionPlayer) = player.notifyPaused()
   protected abstract fun finishTransition(player: TransitionPlayer)
+
+  companion object {
+    val ADJUST_FROM_END = 200.toDuration(DurationUnit.MILLISECONDS)
+    val MIN_FADE_LENGTH = 100.toDuration(DurationUnit.MILLISECONDS)
+  }
 }
 
 fun Duration.asVolume(multiplier: Double): Volume = (inWholeMilliseconds * multiplier).asVolume
