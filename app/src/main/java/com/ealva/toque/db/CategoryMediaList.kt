@@ -31,7 +31,7 @@ import javax.annotation.CheckReturnValue
  *
  * For example, if there are Albums A-Z and the media for Albums B, E, and S are added to a
  * CategoryMediaList, the last CategoryToken would represent the S Album. Navigation to the
- * next category would result in Album T.
+ * next Album category would result in Album T.
  *
  * Category representing media added from All media or External media, should navigate
  * to the first instance of the first category (currently Album).
@@ -58,7 +58,7 @@ data class CategoryMediaList(val idList: MediaIdList, val token: CategoryToken) 
    */
   @CheckReturnValue
   fun maybeShuffle(shuffleMode: ShuffleMode): CategoryMediaList =
-    if (shuffleMode.shuffleMedia.value) shuffled() else this
+    if (shuffleMode.shuffleMedia.shuffle) shuffled() else this
 
   /** Returns the list with all duplicates removed */
   @CheckReturnValue

@@ -95,6 +95,7 @@ value class ShuffleMedia(val value: Boolean) {
   inline val shuffle: Boolean
     get() = value
 
+  @Suppress("unused")
   inline val doNotShuffle: Boolean
     get() = !value
 }
@@ -104,6 +105,7 @@ value class ShuffleLists(val value: Boolean) {
   inline val shuffle: Boolean
     get() = value
 
+  @Suppress("unused")
   inline val doNotShuffle: Boolean
     get() = !value
 }

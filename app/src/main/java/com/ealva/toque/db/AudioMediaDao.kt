@@ -1157,8 +1157,8 @@ private class AudioMediaDaoImpl(
     subsequent: SubsequentToken
   ): CategoryMediaList = audioExists()
     .toErrorIf({ exists -> !exists }, { DaoNotFoundException("No Audio") })
-    .andThen { Ok(if (shuffleLists.value) token.getRandom(this) else subsequent(token)) }
-    .toErrorIf({ token === CategoryToken.All }, { DaoNotFoundException("No next token") })
+    .andThen { Ok(if (shuffleLists.shuffle) token.getRandom(this) else subsequent(token)) }
+    .toErrorIf({ next -> next === CategoryToken.All }, { DaoNotFoundException("No next token") })
     .map { categoryToken -> categoryMediaFlow(categoryToken, subsequent) }
     .onFailure { cause -> LOG.e(cause) { it("Error getting next Category media list") } }
     .getOrElse { emptyFlow() }
