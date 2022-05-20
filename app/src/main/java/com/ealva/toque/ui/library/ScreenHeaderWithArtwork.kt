@@ -25,9 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.ealva.toque.R
 
 @Composable
@@ -41,7 +43,13 @@ fun ScreenHeaderWithArtwork(
     modifier = modifier,
     content = {
       Image(
-        painter = rememberImagePainter(data = artwork, builder = { error(fallbackArt) }),
+        painter = rememberAsyncImagePainter(
+          model = ImageRequest.Builder(LocalContext.current)
+            .data(artwork)
+            .error(fallbackArt)
+            .build(),
+          contentScale = ContentScale.Crop
+        ),
         alignment = Alignment.Center,
         contentScale = ContentScale.Crop,
         contentDescription = stringResource(R.string.Artwork),

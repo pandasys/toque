@@ -49,15 +49,17 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
 import coil.imageLoader
 import coil.request.ImageRequest
-import coil.size.OriginalSize
 import coil.size.Scale
+import coil.size.Size.Companion.ORIGINAL
 import com.ealva.ealvabrainz.common.AlbumTitle
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.asAlbumTitle
@@ -240,12 +242,13 @@ fun RemoteImageItem(item: RemoteImage, selected: (RemoteImage) -> Unit, minSize:
           .clickable { selected(item) }
       ) {
         Image(
-          painter = rememberImagePainter(
-            data = item.location,
-            builder = {
-              scale(Scale.FIT)
-              error(R.drawable.ic_album)
-            }
+          painter = rememberAsyncImagePainter(
+            model = ImageRequest.Builder(LocalContext.current)
+              .data(item.location)
+              .scale(Scale.FIT)
+              .error(R.drawable.ic_big_album)
+              .build(),
+            contentScale = ContentScale.Fit
           ),
           contentDescription = stringResource(R.string.AlbumArt),
           modifier = Modifier.fillMaxSize()
@@ -434,7 +437,7 @@ private class SelectAlbumArtViewModelImpl(
     return if (remoteImage.actualSize != null) remoteImage else {
       val request = ImageRequest.Builder(appContext)
         .data(remoteImage.location)
-        .size(OriginalSize)
+        .size(ORIGINAL)
         .allowHardware(false)
         .build()
       val drawable = appContext.imageLoader.execute(request).drawable

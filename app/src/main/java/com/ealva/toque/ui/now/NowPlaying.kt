@@ -55,18 +55,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.ConstraintSet
 import androidx.constraintlayout.compose.Dimension
-import coil.annotation.ExperimentalCoilApi
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.common.Millis
@@ -94,7 +95,6 @@ import com.ealva.toque.ui.now.NowPlayingScreenIds.ID_TOP_SPACE
 import com.ealva.toque.ui.now.NowPlayingViewModel.NowPlayingState
 import com.ealva.toque.ui.now.NowPlayingViewModel.QueueItem
 import com.ealva.toque.ui.theme.toqueTypography
-import com.google.accompanist.insets.ExperimentalAnimatedInsets
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.pager.ExperimentalPagerApi
@@ -114,7 +114,6 @@ import kotlin.time.DurationUnit
 @Suppress("unused")
 private val LOG by lazyLogger("NowPlaying")
 
-@OptIn(ExperimentalAnimatedInsets::class, ExperimentalUnitApi::class)
 @Composable
 fun NowPlaying(
   state: NowPlayingState,
@@ -279,7 +278,6 @@ private object NowPlayingScreenIds {
   const val ID_RATING_BAR_ROW = 13
 }
 
-@OptIn(ExperimentalUnitApi::class, ExperimentalCoilApi::class)
 @Composable
 private fun PlayerControls(
   state: NowPlayingState,
@@ -447,19 +445,19 @@ private fun MediaArtPager(
   }
 }
 
-@OptIn(ExperimentalCoilApi::class)
 @Composable
 private fun ArtPagerCard(queue: List<QueueItem>, currentPage: Int, size: Int) {
   if (currentPage in queue.indices) {
     val item = queue[currentPage]
     Box(modifier = Modifier.fillMaxSize()) {
       Image(
-        painter = rememberImagePainter(
-          data = if (item.artwork !== Uri.EMPTY) item.artwork else R.drawable.ic_big_album,
-          builder = {
-            size(size)
-            error(R.drawable.ic_album)
-          }
+        painter = rememberAsyncImagePainter(
+          model = ImageRequest.Builder(LocalContext.current)
+            .data(if (item.artwork !== Uri.EMPTY) item.artwork else R.drawable.ic_big_album)
+            .size(size)
+            .error(R.drawable.ic_big_album)
+            .build(),
+          contentScale = ContentScale.Fit
         ),
         contentDescription = "${item.title.value} Album Cover Art",
         modifier = Modifier.fillMaxSize()
@@ -485,7 +483,6 @@ private fun PositionSlider(
   )
 }
 
-@OptIn(ExperimentalCoilApi::class)
 @Composable
 private fun RatingBarRow(
   queueIndex: Int,
@@ -583,7 +580,6 @@ private fun RatingBarRow(
   }
 }
 
-@OptIn(ExperimentalCoilApi::class)
 @Composable
 private fun ButtonRow(
   playState: PlayState,

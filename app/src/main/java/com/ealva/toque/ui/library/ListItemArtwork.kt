@@ -25,18 +25,16 @@ import androidx.compose.material.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil.annotation.ExperimentalCoilApi
-import coil.compose.ImagePainter
-import coil.compose.rememberImagePainter
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.ealva.toque.R
 
-/**
- *
- */
-@OptIn(ExperimentalCoilApi::class)
 @Composable
 fun ListItemArtwork(
   artwork: Uri,
@@ -46,13 +44,18 @@ fun ListItemArtwork(
   val modifier = Modifier.size(56.dp)
   val description = stringResource(id = R.string.Artwork)
   if (artwork !== Uri.EMPTY) {
-    val painter = rememberImagePainter(data = artwork)
+    val painter = rememberAsyncImagePainter(
+      model = ImageRequest.Builder(LocalContext.current)
+        .data(artwork)
+        .build(),
+      contentScale = ContentScale.Fit
+    )
     Image(
       modifier = modifier,
       painter = painter,
       contentDescription = description
     )
-    if (painter.state is ImagePainter.State.Error) {
+    if (painter.state is AsyncImagePainter.State.Error) {
       Icon(
         modifier = modifier,
         painter = painterResource(id = fallback),
@@ -73,10 +76,15 @@ fun ListItemArtwork(
 @Composable
 fun ListItemAlbumArtwork(artwork: Uri) {
   Image(
-    painter = if (artwork !== Uri.EMPTY) rememberImagePainter(
-      data = artwork,
-      builder = { error(R.drawable.ic_big_album) }
-    ) else painterResource(id = R.drawable.ic_big_album),
+    painter = if (artwork !== Uri.EMPTY)
+      rememberAsyncImagePainter(
+        model = ImageRequest.Builder(LocalContext.current)
+          .data(artwork)
+          .error(R.drawable.ic_big_album)
+          .build(),
+        contentScale = ContentScale.Fit
+      )
+    else painterResource(id = R.drawable.ic_big_album),
     contentDescription = stringResource(R.string.Artwork),
     modifier = Modifier.size(56.dp)
   )

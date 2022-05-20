@@ -44,14 +44,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
-import coil.annotation.ExperimentalCoilApi
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
 import com.ealva.toque.audio.AudioItem
@@ -259,7 +261,6 @@ private fun CurrentItemPager(goToNowPlaying: () -> Unit, modifier: Modifier) {
   }
 }
 
-@OptIn(ExperimentalCoilApi::class)
 @Composable
 private fun CurrentItemPagerCard(
   item: AudioItem,
@@ -278,9 +279,12 @@ private fun CurrentItemPagerCard(
       val (albumArt, title, artistAlbum, playPause) = createRefs()
 
       Image(
-        painter = rememberImagePainter(
-          data = if (item.artwork !== Uri.EMPTY) item.artwork else R.drawable.ic_big_album,
-          builder = { error(R.drawable.ic_album) }
+        painter = rememberAsyncImagePainter(
+          model = ImageRequest.Builder(LocalContext.current)
+            .data(if (item.artwork !== Uri.EMPTY) item.artwork else R.drawable.ic_big_album)
+            .error(R.drawable.ic_album)
+            .build(),
+          contentScale = ContentScale.Fit
         ),
         contentDescription = "${item.title.value} Album Cover Art",
         modifier = Modifier

@@ -24,15 +24,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
-import android.os.Build
 import android.os.PowerManager
-import android.os.StrictMode
 import android.telecom.TelecomManager
 import android.view.WindowManager
 import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import coil.util.CoilUtils
+import coil.disk.DiskCache
 import com.ealva.ealvalog.LogLevel
 import com.ealva.ealvalog.Loggers
 import com.ealva.ealvalog.Marker
@@ -41,29 +39,23 @@ import com.ealva.ealvalog.android.AndroidLogger
 import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
 import com.ealva.ealvalog.invoke
-import com.ealva.ealvalog.logger
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.art.ArtworkModule
 import com.ealva.toque.audioout.AudioModule
-import com.ealva.toque.common.debug
 import com.ealva.toque.db.DbModule
 import com.ealva.toque.file.FilesModule
-import com.ealva.toque.log._e
 import com.ealva.toque.prefs.PrefsModule
 import com.ealva.toque.service.ServiceModule
 import com.ealva.toque.service.vlc.LibVlcModule
 import com.ealva.toque.tag.TagModule
 import com.ealva.toque.work.Work
 import com.ealva.toque.work.WorkModule
-import com.ealva.welite.db.log.WeLiteLog
 import com.jakewharton.processphoenix.ProcessPhoenix
 import ealvatag.logging.EalvaTagLog
-import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
-import java.util.concurrent.Executors
 
 interface Toque {
   fun restartApp(intent: Intent, context: Context)
@@ -153,12 +145,21 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory, Configuration.Provid
   override fun newImageLoader(): ImageLoader {
     return ImageLoader.Builder(applicationContext)
       .crossfade(true)
-      .okHttpClient {
-        OkHttpClient.Builder()
-          .cache(CoilUtils.createDefaultCache(applicationContext))
+      .diskCache {
+        DiskCache.Builder()
+          .directory(applicationContext.cacheDir.resolve("image_cache"))
           .build()
       }
       .build()
+    /*
+    ImageLoader.Builder(context)
+    .diskCache {
+        DiskCache.Builder()
+            .directory(context.cacheDir.resolve("image_cache"))
+            .build()
+    }
+    .build()
+     */
   }
 
   companion object {

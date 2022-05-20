@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.imageLoader
 import coil.request.ImageRequest
-import coil.size.PixelSize
 import coil.size.Size
 import com.ealva.toque.R
 import com.ealva.toque.app.Toque.Companion.appContext
@@ -36,7 +35,7 @@ private inline val Dp.asPx: Int
     .applyDimension(COMPLEX_UNIT_DIP, value, appContext.resources.displayMetrics)
     .roundToInt()
 
-private inline val Dp.asSize: Size get() = asPx.let { px -> PixelSize(px, px) }
+private inline val Dp.asSize: Size get() = asPx.let { px -> Size(px, px) }
 
 /**
  * This is the default size of bitmaps loaded for Android metadata. It's lazy as we use the
