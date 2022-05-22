@@ -337,4 +337,5 @@
   <string name="Repeat">Repeat</string>
   <string name="loading_widget">Loading widget…</string>
   <string name="QueueIsEmpty">Queue Is Empty</string>
+    <string name="ClearSearchHistory">Clear Search History</string>
 </resources>

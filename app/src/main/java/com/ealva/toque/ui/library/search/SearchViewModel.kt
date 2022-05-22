@@ -112,6 +112,8 @@ interface SearchViewModel : ActionsViewModel {
 
   fun deleteFromHistory(searchTerm: SearchTerm)
 
+  fun clearHistory()
+
   fun goBack()
 
   fun playMedia(mediaList: CategoryMediaList)
@@ -184,8 +186,7 @@ private class SearchViewModelImpl(
   private val goToNowPlaying: suspend () -> Boolean,
   private val backstack: Backstack,
   dispatcher: CoroutineDispatcher
-) : SearchViewModel, ScopedServices.Registered, ScopedServices.HandlesBack,
-  Bundleable {
+) : SearchViewModel, ScopedServices.Registered, ScopedServices.HandlesBack, Bundleable {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private val localQueueOps = LocalAudioQueueOps(localAudioQueue)
   override val availableCategories: List<SearchCategory<*, *>> = listOf(
@@ -258,20 +259,23 @@ private class SearchViewModelImpl(
   }
 
   override fun search(like: TextFieldValue) {
-    stateFlow.update { state -> state.copy(query = like) }
+    val corrected = like.removeMultipleWhitespace()
+    stateFlow.update { state -> state.copy(query = corrected) }
     scope.launch {
-      val likeText = like.text
+      val likeText = corrected.text
       filterFlow.value = likeText.wrapAsFilter()
-      if (like.text.isNotBlank()) {
+      if (likeText.isNotBlank()) {
         searchHistory.add(SearchTerm(likeText))
       }
     }
   }
 
   override fun deleteFromHistory(searchTerm: SearchTerm) {
-    scope.launch {
-      searchHistory.delete(searchTerm)
-    }
+    scope.launch { searchHistory.delete(searchTerm) }
+  }
+
+  override fun clearHistory() {
+    scope.launch { searchHistory.clear() }
   }
 
   override fun goBack() {
@@ -328,6 +332,7 @@ private class SearchViewModelImpl(
     scope.launch { localQueueOps.addToPlaylist(::getMediaList, ::selectModeOff) }
   }
 
+  @Suppress("ConvertCallChainIntoSequence")
   private suspend fun getMediaList(): Result<CategoryMediaList, Throwable> {
     val onlySelectedItems = hasSelection
     return stateFlow.value.results
@@ -438,6 +443,17 @@ private class SearchViewModelImpl(
       }
     }
   }
+}
+
+private val MULTIPLE_WHITESPACE = "\\s+".toRegex()
+
+fun TextFieldValue.removeMultipleWhitespace(): TextFieldValue {
+  val trimmed = text.replace(MULTIPLE_WHITESPACE, " ")
+  val range = 0..trimmed.length
+  return copy(
+    text = trimmed,
+    selection = TextRange(selection.min.coerceIn(range), selection.max.coerceIn(range))
+  )
 }
 
 @Parcelize

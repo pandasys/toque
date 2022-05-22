@@ -98,10 +98,10 @@ private class SearchHistoryImpl(
   override suspend fun clear(): Boolean = withContext(dispatcher) {
     if (historyFlow.value.isNotEmpty()) {
     searchDao.clearSearchHistory()
-      .onFailure { cause -> LOG.e(cause) { it("Error clearing search history") } }
       .toErrorIf({ count -> count == 0L }) { IllegalStateException("Could not clear history") }
-      .onSuccess { historyFlow.value = emptyList() }
       .map { it > 0 }
+      .onFailure { cause -> LOG.e(cause) { it("Error clearing search history") } }
+      .onSuccess { historyFlow.value = emptyList() }
       .getOrElse { false }
     } else false
   }

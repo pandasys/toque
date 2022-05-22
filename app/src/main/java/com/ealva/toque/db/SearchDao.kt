@@ -29,7 +29,10 @@ import kotlinx.parcelize.Parcelize
 
 @Parcelize
 @JvmInline
-value class SearchTerm(val value: String) : Parcelable
+value class SearchTerm(val value: String) : Parcelable {
+  inline val term: String
+    get() = value
+}
 
 interface SearchDao {
   suspend fun getSearchHistory(): DaoResult<List<SearchTerm>>

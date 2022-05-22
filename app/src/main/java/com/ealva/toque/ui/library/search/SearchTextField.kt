@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -75,9 +76,7 @@ fun SearchTextField(
         backgroundColor = Color.Transparent,
       ),
       keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-      keyboardActions = KeyboardActions(
-        onSearch = { onQueryTextSubmit(query) }
-      ),
+      keyboardActions = KeyboardActions(onSearch = { onQueryTextSubmit(query) }),
       leadingIcon = {
         IconButton(
           onClick = onBackPressed,
@@ -89,27 +88,22 @@ fun SearchTextField(
           IconButton(
             onClick = { onClearText() },
             content = {
-              if (loading) {
-                CircularProgressIndicator(
-                  strokeWidth = 2.dp,
-                  color = MaterialTheme.colors.secondary,
-                  modifier = Modifier.size(26.dp),
-                )
-              }
+              if (loading) CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colors.secondary,
+                modifier = Modifier.size(26.dp),
+              )
 
               Icon(imageVector = Icons.Default.Close, contentDescription = "Clear")
             },
           )
       },
-      modifier = Modifier
-        .onPreviewKeyEvent {
-          val keyEvent = it.nativeKeyEvent
-          if (keyEvent.action == ACTION_DOWN && keyEvent.keyCode == KEYCODE_BACK) {
-            onBackPressed()
-            true
-          } else
-            false
-        },
+      modifier = Modifier.onPreviewKeyEvent { keyEvent ->
+        keyEvent.isBack.also { goBack -> if (goBack) onBackPressed() }
+      },
     )
   }
 }
+
+private inline val KeyEvent.isBack: Boolean
+  get() = nativeKeyEvent.action == ACTION_DOWN && nativeKeyEvent.keyCode == KEYCODE_BACK

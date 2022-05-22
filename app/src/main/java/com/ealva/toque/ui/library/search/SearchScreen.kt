@@ -17,7 +17,6 @@
 package com.ealva.toque.ui.library.search
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
@@ -39,6 +38,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
@@ -50,10 +50,13 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
+import com.ealva.toque.common.fetch
 import com.ealva.toque.db.SearchTerm
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.prefs.AppPrefs
@@ -62,7 +65,6 @@ import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.library.LibraryCategoryTitle
 import com.ealva.toque.ui.library.LibraryItemsActions
-import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -107,15 +109,13 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
   override fun ScreenComposable(modifier: Modifier) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
+    val viewModel = rememberService<SearchViewModel>()
+    val state = viewModel.stateFlow.collectAsState()
 
     fun requestFocusShowKeyboard() {
       focusRequester.requestFocus()
       keyboardController?.show()
     }
-
-    val viewModel = rememberService<SearchViewModel>()
-    val state = viewModel.stateFlow.collectAsState()
-//    val scrollConnection = remember { HeightResizeScrollConnection() }
 
     val list = state.value.results
     val query = state.value.query
@@ -135,7 +135,9 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
               viewModel.search(TextFieldValue(text = ""))
               requestFocusShowKeyboard()
             },
-            onBackPressed = { viewModel.goBack() })
+            onBackPressed = { viewModel.goBack() },
+            placeholder = fetch(R.string.Search)
+          )
           Spacer(modifier = Modifier.height(4.dp))
           LibraryItemsActions(
             itemCount = state.value.totalItemCount,
@@ -152,10 +154,9 @@ data class SearchScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
       } else {
         HistoryList(
           previousSearches = state.value.previousSearches,
-          historyItemSelected = { term ->
-            viewModel.search(TextFieldValue(term.value, TextRange(0, term.value.length)))
-          },
-          deleteTerm = { term -> viewModel.deleteFromHistory(term) }
+          historyItemSelected = { term -> viewModel.search(term.toAllSelectedTextFieldValue()) },
+          deleteTerm = { term -> viewModel.deleteFromHistory(term) },
+          clearHistory = { viewModel.clearHistory() }
         )
       }
     }
@@ -180,11 +181,7 @@ fun SearchItemList(list: Collection<SearchViewModel.SearchResult<*, *>>) {
     list.forEach { searchResult ->
       if (searchResult.isNotEmpty()) {
         stickyHeader(searchResult.category) {
-          Box(
-            modifier = Modifier
-              .background(toqueColors.background)
-              .fillMaxWidth()
-          ) {
+          Box(modifier = Modifier.fillMaxWidth()) {
             LibraryCategoryTitle(
               info = searchResult.category.libraryCategory,
               boxSize = 34.dp,
@@ -203,21 +200,36 @@ fun SearchItemList(list: Collection<SearchViewModel.SearchResult<*, *>>) {
 private fun HistoryList(
   previousSearches: List<SearchTerm>,
   historyItemSelected: (SearchTerm) -> Unit,
-  deleteTerm: (SearchTerm) -> Unit
+  deleteTerm: (SearchTerm) -> Unit,
+  clearHistory: () -> Unit
 ) {
   val scrollState = rememberScrollState()
 
   Column(
     modifier = Modifier
-      .padding(top = 12.dp)
+      .fillMaxWidth()
+      .padding(start = 18.dp, top = 4.dp, end = 18.dp)
       .scrollable(state = scrollState, orientation = Orientation.Vertical)
   ) {
-    previousSearches.forEach { searchTerm ->
-      HistorySearchTerm(
-        searchTerm = searchTerm,
-        onClick = historyItemSelected,
-        deleteTerm = deleteTerm
-      )
+    if (previousSearches.isNotEmpty()) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+      ) {
+        TextButton(onClick = { clearHistory() }) {
+          Text(
+            text = stringResource(id = R.string.ClearSearchHistory),
+            style = toqueTypography.overline
+          )
+        }
+      }
+      previousSearches.forEach { searchTerm ->
+        HistorySearchTerm(
+          searchTerm = searchTerm,
+          onClick = historyItemSelected,
+          deleteTerm = deleteTerm
+        )
+      }
     }
   }
 }
@@ -231,7 +243,6 @@ private fun HistorySearchTerm(
 ) {
   Row(
     modifier = modifier
-      .padding(horizontal = 18.dp)
       .fillMaxWidth()
       .clickable { onClick(searchTerm) },
     verticalAlignment = Alignment.CenterVertically,
@@ -253,3 +264,6 @@ private fun HistorySearchTerm(
     )
   }
 }
+
+private fun SearchTerm.toAllSelectedTextFieldValue(): TextFieldValue =
+  TextFieldValue(text = term, selection = TextRange(0, term.length))
