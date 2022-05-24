@@ -45,7 +45,9 @@ value class Amp(val value: Float) : Comparable<Amp>, Parcelable {
 
     val NONE = Amp(0F)
     val DEFAULT_PREAMP = Amp(12)
-    val RANGE = Amp(-20)..Amp(20)
+    val MIN_AMP = Amp(-20)
+    val MAX_AMP = Amp(20)
+    val RANGE = MIN_AMP..MAX_AMP
     val REPLAY_GAIN_RANGE = Amp(-16)..Amp(16)
     val REPLAY_GAIN_NO_INFO_RANGE = Amp(-20)..Amp(16)
   }

@@ -48,6 +48,8 @@ class VlcEqPreset private constructor(
 
   override fun getBandFrequency(index: Int): Float = MediaPlayer.Equalizer.getBandFrequency(index)
 
+  override fun get(index: Int): Float  = MediaPlayer.Equalizer.getBandFrequency(index)
+
   override val preAmp: Amp
     get() = nativeEq?.preAmp?.let { Amp(it) } ?: Amp.NONE
 

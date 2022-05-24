@@ -16,13 +16,30 @@
 
 package com.ealva.toque.ui.preset
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
+import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import com.ealva.ealvalog.lazyLogger
+import com.ealva.toque.R
 import com.ealva.toque.navigation.ComposeKey
+import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.ui.theme.toqueTypography
+import com.google.accompanist.insets.navigationBarsPadding
+import com.google.accompanist.insets.statusBarsPadding
 import com.zhuinden.simplestack.ServiceBinder
 import com.zhuinden.simplestackcomposeintegration.services.rememberService
 import com.zhuinden.simplestackextensions.servicesktx.add
@@ -31,6 +48,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import javax.annotation.concurrent.Immutable
 
+
 @Suppress("unused")
 private val LOG by lazyLogger(EqPresetEditorScreen::class)
 
@@ -38,15 +56,79 @@ private val LOG by lazyLogger(EqPresetEditorScreen::class)
 @Parcelize
 data class EqPresetEditorScreen(private val noArg: String = "") : ComposeKey(), KoinComponent {
   override fun bindServices(serviceBinder: ServiceBinder) {
-    serviceBinder.add(EqPresetEditorModel(get()))
+    with(serviceBinder) {
+      add(EqPresetEditorModel(backstack, get()))
+    }
   }
 
   @Composable
   override fun ScreenComposable(modifier: Modifier) {
     val viewModel = rememberService<EqPresetEditorModel>()
-    Column(modifier = Modifier.fillMaxSize()) {
-      Text(text = "EQ Preset Editor")
+    val state = viewModel.editorState.collectAsState()
+
+    Scaffold(
+      modifier = Modifier
+        .fillMaxSize()
+        .statusBarsPadding()
+        .navigationBarsPadding(bottom = false),
+      topBar = {
+        EqPresetEditorTopBar(
+          preset = state.value.currentPreset,
+          goBack = { viewModel.goBack() }
+        )
+      }
+    ) {
+
     }
   }
 }
 
+private val CHART_WIDTH = 120.dp
+private val CHART_HEIGHT = 40.dp
+private val PADDING_START = 0.dp
+private val PADDING_TOP = 0.dp
+private val PADDING_END = 0.dp
+private val PADDING_BOTTOM = 4.dp
+private val PADDING = PaddingValues(
+  start = PADDING_START,
+  top = PADDING_TOP,
+  end = PADDING_END,
+  bottom = PADDING_BOTTOM
+)
+
+@Composable
+private fun EqPresetEditorTopBar(
+  preset: EqPreset,
+  goBack: () -> Unit
+) {
+  TopAppBar(
+    title = {
+      Box(
+        modifier = Modifier
+          .width(CHART_WIDTH)
+          .height(CHART_HEIGHT)
+      ) {
+        EqPresetLineChart(
+          preset = preset,
+          width = CHART_WIDTH,
+          height = CHART_HEIGHT,
+          padding = PADDING
+        )
+        Text(
+          modifier = Modifier.align(Alignment.BottomEnd),
+          text = preset.displayName,
+          style = toqueTypography.caption
+        )
+      }
+    },
+    navigationIcon = {
+      IconButton(onClick = goBack) {
+        Icon(
+          painter = painterResource(id = R.drawable.ic_navigate_before),
+          contentDescription = "Back",
+          modifier = Modifier.size(26.dp)
+        )
+      }
+    }
+  )
+}

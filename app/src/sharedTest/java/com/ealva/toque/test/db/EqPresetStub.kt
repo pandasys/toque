@@ -33,6 +33,7 @@ class EqPresetStub(override var id: EqPresetId = EqPresetId(0)) : EqPreset {
     floatArrayOf(31F, 63F, 125F, 250F, 500F, 1000F, 2000F, 4000F, 8000F, 16000F)
 
   override fun getBandFrequency(index: Int): Float = bandFrequencies[index]
+  override fun get(index: Int): Float = bandFrequencies[index]
 
   override var preAmp: Amp = Amp.DEFAULT_PREAMP
   override suspend fun setPreAmp(amplitude: Amp) {

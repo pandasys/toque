@@ -90,7 +90,7 @@ data class ScreenConfig(
 }
 
 val LocalScreenConfig = staticCompositionLocalOf<ScreenConfig> {
-  throw IllegalStateException("LocalScaffoldState not provided")
+  throw IllegalStateException("LocalScreenConfig not provided")
 }
 
 @Composable

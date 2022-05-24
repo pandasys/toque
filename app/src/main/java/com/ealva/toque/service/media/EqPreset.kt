@@ -82,6 +82,8 @@ interface EqPreset {
    */
   fun getBandFrequency(index: Int): Float
 
+  operator fun get(index: Int): Float
+
   /** Current pre-amplification value of this equalizer. */
   val preAmp: Amp
 
@@ -153,6 +155,7 @@ interface EqPreset {
       override val bandCount = DEFAULT_BAND_COUNT
       override val bandIndices = 0 until bandCount
       override fun getBandFrequency(index: Int): Float = 0F
+      override fun get(index: Int): Float = 0F
       override val preAmp: Amp = Amp.NONE
       override suspend fun setPreAmp(amplitude: Amp) {}
       override fun getAmp(index: Int): Amp = Amp.NONE
