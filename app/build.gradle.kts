@@ -194,6 +194,7 @@ dependencies {
   implementation(Libs.FastUtil.FASTUTIL)
   implementation(Libs.Kotlin.Coroutines.CORE)
   implementation(Libs.Kotlin.Coroutines.ANDROID)
+  implementation(Libs.Kotlin.IMMUTABLE)
 
   implementation(Libs.Koin.CORE)
   implementation(Libs.Koin.EXT)

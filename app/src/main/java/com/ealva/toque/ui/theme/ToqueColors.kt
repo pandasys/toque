@@ -18,13 +18,17 @@ package com.ealva.toque.ui.theme
 
 import androidx.compose.material.Colors
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
 data class ToqueColors(
   val material: Colors,
   val warning: Color,
   val onWarning: Color,
   val selectedBackground: Color,
-  val shadedBackground: Color = Color.Black.copy(alpha = 0.3F)
+  val shadedBackground: Color = Color.Black.copy(alpha = 0.3F),
+  val uncheckedThumbColor: Color = material.secondaryVariant
+    .copy(alpha = .38F)
+    .compositeOver(material.surface)
 ) {
   val primary: Color get() = material.primary
   val primaryVariant: Color get() = material.primaryVariant

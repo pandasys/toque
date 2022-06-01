@@ -23,7 +23,6 @@ import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.EqPresetTable
-import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.toque.test.shared.withTestDatabase
 import com.ealva.welite.db.WeLiteUncaughtException
 import com.ealva.welite.db.expr.eq
@@ -65,7 +64,7 @@ object CommonPresetDaoTest {
       val presetData = EqPresetData(
         id = EqPresetId(1000),
         name = "NotThere",
-        preAmpAndBands = PreAmpAndBands(
+        preAmpAndBands = EqPresetDao.PreAmpAndBands(
           Amp(10F),
           Array(EqPresetDao.BAND_COUNT) { Amp(0F) }
         )
@@ -84,7 +83,7 @@ object CommonPresetDaoTest {
       val dao = EqPresetDao(this)
       val name = "MyPreset"
       val initialPreAmp = Amp(12F)
-      val preAmpAndBands = PreAmpAndBands(
+      val preAmpAndBands = EqPresetDao.PreAmpAndBands(
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
@@ -112,7 +111,7 @@ object CommonPresetDaoTest {
       val dao = EqPresetDao(this)
       val name = "MyPreset"
       val initialPreAmp = Amp(12F)
-      val preAmpAndBands = PreAmpAndBands(
+      val preAmpAndBands = EqPresetDao.PreAmpAndBands(
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
@@ -145,7 +144,7 @@ object CommonPresetDaoTest {
       val dao = EqPresetDao(this)
       val name = "MyPreset"
       val initialPreAmp = Amp(12F)
-      val preAmpAndBands = PreAmpAndBands(
+      val preAmpAndBands = EqPresetDao.PreAmpAndBands(
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
@@ -166,7 +165,7 @@ object CommonPresetDaoTest {
       val updatedBands = Array(preAmpAndBands.bands.size) { index ->
         preAmpAndBands.bands[index] + 1F
       }
-      val data = EqPresetData(id, name, PreAmpAndBands(updatedPreAmp, updatedBands))
+      val data = EqPresetData(id, name, EqPresetDao.PreAmpAndBands(updatedPreAmp, updatedBands))
       dao.updatePreset(data).let { result ->
         expect(result).toBeInstanceOf<Ok<Boolean>>()
       }
@@ -188,7 +187,7 @@ object CommonPresetDaoTest {
       val dao = EqPresetDao(this)
       val name = "MyPreset"
       val initialPreAmp = Amp(12F)
-      val preAmpAndBands = PreAmpAndBands(
+      val preAmpAndBands = EqPresetDao.PreAmpAndBands(
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
@@ -213,7 +212,7 @@ object CommonPresetDaoTest {
       val dao = EqPresetDao(this)
       val name = "MyPreset"
       val initialPreAmp = Amp(12F)
-      val preAmpAndBands = PreAmpAndBands(
+      val preAmpAndBands = EqPresetDao.PreAmpAndBands(
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )
@@ -242,7 +241,7 @@ object CommonPresetDaoTest {
       val dao = EqPresetDao(this)
       val name = "MyPreset"
       val initialPreAmp = Amp.DEFAULT_PREAMP
-      val preAmpAndBands = PreAmpAndBands(
+      val preAmpAndBands = EqPresetDao.PreAmpAndBands(
         initialPreAmp,
         Array(EqPresetDao.BAND_COUNT) { index -> Amp(index) }
       )

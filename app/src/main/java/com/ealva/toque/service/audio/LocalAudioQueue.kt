@@ -36,6 +36,7 @@ import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
 import com.ealva.toque.audioout.AudioOutputState
 import com.ealva.toque.common.Duplicates
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.common.QueueChangedException
@@ -64,6 +65,7 @@ import com.ealva.toque.db.QueueDao
 import com.ealva.toque.db.QueuePositionState
 import com.ealva.toque.db.QueuePositionStateDao
 import com.ealva.toque.db.QueuePositionStateDaoFactory
+import com.ealva.toque.log._e
 import com.ealva.toque.log._i
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.InstanceId
@@ -165,6 +167,9 @@ data class LocalAudioQueueState(
       |  playState=$playingState,
       |  repeat=$repeatMode,
       |  shuffle=$shuffleMode,
+      |  eqMode=$eqMode,
+      |  currentPreset=${currentPreset.displayName},
+      |  playbackRate=$playbackRate
       |)
     """.trimMargin()
   }
@@ -215,9 +220,6 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   /** Notification source for events the service to possibly by shown to the user */
   val notificationFlow: Flow<ServiceNotification>
 
-  /** Toggles Eq off/on which is then reflected in new state emission */
-  fun toggleEqMode()
-
   /** Set the rating of the current AudioItem */
   fun setRating(rating: StarRating, allowFileUpdate: Boolean = false)
 
@@ -257,7 +259,12 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
    * Move the queue it at the [from] index to the [to] index position. Other items and current
    * index are updated as appropriate
    */
-  fun moveQueueItem(from: Int, to: Int)
+  suspend fun moveQueueItem(from: Int, to: Int)
+
+  /** Toggles Eq off/on which is then reflected in new state emission */
+  fun toggleEqMode()
+
+  fun setCurrentPreset(id: EqPresetId)
 
   companion object {
     suspend fun make(
@@ -336,7 +343,7 @@ private class LocalAudioQueueImpl(
     prefs.repeatMode(),
     prefs.shuffleMode(),
     sharedPlayerState.eqMode.value,
-    EqPreset.NONE,
+    eqPresetFactory.nonePreset,
     ""
   )
 
@@ -374,6 +381,8 @@ private class LocalAudioQueueImpl(
    */
   override fun toggleEqMode() = prefs.asyncEdit { it[eqMode] = prefs.eqMode().next() }
 
+  override fun setCurrentPreset(id: EqPresetId) = sharedPlayerState.setCurrent(id)
+
   private val queue: List<PlayableAudioItem>
     get() = if (shuffleMedia.value) upNextShuffled else upNextQueue
 
@@ -403,6 +412,7 @@ private class LocalAudioQueueImpl(
    * Note: [resume] probably only true for casting (not this Queue)
    */
   override suspend fun activate(resume: Boolean, playNow: PlayNow) {
+    LOG._e { it("activate playNow:%s", playNow) }
     sharedPlayerState = SharedPlayerState(
       scope,
       eqPresetFactory,
@@ -411,6 +421,8 @@ private class LocalAudioQueueImpl(
       prefs.playbackRate.asFlow().stateIn(scope),
       libVlcPrefs.audioOutputModule.asFlow().stateIn(scope)
     )
+    LOG._e { it("have sharedPlayerState") }
+    reactToPresetChanges(sharedPlayerState)
     reactToEqModeChanges()
     reactToHeadsetChanges()
     reactToAudioFocusChanges()
@@ -463,6 +475,17 @@ private class LocalAudioQueueImpl(
     } else {
       isActive.value = true
     }
+  }
+
+  private fun reactToPresetChanges(sharedPlayerState: SharedPlayerState) {
+    sharedPlayerState.currentPreset
+      .onEach { preset -> handleNewPreset(preset) }
+      .catch { cause -> LOG.e(cause) { it("Error currentPreset flow") } }
+      .launchIn(scope)
+  }
+
+  private fun handleNewPreset(preset: EqPreset) {
+    queueState.update { state -> state.copy(currentPreset = preset) }
   }
 
   /**
@@ -990,50 +1013,49 @@ private class LocalAudioQueueImpl(
     }
   }
 
-  override fun moveQueueItem(from: Int, to: Int) {
+  override suspend fun moveQueueItem(from: Int, to: Int) {
     if (from == to) return
-    scope.launch {
-      val index = currentItemIndex
-      val item = currentItem
 
-      val indexRange = upNextQueue.indices
-      var newQueue = upNextQueue.toMutableList()
-      var newShuffled = upNextShuffled.toMutableList()
-      var newIndex = index
+    val index = currentItemIndex
+    val item = currentItem
 
-      if (from in indexRange && to in indexRange) {
-        if (shuffleMedia.value) {
-          newShuffled.moveItem(from, to)
-        } else {
-          newQueue.moveItem(from, to)
-        }
+    val indexRange = upNextQueue.indices
+    var newQueue = upNextQueue.toMutableList()
+    var newShuffled = upNextShuffled.toMutableList()
+    var newIndex = index
 
-        newIndex = when {
-          from == index -> to
-          from < index -> if (to >= index) index - 1 else index
-          to <= index -> if (from > index) index + 1 else index
-          else -> index
-        }
-
-        try {
-          persistIfCurrentUnchanged(
-            newQueue = newQueue,
-            newShuffled = newShuffled,
-            prevCurrent = item,
-            prevCurrentIndex = index
-          )
-        } catch (e: Exception) {
-          LOG.e(e) { it("Could not persist new queue") }
-          // fatal error persisting, revert to original queues and invoke establish so update is
-          // sent to clients
-          newQueue = upNextQueue.toMutableList()
-          newShuffled = upNextShuffled.toMutableList()
-          newIndex = index
-        }
+    if (from in indexRange && to in indexRange) {
+      if (shuffleMedia.value) {
+        newShuffled.moveItem(from, to)
+      } else {
+        newQueue.moveItem(from, to)
       }
-      // We want to send an state update even if nothing changed to ensure the UI is consistent
-      establishNewQueues(newQueue, newShuffled, newIndex)
+
+      newIndex = when {
+        from == index -> to
+        from < index -> if (to >= index) index - 1 else index
+        to <= index -> if (from > index) index + 1 else index
+        else -> index
+      }
+
+      try {
+        persistIfCurrentUnchanged(
+          newQueue = newQueue,
+          newShuffled = newShuffled,
+          prevCurrent = item,
+          prevCurrentIndex = index
+        )
+      } catch (e: Exception) {
+        LOG.e(e) { it("Could not persist new queue") }
+        // fatal error persisting, revert to original queues and invoke establish so update is
+        // sent to clients
+        newQueue = upNextQueue.toMutableList()
+        newShuffled = upNextShuffled.toMutableList()
+        newIndex = index
+      }
     }
+    // We want to send an state update even if nothing changed to ensure the UI is consistent
+    establishNewQueues(newQueue, newShuffled, newIndex)
   }
 
   private suspend fun toggleShuffleMedia(prevMode: ShuffleMode, newMode: ShuffleMode) {

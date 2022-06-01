@@ -16,10 +16,10 @@
 
 package com.ealva.toque.db
 
+import android.os.Parcelable
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.Millis
-import com.ealva.toque.service.media.PreAmpAndBands
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Queryable
 import com.ealva.welite.db.TransactionInProgress
@@ -33,8 +33,34 @@ import com.ealva.welite.db.table.selectAll
 import com.ealva.welite.db.table.where
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.coroutines.runSuspendCatching
+import kotlinx.parcelize.Parcelize
 
 interface EqPresetDao {
+  @Parcelize
+  data class PreAmpAndBands(val preAmp: Amp, val bands: Array<Amp>) : Parcelable {
+    override fun equals(other: Any?): Boolean {
+      if (this === other) return true
+      if (javaClass != other?.javaClass) return false
+
+      other as PreAmpAndBands
+
+      if (preAmp != other.preAmp) return false
+      if (!bands.contentEquals(other.bands)) return false
+
+      return true
+    }
+
+    override fun hashCode(): Int {
+      var result = preAmp.hashCode()
+      result = 31 * result + bands.contentHashCode()
+      return result
+    }
+
+    override fun toString(): String {
+      return """PreAmpAndBands[$preAmp, ${bands.contentToString()}]"""
+    }
+  }
+
   /**
    * Insert the preset name and all preset data. Returns the preset ID if successful
    */
@@ -114,24 +140,24 @@ private class EqPresetDaoImpl(
 ) : EqPresetDao {
   override suspend fun insertPreset(
     name: String,
-    preAmpAndBands: PreAmpAndBands
+    preAmpAndBands: EqPresetDao.PreAmpAndBands
   ): DaoResult<EqPresetId> = runSuspendCatching {
     db.transaction {
       EqPresetId(INSERT_PRESET.insert {
         it[presetName] = name
         it[updatedTime] = Millis.currentUtcEpochMillis().value
-        it[preAmp] = preAmpAndBands.preAmp()
+        it[preAmp] = preAmpAndBands.preAmp.value
         with(preAmpAndBands) {
-          it[band0] = bands[0]()
-          it[band1] = bands[1]()
-          it[band2] = bands[2]()
-          it[band3] = bands[3]()
-          it[band4] = bands[4]()
-          it[band5] = bands[5]()
-          it[band6] = bands[6]()
-          it[band7] = bands[7]()
-          it[band8] = bands[8]()
-          it[band9] = bands[9]()
+          it[band0] = bands[0].value
+          it[band1] = bands[1].value
+          it[band2] = bands[2].value
+          it[band3] = bands[3].value
+          it[band4] = bands[4].value
+          it[band5] = bands[5].value
+          it[band6] = bands[6].value
+          it[band7] = bands[7].value
+          it[band8] = bands[8].value
+          it[band9] = bands[9].value
         }
       }).also { if (it.value < 1) throw DaoInsertFailedException("Failed to insert $name") }
     }
@@ -152,7 +178,7 @@ private class EqPresetDaoImpl(
       }
       .singleOrNull()
 
-  private fun EqPresetTable.dataFromCursor(cursor: Cursor) = PreAmpAndBands(
+  private fun EqPresetTable.dataFromCursor(cursor: Cursor) = EqPresetDao.PreAmpAndBands(
     Amp(cursor[preAmp]),
     Array(bandColumns.size) { index -> Amp(cursor[bandColumns[index]]) }
   )
@@ -175,18 +201,18 @@ private class EqPresetDaoImpl(
   private fun TransactionInProgress.doUpdatePreset(presetData: EqPresetData) = UPDATE_ALL.update {
     it[BIND_PRESET_ID] = presetData.id.value
     it[updatedTime] = Millis.currentUtcEpochMillis().value
-    it[preAmp] = presetData.preAmpAndBands.preAmp()
+    it[preAmp] = presetData.preAmpAndBands.preAmp.value
     with(presetData.preAmpAndBands) {
-      it[band0] = bands[0]()
-      it[band1] = bands[1]()
-      it[band2] = bands[2]()
-      it[band3] = bands[3]()
-      it[band4] = bands[4]()
-      it[band5] = bands[5]()
-      it[band6] = bands[6]()
-      it[band7] = bands[7]()
-      it[band8] = bands[8]()
-      it[band9] = bands[9]()
+      it[band0] = bands[0].value
+      it[band1] = bands[1].value
+      it[band2] = bands[2].value
+      it[band3] = bands[3].value
+      it[band4] = bands[4].value
+      it[band5] = bands[5].value
+      it[band6] = bands[6].value
+      it[band7] = bands[7].value
+      it[band8] = bands[8].value
+      it[band9] = bands[9].value
     }
   }
 
@@ -197,7 +223,7 @@ private class EqPresetDaoImpl(
     db.transaction {
       EqPresetTable
         .updateColumns {
-          it[preAmp] = amplitude()
+          it[preAmp] = amplitude.value
           it[updatedTime] = Millis.currentUtcEpochMillis().value
         }
         .where { id eq presetId.value }
@@ -215,7 +241,7 @@ private class EqPresetDaoImpl(
       require(index in columnIndices) { "Index $index not in bounds $columnIndices" }
       EqPresetTable
         .updateColumns {
-          it[bandColumns[index]] = amplitude()
+          it[bandColumns[index]] = amplitude.value
           it[updatedTime] = Millis.currentUtcEpochMillis().value
         }
         .where { id eq presetId.value }
@@ -233,7 +259,7 @@ data class EqPresetIdName(val id: EqPresetId, val name: String)
 data class EqPresetData(
   val id: EqPresetId,
   val name: String,
-  val preAmpAndBands: PreAmpAndBands
+  val preAmpAndBands: EqPresetDao.PreAmpAndBands
 )
 
 private val BIND_PRESET_ID = EqPresetTable.id.bindArg()
@@ -273,7 +299,7 @@ private val INSERT_PRESET = EqPresetTable.insertValues {
 object NullEqPresetDao : EqPresetDao {
   override suspend fun insertPreset(
     name: String,
-    preAmpAndBands: PreAmpAndBands
+    preAmpAndBands: EqPresetDao.PreAmpAndBands
   ): DaoResult<EqPresetId> = Err(NotImplementedError())
 
   override suspend fun getPresetData(

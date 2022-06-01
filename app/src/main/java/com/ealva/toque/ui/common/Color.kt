@@ -18,4 +18,13 @@ package com.ealva.toque.ui.common
 
 import androidx.compose.ui.graphics.Color
 
+//private val COLOR_RANGE = 0f..1f
+
 fun Color.timesAlpha(alphaPercentage: Float): Color = copy(alpha = alpha * alphaPercentage)
+
+//fun Color.times(percentage: Float): Color =
+//  copy(
+//    red = (red * percentage).coerceIn(COLOR_RANGE),
+//    green = green * percentage.coerceIn(COLOR_RANGE),
+//    blue = blue * percentage.coerceIn(COLOR_RANGE)
+//  )

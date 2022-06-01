@@ -17,35 +17,40 @@
 package com.ealva.toque.test.db
 
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqBand
 import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.common.Frequency
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.PreAmpAndBands
+import com.ealva.toque.service.media.EqPreset.BandData
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
-class EqPresetStub(override var id: EqPresetId = EqPresetId(0)) : EqPreset {
-  override val isNullPreset: Boolean = false
+class EqPresetStub(
+  override var id: EqPresetId = EqPresetId(0),
+  private val defaultBandValues: Array<Amp> = Array(10) { Amp.NONE }
+) : EqPreset {
   override var name: String = "EqPresetStub"
   override val displayName: String = name
   override var isSystemPreset: Boolean = false
-  override val bandCount: Int = 10
-  override val bandIndices: IntRange = 0 until bandCount
-
   private val bandFrequencies =
     floatArrayOf(31F, 63F, 125F, 250F, 500F, 1000F, 2000F, 4000F, 8000F, 16000F)
-
-  override fun getBandFrequency(index: Int): Float = bandFrequencies[index]
-  override fun get(index: Int): Float = bandFrequencies[index]
+  override val eqBands: ImmutableList<EqBand> = buildList<EqBand> {
+    bandFrequencies.forEachIndexed { index, frequency ->
+      EqBand(index, Frequency(frequency))
+    }
+  }.toImmutableList()
 
   override var preAmp: Amp = Amp.DEFAULT_PREAMP
+
   override suspend fun setPreAmp(amplitude: Amp) {
     preAmp = amplitude
   }
 
-  private val defaultBandValues: Array<Amp> = Array(10) { Amp.NONE }
   private var bandValues: Array<Amp> = defaultBandValues
-  override fun getAmp(index: Int): Amp = bandValues[index]
+  override fun getAmp(band: EqBand): Amp = bandValues[band.index]
 
-  override suspend fun setAmp(index: Int, amplitude: Amp) {
-    bandValues[index] = amplitude
+  override suspend fun setAmp(band: EqBand, amplitude: Amp) {
+    bandValues[band.index] = amplitude
   }
 
   override suspend fun resetAllToDefault() {
@@ -53,14 +58,10 @@ class EqPresetStub(override var id: EqPresetId = EqPresetId(0)) : EqPreset {
     bandValues = defaultBandValues
   }
 
-  override fun getAllValues(): PreAmpAndBands {
-    return PreAmpAndBands(preAmp, bandValues)
-  }
+  override fun getAllValues(): BandData = BandData(preAmp, bandValues.toList())
 
-  override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {
-    preAmp = preAmpAndBands.preAmp
-    bandValues = preAmpAndBands.bands
+  override suspend fun setAllValues(bandData: BandData) {
+    preAmp = bandData.preAmp
+    bandValues = bandData.bandValues.toTypedArray()
   }
-
-  override fun clone(): EqPreset = this
 }

@@ -79,7 +79,7 @@ private val LOG by lazyLogger(MainActivity::class)
 private val topOfStackFlow = MutableStateFlow<ComposeKey>(SplashScreen())
 private val KEY_BACKSTACK = "${MainActivity::class.java.name}_BACK_STACK"
 
-interface MainBridge {
+interface MainBridge : ScreenOrientation {
   val haveWriteExternalPermission: StateFlow<Boolean>
   val activityContext: Context
   fun startAppSettingsActivity()
@@ -215,6 +215,12 @@ class MainActivity : ComponentActivity(), MainBridge {
 
   override val activityIsVisible: Boolean
     get() = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+
+  override var screenOrientation: Int
+    get() = requestedOrientation
+    set(value) {
+      requestedOrientation = value
+    }
 
   override fun onBackPressed() {
     if (!Navigator.onBackPressed(this)) super.onBackPressed()

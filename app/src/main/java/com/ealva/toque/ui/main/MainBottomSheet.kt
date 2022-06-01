@@ -90,6 +90,9 @@ fun MainBottomSheet(
   goToSettings: () -> Unit,
   modifier: Modifier
 ) {
+  val viewModel = rememberService<LocalAudioMiniPlayerViewModel>()
+  val nowPlayingState = viewModel.miniPlayerState.collectAsState()
+
   val config = LocalScreenConfig.current
 
   Box(
@@ -102,10 +105,13 @@ fun MainBottomSheet(
       Column(modifier = Modifier.fillMaxWidth()) {
         if (isExpanded) {
           CurrentItemPager(
-            goToNowPlaying = goToNowPlaying,
             modifier = Modifier
               .fillMaxWidth()
-              .height(config.getMiniPlayerHeight())
+              .height(config.getMiniPlayerHeight()),
+            miniPlayerState = nowPlayingState.value,
+            goToNowPlaying = goToNowPlaying,
+            goToQueueIndexMaybePlay = { index -> viewModel.goToQueueIndexMaybePlay(index) },
+            togglePlayPause = { viewModel.togglePlayPause() }
           )
         }
         MainBottomSheetButtonRow(
@@ -224,14 +230,16 @@ private fun MainBottomSheetButtonRow(
 
 @OptIn(ExperimentalPagerApi::class)
 @Composable
-private fun CurrentItemPager(goToNowPlaying: () -> Unit, modifier: Modifier) {
-  val viewModel = rememberService<LocalAudioMiniPlayerViewModel>()
-  val nowPlayingState = viewModel.miniPlayerState.collectAsState()
-
-  val state = nowPlayingState.value
-  val queue = state.queue
-  val queueIndex = state.queueIndex
-  val playingState = state.playingState
+private fun CurrentItemPager(
+  modifier: Modifier = Modifier,
+  miniPlayerState: MiniPlayerState,
+  goToNowPlaying: () -> Unit,
+  goToQueueIndexMaybePlay: (Int) -> Unit = {},
+  togglePlayPause: () -> Unit,
+) {
+  val queue = miniPlayerState.queue
+  val queueIndex = miniPlayerState.queueIndex
+  val playingState = miniPlayerState.playingState
 
   val pagerState = rememberPagerState(initialPage = queueIndex.coerceAtLeast(0))
 
@@ -243,7 +251,7 @@ private fun CurrentItemPager(goToNowPlaying: () -> Unit, modifier: Modifier) {
 
   LaunchedEffect(pagerState) {
     snapshotFlow { pagerState.currentPage }.collect { index ->
-      viewModel.goToQueueIndexMaybePlay(index)
+      goToQueueIndexMaybePlay(index)
     }
   }
 
@@ -255,7 +263,7 @@ private fun CurrentItemPager(goToNowPlaying: () -> Unit, modifier: Modifier) {
     CurrentItemPagerCard(
       item = queue[page],
       playState = playingState,
-      togglePlayPause = { viewModel.togglePlayPause() },
+      togglePlayPause = togglePlayPause,
       goToNowPlaying = goToNowPlaying
     )
   }

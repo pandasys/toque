@@ -192,4 +192,10 @@ class LockScreenActivity : ComponentActivity(), MainBridge {
   override fun requestOverlayPermission() = Unit
   override val activityIsVisible: Boolean
     get() = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+
+  override var screenOrientation: Int
+    get() = requestedOrientation
+    set(value) {
+      requestedOrientation = value
+    }
 }

@@ -25,11 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.LinearProgressIndicator
-import androidx.compose.material.LocalContentColor
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
@@ -37,12 +33,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.imageLoader
 import coil.request.ImageRequest
-import coil.size.OriginalSize
 import com.ealva.ealvabrainz.common.ArtistName
 import com.ealva.ealvabrainz.common.asArtistName
 import com.ealva.ealvalog.e
@@ -60,6 +54,8 @@ import com.ealva.toque.persist.ArtistId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectArtistArtViewModel.SelectState
+import com.ealva.toque.ui.common.ResetButton
+import com.ealva.toque.ui.common.SearchButton
 import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.ealva.toque.ui.theme.toqueColors
@@ -160,22 +156,8 @@ private fun TitleBar(search: () -> Unit, reset: () -> Unit) {
     backgroundColor = toqueColors.surface,
     modifier = Modifier.fillMaxWidth(),
     actions = {
-      IconButton(onClick = search) {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_search),
-          contentDescription = "Search",
-          modifier = Modifier.size(26.dp),
-          tint = LocalContentColor.current
-        )
-      }
-      IconButton(onClick = reset) {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_restore),
-          contentDescription = "Restore original",
-          modifier = Modifier.size(26.dp),
-          tint = LocalContentColor.current
-        )
-      }
+      SearchButton(onClick = search)
+      ResetButton(onClick = reset)
     }
   )
 }
@@ -316,7 +298,7 @@ private class SelectArtistArtViewModelImpl(
     return if (remoteImage.actualSize != null) remoteImage else {
       val request = ImageRequest.Builder(appContext)
         .data(remoteImage.location)
-        .size(OriginalSize)
+        .size(coil.size.Size.ORIGINAL)
         .allowHardware(false)
         .build()
       val drawable = appContext.imageLoader.execute(request).drawable as? BitmapDrawable

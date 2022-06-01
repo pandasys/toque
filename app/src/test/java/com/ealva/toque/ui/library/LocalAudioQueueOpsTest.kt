@@ -22,23 +22,15 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.db.CategoryToken
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.persist.MediaId
-import com.ealva.toque.persist.MediaIdList
-import com.ealva.toque.prefs.PlayUpNextAction
-import com.ealva.toque.service.audio.LocalAudioQueue
-import com.ealva.toque.service.audio.NullLocalAudioQueue
+import com.ealva.toque.sharedTest.LocalAudioQueueViewModelSpy
 import com.ealva.toque.test.shared.CoroutineRule
-import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
-import com.ealva.toque.ui.common.DialogPrompt
 import com.ealva.toque.ui.library.LocalAudioQueueOps.OpMessage
-import com.ealva.toque.ui.main.Notification
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.get
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -183,48 +175,6 @@ class LocalAudioQueueOpsTest {
     expect(queueOps.addToPlaylist({ Ok(MEDIA_LIST) }, { clearCalled = true }).get())
       .toBe(PromptResult.Executed)
     expect(clearCalled).toBe(true)
-  }
-}
-
-private class LocalAudioQueueViewModelSpy : LocalAudioQueueViewModel {
-  override val localAudioQueue: StateFlow<LocalAudioQueue> = MutableStateFlow(NullLocalAudioQueue)
-  override val playUpNextAction: StateFlow<PlayUpNextAction> =
-    MutableStateFlow(PlayUpNextAction.Prompt)
-  override val queueSize: Int = 0
-
-  var _isPlaying: Boolean = false
-  override val isPlaying: Boolean
-    get() = _isPlaying
-
-  override fun emitNotification(notification: Notification) {}
-
-  var _playReturn: PromptResult = PromptResult.Executed
-  override suspend fun play(mediaList: CategoryMediaList): PromptResult {
-    return _playReturn
-  }
-
-  var _shuffleReturn: PromptResult = PromptResult.Executed
-  override suspend fun shuffle(mediaList: CategoryMediaList): PromptResult {
-    return _shuffleReturn
-  }
-
-  override fun playNext(mediaList: CategoryMediaList) {
-  }
-
-  override fun addToUpNext(categoryMediaList: CategoryMediaList) {
-  }
-
-  var _addToPlaylistReturn: PromptResult =
-    PromptResult.Executed
-
-  override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
-    return _addToPlaylistReturn
-  }
-
-  override fun showPrompt(prompt: DialogPrompt) {
-  }
-
-  override fun clearPrompt() {
   }
 }
 

@@ -222,7 +222,7 @@ private class MainViewModelImpl(
 
   private fun emitOrEnqueue(notification: Notification) {
     activeNotification?.let { active ->
-      if (active.doNotDismissEarly) {
+      if (!notification.displaysAction && active.doNotDismissEarly) {
         notificationDeque.addLast(notification)
       } else {
         active.dismiss()

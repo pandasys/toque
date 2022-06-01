@@ -273,6 +273,7 @@ class MediaPlayerService : MediaBrowserServiceCompat(), ToqueMediaController, Li
     mediaSession.browser.onSearch(query, extras ?: Bundle.EMPTY, result)
 
   override suspend fun setCurrentQueue(type: QueueType, resume: Boolean) {
+    LOG._e { it("setCurrentQueue type:%s", type) }
     val current = currentQueue
     if (current.queueType != type) {
       if (current !== NullPlayableMediaQueue) {

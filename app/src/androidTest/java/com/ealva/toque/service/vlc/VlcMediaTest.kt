@@ -22,10 +22,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
-import com.ealva.toque.service.vlc.LibVlcPrefs
-import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
-import com.ealva.toque.service.vlc.LibVlcSingleton
-import com.ealva.toque.test.shared.CoroutineRule
+import com.ealva.toque.sharedtest.CoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.TestScope

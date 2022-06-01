@@ -68,7 +68,6 @@ import com.ealva.toque.persist.asMediaIdList
 import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
-import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.common.LibraryScrollBar
 import com.ealva.toque.ui.common.LocalScreenConfig
@@ -361,7 +360,7 @@ private fun DragHandle(index: Int, modifier: Modifier) {
 }
 
 @Immutable
-data class  QueueAudioItem(val item: AudioItem, val position: Int) : AudioItem by item
+data class QueueAudioItem(val item: AudioItem, val position: Int) : AudioItem by item
 
 @Immutable
 data class QueueState(
@@ -406,12 +405,9 @@ interface QueueViewModel {
 private class QueueViewModelImpl(
   private val localAudioQueueModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
-  private val dispatcher: CoroutineDispatcher
+  dispatcher: CoroutineDispatcher
 ) : QueueViewModel, ScopedServices.Registered, ScopedServices.HandlesBack {
-  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-  private var queueStateJob: Job? = null
-  private var localAudioQueue: LocalAudioQueue = NullLocalAudioQueue
-
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   override val queueState = MutableStateFlow(QueueState(emptyList(), -1))
   override val selectedFlow = SelectedItemsFlow<InstanceId>(SelectedItems())
   override val inDragMode = MutableStateFlow(false)
@@ -455,16 +451,16 @@ private class QueueViewModelImpl(
 
   override fun moveQueueItem(from: Int, to: Int) {
     inDragMode.value = false
-    if (from != to) localAudioQueue.moveQueueItem(from, to)
+    if (from != to) localAudioQueueModel.moveQueueItem(from, to)
   }
 
   override fun deleteQueueItem(item: QueueAudioItem) {
     selectedFlow.deselect(item.instanceId)
-    scope.launch { localAudioQueue.removeFromQueue(item.position, item) }
+    scope.launch { localAudioQueueModel.removeFromQueue(item.position, item) }
   }
 
   override fun goToQueueItemMaybePlay(item: QueueAudioItem) =
-    localAudioQueue.goToIndexMaybePlay(item.position)
+    localAudioQueueModel.goToIndexMaybePlay(item.position)
 
   override fun itemClicked(item: QueueAudioItem) =
     selectedFlow.ifInSelectionModeToggleElse(item.instanceId) { goToQueueItemMaybePlay(item) }
@@ -508,36 +504,15 @@ private class QueueViewModelImpl(
     queue.filterIfHasSelection(selectedFlow.value) { it.instanceId }
 
   override fun onServiceRegistered() {
-    localAudioQueueModel.localAudioQueue
-      .onEach { queue -> handleQueueChange(queue) }
-      .launchIn(scope)
-  }
-
-  override fun onServiceUnregistered() {
-    scope.cancel()
-  }
-
-  private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
-    when (queue) {
-      is NullLocalAudioQueue -> queueInactive()
-      is LocalAudioQueue -> queueActive(queue)
-      else -> queueInactive()
-    }
-  }
-
-  private fun queueActive(queue: LocalAudioQueue) {
-    localAudioQueue = queue
-    queueStateJob = queue.queueState
+    localAudioQueueModel.audioQueueState
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("Error with LocalAudioQueueState flow") } }
       .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }
 
-  private fun queueInactive() {
-    queueStateJob?.cancel()
-    queueStateJob = null
-    localAudioQueue = NullLocalAudioQueue
+  override fun onServiceUnregistered() {
+    scope.cancel()
   }
 
   private fun handleServiceState(localAudioQueueState: LocalAudioQueueState) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.sharedtest
+package com.ealva.toque.sharedTest
 
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.Millis

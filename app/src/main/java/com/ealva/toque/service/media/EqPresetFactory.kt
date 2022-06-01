@@ -19,27 +19,28 @@ package com.ealva.toque.service.media
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.db.DaoResult
-import com.ealva.toque.db.EqPresetIdName
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
+import kotlinx.coroutines.flow.StateFlow
 
 interface EqPresetFactory {
+  suspend fun allPresets(): StateFlow<List<EqPreset>>
 
   /**
-   * Number of distinct frequency bands for an equalizer
+   * Get an EqPreset based on the [id]. Result is either a system or user preset, based on the [id]
    */
-  val bandCount: Int
-
-  val bandIndices: IntRange
-
-  val systemPresetCount: Int
-
-  suspend fun getAllPresets(): List<EqPresetIdName>
-
   suspend fun getPreset(id: EqPresetId): DaoResult<EqPreset>
 
+  /**
+   * Make a new user [EqPreset] from [eqPreset] with [name].
+   */
   suspend fun makeFrom(eqPreset: EqPreset, name: String): DaoResult<EqPreset>
 
+  /**
+   * Get the "preferred" [EqPreset] based on one of [mediaId], [albumId], or current [outputRoute],
+   * in that order. If no match is found, the "default" preset is returned. The default is typically
+   * the system "Flat preset.
+   */
   suspend fun getPreferred(
     mediaId: MediaId,
     albumId: AlbumId,

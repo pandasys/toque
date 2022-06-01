@@ -16,47 +16,96 @@
 
 package com.ealva.toque.ui.preset
 
+import androidx.compose.runtime.Immutable
 import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqBand
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.log._e
+import com.ealva.toque.navigation.AllowableNavigation
+import com.ealva.toque.service.audio.LocalAudioQueueState
+import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
+import com.ealva.toque.service.media.EqPreset.BandData
 import com.ealva.toque.service.media.EqPresetFactory
-import com.ealva.toque.service.media.PreAmpAndBands
+import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.main.MainViewModel
+import com.ealva.toque.ui.main.ScreenOrientation
 import com.ealva.toque.ui.nav.backIfAllowed
+import com.ealva.toque.ui.preset.EqPresetEditorModel.Preset
 import com.zhuinden.simplestack.Backstack
 import com.zhuinden.simplestack.Bundleable
 import com.zhuinden.simplestack.ScopedServices
 import com.zhuinden.statebundle.StateBundle
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+private val List<EqPreset>.asPresets: List<Preset>
+  get() = map { eqPreset -> eqPreset.asPreset }
+
+private val EqPreset.asPreset: Preset
+  get() = Preset(id, displayName, isSystemPreset, getAllValues(), eqBands)
 
 @Suppress("unused")
 private val LOG by lazyLogger(EqPresetEditorModel::class)
 
-interface EqPresetEditorModel {
+interface EqPresetEditorModel : AllowableNavigation, ScreenOrientation {
+  @Immutable
+  data class Preset(
+    val id: EqPresetId,
+    val displayName: String,
+    val isSystemPreset: Boolean,
+    val bandData: BandData,
+    val eqBands: ImmutableList<EqBand>
+  ) {
+    val isEditable: Boolean
+      get() = !isSystemPreset
+  }
 
-  fun goBack()
-
+  @Immutable
   data class State(
-    val currentPreset: EqPreset,
-    val allPresets: List<EqPreset>
+    /** True if currently in editing mode */
+    val editing: Boolean,
+    val currentPreset: Preset,
+    val allPresets: List<Preset>,
+    val eqMode: EqMode,
   )
 
   val editorState: StateFlow<State>
 
+  fun toggleEqMode()
+  fun presetSelected(preset: Preset)
+  fun goBack()
+  fun setPreAmp(amp: Amp)
+  fun setBand(band: EqBand, amp: Amp)
+  fun saveAs()
+
   companion object {
     operator fun invoke(
+      mainViewModel: MainViewModel,
+      localAudioModel: LocalAudioQueueViewModel,
       backstack: Backstack,
       eqPresetFactory: EqPresetFactory,
       dispatcher: CoroutineDispatcher = Dispatchers.Main
     ): EqPresetEditorModel = EqPresetEditorModelImpl(
+      mainViewModel = mainViewModel,
+      localAudioModel = localAudioModel,
       backstack = backstack,
       eqPresetFactory = eqPresetFactory,
       dispatcher = dispatcher
@@ -64,50 +113,139 @@ interface EqPresetEditorModel {
   }
 }
 
-private val EMPTY_STATE = EqPresetEditorModel.State(
-  currentPreset = EqPresetDummy(
-    defaultBandValues = arrayOf(
-      Amp(0),
-      Amp(0),
-      Amp(0),
-      Amp(0),
-      Amp(0),
-      Amp(0),
-      Amp(0),
-      Amp(0),
-      Amp(-2),
-      Amp(-4),
-    )
-  ),
-  allPresets = emptyList()
-)
+private const val TRY_EMIT_FAILED_MESSAGE = "applyEditsFlow tryEmit failed. Ensure " +
+  "MutableSharedFlow is configured with extraBufferCapacity = 1 and onBufferOverflow = " +
+  "BufferOverflow.DROP_OLDEST"
 
 private class EqPresetEditorModelImpl(
+  private val mainViewModel: MainViewModel,
+  private val localAudioModel: LocalAudioQueueViewModel,
   private val backstack: Backstack,
   private val eqPresetFactory: EqPresetFactory,
   dispatcher: CoroutineDispatcher
-) : EqPresetEditorModel, ScopedServices.Registered, ScopedServices.Activated, Bundleable {
+) : EqPresetEditorModel, ScopedServices.Registered, Bundleable, ScreenOrientation by mainViewModel {
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private val originalOrientation = screenOrientation
+  private val audioQueueState = localAudioModel.audioQueueState.value
+
+  /**
+   * We are using a flow to apply edits to ensure ordering. Edits may arrive very quickly as the
+   * user moves a slider and persisting values is suspending.
+   *
+   * extraBufferCapacity is 1 and overflow is DROP_OLDEST because we only care about the last edit
+   * and we want to use the non-suspending tryEmit.
+   */
+  private val applyEditsFlow = MutableSharedFlow<BandData>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
+
+  override val editorState = MutableStateFlow(
+    EqPresetEditorModel.State(
+      editing = false,
+      currentPreset = audioQueueState.currentPreset.asPreset,
+      allPresets = emptyList(),
+      eqMode = audioQueueState.eqMode
+    )
+  )
+  private val currentEqPreset: EqPreset
+    get() = audioQueueState.currentPreset
+
+  private val currentData: Preset
+    get() = currentEqPreset.asPreset
+
+  private var editingValues: BandData? = null
+  private var initialValues: BandData? = null
+
+  private val inEditingMode: Boolean
+    get() = editingValues != null
+
+  override fun onServiceRegistered() {
+    LOG.e { it("onServiceRegistered") }
+    localAudioModel.audioQueueState
+      .onEach { audioQueueState -> handleAudioQueueState(audioQueueState) }
+      .catch { cause -> LOG.e(cause) { it("Error audioQueueState flow") } }
+      .launchIn(scope)
+
+    scope.launch {
+      eqPresetFactory.allPresets()
+        .onEach { list -> editorState.update { state -> state.copy(allPresets = list.asPresets) } }
+        .collect()
+    }
+
+    applyEditsFlow
+      .onEach { presetData -> applyEdit(presetData) }
+      .launchIn(scope)
+  }
+
+  private suspend fun applyEdit(bandData: BandData) {
+    currentEqPreset.setAllValues(bandData)
+    editorState.update { state ->
+      state.copy(currentPreset = state.currentPreset.copy(bandData = bandData) )
+    }
+  }
+
+  override fun onServiceUnregistered() {
+    scope.cancel()
+  }
+
   override fun goBack() {
     backstack.backIfAllowed()
   }
 
-  override val editorState = MutableStateFlow(EMPTY_STATE)
-
-  override fun onServiceRegistered() {
-    LOG.e { it("onServiceRegistered") }
+  override fun setPreAmp(amp: Amp) {
+    maybeEstablishInitialValues()
+    updateEditingValues { presetData -> presetData.setPreAmp(amp) }
   }
 
-  override fun onServiceUnregistered() {
-    LOG.e { it("onServiceUnregistered") }
+  override fun setBand(band: EqBand, amp: Amp) {
+    maybeEstablishInitialValues()
+    updateEditingValues { presetData -> presetData.setBand(band, amp) }
   }
 
-  override fun onServiceActive() {
-    LOG.e { it("onServiceActive") }
+  private inline fun updateEditingValues(editBlock: (BandData) -> BandData) {
+    editingValues = editingValues?.let { current -> editBlock(current).also { emitEdit(it) } }
   }
 
-  override fun onServiceInactive() {
-    LOG.e { it("onServiceInactive") }
+  private fun emitEdit(it: BandData) {
+    if (!applyEditsFlow.tryEmit(it)) LOG.e { it(TRY_EMIT_FAILED_MESSAGE) }
+  }
+
+  override fun saveAs() {
+    LOG._e { it("SaveAs") }
+  }
+
+  override fun navigateIfAllowed(command: () -> Unit) {
+    // If data is unsaved, prompt like below, else execute command
+    if (inEditingMode) {
+      // show prompt
+    } else {
+      command()
+    }
+//    val playlistData = currentPlaylistData
+//    if (playlistData.let { it.isValid && it.hasNotBeenEdited }) {
+//      command()
+//    } else {
+//      // Exit and discard all changes? Exit, Cancel, Save (if savable)
+//      showExitPrompt(playlistData, command)
+//    }
+  }
+
+  private fun maybeEstablishInitialValues() {
+    if (initialValues == null) {
+      currentData.bandData.let { data ->
+        initialValues = data
+        editingValues = data
+      }
+    }
+  }
+
+  override fun toggleEqMode() {
+    localAudioModel.toggleEqMode()
+  }
+
+  override fun presetSelected(preset: Preset) {
+    localAudioModel.setCurrentPreset(preset.id)
   }
 
   override fun toBundle(): StateBundle = StateBundle().apply {
@@ -122,50 +260,15 @@ private class EqPresetEditorModelImpl(
   private fun restoreFromBundle(bundle: StateBundle) {
     LOG._e { it("restoreFromBundle") }
   }
+
+  private fun handleAudioQueueState(audioQueueState: LocalAudioQueueState) {
+    editorState.update { state ->
+      val newEqPreset = audioQueueState.currentPreset
+      state.copy(
+        currentPreset = newEqPreset.asPreset,
+        eqMode = audioQueueState.eqMode
+      )
+    }
+  }
 }
 
-private class EqPresetDummy(
-  override var id: EqPresetId = EqPresetId(0),
-  private val defaultBandValues: Array<Amp> = Array(10) { Amp.NONE }
-) : EqPreset {
-  override val isNullPreset: Boolean = false
-  override var name: String = "Speaker"
-  override var isSystemPreset: Boolean = false
-  override val displayName: String = if (isSystemPreset) "*$name" else name
-  override val bandCount: Int = 10
-  override val bandIndices: IntRange = 0 until bandCount
-
-  private val bandFrequencies =
-    floatArrayOf(31F, 63F, 125F, 250F, 500F, 1000F, 2000F, 4000F, 8000F, 16000F)
-
-  override fun getBandFrequency(index: Int): Float = bandFrequencies[index]
-  override fun get(index: Int): Float = bandValues[index].value
-
-  override var preAmp: Amp = Amp.DEFAULT_PREAMP
-  override suspend fun setPreAmp(amplitude: Amp) {
-    preAmp = amplitude
-  }
-
-  private var bandValues: Array<Amp> = defaultBandValues
-  override fun getAmp(index: Int): Amp = bandValues[index]
-
-  override suspend fun setAmp(index: Int, amplitude: Amp) {
-    bandValues[index] = amplitude
-  }
-
-  override suspend fun resetAllToDefault() {
-    preAmp = Amp.DEFAULT_PREAMP
-    bandValues = defaultBandValues
-  }
-
-  override fun getAllValues(): PreAmpAndBands {
-    return PreAmpAndBands(preAmp, bandValues)
-  }
-
-  override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {
-    preAmp = preAmpAndBands.preAmp
-    bandValues = preAmpAndBands.bands
-  }
-
-  override fun clone(): EqPreset = this
-}

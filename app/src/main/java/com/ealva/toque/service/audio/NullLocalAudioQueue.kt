@@ -17,6 +17,7 @@
 package com.ealva.toque.service.audio
 
 import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
 import com.ealva.toque.common.ShuffleMode
@@ -40,6 +41,7 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val queueState = MutableStateFlow(LocalAudioQueueState.NONE)
   override val notificationFlow = emptyFlow<ServiceNotification>()
   override fun toggleEqMode() = Unit
+  override fun setCurrentPreset(id: EqPresetId) = Unit
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
   override suspend fun addToUpNext(
     categoryMediaList: CategoryMediaList
@@ -60,7 +62,7 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override fun setRepeatMode(mode: RepeatMode) = Unit
   override fun setShuffleMode(mode: ShuffleMode) = Unit
   override suspend fun removeFromQueue(index: Int, item: AudioItem) = Unit
-  override fun moveQueueItem(from: Int, to: Int) = Unit
+  override suspend fun moveQueueItem(from: Int, to: Int) = Unit
   override val isActive: StateFlow<Boolean> = MutableStateFlow(false)
   override suspend fun activate(resume: Boolean, playNow: PlayNow) = Unit
   override fun deactivate() = Unit

@@ -16,44 +16,80 @@
 
 package com.ealva.toque.service.media
 
+import android.os.Parcel
 import android.os.Parcelable
+import androidx.compose.runtime.Immutable
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqBand
 import com.ealva.toque.common.EqPresetId
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toPersistentList
+import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
-
-@Parcelize
-data class PreAmpAndBands(val preAmp: Amp, val bands: Array<Amp>) : Parcelable {
-  override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (javaClass != other?.javaClass) return false
-
-    other as PreAmpAndBands
-
-    if (preAmp != other.preAmp) return false
-    if (!bands.contentEquals(other.bands)) return false
-
-    return true
-  }
-
-  override fun hashCode(): Int {
-    var result = preAmp.hashCode()
-    result = 31 * result + bands.contentHashCode()
-    return result
-  }
-
-  override fun toString(): String {
-    return """PreAmpAndBands[$preAmp, ${bands.contentToString()}]"""
-  }
-}
+import kotlinx.parcelize.WriteWith
 
 interface EqPreset {
+
+  @Immutable
+  interface BandData : Parcelable {
+    val preAmp: Amp
+    val bandValues: ImmutableList<Amp>
+
+    fun setPreAmp(amp: Amp): BandData
+    fun setBand(band: EqBand, amp: Amp): BandData
+
+    operator fun get(band: EqBand): Amp = bandValues[band.index]
+
+    fun clone(): BandData
+
+    companion object {
+      operator fun invoke(preAmp: Amp, bands: List<Amp>): BandData {
+        return PresetBandData(preAmp, bands.toPersistentList())
+      }
+
+      private object BandListParceler : Parceler<PersistentList<Amp>> {
+        override fun PersistentList<Amp>.write(parcel: Parcel, flags: Int) {
+          parcel.writeList(this)
+        }
+
+        override fun create(parcel: Parcel): PersistentList<Amp> = ArrayList<Amp>(10).apply {
+          parcel.readList(this, Amp::class.java.classLoader)
+        }.toPersistentList()
+      }
+
+      @Parcelize
+      private data class PresetBandData(
+        override val preAmp: Amp,
+        override val bandValues: @WriteWith<BandListParceler> PersistentList<Amp>
+      ) : BandData {
+        override fun setPreAmp(amp: Amp): PresetBandData = copy(preAmp = amp)
+        override fun setBand(
+          band: EqBand,
+          amp: Amp
+        ): PresetBandData = copy(bandValues = bandValues.set(band.index, amp))
+        override fun clone(): BandData = copy()
+      }
+    }
+  }
+
   /**
    * Id of the preset and should be treated as an opaque value (could be a system ID or an
    * internal persistent ID)
    */
   val id: EqPresetId
 
-  val isNullPreset: Boolean
+  /**
+   * True if this preset represents "no preset", equivalent to the Equalizer being off. If this
+   * value is true, none of the other preset information should be used.
+   */
+  val isNone: Boolean
+    get() = id.value < 0
+
+  /** This is the opposite of [isNone] */
+  val isValid: Boolean
+    get() = !isNone
 
   /**
    * Get the name of this equalizer preset, which is either a system preset or user assigned name.
@@ -69,47 +105,35 @@ interface EqPreset {
   /** System presets are not editable and are not persisted */
   val isSystemPreset: Boolean
 
-  /** Get the number of distinct frequency bands for an equalizer */
-  val bandCount: Int
-
-  val bandIndices: IntRange
-
-  /**
-   * Get a particular equalizer band frequency. This value can be used, for example, to create a
-   * label for an equalizer band control in a user interface.
-   * @param index index of the band, counting from zero.
-   * @return equalizer band frequency (Hz), or -1 if there is no such band
-   */
-  fun getBandFrequency(index: Int): Float
-
-  operator fun get(index: Int): Float
+  val eqBands: ImmutableList<EqBand>
 
   /** Current pre-amplification value of this equalizer. */
   val preAmp: Amp
 
   /**
-   * Set this preset's PreAmp [amplitude]. Not a var as we need to suspend on set
+   * Set this preset's PreAmp [amplitude]. The preamp adjusts the overall gain of the equalizer.
+   *
+   * Not a var as we need to suspend on set
    * @throws UnsupportedOperationException if this is a system preset
    * @throws IllegalArgumentException if value is not in [Amp.RANGE]
    */
-  @Throws(UnsupportedOperationException::class)
+  @Throws(UnsupportedOperationException::class, IllegalArgumentException::class)
   suspend fun setPreAmp(amplitude: Amp)
 
   /**
    * Get the amplification value for a particular equalizer frequency band.
-   * @param index counting from zero, of the frequency band to get.
-   * @return amplification value (Hz); NaN if there is no such frequency band.
+   * @param band the frequency band to get
+   * @return amplification value (Hz)
    */
-  fun getAmp(index: Int): Amp
+  fun getAmp(band: EqBand): Amp
 
   /**
-   * Set a new amplification [amplitude] for the equalizer frequency band at [index].
+   * Set a new amplification [amplitude] for the equalizer frequency [band].
    * @throws UnsupportedOperationException if this is a system preset
    * @throws IllegalArgumentException if value is not in [Amp.RANGE]
-   * @throws IllegalArgumentException if index is not in [bandIndices]
    */
   @Throws(UnsupportedOperationException::class)
-  suspend fun setAmp(index: Int, amplitude: Amp)
+  suspend fun setAmp(band: EqBand, amplitude: Amp)
 
   /**
    * Sets all frequencies to flat and the preamp to it's default value
@@ -121,52 +145,35 @@ interface EqPreset {
   /**
    * Get the preamp value and all band values in an array
    */
-  fun getAllValues(): PreAmpAndBands
+  fun getAllValues(): BandData
 
   /**
-   * Set the preamp and all band values. The size of the amp array must be equal to [bandCount].
-   * Oh, and this one time at band camp...
+   * Set the preamp and all band values.
    * @throws UnsupportedOperationException if this is a system preset
-   * @throws IllegalArgumentException if value is not in [Amp.RANGE]
-   * @throws IllegalArgumentException if index is not in [bandIndices]
    */
   @Throws(UnsupportedOperationException::class)
-  suspend fun setAllValues(preAmpAndBands: PreAmpAndBands)
-
-  /**
-   * Return and exact clone, including any underlying native preset. This is used during editing.
-   * When a band value is changed a clone should be made because EqPreset instances currently use
-   * identity equals. A clone will not be equal to the original.
-   */
-  fun clone(): EqPreset
+  suspend fun setAllValues(bandData: BandData)
 
   companion object {
     val BAND_DEFAULT = Amp.NONE
-    private const val DEFAULT_BAND_COUNT = 10
-
-    const val NONE_EQ_PRESET_NAME = "EqPreset.NONE"
 
     val NONE = object : EqPreset {
       override val id: EqPresetId = EqPresetId(-1L)
-      override val isNullPreset: Boolean = true
-      override val name = NONE_EQ_PRESET_NAME
+      override val name = "EqPreset.NONE"
       override val displayName = "None"
       override val isSystemPreset = true
-      override val bandCount = DEFAULT_BAND_COUNT
-      override val bandIndices = 0 until bandCount
-      override fun getBandFrequency(index: Int): Float = 0F
-      override fun get(index: Int): Float = 0F
+      override val eqBands: ImmutableList<EqBand> = emptyList<EqBand>().toImmutableList()
       override val preAmp: Amp = Amp.NONE
       override suspend fun setPreAmp(amplitude: Amp) {}
-      override fun getAmp(index: Int): Amp = Amp.NONE
-      override suspend fun setAmp(index: Int, amplitude: Amp) {}
+      override fun getAmp(band: EqBand): Amp = Amp.NONE
+      override suspend fun setAmp(band: EqBand, amplitude: Amp) {}
       override suspend fun resetAllToDefault() {}
-      override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {}
-      override fun clone(): EqPreset = this
-      override fun getAllValues(): PreAmpAndBands = PreAmpAndBands(
+      override suspend fun setAllValues(bandData: BandData) {}
+      override fun getAllValues(): BandData = BandData(
         Amp.NONE,
-        Array(bandCount) { Amp.NONE }
+        List(10) { Amp.NONE }
       )
+
       override fun toString() = "NONE"
     }
   }

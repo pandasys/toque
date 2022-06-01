@@ -40,13 +40,10 @@ import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
-import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
-import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.PlayState
-import com.ealva.toque.service.queue.PlayableMediaQueue
 import com.ealva.toque.service.queue.StreamVolume
 import com.ealva.toque.ui.art.SelectAlbumArtScreen
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
@@ -66,7 +63,6 @@ import com.zhuinden.simplestack.ScopedServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -236,9 +232,6 @@ private class NowPlayingViewModelImpl(
   private val appPrefsSingleton: AppPrefsSingleton
 ) : NowPlayingViewModel, ScopedServices.Registered {
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-  private var currentQueueJob: Job? = null
-  private var queueStateJob: Job? = null
-  private var audioQueue: LocalAudioQueue = NullLocalAudioQueue
 
   override val nowPlayingState = MutableStateFlow(NowPlayingState.NONE)
 
@@ -255,39 +248,15 @@ private class NowPlayingViewModelImpl(
         .collect()
     }
 
-    currentQueueJob = localAudioQueueModel.localAudioQueue
-      .onEach { queue -> handleQueueChange(queue) }
-      .launchIn(scope)
-  }
-
-  override fun onServiceUnregistered() {
-//    currentQueueJob?.cancel()
-//    currentQueueJob = null
-//    handleQueueChange(NullLocalAudioQueue)
-    scope.cancel()
-  }
-
-  private fun handleQueueChange(queue: PlayableMediaQueue<*>) {
-    when (queue) {
-      is NullLocalAudioQueue -> queueInactive()
-      is LocalAudioQueue -> queueActive(queue)
-      else -> queueInactive()
-    }
-  }
-
-  private fun queueActive(queue: LocalAudioQueue) {
-    audioQueue = queue
-    queueStateJob = audioQueue.queueState
+    localAudioQueueModel.audioQueueState
       .onEach { state -> handleServiceState(state) }
       .catch { cause -> LOG.e(cause) { it("LocalAudioQueue state flow error") } }
       .onCompletion { LOG._i { it("LocalAudioQueue state flow completed") } }
       .launchIn(scope)
   }
 
-  private fun queueInactive() {
-    queueStateJob?.cancel()
-    queueStateJob = null
-    audioQueue = NullLocalAudioQueue
+  override fun onServiceUnregistered() {
+    scope.cancel()
   }
 
   private fun handleServiceState(newState: LocalAudioQueueState) = nowPlayingState.update { state ->
@@ -306,30 +275,30 @@ private class NowPlayingViewModelImpl(
     )
   }
 
-  override fun nextShuffleMode() = audioQueue.nextShuffleMode()
+  override fun nextShuffleMode() = localAudioQueueModel.nextShuffleMode()
 
-  override fun nextMedia() = audioQueue.next()
+  override fun nextMedia() = localAudioQueueModel.next()
 
-  override fun previousMedia() = audioQueue.previous()
+  override fun previousMedia() = localAudioQueueModel.previous()
 
-  override fun nextList() = audioQueue.nextList()
+  override fun nextList() = localAudioQueueModel.nextList()
 
-  override fun previousList() = audioQueue.previousList()
+  override fun previousList() = localAudioQueueModel.previousList()
 
-  override fun togglePlayPause() = audioQueue.togglePlayPause()
+  override fun togglePlayPause() = localAudioQueueModel.togglePlayPause()
 
-  override fun nextRepeatMode() = audioQueue.nextRepeatMode()
+  override fun nextRepeatMode() = localAudioQueueModel.nextRepeatMode()
 
-  override fun toggleEqMode() = audioQueue.toggleEqMode()
+  override fun toggleEqMode() = localAudioQueueModel.toggleEqMode()
 
-  override fun seekTo(position: Millis) = audioQueue.seekTo(position)
+  override fun seekTo(position: Millis) = localAudioQueueModel.seekTo(position)
 //    nowPlayingState.update { state -> state.copy(position = position) }
 
-  override fun userSeekingComplete() = audioQueue.seekTo(nowPlayingState.value.position)
+  override fun userSeekingComplete() = localAudioQueueModel.seekTo(nowPlayingState.value.position)
 
   override fun goToQueueIndexMaybePlay(index: Int) {
     if (index != currentIndex) {
-      audioQueue.goToIndexMaybePlay(index)
+      localAudioQueueModel.goToIndexMaybePlay(index)
     }
   }
 

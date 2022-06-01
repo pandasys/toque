@@ -16,21 +16,26 @@
 
 package com.ealva.toque.common
 
-import android.net.Uri
-import com.ealva.toque.file.ifEmpty
+import com.nhaarman.expect.expect
+import org.junit.Test
 
-interface EntityArtwork {
-  val remoteArtwork: Uri
-  val localArtwork: Uri
-
-  companion object {
-    private data class ArtworkData(
-      override val remoteArtwork: Uri,
-      override val localArtwork: Uri
-    ) : EntityArtwork
-
-    operator fun invoke(remote: Uri, local: Uri): EntityArtwork = ArtworkData(remote, local)
+class FrequencyTest {
+  @Test
+  fun testGetDisplayString() {
+    val freqList = listOf(
+      Frequency(31F) to "31 Hz",
+      Frequency(63F) to "63 Hz",
+      Frequency(125F) to "125 Hz",
+      Frequency(250F) to "250 Hz",
+      Frequency(500F) to "500 Hz",
+      Frequency(1000F) to "1 kHz",
+      Frequency(2000F) to "2 kHz",
+      Frequency(4000F) to "4 kHz",
+      Frequency(8000F) to "8 kHz",
+      Frequency(16000F) to "16 kHz"
+    )
+    freqList.forEach { (frequency, result) ->
+      expect(frequency.displayString).toBe(result)
+    }
   }
 }
-
-inline val EntityArtwork.preferredArt: Uri get() = localArtwork.ifEmpty { remoteArtwork }

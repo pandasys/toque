@@ -83,4 +83,4 @@ private fun mimeTypeFromLookup(ext: String): String = when {
   else -> ""
 }
 
-fun Uri.elseIfEmpty(remote: Uri): Uri = if (this === Uri.EMPTY) remote else this
+inline fun Uri.ifEmpty(other: () -> Uri): Uri = if (this === Uri.EMPTY) other() else this

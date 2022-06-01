@@ -285,7 +285,7 @@ class MediaScannerService : LifecycleService() {
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     fun startScanner(context: Context, reason: String, rescan: RescanType) {
-      LOG.i { it("reason=%s rescan=%s", reason, rescan) }
+      LOG._e { it("reason=%s rescan=%s", reason, rescan) }
       if (context.cannotWriteStorage()) {
         LOG.e { it("Don't have read external permission. Not starting media scanner.") }
       } else {
@@ -294,6 +294,7 @@ class MediaScannerService : LifecycleService() {
           scanReason = reason
           rescanType = rescan
         }
+        LOG._e { it("getWorkEnqueuer") }
         WorkEnqueuer.getWorkEnqueuer(context).enqueueWork(intent)
       }
     }
@@ -360,7 +361,9 @@ private class WorkEnqueuerImpl(
 
   override fun enqueueWork(work: Intent) {
     // no need to defensively copy [work] since we created in this file
+    LOG._e { it("startForegroundService") }
     ContextCompat.startForegroundService(context, work)
+    LOG._e { it("after startForegroundService") }
     mutex.withLock {
       if (!launching) {
         launching = true

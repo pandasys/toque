@@ -24,7 +24,7 @@ import kotlinx.parcelize.Parcelize
 typealias AmpRange = ClosedRange<Amp>
 
 operator fun ClosedFloatingPointRange<Float>.contains(amp: Amp): Boolean =
-  contains(amp())
+  contains(amp.value)
 
 /** Represents Amplitude */
 @Parcelize
@@ -36,8 +36,6 @@ value class Amp(val value: Float) : Comparable<Amp>, Parcelable {
   operator fun plus(rhs: Amp): Amp = Amp(value + rhs.value)
   operator fun plus(rhs: Float): Amp = Amp(value + rhs)
 
-  inline operator fun invoke(): Float = value
-
   override fun toString(): String = value.toString()
 
   companion object {
@@ -45,7 +43,9 @@ value class Amp(val value: Float) : Comparable<Amp>, Parcelable {
 
     val NONE = Amp(0F)
     val DEFAULT_PREAMP = Amp(12)
+    @Suppress("MemberVisibilityCanBePrivate")
     val MIN_AMP = Amp(-20)
+    @Suppress("MemberVisibilityCanBePrivate")
     val MAX_AMP = Amp(20)
     val RANGE = MIN_AMP..MAX_AMP
     val REPLAY_GAIN_RANGE = Amp(-16)..Amp(16)

@@ -75,7 +75,7 @@ open class BaseToquePreferenceStore<T : PreferenceStore<T>>(
     default: Amp,
     customName: String? = null,
     sanitize: ((Amp) -> Amp) = { it.coerceIn(Amp.RANGE) }
-  ): AmpStorePref = asTypePref(default, ::Amp, { it() }, customName, sanitize)
+  ): AmpStorePref = asTypePref(default, ::Amp, { it.value }, customName, sanitize)
 
   protected inline fun <reified T> enumPref(
     default: T,

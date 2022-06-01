@@ -19,17 +19,12 @@ package com.ealva.toque.service.vlc
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.service.vlc.LibVlcPrefs
-import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
-import com.ealva.toque.service.vlc.LibVlcSingleton
-import com.ealva.toque.test.shared.CoroutineRule
+import com.ealva.toque.sharedtest.CoroutineRule
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -74,7 +69,6 @@ class LibVlcFactoryTest {
         dispatcher = coroutineRule.testDispatcher
       )
       // Test will break when upgrading LibVlc and that's expected (obviously)
-// Test will break when upgrading LibVlc and that's expected (obviously)
       factory.withInstance { libVlc ->
         expect(libVlc.libVlcVersion()).toBe("3.0.16 Vetinari")
       }

@@ -20,6 +20,8 @@ import com.ealva.ealvalog.e
 import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
+import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.common.Millis
 import com.ealva.toque.common.PlaylistName
 import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.fetch
@@ -45,6 +47,7 @@ import com.ealva.toque.ui.common.DialogPrompt
 import com.ealva.toque.ui.library.PlayUpNextPrompt
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
+import com.ealva.toque.ui.queue.QueueAudioItem
 import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.onFailure
@@ -67,7 +70,7 @@ import java.util.regex.Pattern
 private val LOG by lazyLogger(LocalAudioQueueViewModel::class)
 
 interface LocalAudioQueueViewModel {
-  val localAudioQueue: StateFlow<LocalAudioQueue>
+  val audioQueueState: StateFlow<LocalAudioQueueState>
   val playUpNextAction: StateFlow<PlayUpNextAction>
   val queueSize: Int
   val isPlaying: Boolean
@@ -96,6 +99,20 @@ interface LocalAudioQueueViewModel {
 
   fun clearPrompt()
 
+  fun goToIndexMaybePlay(index: Int)
+  fun nextList()
+  fun next()
+  fun nextRepeatMode()
+  fun nextShuffleMode()
+  fun previousList()
+  fun previous()
+  fun seekTo(position: Millis)
+  fun toggleEqMode()
+  fun togglePlayPause()
+  fun moveQueueItem(from: Int, to: Int)
+  fun removeFromQueue(position: Int, item: QueueAudioItem)
+  fun setCurrentPreset(id: EqPresetId)
+
   companion object {
     operator fun invoke(
       mainViewModel: MainViewModel,
@@ -121,17 +138,17 @@ class LocalAudioQueueViewModelImpl(
   dispatcher: CoroutineDispatcher
 ) : LocalAudioQueueViewModel, ScopedServices.Registered {
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
+  private var localAudioQueue: LocalAudioQueue = NullLocalAudioQueue
   private var queueStateJob: Job? = null
   private var queueNotificationJob: Job? = null
   private val prefsHolder = MutableStateFlow(PrefsHolder())
-  private var lastState: LocalAudioQueueState = LocalAudioQueueState.NONE
 
-  override val localAudioQueue = MutableStateFlow<LocalAudioQueue>(NullLocalAudioQueue)
+  override val audioQueueState = MutableStateFlow(LocalAudioQueueState.NONE)
   override val playUpNextAction = MutableStateFlow(PlayUpNextAction.Prompt)
   override val queueSize: Int
-    get() = lastState.queue.size
+    get() = audioQueueState.value.queue.size
   override val isPlaying: Boolean
-    get() = lastState.playingState.isPlaying
+    get() = audioQueueState.value.playingState.isPlaying
 
   override fun onServiceRegistered() {
     scope.launch {
@@ -222,7 +239,7 @@ class LocalAudioQueueViewModelImpl(
     playNow: PlayNow
   ) {
     val size = mediaList.size
-    localAudioQueue.value.playNext(mediaList, clear, playNow, Manual)
+    localAudioQueue.playNext(mediaList, clear, playNow, Manual)
       .onSuccess { queueSize ->
         val plural = if (appPrefsSingleton.instance().allowDuplicates() || clear()) {
           R.plurals.AddedToUpNextNewSize
@@ -241,7 +258,7 @@ class LocalAudioQueueViewModelImpl(
     scope.launch {
       val quantity = categoryMediaList.size
       mainViewModel.notify(
-        localAudioQueue.value.addToUpNext(categoryMediaList)
+        localAudioQueue.addToUpNext(categoryMediaList)
           .onFailure { cause -> LOG.e(cause) { it("Error during addToUpNext") } }
           .map { queueSize ->
             Notification(
@@ -260,6 +277,60 @@ class LocalAudioQueueViewModelImpl(
   override fun clearPrompt() {
     mainViewModel.clearPrompt()
   }
+
+  override fun goToIndexMaybePlay(index: Int) {
+    localAudioQueue.goToIndexMaybePlay(index)
+  }
+
+  override fun nextList() {
+    localAudioQueue.nextList()
+  }
+
+  override fun next() {
+    localAudioQueue.next()
+  }
+
+  override fun nextRepeatMode() {
+    localAudioQueue.nextRepeatMode()
+  }
+
+  override fun nextShuffleMode() {
+    localAudioQueue.nextShuffleMode()
+  }
+
+  override fun previousList() {
+    localAudioQueue.previousList()
+  }
+
+  override fun previous() {
+    localAudioQueue.previous()
+  }
+
+  override fun seekTo(position: Millis) {
+    localAudioQueue.seekTo(position)
+  }
+
+  override fun toggleEqMode() {
+    localAudioQueue.toggleEqMode()
+  }
+
+  override fun togglePlayPause() {
+    localAudioQueue.togglePlayPause()
+  }
+
+  override fun moveQueueItem(from: Int, to: Int) {
+    scope.launch {
+      localAudioQueue.moveQueueItem(from, to)
+    }
+  }
+
+  override fun removeFromQueue(position: Int, item: QueueAudioItem) {
+    scope.launch {
+      localAudioQueue.removeFromQueue(position, item)
+    }
+  }
+
+  override fun setCurrentPreset(id: EqPresetId) = localAudioQueue.setCurrentPreset(id)
 
   override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
     val deferred = CompletableDeferred<PromptResult>()
@@ -373,17 +444,17 @@ class LocalAudioQueueViewModelImpl(
   }
 
   private fun queueInactive() {
-    localAudioQueue.value = NullLocalAudioQueue
-    queueStateJob?.cancel()
-    lastState = LocalAudioQueueState.NONE
+    localAudioQueue = NullLocalAudioQueue
     queueNotificationJob?.cancel()
+    queueStateJob?.cancel()
+    audioQueueState.value = LocalAudioQueueState.NONE
   }
 
   private fun queueActive(queue: LocalAudioQueue) {
-    localAudioQueue.value = queue
+    localAudioQueue = queue
 
     queueStateJob = queue.queueState
-      .onEach { audioQueueState -> lastState = audioQueueState }
+      .onEach { state -> audioQueueState.value = state }
       .launchIn(scope)
 
     queueNotificationJob = queue.notificationFlow

@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package com.ealva.toque.common
+package com.ealva.toque.ui.main
 
-import android.net.Uri
-import com.ealva.toque.file.ifEmpty
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 
-interface EntityArtwork {
-  val remoteArtwork: Uri
-  val localArtwork: Uri
-
-  companion object {
-    private data class ArtworkData(
-      override val remoteArtwork: Uri,
-      override val localArtwork: Uri
-    ) : EntityArtwork
-
-    operator fun invoke(remote: Uri, local: Uri): EntityArtwork = ArtworkData(remote, local)
-  }
+interface ScreenOrientation {
+  var screenOrientation: Int
 }
 
-inline val EntityArtwork.preferredArt: Uri get() = localArtwork.ifEmpty { remoteArtwork }
+@Composable
+fun LockScreenOrientation(requested: Int, screenOrientation: ScreenOrientation) {
+  DisposableEffect(Unit) {
+    val originalOrientation = screenOrientation.screenOrientation
+    screenOrientation.screenOrientation = requested
+    onDispose {
+      // restore original orientation when view disappears
+      screenOrientation.screenOrientation = originalOrientation
+    }
+  }
+}

@@ -44,16 +44,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.R
-import com.ealva.toque.log._e
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.theme.toque
 import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionRequired
+import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.rememberPermissionState
 import com.zhuinden.simplestack.ScopeKey
 import com.zhuinden.simplestack.ScopedServices
@@ -94,7 +93,7 @@ data class SplashScreen(private val noArg: String = "") : ComposeKey(), ScopeKey
       viewModel.haveWritePermission.value,
       viewModel.getWriteExternalPermission,
       exit = { viewModel.exit() },
-      navigateToSettingsScreen = { viewModel.startAppSettingsActivity() },
+      goToSettings = { viewModel.startAppSettingsActivity() },
       gainedPermission = { viewModel.gainedReadExternalPermission() }
     )
   }
@@ -126,22 +125,19 @@ private class SplashScreenModelImpl(
 
   /**
    * Called when SplashScreen becomes active, either when the app starts or coming to the front
-   * after an activity is shown for permission, so check permissions here
+   * after an activity is shown for permission request, so check permissions here
    */
   override fun onServiceActive() {
-    LOG._e { it("onServiceActive") }
     mainModel.haveWriteExternalPermission
       .onEach { havePerm -> haveWritePermissionChanged(havePerm) }
       .launchIn(scope)
   }
 
   private fun haveWritePermissionChanged(havePerm: Boolean) {
-    LOG._e { it("haveWritePermissionChanged %s", havePerm) }
     if (havePerm) mainModel.gainedReadExternalPermission() else haveWritePermission.value = false
   }
 
   override fun onServiceInactive() {
-    LOG._e { it("onServiceInactive") }
     scope.cancel()
   }
 
@@ -164,7 +160,7 @@ fun Splash(
   haveWritePermission: Boolean,
   getWritePermission: Boolean,
   exit: () -> Unit,
-  navigateToSettingsScreen: () -> Unit,
+  goToSettings: () -> Unit,
   gainedPermission: () -> Unit
 ) {
   var userExit by rememberSaveable { mutableStateOf(false) }
@@ -194,44 +190,74 @@ fun Splash(
     Spacer(modifier = Modifier.height(20.dp))
     if (!haveWritePermission) {
       if (getWritePermission) {
-        PermissionRequired(
-          permissionState = readExternalState,
-          permissionNotGrantedContent = {
-            if (userExit) {
-              exit()
-            } else {
-              Rationale(
-                userExit = { userExit = true },
-                onRequestPermission = { readExternalState.launchPermissionRequest() }
-              )
-            }
-          },
-          permissionNotAvailableContent = {
-            if (userExit) {
-              exit()
-            } else {
-              PermissionDenied(
-                userExit = { userExit = true },
-                navigateToSettingsScreen
-              )
-            }
-          }
-        ) {
-          gainedPermission()
-        }
-      } else {
-        Rationale(
-          userExit = exit,
-          onRequestPermission = navigateToSettingsScreen
+        GetWritePermission(
+          readExternalState = readExternalState,
+          userExit = userExit,
+          exit = exit,
+          goToSettings = goToSettings,
+          gainedPermission = gainedPermission,
+          userSaysExit = { userExit = true },
+          launchPermissionRequest = { readExternalState.launchPermissionRequest() }
         )
+      } else {
+        Rationale(userSaysExit = exit, onRequestPermission = goToSettings)
       }
     }
   }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+private fun GetWritePermission(
+  readExternalState: PermissionState,
+  userExit: Boolean,
+  exit: () -> Unit,
+  goToSettings: () -> Unit,
+  gainedPermission: () -> Unit,
+  userSaysExit: () -> Unit,
+  launchPermissionRequest: () -> Unit
+) {
+  PermissionRequired(
+    permissionState = readExternalState,
+    permissionNotGrantedContent = {
+      PermissionNotGranted(
+        userExit = userExit,
+        exit = exit,
+        launchPermissionRequest = launchPermissionRequest,
+        userSaysExit = userSaysExit
+      )
+    },
+    permissionNotAvailableContent = {
+      PermissionNotAvailable(
+        userExit = userExit,
+        exit = exit,
+        goToSettings = goToSettings,
+        userSaysExit = userSaysExit
+      )
+    },
+    content = { gainedPermission() }
+  )
+}
+
+@Composable
+fun PermissionNotAvailable(
+  userExit: Boolean,
+  exit: () -> Unit,
+  goToSettings: () -> Unit,
+  userSaysExit: () -> Unit
+) = if (userExit) exit() else PermissionDenied(userSaysExit, goToSettings)
+
+@Composable
+fun PermissionNotGranted(
+  userExit: Boolean,
+  exit: () -> Unit,
+  launchPermissionRequest: () -> Unit,
+  userSaysExit: () -> Unit
+) = if (userExit) exit() else Rationale(userSaysExit, launchPermissionRequest)
+
 @Composable
 private fun Rationale(
-  userExit: () -> Unit,
+  userSaysExit: () -> Unit,
   onRequestPermission: () -> Unit
 ) {
   Column {
@@ -248,7 +274,7 @@ private fun Rationale(
         Text(text = stringResource(id = R.string.RequestPermission))
       }
       Spacer(Modifier.width(8.dp))
-      Button(onClick = userExit) {
+      Button(onClick = userSaysExit) {
         Text(stringResource(id = R.string.Exit))
       }
     }

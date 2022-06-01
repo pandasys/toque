@@ -338,4 +338,9 @@
   <string name="loading_widget">Loading widget…</string>
   <string name="QueueIsEmpty">Queue Is Empty</string>
     <string name="ClearSearchHistory">Clear Search History</string>
+    <string name="EMPTY">EMPTY</string>
+    <string name="Preamp">Preamp</string>
+  <string name="GoBack">Go Back</string>
+  <string name="Reset">Reset</string>
+  <string name="SaveAs">Save As</string>
 </resources>

@@ -21,7 +21,7 @@ object SdkVersion {
 }
 
 object PluginsVersion {
-  const val AGP = "7.2.0"
+  const val AGP = "7.2.1"
   const val DETEKT = "1.20.0"
   const val DOKKA = "1.6.10"
   const val KOTLIN = "1.6.10"
@@ -192,6 +192,8 @@ object Libs {
         "org.jetbrains.kotlinx:kotlinx-coroutines-android:$VERSION"
       const val TEST = "org.jetbrains.kotlinx:kotlinx-coroutines-test:$VERSION"
     }
+
+    const val IMMUTABLE = "org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5"
 
     object Serialization {
       private const val VERSION = "1.3.2"

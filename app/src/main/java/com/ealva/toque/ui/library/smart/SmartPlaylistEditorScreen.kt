@@ -69,6 +69,7 @@ import com.ealva.toque.db.smart.SmartOrderBy
 import com.ealva.toque.navigation.ComposeKey
 import com.ealva.toque.persist.PlaylistId
 import com.ealva.toque.ui.common.AutoCompleteTextView
+import com.ealva.toque.ui.common.BackButton
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.common.ScreenConfig
 import com.ealva.toque.ui.library.LibraryItemsScreen
@@ -350,15 +351,7 @@ private fun TitleBar(
     title = { AppBarTitle(stringResource(id = R.string.SmartPlaylistEditor)) },
     backgroundColor = toqueColors.surface,
     modifier = Modifier.fillMaxWidth(),
-    navigationIcon = {
-      IconButton(onClick = back) {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_navigate_before),
-          contentDescription = "Back",
-          modifier = Modifier.size(26.dp)
-        )
-      }
-    },
+    navigationIcon = { BackButton(onClick = back) },
     actions = {
       IconButton(onClick = restore) {
         Icon(

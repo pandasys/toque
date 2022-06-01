@@ -38,9 +38,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.ealva.toque.common.Amp
+import com.ealva.toque.common.EqBand
 import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.common.Frequency
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.PreAmpAndBands
+import com.ealva.toque.service.media.EqPreset.BandData
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 private val ClosedRange<Amp>.spread: Float
   get() = endInclusive.value - start.value
@@ -63,7 +67,7 @@ private data class CanvasConfig(
 
 @Composable
 fun EqPresetLineChart(
-  preset: EqPreset,
+  bands: ImmutableList<Amp>,
   width: Dp,
   height: Dp,
   padding: PaddingValues = PaddingValues(),
@@ -83,16 +87,11 @@ fun EqPresetLineChart(
     )
   }
 
-  val bandValues = FloatArray(preset.bandCount)
-  for (i in bandValues.indices) {
-    bandValues[i] = preset[i]
-  }
-
-  LineChart(points = bandValues, color = color, canvasConfig = config)
+  LineChart(points = bands, color = color, canvasConfig = config)
 }
 
 @Composable
-private fun LineChart(points: FloatArray, color: Color, canvasConfig: CanvasConfig) {
+private fun LineChart(points: ImmutableList<Amp>, color: Color, canvasConfig: CanvasConfig) {
   Canvas(
     modifier = Modifier
       .width(canvasConfig.widthDp)
@@ -104,7 +103,7 @@ private fun LineChart(points: FloatArray, color: Color, canvasConfig: CanvasConf
       Offset(canvasConfig.paddingLeft, yCenter),
       Offset(canvasConfig.width - canvasConfig.paddingRight, yCenter)
     )
-    drawPath(
+    if (points.isNotEmpty()) drawPath(
       path = createSmoothPath(points, canvasConfig),
       color = color,
       style = Stroke(4F)
@@ -114,23 +113,23 @@ private fun LineChart(points: FloatArray, color: Color, canvasConfig: CanvasConf
 }
 
 private fun createSmoothPath(
-  points: FloatArray,
+  points: ImmutableList<Amp>,
   config: CanvasConfig
 ): Path = Path().apply {
   val maxX = points.indices.last.toFloat()
   moveTo(
     getXPos(0, maxX, config),
-    getYPos(points[0], config)
+    getYPos(points[0].value, config)
   )
   for (i in 1 until points.size - 1) {
     val thisPointX: Float = getXPos(i, maxX, config)
-    val thisPointY: Float = getYPos(points[i], config)
+    val thisPointY: Float = getYPos(points[i].value, config)
     val nextPointX: Float = getXPos(i + 1, maxX, config)
-    val nextPointY: Float = getYPos(points[points.index(i + 1)], config)
+    val nextPointY: Float = getYPos(points[points.index(i + 1)].value, config)
     val startDiffX: Float = nextPointX - getXPos(points.index(i - 1), maxX, config)
-    val startDiffY: Float = nextPointY - getYPos(points[points.index(i - 1)], config)
+    val startDiffY: Float = nextPointY - getYPos(points[points.index(i - 1)].value, config)
     val endDiffX: Float = getXPos(points.index(i + 2), maxX, config) - thisPointX
-    val endDiffY: Float = getYPos(points[points.index(i + 2)], config) - thisPointY
+    val endDiffY: Float = getYPos(points[points.index(i + 2)].value, config) - thisPointY
     val firstControlX: Float = thisPointX + GRAPH_SMOOTHNESS * startDiffX
     val firstControlY: Float = thisPointY + GRAPH_SMOOTHNESS * startDiffY
     val secondControlX: Float = nextPointX - GRAPH_SMOOTHNESS * endDiffX
@@ -139,7 +138,7 @@ private fun createSmoothPath(
   }
 }
 
-private fun FloatArray.index(index: Int): Int {
+private fun ImmutableList<Amp>.index(index: Int): Int {
   return index.coerceIn(indices)
 }
 
@@ -162,7 +161,7 @@ private fun getXPos(value: Int, maxValue: Float, config: CanvasConfig): Float {
 @Preview
 @Composable
 fun EqPresetLineChartPreview() {
-  val preset = EqPresetData(
+  val preset = EqPresetStub(
     defaultBandValues = arrayOf(
       Amp(3),
       Amp(5),
@@ -182,7 +181,7 @@ fun EqPresetLineChartPreview() {
       .background(Color.Black)
   ) {
     EqPresetLineChart(
-      preset = preset,
+      bands = preset.getAllValues().bandValues,
       width = 100.dp,
       height = 40.dp,
       padding = PaddingValues(4.dp),
@@ -191,34 +190,32 @@ fun EqPresetLineChartPreview() {
   }
 }
 
-
-private class EqPresetData(
+private class EqPresetStub(
   override var id: EqPresetId = EqPresetId(0),
   private val defaultBandValues: Array<Amp> = Array(10) { Amp.NONE }
 ) : EqPreset {
-  override val isNullPreset: Boolean = false
-  override var name: String = "Speaker"
+  override var name: String = "EqPresetStub"
+  override val displayName: String = name
   override var isSystemPreset: Boolean = false
-  override val displayName: String = if (isSystemPreset) "*$name" else name
-  override val bandCount: Int = 10
-  override val bandIndices: IntRange = 0 until bandCount
-
   private val bandFrequencies =
     floatArrayOf(31F, 63F, 125F, 250F, 500F, 1000F, 2000F, 4000F, 8000F, 16000F)
-
-  override fun getBandFrequency(index: Int): Float = bandFrequencies[index]
-  override fun get(index: Int): Float = bandValues[index].value
+  override val eqBands: ImmutableList<EqBand> = buildList<EqBand> {
+    bandFrequencies.forEachIndexed { index, frequency ->
+      EqBand(index, Frequency(frequency))
+    }
+  }.toImmutableList()
 
   override var preAmp: Amp = Amp.DEFAULT_PREAMP
+
   override suspend fun setPreAmp(amplitude: Amp) {
     preAmp = amplitude
   }
 
   private var bandValues: Array<Amp> = defaultBandValues
-  override fun getAmp(index: Int): Amp = bandValues[index]
+  override fun getAmp(band: EqBand): Amp = bandValues[band.index]
 
-  override suspend fun setAmp(index: Int, amplitude: Amp) {
-    bandValues[index] = amplitude
+  override suspend fun setAmp(band: EqBand, amplitude: Amp) {
+    bandValues[band.index] = amplitude
   }
 
   override suspend fun resetAllToDefault() {
@@ -226,14 +223,10 @@ private class EqPresetData(
     bandValues = defaultBandValues
   }
 
-  override fun getAllValues(): PreAmpAndBands {
-    return PreAmpAndBands(preAmp, bandValues)
-  }
+  override fun getAllValues(): BandData = BandData(preAmp, bandValues.toList())
 
-  override suspend fun setAllValues(preAmpAndBands: PreAmpAndBands) {
-    preAmp = preAmpAndBands.preAmp
-    bandValues = preAmpAndBands.bands
+  override suspend fun setAllValues(bandData: BandData) {
+    preAmp = bandData.preAmp
+    bandValues = bandData.bandValues.toTypedArray()
   }
-
-  override fun clone(): EqPreset = this
 }

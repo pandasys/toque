@@ -23,7 +23,6 @@ import com.ealva.toque.audioout.AudioOutputModule
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.PlaybackRate
-import com.ealva.toque.db.EqPresetIdName
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.DuckAction
@@ -111,9 +110,6 @@ interface SharedPlayerState {
    */
   fun setCurrent(preset: EqPreset)
 
-  /** Get all preset id/name pairs, typically to display to the user */
-  suspend fun getAll(): List<EqPresetIdName>
-
   companion object {
     /**
      * Instances will use [scope] for structured concurrency (instance live as long as their
@@ -154,8 +150,8 @@ private class SharedPlayerStateImpl(
   override val outputModule: StateFlow<AudioOutputModule>,
   private val dispatcher: CoroutineDispatcher
 ) : SharedPlayerState {
-  private val nonePreset by lazy { factory.nonePreset }
-  override val currentPreset by lazy { MutableStateFlow(factory.nonePreset) }
+  private val nonePreset = factory.nonePreset
+  override val currentPreset = MutableStateFlow(nonePreset)
   override var duckedState: DuckAction = DuckAction.None
 
   override fun setPreferred(
@@ -188,10 +184,6 @@ private class SharedPlayerStateImpl(
   override fun setCurrent(preset: EqPreset) {
     currentPreset.update { preset }
   }
-
-  override suspend fun getAll(): List<EqPresetIdName> {
-    return factory.getAllPresets()
-  }
 }
 
 object NullSharedPlayerState : SharedPlayerState {
@@ -204,5 +196,4 @@ object NullSharedPlayerState : SharedPlayerState {
   override fun setPreferred(mediaId: MediaId, albumId: AlbumId) = Unit
   override fun setCurrent(id: EqPresetId) = Unit
   override fun setCurrent(preset: EqPreset) = Unit
-  override suspend fun getAll(): List<EqPresetIdName> = emptyList()
 }

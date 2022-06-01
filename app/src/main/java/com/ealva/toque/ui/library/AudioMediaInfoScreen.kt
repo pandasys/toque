@@ -74,6 +74,7 @@ import com.ealva.toque.service.media.EmbeddedArtwork
 import com.ealva.toque.service.media.MediaFileTagInfo
 import com.ealva.toque.service.media.MediaMetadataParserFactory
 import com.ealva.toque.tag.ArtistParserFactory
+import com.ealva.toque.ui.common.BackButton
 import com.ealva.toque.ui.common.LocalScreenConfig
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.main.Notification
@@ -160,15 +161,7 @@ data class AudioMediaInfoScreen(
         title = { AppBarTitle(mediaInfo.value.title.value) },
         backgroundColor = toqueColors.surface,
         modifier = Modifier.fillMaxWidth(),
-        navigationIcon = {
-          IconButton(onClick = { viewModel.goBack() }) {
-            Icon(
-              painter = painterResource(id = R.drawable.ic_navigate_before),
-              contentDescription = "Back",
-              modifier = Modifier.size(26.dp)
-            )
-          }
-        }
+        navigationIcon = { BackButton(onClick = { viewModel.goBack() }) }
       )
       MediaInfo(mediaInfo.value)
     }

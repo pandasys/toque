@@ -25,6 +25,7 @@ import com.ealva.ealvalog.invoke
 import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.app.Toque
 import com.ealva.toque.audio.AudioItem
+import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.LoggingCoroutineExceptionHandler
 import com.ealva.toque.common.Millis
 import com.ealva.toque.common.RepeatMode
@@ -85,6 +86,7 @@ class LocalAudioCommandProcessor(
   //private val uiModeManager: UiModeManager by inject()
 
   override suspend fun activate(resume: Boolean, playNow: PlayNow) {
+    LOG._e { it("activate") }
 //    sessionControl.onMediaButton(::handleMediaButton)
     realQueue.isActive
       .onStart { realQueue.activate(resume, playNow) }
@@ -96,7 +98,7 @@ class LocalAudioCommandProcessor(
 
   private suspend fun handleIsActive(isActive: Boolean) {
     if (isActive) {
-      if (appPrefs.firstRun()) collectAudioDaoEventsAndStartMediaScanner()
+      collectAudioDaoEventsAndStartMediaScanner()
       collectCommandFlow()
       collectMediaSessionEventFlow(sessionControl)
     }
@@ -137,6 +139,8 @@ class LocalAudioCommandProcessor(
 
   override fun toggleEqMode() = asyncCommand { toggleEqMode() }
 
+  override fun setCurrentPreset(id: EqPresetId) = asyncCommand { setCurrentPreset(id) }
+
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) =
     asyncCommand { setRating(rating, allowFileUpdate) }
 
@@ -154,7 +158,7 @@ class LocalAudioCommandProcessor(
   override suspend fun removeFromQueue(index: Int, item: AudioItem) =
     command { removeFromQueue(index, item) }
 
-  override fun moveQueueItem(from: Int, to: Int) = asyncCommand { moveQueueItem(from, to) }
+  override suspend fun moveQueueItem(from: Int, to: Int) = command { moveQueueItem(from, to) }
 
   private suspend fun <T : Any> deferredResult(block: suspend LocalAudioQueue.() -> T): T {
     val deferred = CompletableDeferred<T>()
@@ -179,6 +183,7 @@ class LocalAudioCommandProcessor(
   }
 
   private suspend fun collectAudioDaoEventsAndStartMediaScanner() {
+
     var addToQueueCount = ADD_NEW_MEDIA_COUNT
     audioMediaDao
       .audioDaoEvents
@@ -191,7 +196,7 @@ class LocalAudioCommandProcessor(
 
   private fun startMediaScannerModifiedSinceLastScan() = MediaScannerService.startScanner(
     Toque.appContext,
-    "FirstRun",
+    "StartUp",
     MediaScannerService.RescanType.ModifiedSinceLast
   )
 
@@ -261,7 +266,7 @@ class LocalAudioCommandProcessor(
   }
 
   private fun handleScannerEvent(addToQueueCount: Int, event: AudioDaoEvent): Int =
-    if (addToQueueCount > 0 && event is AudioDaoEvent.MediaCreated) {
+    if (appPrefs.firstRun() && addToQueueCount > 0 && event is AudioDaoEvent.MediaCreated) {
       scope.launch { addToUpNext(CategoryMediaList.invoke(event.id, CategoryToken.All)) }
       addToQueueCount - 1
     } else 0

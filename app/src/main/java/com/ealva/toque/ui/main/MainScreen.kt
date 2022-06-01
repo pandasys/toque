@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Surface
 import androidx.compose.material.rememberScaffoldState
@@ -59,7 +58,6 @@ import kotlin.math.roundToInt
 @Suppress("unused")
 private val LOG by lazyLogger("MainScreen")
 
-@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MainScreen(
   composeStateChanger: ComposeStateChanger,

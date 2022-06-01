@@ -80,6 +80,8 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.prefs.AppPrefsSingleton
 import com.ealva.toque.ui.art.SelectAlbumArtViewModel.SelectState
 import com.ealva.toque.ui.common.LocalScreenConfig
+import com.ealva.toque.ui.common.ResetButton
+import com.ealva.toque.ui.common.SearchButton
 import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.settings.AppBarTitle
 import com.ealva.toque.ui.theme.toqueColors
@@ -183,22 +185,8 @@ private fun TitleBar(search: () -> Unit, reset: () -> Unit) {
     backgroundColor = toqueColors.surface,
     modifier = Modifier.fillMaxWidth(),
     actions = {
-      IconButton(onClick = search) {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_search),
-          contentDescription = "Search",
-          modifier = Modifier.size(26.dp),
-          tint = LocalContentColor.current
-        )
-      }
-      IconButton(onClick = reset) {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_restore),
-          contentDescription = "Restore original",
-          modifier = Modifier.size(26.dp),
-          tint = LocalContentColor.current
-        )
-      }
+      SearchButton(onClick = search)
+      ResetButton(onClick = reset)
     }
   )
 }

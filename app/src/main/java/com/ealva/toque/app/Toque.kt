@@ -38,7 +38,6 @@ import com.ealva.ealvalog.Markers
 import com.ealva.ealvalog.android.AndroidLogger
 import com.ealva.ealvalog.android.AndroidLoggerFactory
 import com.ealva.ealvalog.core.BasicMarkerFactory
-import com.ealva.ealvalog.invoke
 import com.ealva.toque.android.content.requireSystemService
 import com.ealva.toque.art.ArtworkModule
 import com.ealva.toque.audioout.AudioModule
@@ -52,10 +51,14 @@ import com.ealva.toque.work.Work
 import com.ealva.toque.work.WorkModule
 import com.jakewharton.processphoenix.ProcessPhoenix
 import ealvatag.logging.EalvaTagLog
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
+import org.videolan.libvlc.LibVLC
 
 interface Toque {
   fun restartApp(intent: Intent, context: Context)
@@ -84,11 +87,16 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory, Configuration.Provid
   override fun getWorkManagerConfiguration(): Configuration =
     koinApplication.koin.get<Work>().getWorkManagerConfiguration()
 
+  @OptIn(DelicateCoroutinesApi::class)
   override fun onCreate() {
     super.onCreate()
     appContext = applicationContext
 
+    // Loading here because we quickly access some static methods (EqPreset related)
+    GlobalScope.launch { LibVLC.loadLibraries() }
+
     setupLogging()
+
 //    debug {
 //      WeLiteLog.logQueryPlans = true
 //      WeLiteLog.logSql = true
@@ -151,15 +159,6 @@ class ToqueImpl : Application(), Toque, ImageLoaderFactory, Configuration.Provid
           .build()
       }
       .build()
-    /*
-    ImageLoader.Builder(context)
-    .diskCache {
-        DiskCache.Builder()
-            .directory(context.cacheDir.resolve("image_cache"))
-            .build()
-    }
-    .build()
-     */
   }
 
   companion object {

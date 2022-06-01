@@ -20,9 +20,6 @@ import android.os.Parcelable
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
@@ -35,11 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.ealva.comppref.pref.CallbackSettingItem
 import com.ealva.comppref.pref.CheckboxSettingItem
 import com.ealva.comppref.pref.DefaultSettingMakers
@@ -79,6 +74,7 @@ import com.ealva.toque.prefs.ThemeChoice
 import com.ealva.toque.service.vlc.LibVlcPrefs
 import com.ealva.toque.service.vlc.LibVlcPrefsSingleton
 import com.ealva.toque.service.vlc.ReplayGainMode
+import com.ealva.toque.ui.common.BackButton
 import com.ealva.toque.ui.main.MainViewModel
 import com.ealva.toque.ui.nav.backIfAllowed
 import com.ealva.toque.ui.nav.goToScreen
@@ -652,15 +648,7 @@ fun <T : PreferenceStore<T>> ToqueSettingsScreen(
       title = { if (subtitle == null) AppBarTitle(title) else TitleAndSubtitle(title, subtitle) },
       backgroundColor = toqueColors.surface,
       modifier = Modifier.fillMaxWidth(),
-      navigationIcon = {
-        IconButton(onClick = back) {
-          Icon(
-            painter = painterResource(R.drawable.ic_navigate_before),
-            contentDescription = "Back",
-            modifier = Modifier.size(26.dp)
-          )
-        }
-      }
+      navigationIcon = { BackButton(onClick = back) },
     )
     SettingsScreen(items = settingsState.value, makers = SettingMaker())
   }
