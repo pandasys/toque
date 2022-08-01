@@ -24,6 +24,7 @@ import com.ealva.toque.common.ShuffleMode
 import com.ealva.toque.common.StarRating
 import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.persist.InstanceId
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.notify.ServiceNotification
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.MayFade
@@ -42,6 +43,9 @@ object NullLocalAudioQueue : LocalAudioQueue {
   override val notificationFlow = emptyFlow<ServiceNotification>()
   override fun toggleEqMode() = Unit
   override fun setCurrentPreset(id: EqPresetId) = Unit
+  override fun setPresetOverride(eqPreset: EqPreset) = Unit
+  override fun setPresetOverride(id: EqPresetId) = Unit
+  override fun clearPresetOverride() = Unit
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) = Unit
   override suspend fun addToUpNext(
     categoryMediaList: CategoryMediaList

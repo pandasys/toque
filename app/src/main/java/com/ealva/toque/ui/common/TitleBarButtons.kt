@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import com.ealva.toque.R
 import com.ealva.toque.common.fetch
 import com.ealva.toque.ui.icons.filled.ArrowBack
-import com.ealva.toque.ui.icons.filled.SaveAlt
 
 @Composable
 fun TitleBarIconButton(
@@ -62,12 +61,21 @@ fun BackButton(onClick: () -> Unit) {
   )
 }
 
+//@Composable
+//fun SaveAsButton(onClick: () -> Unit) {
+//  TitleBarIconButton(
+//    onClick = onClick,
+//    imageVector = SaveAlt,
+//    contentDescription = fetch(R.string.SaveAs)
+//  )
+//}
+
 @Composable
-fun SaveAsButton(onClick: () -> Unit) {
-  TitleBarIconButton(
+fun AssignButton(onClick: () -> Unit) {
+  TitleBarButton(
+    iconRes = R.drawable.ic_clipboard_text,
+    contentDescription = fetch(R.string.SaveAs),
     onClick = onClick,
-    imageVector = SaveAlt,
-    contentDescription = fetch(R.string.SaveAs)
   )
 }
 

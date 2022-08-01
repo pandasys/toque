@@ -157,6 +157,15 @@ data class LocalAudioQueueState(
   val extraMediaInfo: String,
   val playbackRate: PlaybackRate = PlaybackRate.NORMAL
 ) {
+  val hasCurrentItem: Boolean
+    get() = queueIndex in queue.indices
+
+  val currentMediaId: MediaId
+    get() = if (hasCurrentItem) queue[queueIndex].id else MediaId.INVALID
+
+  val currentAlbumId: AlbumId
+    get() = if (hasCurrentItem) queue[queueIndex].albumId else AlbumId.INVALID
+
   override fun toString(): String {
     return """
       |LocalAudioQueueState(
@@ -265,6 +274,12 @@ interface LocalAudioQueue : PlayableMediaQueue<AudioItem> {
   fun toggleEqMode()
 
   fun setCurrentPreset(id: EqPresetId)
+
+  fun setPresetOverride(eqPreset: EqPreset)
+
+  fun setPresetOverride(id: EqPresetId)
+
+  fun clearPresetOverride()
 
   companion object {
     suspend fun make(
@@ -383,6 +398,18 @@ private class LocalAudioQueueImpl(
 
   override fun setCurrentPreset(id: EqPresetId) = sharedPlayerState.setCurrent(id)
 
+  override fun setPresetOverride(eqPreset: EqPreset) {
+    sharedPlayerState.setPresetOverride(eqPreset)
+  }
+
+  override fun setPresetOverride(id: EqPresetId) {
+    sharedPlayerState.setPresetOverride(id)
+  }
+
+  override fun clearPresetOverride() {
+    sharedPlayerState.clearPresetOverride()
+  }
+
   private val queue: List<PlayableAudioItem>
     get() = if (shuffleMedia.value) upNextShuffled else upNextQueue
 
@@ -479,7 +506,7 @@ private class LocalAudioQueueImpl(
 
   private fun reactToPresetChanges(sharedPlayerState: SharedPlayerState) {
     sharedPlayerState.currentPreset
-      .onEach { preset -> handleNewPreset(preset) }
+      .onEach { preset -> handleNewPreset(preset.eqPreset) }
       .catch { cause -> LOG.e(cause) { it("Error currentPreset flow") } }
       .launchIn(scope)
   }

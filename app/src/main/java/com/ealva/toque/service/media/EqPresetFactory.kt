@@ -16,14 +16,34 @@
 
 package com.ealva.toque.service.media
 
+import androidx.annotation.StringRes
+import com.ealva.toque.R
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
+import com.ealva.toque.common.fetch
+import com.ealva.toque.db.BoolResult
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import kotlinx.coroutines.flow.StateFlow
 
 interface EqPresetFactory {
+  enum class EqPresetAssociation(@StringRes private val titleRes: Int) {
+    Song(R.string.Song),
+    Album(R.string.Album),
+    Speaker(R.string.Speaker),
+    WiredHeadset(R.string.WiredConnection),
+    Bluetooth(R.string.Bluetooth),
+    Default(R.string.Default);
+
+    override fun toString(): String = fetch(titleRes)
+  }
+
+  /**
+   * Setting this preset turns off equalization.
+   */
+  val nonePreset: EqPreset
+
   suspend fun allPresets(): StateFlow<List<EqPreset>>
 
   /**
@@ -47,10 +67,16 @@ interface EqPresetFactory {
     outputRoute: AudioOutputRoute
   ): DaoResult<EqPreset>
 
-  /**
-   * Setting this preset turns off equalization.
-   */
-  val nonePreset: EqPreset
+  suspend fun defaultPreset(): EqPreset
+
+  suspend fun makeAssociations(
+    eqPreset: EqPreset,
+    mediaId: MediaId,
+    albumId: AlbumId,
+    associations: List<EqPresetAssociation>
+  ): BoolResult
+
+  suspend fun getAssociations(eqPreset: EqPreset): List<EqPresetAssociation>
 
   companion object {
     const val DEFAULT_SYSTEM_PRESET_NAME = "Flat"

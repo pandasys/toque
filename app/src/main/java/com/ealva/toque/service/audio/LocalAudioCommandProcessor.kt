@@ -42,6 +42,7 @@ import com.ealva.toque.prefs.AppPrefs
 import com.ealva.toque.scanner.MediaScannerService
 import com.ealva.toque.service.audio.LocalAudioCommand.DeferredResult
 import com.ealva.toque.service.controller.SessionControlEvent
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.MayFade
 import com.ealva.toque.service.queue.MayFade.AllowFade
@@ -138,8 +139,9 @@ class LocalAudioCommandProcessor(
     command { MediaSessionBrowser.handleMedia(id, extras, PlayMediaFromId(this, audioMediaDao)) }
 
   override fun toggleEqMode() = asyncCommand { toggleEqMode() }
-
   override fun setCurrentPreset(id: EqPresetId) = asyncCommand { setCurrentPreset(id) }
+  override fun setPresetOverride(eqPreset: EqPreset) = asyncCommand { setPresetOverride(eqPreset) }
+  override fun clearPresetOverride() = asyncCommand { clearPresetOverride() }
 
   override fun setRating(rating: StarRating, allowFileUpdate: Boolean) =
     asyncCommand { setRating(rating, allowFileUpdate) }

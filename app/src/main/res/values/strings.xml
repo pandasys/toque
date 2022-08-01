@@ -337,10 +337,21 @@
   <string name="Repeat">Repeat</string>
   <string name="loading_widget">Loading widget…</string>
   <string name="QueueIsEmpty">Queue Is Empty</string>
-    <string name="ClearSearchHistory">Clear Search History</string>
-    <string name="EMPTY">EMPTY</string>
-    <string name="Preamp">Preamp</string>
+  <string name="ClearSearchHistory">Clear Search History</string>
+  <string name="EMPTY">EMPTY</string>
+  <string name="Preamp">Preamp</string>
   <string name="GoBack">Go Back</string>
   <string name="Reset">Reset</string>
   <string name="SaveAs">Save As</string>
+  <string name="SavePresetAs">Save Preset As</string>
+  <string name="Preset">Preset</string>
+  <string name="CouldNotCreatePreset">Could not create preset %s</string>
+  <string name="CreatedPreset">Created preset %s</string>
+  <string name="Default">Default</string>
+  <string name="Song">Song</string>
+  <string name="WiredConnection">Wired Connection</string>
+  <string name="Assign">Assign</string>
+  <string name="AssignPreset">Assign Preset</string>
+  <string name="CouldNotMakeAssocsFor">Could not make associations for %s</string>
+  <string name="MadeAssocsFor">Made associations for %s</string>
 </resources>

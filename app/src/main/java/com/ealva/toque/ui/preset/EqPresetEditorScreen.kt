@@ -35,8 +35,6 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ExposedDropdownMenuBox
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Slider
-import androidx.compose.material.Switch
-import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
@@ -57,14 +55,14 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.common.Amp
 import com.ealva.toque.common.EqBand
 import com.ealva.toque.navigation.ComposeKey
-import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
+import com.ealva.toque.ui.common.AssignButton
 import com.ealva.toque.ui.common.BackButton
 import com.ealva.toque.ui.common.LocalScreenConfig
-import com.ealva.toque.ui.common.SaveAsButton
+import com.ealva.toque.ui.common.PopupMenu
+import com.ealva.toque.ui.common.PopupMenuItem
 import com.ealva.toque.ui.main.LockScreenOrientation
 import com.ealva.toque.ui.preset.EqPresetEditorModel.Preset
-import com.ealva.toque.ui.theme.toqueColors
 import com.ealva.toque.ui.theme.toqueTypography
 import com.google.accompanist.insets.navigationBarsPadding
 import com.google.accompanist.insets.statusBarsPadding
@@ -136,10 +134,9 @@ private fun EqScreenEditor(state: EqPresetEditorModel.State, viewModel: EqPreset
       EqPresetEditorTopBar(
         current = state.currentPreset,
         all = state.allPresets,
-        eqMode = state.eqMode,
+        menuItems = state.makeMenuItems(viewModel),
+        assignPreset = { viewModel.assignPreset() },
         selectionChanged = { preset -> viewModel.presetSelected(preset) },
-        toggleEqMode = { viewModel.toggleEqMode() },
-        saveAs = { viewModel.saveAs() },
         goBack = { viewModel.goBack() }
       )
     }
@@ -285,10 +282,9 @@ private val MENU_CHART_HEIGHT = 40.dp
 private fun EqPresetEditorTopBar(
   current: Preset,
   all: List<Preset>,
-  eqMode: EqMode,
+  menuItems: List<PopupMenuItem>,
+  assignPreset: () -> Unit,
   selectionChanged: (Preset) -> Unit,
-  toggleEqMode: () -> Unit,
-  saveAs: () -> Unit,
   goBack: () -> Unit
 ) {
   TopAppBar(
@@ -297,12 +293,8 @@ private fun EqPresetEditorTopBar(
     },
     navigationIcon = { BackButton(goBack) },
     actions = {
-      Switch(
-        checked = eqMode.isOn(),
-        onCheckedChange = { toggleEqMode() },
-        colors = SwitchDefaults.colors(uncheckedThumbColor = toqueColors.uncheckedThumbColor)
-      )
-      SaveAsButton(onClick = saveAs)
+      AssignButton(onClick = assignPreset)
+      PopupMenu(items = menuItems)
     }
   )
 }

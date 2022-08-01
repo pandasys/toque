@@ -364,7 +364,6 @@ object EqPresetAssociationTable : Table() {
    * preset
    */
   val presetId = long("EqPresetAssoc_PresetId")
-  val isSystemPreset = bool("EqPresetAssocIsSystem")
   val associationType = integer("EqPresetAssocAssocType")
 
   /**

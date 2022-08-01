@@ -532,6 +532,9 @@ private class VlcPlayerImpl(
   }
 }
 
+private fun SharedPlayerState.EqPresetBandData.asVlcPreset(): VlcEqPreset =
+  if (eqPreset.isNone) VlcEqPreset.NONE else eqPreset as VlcEqPreset
+
 @Suppress("unused")
 private val MediaPlayer.Event.asString: String
   get() {

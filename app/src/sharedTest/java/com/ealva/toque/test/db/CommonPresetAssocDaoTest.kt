@@ -28,44 +28,10 @@ import com.ealva.toque.test.shared.withTestDatabase
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.get
 import com.github.michaelbull.result.getOr
-import com.github.michaelbull.result.getOrElse
 import com.nhaarman.expect.expect
 import kotlinx.coroutines.CoroutineDispatcher
 
 object CommonPresetAssocDaoTest {
-  suspend fun testSetAsDefault(appCtx: Context, testDispatcher: CoroutineDispatcher) {
-    withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
-      val dao = EqPresetAssociationDao(this)
-      val preset = EqPresetStub(EqPresetId(1)).apply { name = "NewDefault" }
-      dao.setAsDefault(preset)
-      val result = dao.getAssociationsFor(preset)
-      expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
-      val list = result getOrElse { emptyList() }
-      expect(list).toHaveSize(1)
-      expect(list[0]).toBe(PresetAssociation.DEFAULT)
-    }
-  }
-
-  suspend fun testReplaceDefault(appCtx: Context, testDispatcher: CoroutineDispatcher) {
-    withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
-      val dao = EqPresetAssociationDao(this)
-      val firstPreset = EqPresetStub(EqPresetId(1)).apply { name = "FirstPreset" }
-      val lastPreset = EqPresetStub(EqPresetId(2)).apply { name = "SecondPreset" }
-      dao.setAsDefault(firstPreset)
-      dao.setAsDefault(lastPreset)
-      val firstResult = dao.getAssociationsFor(firstPreset)
-      expect(firstResult).toBeInstanceOf<Ok<List<PresetAssociation>>>()
-      val firstList = firstResult.get()
-      expect(firstList).toHaveSize(0)
-
-      val lastResult = dao.getAssociationsFor(lastPreset)
-      expect(lastResult).toBeInstanceOf<Ok<List<PresetAssociation>>>()
-      val lastList = lastResult.getOrElse { emptyList() }
-      expect(lastList).toHaveSize(1)
-      expect(lastList[0]).toBe(PresetAssociation.DEFAULT)
-    }
-  }
-
   suspend fun testMakeAssociations(appCtx: Context, testDispatcher: CoroutineDispatcher) {
     withTestDatabase(appCtx, setOf(EqPresetAssociationTable), testDispatcher) {
       val dao = EqPresetAssociationDao(this)
@@ -80,9 +46,9 @@ object CommonPresetAssocDaoTest {
         PresetAssociation.makeForOutput(output),
         PresetAssociation.makeForMedia(mediaId)
       )
-      expect(dao.makeAssociations(preset, assocs)).toBe(Ok(true))
+      expect(dao.makeAssociations(preset.id, assocs)).toBe(Ok(true))
 
-      val result = dao.getAssociationsFor(preset)
+      val result = dao.getAssociationsFor(preset.id)
       expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
       val list = result.getOr(emptyList())
       expect(list).toHaveSize(3)
@@ -107,9 +73,9 @@ object CommonPresetAssocDaoTest {
         PresetAssociation.makeForMedia(mediaId1),
         PresetAssociation.DEFAULT
       )
-      expect(dao.makeAssociations(preset1, firstAssocs)).toBe(Ok(true))
+      expect(dao.makeAssociations(preset1.id, firstAssocs)).toBe(Ok(true))
 
-      dao.getAssociationsFor(preset1).let { result ->
+      dao.getAssociationsFor(preset1.id).let { result ->
         expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
         val list = result.getOr(emptyList())
         expect(list).toHaveSize(4)
@@ -119,7 +85,7 @@ object CommonPresetAssocDaoTest {
       }
 
       val preset2 = EqPresetStub(EqPresetId(2)).apply { name = "Preset2" }
-      dao.setAsDefault(preset2)
+//      dao.setAsDefault(preset2)
 
       val mediaId2 = 500L.asMediaId
       val albumId2 = 50L.asAlbumId
@@ -129,8 +95,8 @@ object CommonPresetAssocDaoTest {
         PresetAssociation.makeForAlbum(albumId2),
         PresetAssociation.makeForMedia(mediaId2)
       )
-      expect(dao.makeAssociations(preset1, secondAssocs)).toBe(Ok(true))
-      dao.getAssociationsFor(preset1).let { result ->
+      expect(dao.makeAssociations(preset1.id, secondAssocs)).toBe(Ok(true))
+      dao.getAssociationsFor(preset1.id).let { result ->
         expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
         val list = result.getOr(emptyList())
         expect(list).toHaveSize(3)
@@ -139,7 +105,7 @@ object CommonPresetAssocDaoTest {
         expect(list[2]).toBe(PresetAssociation.makeForOutput(output2))
       }
 
-      dao.getAssociationsFor(preset2).let { result ->
+      dao.getAssociationsFor(preset2.id).let { result ->
         expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
         val list = result.getOr(emptyList())
         expect(list).toHaveSize(1)
@@ -177,9 +143,9 @@ object CommonPresetAssocDaoTest {
         PresetAssociation.makeForOutput(output),
         PresetAssociation.makeForMedia(mediaId)
       )
-      expect(dao.makeAssociations(preset, assocs)).toBe(Ok(true))
+      expect(dao.makeAssociations(preset.id, assocs)).toBe(Ok(true))
 
-      val result = dao.getAssociationsFor(preset)
+      val result = dao.getAssociationsFor(preset.id)
       expect(result).toBeInstanceOf<Ok<List<PresetAssociation>>>()
       val list = result.getOr(emptyList())
       expect(list).toHaveSize(3)

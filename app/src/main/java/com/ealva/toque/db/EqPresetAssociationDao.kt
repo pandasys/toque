@@ -26,7 +26,6 @@ import com.ealva.toque.persist.MediaId
 import com.ealva.toque.persist.asAlbumId
 import com.ealva.toque.persist.asMediaId
 import com.ealva.toque.persist.reify
-import com.ealva.toque.service.media.EqPreset
 import com.ealva.welite.db.Database
 import com.ealva.welite.db.Transaction
 import com.ealva.welite.db.TransactionInProgress
@@ -52,20 +51,17 @@ interface EqPresetAssociationDao {
   fun TransactionInProgress.deleteMediaAndAlbumAssociations()
 
   /**
-   * Delete any current default association and then set this [preset] as the default preset. The
-   * default preset will be used when there is no song, album, or connection associated preset.
+   * Associate [eqPresetId] with the list of associations.
    */
-  suspend fun setAsDefault(preset: EqPreset): BoolResult
+  suspend fun makeAssociations(
+    eqPresetId: EqPresetId,
+    associations: List<PresetAssociation>
+  ): BoolResult
 
   /**
-   * Associate [preset] with the list of associations.
+   * Get the list of associations for [eqPresetId]
    */
-  suspend fun makeAssociations(preset: EqPreset, associations: List<PresetAssociation>): BoolResult
-
-  /**
-   * Get the list of associations for [preset]
-   */
-  suspend fun getAssociationsFor(preset: EqPreset): AssociationListResult
+  suspend fun getAssociationsFor(eqPresetId: EqPresetId): AssociationListResult
 
   suspend fun getPreferredId(
     mediaId: MediaId,
@@ -84,43 +80,48 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
   override fun TransactionInProgress.deleteMediaAndAlbumAssociations() {
     EqPresetAssociationTable.delete {
       (associationType eq PresetAssociationType.Media.id) or
-      (associationType eq PresetAssociationType.Album.id)
+        (associationType eq PresetAssociationType.Album.id)
     }
   }
 
   private fun Transaction.insertAssociation(
-    preset: EqPreset,
+    eqPresetId: EqPresetId,
     association: PresetAssociation
   ): Long = insertAssociation(
-    preset.id,
-    preset.isSystemPreset,
+    eqPresetId,
     association.type.id,
     association.id
   )
 
   override suspend fun makeAssociations(
-    preset: EqPreset,
+    eqPresetId: EqPresetId,
     associations: List<PresetAssociation>
-  ): BoolResult = runSuspendCatching { db.transaction { doMakeAssociations(preset, associations) } }
-
-
-  private fun Transaction.doMakeAssociations(
-    preset: EqPreset,
-    associations: List<PresetAssociation>
-  ): Boolean = associations.isNotEmpty().also {
-    deletePresetAssociations(preset.id)
-    associations.forEach { assoc ->
-      if (insertAssociation(preset, assoc) < 1)
-        throw DaoException("Could not insert $preset/$assoc")
+  ): BoolResult = runSuspendCatching {
+    db.transaction {
+      doMakeAssociations(
+        eqPresetId,
+        associations
+      )
     }
   }
 
-  override suspend fun getAssociationsFor(preset: EqPreset) = runSuspendCatching {
+
+  private fun Transaction.doMakeAssociations(
+    eqPresetId: EqPresetId,
+    associations: List<PresetAssociation>
+  ): Boolean = associations.isNotEmpty().also {
+    deletePresetAssociations(eqPresetId)
+    associations.forEach { assoc ->
+      if (insertAssociation(eqPresetId, assoc) < 1)
+        throw DaoException("Could not insert $eqPresetId/$assoc")
+    }
+  }
+
+  override suspend fun getAssociationsFor(eqPresetId: EqPresetId) = runSuspendCatching {
     db.query {
       QUERY_ASSOCIATIONS
         .sequence(bind = { bindings ->
-          bindings[BIND_PRESET_ID] = preset.id.value
-          bindings[BIND_IS_SYSTEM] = preset.isSystemPreset
+          bindings[BIND_PRESET_ID] = eqPresetId.value
         }) { cursor -> PresetAssociation.reify(cursor[associationType], cursor[associationId]) }
         .toList()
     }
@@ -148,51 +149,27 @@ private class EqPresetAssociationDaoImpl(val db: Database) : EqPresetAssociation
 
   private fun Transaction.insertAssociation(
     assocPresetId: EqPresetId,
-    isSystem: Boolean,
     assocType: Int,
     assocId: Long
   ): Long = run {
     INSERT_STATEMENT.insert {
       it[presetId] = assocPresetId.value
-      it[isSystemPreset] = isSystem
       it[associationType] = assocType
       it[associationId] = assocId
     }
-  }
-
-  private fun Transaction.deleteAssociation(
-    association: PresetAssociation
-  ): Long = run {
-    EqPresetAssociationTable.delete {
-      (associationType eq association.type.id) and (associationId eq association.id)
-    }
-  }
-
-  override suspend fun setAsDefault(preset: EqPreset): BoolResult =
-    runSuspendCatching {
-      (db.transaction { doSetAsDefault(preset) } > 0).also { rc ->
-        if (!rc) throw DaoInsertFailedException("Error setting $preset as default.")
-      }
-    }
-
-  private fun Transaction.doSetAsDefault(preset: EqPreset): Long {
-    deleteAssociation(PresetAssociation.DEFAULT)
-    return insertAssociation(preset, PresetAssociation.DEFAULT)
   }
 }
 
 private val INSERT_STATEMENT = EqPresetAssociationTable.insertValues {
   it[presetId].bindArg()
-  it[isSystemPreset].bindArg()
   it[associationType].bindArg()
   it[associationId].bindArg()
 }
 
 private val BIND_PRESET_ID = EqPresetAssociationTable.presetId.bindArg()
-private val BIND_IS_SYSTEM = EqPresetAssociationTable.isSystemPreset.bindArg()
 private val QUERY_ASSOCIATIONS = EqPresetAssociationTable
   .selects { listOf(associationType, associationId) }
-  .where { (presetId eq BIND_PRESET_ID) and (isSystemPreset eq BIND_IS_SYSTEM) }
+  .where { presetId eq BIND_PRESET_ID }
   .orderByAsc { associationType }
 
 private val DELETE_PRESET = EqPresetAssociationTable.deleteWhere {
@@ -206,13 +183,13 @@ private val QUERY_DEFAULT = EqPresetAssociationTable
   .select { presetId }
   .where {
     ((associationType eq PresetAssociationType.Media.id) and (associationId eq BIND_MEDIA_ID)) or
-    ((associationType eq PresetAssociationType.Album.id) and (associationId eq BIND_ALBUM_ID)) or
-    ((associationType eq PresetAssociationType.Output.id) and (associationId eq BIND_ROUTE_ID)) or
-    (associationType eq PresetAssociationType.Default.id)
+      ((associationType eq PresetAssociationType.Album.id) and (associationId eq BIND_ALBUM_ID)) or
+      ((associationType eq PresetAssociationType.Output.id) and (associationId eq BIND_ROUTE_ID)) or
+      (associationType eq PresetAssociationType.Default.id)
   }.orderByAsc { associationType }
 
 /**
- * The [id] for this type must not be changed for 2 reasons:
+ * The [id] for this type must NOT be changed for 2 reasons:
  * 1. The [id] is persisted
  * 2. The [id] is used to order the preferred association
  *

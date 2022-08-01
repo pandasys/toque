@@ -22,6 +22,7 @@ import com.ealva.toque.db.CategoryMediaList
 import com.ealva.toque.persist.MediaIdList
 import com.ealva.toque.prefs.PlayUpNextAction
 import com.ealva.toque.service.audio.LocalAudioQueueState
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel
 import com.ealva.toque.ui.audio.LocalAudioQueueViewModel.PromptResult
 import com.ealva.toque.ui.common.DialogPrompt
@@ -51,12 +52,8 @@ class LocalAudioQueueViewModelSpy : LocalAudioQueueViewModel {
     return _shuffleReturn
   }
 
-  override fun playNext(mediaList: CategoryMediaList) {
-  }
-
-  override fun addToUpNext(categoryMediaList: CategoryMediaList) {
-  }
-
+  override fun playNext(mediaList: CategoryMediaList) = Unit
+  override fun addToUpNext(categoryMediaList: CategoryMediaList) = Unit
   var _addToPlaylistReturn: PromptResult =
     PromptResult.Executed
 
@@ -64,35 +61,22 @@ class LocalAudioQueueViewModelSpy : LocalAudioQueueViewModel {
     return _addToPlaylistReturn
   }
 
-  override fun showPrompt(prompt: DialogPrompt) {
-  }
-
-  override fun clearPrompt() {
-  }
-
-  override fun goToIndexMaybePlay(index: Int) {}
-
-  override fun nextList() {}
-
-  override fun next() {}
-
-  override fun nextRepeatMode() {}
-
-  override fun nextShuffleMode() {}
-
-  override fun previousList() {}
-
-  override fun previous() {}
-
-  override fun seekTo(position: Millis) {}
-
-  override fun toggleEqMode() {}
-
-  override fun togglePlayPause() {}
-
-  override fun moveQueueItem(from: Int, to: Int) {}
-
-  override fun removeFromQueue(position: Int, item: QueueAudioItem) {}
-
-  override fun setCurrentPreset(id: EqPresetId) {}
+  override fun showPrompt(prompt: DialogPrompt) = Unit
+  override fun clearPrompt() = Unit
+  override fun goToIndexMaybePlay(index: Int) = Unit
+  override fun nextList() = Unit
+  override fun next() = Unit
+  override fun nextRepeatMode() = Unit
+  override fun nextShuffleMode() = Unit
+  override fun previousList() = Unit
+  override fun previous() = Unit
+  override fun seekTo(position: Millis) = Unit
+  override fun toggleEqMode() = Unit
+  override fun togglePlayPause() = Unit
+  override fun moveQueueItem(from: Int, to: Int) = Unit
+  override fun removeFromQueue(position: Int, item: QueueAudioItem) = Unit
+  override fun setCurrentPreset(id: EqPresetId) = Unit
+  override fun setPresetOverride(preset: EqPreset) = Unit
+  override fun setPresetOverride(id: EqPresetId) = Unit
+  override fun clearPresetOverride() = Unit
 }

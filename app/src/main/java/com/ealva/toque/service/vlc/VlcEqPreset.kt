@@ -27,8 +27,8 @@ import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
 import com.ealva.toque.db.NullEqPresetDao
 import com.ealva.toque.service.media.EqPreset
-import com.ealva.toque.service.media.EqPreset.Companion.BAND_DEFAULT
 import com.ealva.toque.service.media.EqPreset.BandData
+import com.ealva.toque.service.media.EqPreset.Companion.BAND_DEFAULT
 import com.github.michaelbull.result.onFailure
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList

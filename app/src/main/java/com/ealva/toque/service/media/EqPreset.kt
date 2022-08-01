@@ -45,6 +45,11 @@ interface EqPreset {
     fun clone(): BandData
 
     companion object {
+      val FLAT: BandData = PresetBandData(
+        Amp.NONE,
+        List(10) { Amp.NONE }.toPersistentList()
+      )
+
       operator fun invoke(preAmp: Amp, bands: List<Amp>): BandData {
         return PresetBandData(preAmp, bands.toPersistentList())
       }

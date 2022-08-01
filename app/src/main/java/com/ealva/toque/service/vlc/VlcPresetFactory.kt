@@ -22,16 +22,26 @@ import com.ealva.ealvalog.lazyLogger
 import com.ealva.toque.audioout.AudioOutputRoute
 import com.ealva.toque.common.EqPresetId
 import com.ealva.toque.common.getOrThrow
+import com.ealva.toque.db.BoolResult
 import com.ealva.toque.db.DaoResult
 import com.ealva.toque.db.EqPresetAssociationDao
 import com.ealva.toque.db.EqPresetDao
 import com.ealva.toque.db.EqPresetData
+import com.ealva.toque.db.PresetAssociation
+import com.ealva.toque.db.PresetAssociationType
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPreset.BandData
 import com.ealva.toque.service.media.EqPresetFactory
 import com.ealva.toque.service.media.EqPresetFactory.Companion.DEFAULT_SYSTEM_PRESET_NAME
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation.Album
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation.Bluetooth
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation.Default
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation.Song
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation.Speaker
+import com.ealva.toque.service.media.EqPresetFactory.EqPresetAssociation.WiredHeadset
 import com.ealva.toque.service.vlc.VlcEqPreset.Companion.setNativeEqValues
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Result
@@ -45,6 +55,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.videolan.libvlc.MediaPlayer
 
+private val PresetAssociation.asEqPresetAssociation: EqPresetAssociation
+  get() = when (type) {
+    PresetAssociationType.Media -> Song
+    PresetAssociationType.Album -> Album
+    PresetAssociationType.Output -> outputRoute.asEqPresetAssociation
+    PresetAssociationType.Default -> Default
+  }
+
+private val AudioOutputRoute.asEqPresetAssociation: EqPresetAssociation
+  get() = when (this) {
+    AudioOutputRoute.Speaker -> Speaker
+    AudioOutputRoute.HeadphoneJack -> WiredHeadset
+    AudioOutputRoute.Bluetooth -> Bluetooth
+  }
+
 private val BandData.asPreAmpAndBands: EqPresetDao.PreAmpAndBands
   get() = EqPresetDao.PreAmpAndBands(preAmp, bandValues.toTypedArray())
 
@@ -53,10 +78,15 @@ private val EqPresetData.asBandData: BandData
 
 private val LOG by lazyLogger(VlcPresetFactory::class)
 
+private const val ASSOC_ERROR = "Error associating with %s %s %s"
+
 class VlcPresetFactory(
   private val eqPresetDao: EqPresetDao,
   private val eqPresetAssocDao: EqPresetAssociationDao
 ) : EqPresetFactory {
+  override val nonePreset: EqPreset
+    get() = VlcEqPreset.NONE
+
   override suspend fun allPresets(): StateFlow<List<EqPreset>> {
     cacheAllPresets()
     updateAllPresetsFlow()
@@ -66,8 +96,7 @@ class VlcPresetFactory(
   private suspend fun cacheAllPresets(): List<EqPreset> {
     return buildList {
       addAll(
-        (0 until systemPresetCount)
-          .mapNotNull { index -> systemPresetOrNull(EqPresetId(index)) }
+        (0 until systemPresetCount).mapNotNull { index -> systemPresetOrNull(EqPresetId(index)) }
       )
 
       addAll(
@@ -86,7 +115,7 @@ class VlcPresetFactory(
    * 1000, so they should never clash with system IDs.
    */
   override suspend fun getPreset(id: EqPresetId): DaoResult<EqPreset> = runSuspendCatching {
-    if (id.value in 0..systemPresetCount) getSystemPreset(id) else getUserPreset(id)
+    if (id.value in 0 until systemPresetCount) getSystemPreset(id) else getUserPreset(id)
   }
 
   private suspend fun getUserPreset(id: EqPresetId): EqPreset = getOrPut(id) {
@@ -157,6 +186,24 @@ class VlcPresetFactory(
     outputRoute: AudioOutputRoute
   ): DaoResult<EqPreset> = doGetPreferred(mediaId, albumId, outputRoute)
 
+  override suspend fun defaultPreset(): EqPreset = getPreset(defaultId)
+    .getOrElse { getSystemPreset(EqPresetId(0)) }
+
+  override suspend fun makeAssociations(
+    eqPreset: EqPreset,
+    mediaId: MediaId,
+    albumId: AlbumId,
+    associations: List<EqPresetAssociation>
+  ): BoolResult = eqPresetAssocDao
+    .makeAssociations(eqPreset.id, associations.mapToDaoAssociations(mediaId, albumId))
+    .onFailure { cause -> LOG.e(cause) { it(ASSOC_ERROR, eqPreset, mediaId, albumId) } }
+
+  override suspend fun getAssociations(eqPreset: EqPreset) = eqPresetAssocDao
+    .getAssociationsFor(eqPreset.id)
+    .onFailure { cause -> LOG.e(cause) { it("Error getting associations for %s", eqPreset) } }
+    .getOrElse { emptyList() }
+    .map { association -> association.asEqPresetAssociation }
+
   private suspend fun doGetPreferred(
     mediaId: MediaId,
     albumId: AlbumId,
@@ -166,9 +213,6 @@ class VlcPresetFactory(
     .map { id -> getPreset(id) }
     .onFailure { cause -> LOG.e(cause) { it("Error getting preferred preset") } }
     .getOrElse { getPreset(defaultId) }
-
-  override val nonePreset: EqPreset
-    get() = VlcEqPreset.NONE
 
   /**
    * There will likely be a very limited number of presets active in normal use, so we will keep
@@ -210,4 +254,18 @@ class VlcPresetFactory(
     }
 
   private fun nameOfSystemPreset(index: Int) = MediaPlayer.Equalizer.getPresetName(index)
+}
+
+private fun List<EqPresetAssociation>.mapToDaoAssociations(
+  mediaId: MediaId,
+  albumId: AlbumId
+): List<PresetAssociation> = map { eqPresetAssociation ->
+  when (eqPresetAssociation) {
+    Default -> PresetAssociation.DEFAULT
+    Song -> PresetAssociation.makeForMedia(mediaId)
+    Album -> PresetAssociation.makeForAlbum(albumId)
+    Speaker -> PresetAssociation.makeForOutput(AudioOutputRoute.Speaker)
+    WiredHeadset -> PresetAssociation.makeForOutput(AudioOutputRoute.HeadphoneJack)
+    Bluetooth -> PresetAssociation.makeForOutput(AudioOutputRoute.Bluetooth)
+  }
 }

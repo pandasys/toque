@@ -34,8 +34,8 @@ object DbModule {
     single { AlbumDao(db = get()) }
     single { ArtistAlbumDao() }
     single { ComposerDao(db = get()) }
-    single { EqPresetDao(db = get()) }
     single { EqPresetAssociationDao(db = get()) }
+    single { EqPresetDao(db = get()) }
     single { PlaylistDao(db = get()) }
     single { SchemaDao(db = get()) }
     single {

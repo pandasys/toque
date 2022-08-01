@@ -26,6 +26,7 @@ import com.ealva.toque.common.PlaybackRate
 import com.ealva.toque.persist.AlbumId
 import com.ealva.toque.persist.MediaId
 import com.ealva.toque.prefs.DuckAction
+import com.ealva.toque.service.audio.SharedPlayerState.EqPresetBandData
 import com.ealva.toque.service.media.EqMode
 import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.media.EqPresetFactory
@@ -37,7 +38,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private val LOG by lazyLogger(SharedPlayerState::class)
@@ -81,10 +81,24 @@ interface SharedPlayerState {
   val outputRoute: StateFlow<AudioOutputRoute>
 
   /**
-   * EqPreset equals is identity. So when editing preset and setting that preset, ensure the preset
-   * is a copy so that this flow will emit.
+   * EqPreset equality does not change for the life of the preset. However, the internal data
+   * of the native preset does, so we externalize that to detect changes.
    */
-  val currentPreset: StateFlow<EqPreset>
+  data class EqPresetBandData(
+    val eqPreset: EqPreset,
+    val bandData: EqPreset.BandData
+  ) {
+    companion object {
+      val FLAT = EqPresetBandData(EqPreset.NONE, EqPreset.BandData.FLAT)
+    }
+  }
+
+  /**
+   * Currently set [EqPreset]. If [eqMode] is [EqMode.Off] then will be special "None" preset,
+   * where [EqPreset.isValid] = false, unless an override has be set via [setPresetOverride]. An
+   * EqPreset editor may set override to prevent it from changing during editing.
+   */
+  val currentPreset: StateFlow<EqPresetBandData>
 
   /** User requested OpenSL ES or AudioTrack */
   val outputModule: StateFlow<AudioOutputModule>
@@ -109,6 +123,22 @@ interface SharedPlayerState {
    * media changes during playback.
    */
   fun setCurrent(preset: EqPreset)
+
+  /**
+   * Set a [preset] which overrides any changes and remains the selected preset regardless of other
+   * calls to change the current preset.
+   *
+   * Throws [IllegalArgumentException] if [preset] is not valid, ie the "none" preset
+   */
+  fun setPresetOverride(preset: EqPreset)
+
+  fun setPresetOverride(id: EqPresetId)
+
+  /**
+   * Clears any preset override previously set by [setPresetOverride] and reverts to the last
+   * "desired" preset which has been
+   */
+  fun clearPresetOverride()
 
   companion object {
     /**
@@ -151,7 +181,9 @@ private class SharedPlayerStateImpl(
   private val dispatcher: CoroutineDispatcher
 ) : SharedPlayerState {
   private val nonePreset = factory.nonePreset
-  override val currentPreset = MutableStateFlow(nonePreset)
+  private var presetOverride: EqPreset? = null
+  private var lastDesired: EqPreset = nonePreset
+  override val currentPreset = MutableStateFlow(EqPresetBandData.FLAT)
   override var duckedState: DuckAction = DuckAction.None
 
   override fun setPreferred(
@@ -159,14 +191,13 @@ private class SharedPlayerStateImpl(
     albumId: AlbumId
   ) {
     if (eqMode.value.isOff()) {
-      currentPreset.update { nonePreset }
+      setCurrent(nonePreset)
     } else {
       scope.launch(dispatcher) {
-        currentPreset.update {
-          factory.getPreferred(mediaId, albumId, outputRoute.value)
-            .onFailure { cause -> LOG.e(cause) { it("Error getting preferred preset") } }
-            .getOrElse { nonePreset }
-        }
+        setCurrent(factory.getPreferred(mediaId, albumId, outputRoute.value)
+          .onFailure { cause -> LOG.e(cause) { it("Error getting preferred preset") } }
+          .getOrElse { nonePreset }
+        )
       }
     }
   }
@@ -182,7 +213,28 @@ private class SharedPlayerStateImpl(
   }
 
   override fun setCurrent(preset: EqPreset) {
-    currentPreset.update { preset }
+    lastDesired = preset
+    if (presetOverride == null)
+      currentPreset.value = EqPresetBandData(preset, preset.getAllValues())
+  }
+
+  override fun setPresetOverride(preset: EqPreset) {
+    require(preset.isValid)
+    presetOverride = preset
+    currentPreset.value = EqPresetBandData(preset, preset.getAllValues())
+  }
+
+  override fun setPresetOverride(id: EqPresetId) {
+    scope.launch(dispatcher) {
+      factory.getPreset(id)
+        .onFailure { cause -> LOG.e(cause) { it("Error setting preset override %s", id) } }
+        .onSuccess { preset -> setPresetOverride(preset) }
+    }
+  }
+
+  override fun clearPresetOverride() {
+    presetOverride = null
+    setCurrent(lastDesired)
   }
 }
 
@@ -191,9 +243,12 @@ object NullSharedPlayerState : SharedPlayerState {
   override val playbackRate = MutableStateFlow(PlaybackRate.NORMAL)
   override val eqMode = MutableStateFlow(EqMode.Off)
   override val outputRoute = MutableStateFlow(AudioOutputRoute.Speaker)
-  override val currentPreset = MutableStateFlow(EqPreset.NONE)
+  override val currentPreset = MutableStateFlow(EqPresetBandData.FLAT)
   override val outputModule = MutableStateFlow(AudioOutputModule.AudioTrack)
   override fun setPreferred(mediaId: MediaId, albumId: AlbumId) = Unit
   override fun setCurrent(id: EqPresetId) = Unit
   override fun setCurrent(preset: EqPreset) = Unit
+  override fun setPresetOverride(preset: EqPreset) = Unit
+  override fun setPresetOverride(id: EqPresetId) = Unit
+  override fun clearPresetOverride() = Unit
 }

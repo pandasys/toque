@@ -39,6 +39,7 @@ import com.ealva.toque.service.audio.LocalAudioQueue
 import com.ealva.toque.service.audio.LocalAudioQueueState
 import com.ealva.toque.service.audio.NullLocalAudioQueue
 import com.ealva.toque.service.audio.TransitionType.Manual
+import com.ealva.toque.service.media.EqPreset
 import com.ealva.toque.service.queue.ClearQueue
 import com.ealva.toque.service.queue.PlayNow
 import com.ealva.toque.service.queue.PlayableMediaQueue
@@ -112,6 +113,9 @@ interface LocalAudioQueueViewModel {
   fun moveQueueItem(from: Int, to: Int)
   fun removeFromQueue(position: Int, item: QueueAudioItem)
   fun setCurrentPreset(id: EqPresetId)
+  fun setPresetOverride(preset: EqPreset)
+  fun setPresetOverride(id: EqPresetId)
+  fun clearPresetOverride()
 
   companion object {
     operator fun invoke(
@@ -331,6 +335,10 @@ class LocalAudioQueueViewModelImpl(
   }
 
   override fun setCurrentPreset(id: EqPresetId) = localAudioQueue.setCurrentPreset(id)
+  override fun setPresetOverride(preset: EqPreset) = localAudioQueue.setPresetOverride(preset)
+  override fun setPresetOverride(id: EqPresetId) = localAudioQueue.setPresetOverride(id)
+
+  override fun clearPresetOverride() = localAudioQueue.clearPresetOverride()
 
   override suspend fun addToPlaylist(mediaIdList: MediaIdList): PromptResult {
     val deferred = CompletableDeferred<PromptResult>()

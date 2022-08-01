@@ -19,14 +19,13 @@ package com.ealva.toque.db
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ealva.toque.test.shared.CoroutineRule
+import com.ealva.toque.sharedtest.CoroutineRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.BeforeTest
-import com.ealva.toque.test.db.CommonPresetAssocDaoTest as Common
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -42,18 +41,8 @@ class EqPresetAssociationDaoTest {
   }
 
   @Test
-  fun testSetDefaultPreset() = runTest {
-    Common.testSetAsDefault(appCtx, coroutineRule.testDispatcher)
-  }
-
-  @Test
-  fun testReplaceDefault() = runTest {
-    Common.testReplaceDefault(appCtx, coroutineRule.testDispatcher)
-  }
-
-  @Test
   fun testMakeAssociations() = runTest {
-    Common.testMakeAssociations(appCtx, coroutineRule.testDispatcher)
+    CommonPresetAssocDaoTest.testMakeAssociations(appCtx, coroutineRule.testDispatcher)
   }
 
   @Test
